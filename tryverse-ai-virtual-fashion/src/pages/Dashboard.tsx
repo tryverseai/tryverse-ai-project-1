@@ -1,0 +1,109 @@
+import { useState } from "react";
+import { Navbar } from "@/components/Navbar";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  Package, BarChart3, Settings, Key, Code, LayoutDashboard, Cpu, CreditCard
+} from "lucide-react";
+import { OverviewTab } from "@/components/dashboard/OverviewTab";
+import { ApiKeysTab } from "@/components/dashboard/ApiKeysTab";
+import { WidgetTab } from "@/components/dashboard/WidgetTab";
+import { AnalyticsTab } from "@/components/dashboard/AnalyticsTab";
+import { ProductsTab } from "@/components/dashboard/ProductsTab";
+import { SettingsTab } from "@/components/dashboard/SettingsTab";
+import { BillingTab } from "@/components/dashboard/BillingTab";
+import { TechnologySection } from "@/components/TechnologySection";
+
+const sidebarItems = [
+  { icon: LayoutDashboard, label: "Overview" },
+  { icon: BarChart3, label: "Analytics" },
+  { icon: Package, label: "Products" },
+  { icon: Key, label: "API Keys" },
+  { icon: Code, label: "Widget" },
+  { icon: CreditCard, label: "Billing" },
+  { icon: Cpu, label: "Technology" },
+  { icon: Settings, label: "Settings" },
+];
+
+const tabComponents: Record<string, React.FC> = {
+  Overview: OverviewTab,
+  Analytics: AnalyticsTab,
+  Products: ProductsTab,
+  "API Keys": ApiKeysTab,
+  Widget: WidgetTab,
+  Billing: BillingTab,
+  Settings: SettingsTab,
+};
+
+const Dashboard = () => {
+  const [activeTab, setActiveTab] = useState("Overview");
+  const { user } = useAuth();
+  const brandName = user?.user_metadata?.brand_name || "Your Brand";
+
+  const renderContent = () => {
+    if (activeTab === "Technology") {
+      return <TechnologySection />;
+    }
+    const ActiveComponent = tabComponents[activeTab] || OverviewTab;
+    return <ActiveComponent />;
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <main className="pt-20">
+        <div className="flex">
+          {/* Sidebar */}
+          <aside className="hidden lg:flex flex-col w-60 min-h-[calc(100vh-5rem)] border-r border-border p-4 pt-6 sticky top-20">
+            <div className="mb-6">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Brand Dashboard</p>
+              <p className="text-sm font-semibold text-foreground">{brandName}</p>
+            </div>
+            <nav className="space-y-1">
+              {sidebarItems.map((item) => (
+                <button
+                  key={item.label}
+                  onClick={() => setActiveTab(item.label)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    activeTab === item.label
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </aside>
+
+          {/* Mobile tabs */}
+          <div className="lg:hidden fixed top-20 left-0 right-0 z-30 bg-background border-b border-border overflow-x-auto">
+            <div className="flex px-4 py-2 gap-1">
+              {sidebarItems.map((item) => (
+                <button
+                  key={item.label}
+                  onClick={() => setActiveTab(item.label)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                    activeTab === item.label
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <item.icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Main content */}
+          <div className="flex-1 p-6 md:p-8 lg:pt-8 pt-20">
+            {renderContent()}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default Dashboard;

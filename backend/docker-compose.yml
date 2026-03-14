@@ -1,0 +1,59 @@
+version: '3.9'
+
+services:
+  backend:
+    build: .
+    container_name: tryverse-backend
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - tryverse
+
+  worker:
+    build: .
+    container_name: tryverse-worker
+    command: node dist/services/queue/worker.js
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - tryverse
+    deploy:
+      replicas: 2   # Scale workers horizontally
+
+  redis:
+    image: redis:7-alpine
+    container_name: tryverse-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - tryverse
+
+volumes:
+  redis_data:
+
+networks:
+  tryverse:
+    driver: bridge

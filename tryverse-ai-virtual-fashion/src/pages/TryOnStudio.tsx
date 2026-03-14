@@ -1,0 +1,451 @@
+import { useState, useRef, useCallback } from "react";
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
+import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
+import { Upload, Camera, User, Scan, Check, RotateCcw, ArrowRight, Glasses, ShoppingBag, Shirt, AlertCircle, X } from "lucide-react";
+import { toast } from "sonner";
+import { uploadImage, startTryOn, type TryOnCategory } from "@/lib/backendApi";
+
+import modelMaleBefore from "@/assets/model-male-before.jpg";
+import modelFemaleBefore from "@/assets/model-female-before.jpg";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+type Mode = "upload" | "ai-model";
+type Phase = "select" | "uploading" | "processing" | "result" | "error";
+
+interface UploadedImage {
+  file: File;
+  previewUrl: string;
+  filePath?: string;
+}
+
+// ─── Active categories (V1) ───────────────────────────────────────────────────
+const categories: { id: TryOnCategory; label: string; icon: typeof Shirt }[] = [
+  { id: "clothing", label: "Clothing",  icon: Shirt        },
+  { id: "bags",     label: "Bags",      icon: ShoppingBag  },
+  { id: "glasses",  label: "Eyewear",   icon: Glasses      },
+];
+
+// ─── AI demo models ───────────────────────────────────────────────────────────
+const aiModels = [
+  { id: "female-slim",     name: "Ava",    bodyType: "Slim",      image: modelFemaleBefore, gender: "Female" },
+  { id: "female-athletic", name: "Maya",   bodyType: "Athletic",  image: modelFemaleBefore, gender: "Female" },
+  { id: "female-plus",     name: "Jordan", bodyType: "Plus Size", image: modelFemaleBefore, gender: "Female" },
+  { id: "male-slim",       name: "James",  bodyType: "Slim",      image: modelMaleBefore,   gender: "Male"   },
+  { id: "male-athletic",   name: "Marcus", bodyType: "Athletic",  image: modelMaleBefore,   gender: "Male"   },
+  { id: "male-tall",       name: "David",  bodyType: "Tall",      image: modelMaleBefore,   gender: "Male"   },
+];
+
+// ─── Component ────────────────────────────────────────────────────────────────
+const TryOnStudio = () => {
+  const [mode, setMode] = useState<Mode>("upload");
+  const [phase, setPhase] = useState<Phase>("select");
+  const [selectedCategory, setSelectedCategory] = useState<TryOnCategory>("clothing");
+  const [genderFilter, setGenderFilter] = useState<"Female" | "Male">("Female");
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+
+  // Upload mode state
+  const [personImage, setPersonImage]   = useState<UploadedImage | null>(null);
+  const [productImage, setProductImage] = useState<UploadedImage | null>(null);
+
+  // Result state
+  const [resultUrl, setResultUrl]       = useState<string | null>(null);
+  const [errorMsg, setErrorMsg]         = useState<string | null>(null);
+  const [processingTime, setProcessingTime] = useState<number | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string>("");
+
+  const personInputRef  = useRef<HTMLInputElement>(null);
+  const productInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Image selection helpers ──────────────────────────────────────────────
+  const handleFileSelect = useCallback((
+    file: File,
+    setter: (img: UploadedImage) => void
+  ) => {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error("Please upload a JPG, PNG, or WebP image");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be under 10MB");
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setter({ file, previewUrl });
+  }, []);
+
+  const handleDrop = useCallback((
+    e: React.DragEvent,
+    setter: (img: UploadedImage) => void
+  ) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file, setter);
+  }, [handleFileSelect]);
+
+  // ── Core try-on flow ─────────────────────────────────────────────────────
+  const handleTryOn = async () => {
+    if (!personImage || !productImage) {
+      toast.error("Please upload both your photo and a product image");
+      return;
+    }
+
+    try {
+      setPhase("uploading");
+      setErrorMsg(null);
+
+      // Step 1: Upload person image
+      setUploadProgress("Uploading your photo…");
+      const personUpload = await uploadImage(personImage.file, 'person');
+
+      // Step 2: Upload product image
+      setUploadProgress("Uploading product image…");
+      const productUpload = await uploadImage(productImage.file, 'product');
+
+      // Step 3: Start AI inference
+      setUploadProgress("Starting AI try-on…");
+      setPhase("processing");
+
+      const result = await startTryOn({
+        personImagePath: personUpload.filePath,
+        productImagePath: productUpload.filePath,
+        category: selectedCategory,
+        productDescription: `${selectedCategory} item for virtual try-on`,
+      });
+
+      if (result.status === 'completed' && result.resultUrl) {
+        setResultUrl(result.resultUrl);
+        setProcessingTime(result.processingTimeMs || null);
+        setPhase("result");
+        toast.success("Virtual try-on complete!");
+      } else if (result.status === 'failed') {
+        throw new Error(result.error || "AI processing failed. Please try again.");
+      } else if (result.status === 'queued' || result.status === 'processing') {
+        // Async mode — poll for result
+        await pollForResult(result.tryonId);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      setErrorMsg(msg);
+      setPhase("error");
+      toast.error(msg);
+    }
+  };
+
+  const pollForResult = async (tryonId: string) => {
+    const { pollTryOnStatus } = await import("@/lib/backendApi");
+    const maxAttempts = 40;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const status = await pollTryOnStatus(tryonId);
+      if (status.status === 'completed' && status.resultUrl) {
+        setResultUrl(status.resultUrl);
+        setProcessingTime(status.processingTimeMs || null);
+        setPhase("result");
+        toast.success("Virtual try-on complete!");
+        return;
+      }
+      if (status.status === 'failed') {
+        throw new Error(status.error || "Processing failed");
+      }
+    }
+    throw new Error("Try-on timed out. Please try again.");
+  };
+
+  const handleReset = () => {
+    setPhase("select");
+    setPersonImage(null);
+    setProductImage(null);
+    setResultUrl(null);
+    setErrorMsg(null);
+    setProcessingTime(null);
+    setSelectedModel(null);
+    setUploadProgress("");
+  };
+
+  const filteredModels = aiModels.filter((m) => m.gender === genderFilter);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <main className="pt-24 pb-20">
+        <div className="max-w-7xl mx-auto px-6">
+
+          {/* Header */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
+            <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-3">
+              Virtual Try-On Studio
+            </h1>
+            <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+              Upload your photo and a product image — our AI will show you exactly how it looks.
+            </p>
+          </motion.div>
+
+          {/* Mode selector */}
+          <div className="flex justify-center gap-2 mb-6">
+            {([
+              { id: "upload" as Mode,   label: "Upload Photo", icon: Upload },
+              { id: "ai-model" as Mode, label: "AI Model Demo", icon: User  },
+            ] as const).map((m) => (
+              <button
+                key={m.id}
+                onClick={() => { setMode(m.id); handleReset(); }}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
+                  mode === m.id ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                <m.icon className="h-4 w-4" />
+                {m.label}
+                {m.id === "ai-model" && (
+                  <span className="text-[10px] bg-muted-foreground/20 rounded-full px-1.5 py-0.5">Demo</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Category selector */}
+          <div className="flex justify-center gap-2 mb-10">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => { setSelectedCategory(cat.id); setProductImage(null); }}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium transition-all ${
+                  selectedCategory === cat.id
+                    ? "bg-foreground/10 text-foreground border border-foreground/20"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <cat.icon className="h-3.5 w-3.5" />
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="max-w-5xl mx-auto">
+            <AnimatePresence mode="wait">
+
+              {/* ── SELECT PHASE ─────────────────────────────────────────── */}
+              {phase === "select" && mode === "upload" && (
+                <motion.div key="upload-select" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid md:grid-cols-2 gap-8">
+
+                  {/* Person Photo Upload */}
+                  <div className="bg-card rounded-2xl border border-border/50 p-6">
+                    <h3 className="font-display text-lg font-semibold text-foreground mb-1">Your Photo</h3>
+                    <p className="text-sm text-muted-foreground mb-5">Upload a clear front-facing photo</p>
+
+                    {personImage ? (
+                      <div className="relative rounded-xl overflow-hidden">
+                        <img src={personImage.previewUrl} alt="Your photo" className="w-full aspect-[3/4] object-cover" />
+                        <button
+                          onClick={() => setPersonImage(null)}
+                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-background/90 flex items-center justify-center hover:bg-background transition-colors"
+                        >
+                          <X className="h-4 w-4 text-foreground" />
+                        </button>
+                        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/90 rounded-full px-2 py-1">
+                          <Check className="h-3 w-3 text-foreground" />
+                          <span className="text-xs font-medium text-foreground">Photo uploaded</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className="border-2 border-dashed border-border rounded-xl p-10 text-center hover:border-foreground/30 transition-colors cursor-pointer"
+                        onClick={() => personInputRef.current?.click()}
+                        onDrop={(e) => handleDrop(e, setPersonImage)}
+                        onDragOver={(e) => e.preventDefault()}
+                      >
+                        <Camera className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                        <p className="text-sm font-medium text-foreground mb-1">Drop photo here or click to upload</p>
+                        <p className="text-xs text-muted-foreground">JPG, PNG or WebP · up to 10MB</p>
+                        <p className="text-xs text-muted-foreground mt-2">Best results: standing, good lighting, plain background</p>
+                      </div>
+                    )}
+                    <input ref={personInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                      onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], setPersonImage)} />
+                  </div>
+
+                  {/* Product Image Upload */}
+                  <div className="bg-card rounded-2xl border border-border/50 p-6">
+                    <h3 className="font-display text-lg font-semibold text-foreground mb-1">
+                      {selectedCategory === 'clothing' ? 'Clothing Item' : selectedCategory === 'bags' ? 'Bag / Accessory' : 'Eyewear'}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-5">Upload the product image to try on</p>
+
+                    {productImage ? (
+                      <div className="relative rounded-xl overflow-hidden">
+                        <img src={productImage.previewUrl} alt="Product" className="w-full aspect-[3/4] object-cover" />
+                        <button
+                          onClick={() => setProductImage(null)}
+                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-background/90 flex items-center justify-center hover:bg-background transition-colors"
+                        >
+                          <X className="h-4 w-4 text-foreground" />
+                        </button>
+                        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/90 rounded-full px-2 py-1">
+                          <Check className="h-3 w-3 text-foreground" />
+                          <span className="text-xs font-medium text-foreground">Product uploaded</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className="border-2 border-dashed border-border rounded-xl p-10 text-center hover:border-foreground/30 transition-colors cursor-pointer"
+                        onClick={() => productInputRef.current?.click()}
+                        onDrop={(e) => handleDrop(e, setProductImage)}
+                        onDragOver={(e) => e.preventDefault()}
+                      >
+                        <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                        <p className="text-sm font-medium text-foreground mb-1">Drop product image or click to upload</p>
+                        <p className="text-xs text-muted-foreground">JPG, PNG or WebP · up to 10MB</p>
+                        <p className="text-xs text-muted-foreground mt-2">Best results: product on white background, full item visible</p>
+                      </div>
+                    )}
+                    <input ref={productInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                      onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], setProductImage)} />
+
+                    <Button
+                      onClick={handleTryOn}
+                      disabled={!personImage || !productImage}
+                      className="w-full mt-6 gradient-primary text-primary-foreground shadow-soft"
+                    >
+                      Try It On <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* ── AI MODEL DEMO PHASE ───────────────────────────────────── */}
+              {phase === "select" && mode === "ai-model" && (
+                <motion.div key="demo-select" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6 text-center">
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                      Demo mode — shows example results. Switch to Upload Photo for real AI try-on.
+                    </p>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div className="bg-card rounded-2xl border border-border/50 p-6">
+                      <h3 className="font-display text-lg font-semibold text-foreground mb-1">Choose a Model</h3>
+                      <p className="text-sm text-muted-foreground mb-4">Select an AI model for demonstration</p>
+                      <div className="flex gap-2 mb-4">
+                        {(["Female", "Male"] as const).map((g) => (
+                          <button key={g} onClick={() => { setGenderFilter(g); setSelectedModel(null); }}
+                            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${genderFilter === g ? "bg-foreground text-background" : "bg-muted text-muted-foreground"}`}>
+                            {g}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {filteredModels.map((model) => (
+                          <button key={model.id} onClick={() => setSelectedModel(model.id)}
+                            className={`rounded-xl overflow-hidden border-2 transition-all ${selectedModel === model.id ? "border-foreground shadow-soft" : "border-border/50 hover:border-foreground/20"}`}>
+                            <div className="aspect-[3/4] relative">
+                              <img src={model.image} alt={model.name} className="w-full h-full object-cover" />
+                              <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-foreground/50 to-transparent">
+                                <p className="text-primary-foreground text-xs font-medium">{model.name}</p>
+                                <p className="text-primary-foreground/70 text-[10px]">{model.bodyType}</p>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-card rounded-2xl border border-border/50 p-6 flex flex-col items-center justify-center text-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                        <Upload className="h-7 w-7 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-display text-base font-semibold text-foreground mb-1">Real AI Try-On Available</p>
+                        <p className="text-sm text-muted-foreground">Switch to Upload Photo mode to try on your own products with live AI inference.</p>
+                      </div>
+                      <Button onClick={() => { setMode("upload"); handleReset(); }} className="gradient-primary text-primary-foreground shadow-soft gap-2">
+                        <Upload className="h-4 w-4" /> Upload Your Photo
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* ── UPLOADING PHASE ──────────────────────────────────────── */}
+              {phase === "uploading" && (
+                <motion.div key="uploading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-md mx-auto text-center py-20">
+                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                    className="w-16 h-16 rounded-full border-2 border-border border-t-foreground flex items-center justify-center mx-auto mb-6">
+                    <Upload className="h-6 w-6 text-foreground" />
+                  </motion.div>
+                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">Preparing Images</h3>
+                  <p className="text-sm text-muted-foreground">{uploadProgress}</p>
+                </motion.div>
+              )}
+
+              {/* ── PROCESSING PHASE ─────────────────────────────────────── */}
+              {phase === "processing" && (
+                <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-md mx-auto text-center py-20">
+                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    className="w-16 h-16 rounded-full border-2 border-border border-t-foreground flex items-center justify-center mx-auto mb-6">
+                    <Scan className="h-6 w-6 text-foreground" />
+                  </motion.div>
+                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">AI is Working</h3>
+                  <p className="text-sm text-muted-foreground">Preprocessing images · Running inference · Enhancing result</p>
+                  <div className="mt-6 h-1 bg-muted rounded-full overflow-hidden max-w-xs mx-auto">
+                    <motion.div className="h-full bg-foreground rounded-full" initial={{ width: "5%" }}
+                      animate={{ width: "92%" }} transition={{ duration: 25, ease: "easeInOut" }} />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-3">This usually takes 20–40 seconds</p>
+                </motion.div>
+              )}
+
+              {/* ── RESULT PHASE ─────────────────────────────────────────── */}
+              {phase === "result" && resultUrl && (
+                <motion.div key="result" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="max-w-2xl mx-auto">
+                  <div className="bg-card rounded-2xl border border-border/50 overflow-hidden shadow-elevated">
+                    <div className="aspect-[3/4] relative">
+                      <img src={resultUrl} alt="Try-on result" className="w-full h-full object-cover" />
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-foreground/70 to-transparent p-6 pt-20">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/90 text-foreground text-xs font-semibold mb-3">
+                          <Check className="h-3 w-3" />
+                          AI Try-On Complete
+                          {processingTime && <span className="text-muted-foreground ml-1">· {(processingTime / 1000).toFixed(1)}s</span>}
+                        </div>
+                        <p className="text-primary-foreground font-display text-xl font-semibold capitalize">{selectedCategory} Try-On</p>
+                        <p className="text-primary-foreground/70 text-sm mt-1">Powered by TryVerse AI</p>
+                      </div>
+                    </div>
+                    <div className="p-6 border-t border-border/50 flex justify-between items-center">
+                      <a
+                        href={resultUrl}
+                        download="tryverse-result.jpg"
+                        className="text-sm font-medium text-foreground hover:underline"
+                      >
+                        Download result
+                      </a>
+                      <Button onClick={handleReset} variant="outline" className="gap-2">
+                        <RotateCcw className="h-4 w-4" /> Try Another
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* ── ERROR PHASE ──────────────────────────────────────────── */}
+              {phase === "error" && (
+                <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-md mx-auto text-center py-20">
+                  <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-6">
+                    <AlertCircle className="h-7 w-7 text-destructive" />
+                  </div>
+                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">Something went wrong</h3>
+                  <p className="text-sm text-muted-foreground mb-6">{errorMsg || "Please try again."}</p>
+                  <Button onClick={handleReset} variant="outline" className="gap-2">
+                    <RotateCcw className="h-4 w-4" /> Try Again
+                  </Button>
+                </motion.div>
+              )}
+
+            </AnimatePresence>
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+};
+
+export default TryOnStudio;
