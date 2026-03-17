@@ -14,7 +14,8 @@ router.get(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user!.id;
-      const days = Math.min(parseInt(String(req.query.days || '30'), 10), 365);
+      const daysRaw = parseInt(String(req.query.days || '30'), 10);
+      const days = Number.isNaN(daysRaw) || daysRaw < 1 ? 30 : Math.min(daysRaw, 365);
 
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 

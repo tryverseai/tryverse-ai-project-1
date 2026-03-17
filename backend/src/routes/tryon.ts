@@ -2,10 +2,12 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { body, param } from 'express-validator';
 import { v4 as uuidv4 } from 'uuid';
 import { requireAuth, optionalAuth } from '../middleware/auth';
+import { optionalApiKey } from '../middleware/apiKey';
+import { tryonRateLimit } from '../middleware/rateLimiter';
 import { planAwareTryonRateLimit } from '../middleware/planRateLimit';
 import { handleValidationErrors } from '../middleware/validate';
 import { checkCredits } from '../services/credits';
-import { enqueueTryOnJob, getJobStatus, getTryOnQueue } from '../services/queue/producer';
+import { enqueueTryOnJob, getJobStatusForUser, getTryOnQueue } from '../services/queue/producer';
 import { executeTryOnPipeline } from '../services/ai/pipeline';
 import { getSupportedCategories } from '../services/ai/replicate';
 import { supabaseAdmin } from '../config/supabase';
@@ -38,15 +40,22 @@ router.get('/categories', (_req: Request, res: Response) => {
  */
 router.post(
   '/',
+  tryonRateLimit,
   optionalAuth,
   planAwareTryonRateLimit,
   [
     body('personImagePath')
-      .isString().notEmpty()
-      .withMessage('personImagePath is required'),
+      .isString()
+      .notEmpty()
+      .isLength({ max: 200 })
+      .matches(/^[a-zA-Z0-9_-]+\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$|^anonymous\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$/i)
+      .withMessage('personImagePath must be a valid storage path from upload'),
     body('productImagePath')
-      .isString().notEmpty()
-      .withMessage('productImagePath is required'),
+      .isString()
+      .notEmpty()
+      .isLength({ max: 200 })
+      .matches(/^[a-zA-Z0-9_-]+\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$|^anonymous\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$/i)
+      .withMessage('productImagePath must be a valid storage path from upload'),
     body('category')
       .isIn(VALID_CATEGORIES)
       .withMessage(
@@ -173,10 +182,11 @@ router.post(
 
 /**
  * GET /api/tryon/:tryonId
- * Polls the status of a try-on job.
+ * Polls the status of a try-on job. Supports JWT (dashboard) or API key (widget).
  */
 router.get(
   '/:tryonId',
+  optionalApiKey,
   optionalAuth,
   [param('tryonId').isUUID().withMessage('Invalid tryonId')],
   handleValidationErrors,
@@ -185,13 +195,18 @@ router.get(
       const tryonId = req.params.tryonId as string;
       const userId = req.user?.id || req.widgetUserId;
 
+      // Always enforce ownership: user or widget (API key owner) must own the tryon
       const query = supabaseAdmin
         .from('tryons')
-        .select('id, status, result_image, created_at, completed_at, category')
+        .select('id, status, result_image, created_at, completed_at, category, user_id')
         .eq('id', tryonId);
 
-      if (userId && !req.apiKey) {
+      if (userId) {
         query.eq('user_id', userId);
+      } else {
+        // Anonymous/widget without resolved user: deny access
+        res.status(401).json({ error: 'Authentication required to access try-on status' });
+        return;
       }
 
       const { data: tryon, error } = await query.single();
@@ -222,15 +237,21 @@ router.get(
 
 /**
  * GET /api/tryon/job/:jobId
- * Gets Bull queue job status.
+ * Gets Bull queue job status. Verifies ownership before returning.
  */
 router.get(
   '/job/:jobId',
   requireAuth,
+  [param('jobId').isString().notEmpty().withMessage('jobId required')],
+  handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const jobId = req.params.jobId as string;
-      const status = await getJobStatus(jobId);
+      const status = await getJobStatusForUser(jobId, req.user!.id);
+      if (!status) {
+        res.status(404).json({ error: 'Job not found' });
+        return;
+      }
       res.json(status);
     } catch (err) {
       next(err);

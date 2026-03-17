@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import { requireAuth } from '../middleware/auth';
 import { paymentRateLimit } from '../middleware/rateLimiter';
 import { handleValidationErrors } from '../middleware/validate';
+import { env } from '../config/env';
 import {
   initializePaystackPayment,
   validatePaystackSignature,
@@ -30,9 +31,28 @@ router.post(
   paymentRateLimit,
   requireAuth,
   [
-    body('planId').isString().notEmpty().withMessage('planId is required'),
+    body('planId').isString().notEmpty().isLength({ max: 50 }).withMessage('planId is required'),
     body('amount').isNumeric().withMessage('amount must be a number'),
-    body('callbackUrl').isURL().withMessage('callbackUrl must be a valid URL'),
+    body('callbackUrl')
+      .isURL()
+      .withMessage('callbackUrl must be a valid URL')
+      .custom((url) => {
+        try {
+          const allowed = new URL(env.FRONTEND_URL);
+          const given = new URL(url);
+          if (allowed.hostname !== given.hostname) {
+            throw new Error('callbackUrl host must match FRONTEND_URL');
+          }
+          // In production, require same origin; in dev allow localhost on any port
+          if (env.NODE_ENV === 'production' && allowed.origin !== given.origin) {
+            throw new Error('callbackUrl must match application origin in production');
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith('callbackUrl')) throw e;
+          throw new Error('Invalid callbackUrl');
+        }
+        return true;
+      }),
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -65,10 +85,28 @@ router.post(
   paymentRateLimit,
   requireAuth,
   [
-    body('planId').isString().notEmpty().withMessage('planId is required'),
+    body('planId').isString().notEmpty().isLength({ max: 50 }).withMessage('planId is required'),
     body('amount').isNumeric().withMessage('amount must be a number'),
-    body('currency').isString().notEmpty().withMessage('currency is required'),
-    body('callbackUrl').isURL().withMessage('callbackUrl must be a valid URL'),
+    body('currency').isString().isLength({ min: 3, max: 3 }).withMessage('currency must be 3-letter code'),
+    body('callbackUrl')
+      .isURL()
+      .withMessage('callbackUrl must be a valid URL')
+      .custom((url) => {
+        try {
+          const allowed = new URL(env.FRONTEND_URL);
+          const given = new URL(url);
+          if (allowed.hostname !== given.hostname) {
+            throw new Error('callbackUrl host must match FRONTEND_URL');
+          }
+          if (env.NODE_ENV === 'production' && allowed.origin !== given.origin) {
+            throw new Error('callbackUrl must match application origin in production');
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith('callbackUrl')) throw e;
+          throw new Error('Invalid callbackUrl');
+        }
+        return true;
+      }),
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -165,13 +203,28 @@ router.post(
 /**
  * GET /api/payment/verify/paystack/:reference
  * Manually verify a Paystack transaction (called after redirect).
+ * Verifies the payment belongs to the authenticated user (IDOR prevention).
  */
 router.get(
   '/verify/paystack/:reference',
   requireAuth,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await verifyPaystackTransaction(req.params.reference as string);
+      const reference = String(req.params.reference || '').trim();
+      if (!reference) {
+        res.status(400).json({ error: 'Reference required' });
+        return;
+      }
+      const result = await verifyPaystackTransaction(reference);
+      if (result.metadata?.user_id !== req.user!.id) {
+        logger.warn('Payment verify: user mismatch', {
+          reference,
+          expectedUser: req.user!.id,
+          paymentUser: result.metadata?.user_id,
+        });
+        res.status(403).json({ error: 'This payment does not belong to your account' });
+        return;
+      }
       res.json(result);
     } catch (err) {
       next(err);
@@ -182,13 +235,28 @@ router.get(
 /**
  * GET /api/payment/verify/flutterwave/:transactionId
  * Manually verify a Flutterwave transaction.
+ * Verifies the payment belongs to the authenticated user (IDOR prevention).
  */
 router.get(
   '/verify/flutterwave/:transactionId',
   requireAuth,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await verifyFlutterwaveTransaction(req.params.transactionId as string);
+      const transactionId = String(req.params.transactionId || '').trim();
+      if (!transactionId) {
+        res.status(400).json({ error: 'Transaction ID required' });
+        return;
+      }
+      const result = await verifyFlutterwaveTransaction(transactionId);
+      if (result.meta?.user_id !== req.user!.id) {
+        logger.warn('Payment verify: user mismatch', {
+          transactionId,
+          expectedUser: req.user!.id,
+          paymentUser: result.meta?.user_id,
+        });
+        res.status(403).json({ error: 'This payment does not belong to your account' });
+        return;
+      }
       res.json(result);
     } catch (err) {
       next(err);

@@ -90,7 +90,11 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction): Pr
     const limit = Math.min(parseInt(String(req.query.limit || '50'), 10), 200);
     const page = Math.max(parseInt(String(req.query.page || '1'), 10), 1);
     const offset = (page - 1) * limit;
-    const search = req.query.search as string | undefined;
+    const searchRaw = req.query.search as string | undefined;
+    // Sanitize: alphanumeric, spaces, @.- allowed; max 80 chars (prevents injection and DoS)
+    const search = searchRaw
+      ? String(searchRaw).slice(0, 80).replace(/[^a-zA-Z0-9@.\s-]/g, '').trim() || undefined
+      : undefined;
 
     let query = supabaseAdmin
       .from('profiles')

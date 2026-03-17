@@ -81,3 +81,37 @@ export async function getJobStatus(jobId: string): Promise<{
     error: job.failedReason,
   };
 }
+
+/**
+ * Gets job status only if the job belongs to the given user.
+ * Returns null if job not found or user is not the owner (IDOR prevention).
+ */
+export async function getJobStatusForUser(
+  jobId: string,
+  userId: string
+): Promise<{
+  status: string;
+  progress: number;
+  result?: unknown;
+  error?: string;
+} | null> {
+  const queue = getTryOnQueue();
+  if (!queue) return null;
+
+  const job = await queue.getJob(jobId);
+  if (!job || !job.data) return null;
+
+  const jobData = job.data as TryOnJob;
+  const jobUserId = jobData.userId ?? null;
+  if (jobUserId !== userId) return null;
+
+  const state = await job.getState();
+  const progress = job.progress() as number;
+
+  return {
+    status: state,
+    progress: typeof progress === 'number' ? progress : 0,
+    result: job.returnvalue,
+    error: job.failedReason,
+  };
+}

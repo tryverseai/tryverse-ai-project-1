@@ -33,9 +33,14 @@ export async function optionalApiKey(req: Request, res: Response, next: NextFunc
  * Sets req.apiKey and req.widgetUserId on success.
  */
 export async function requireApiKey(req: Request, res: Response, next: NextFunction): Promise<void> {
+  // Prefer header over query: query params may appear in logs, referrers
   const keyValue =
     (req.headers['x-api-key'] as string) ||
     (req.query.api_key as string);
+
+  if (req.query.api_key && !req.headers['x-api-key']) {
+    logger.warn('API key passed via query string; prefer x-api-key header', { path: req.path });
+  }
 
   if (!keyValue) {
     res.status(401).json({ error: 'API key required. Provide via x-api-key header.' });

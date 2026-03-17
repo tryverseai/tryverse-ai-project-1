@@ -26,6 +26,9 @@ initSentry();
 
 const app = express();
 
+// Trust proxy for X-Forwarded-* headers (required behind nginx, load balancers)
+app.set('trust proxy', 1);
+
 // Sentry request/tracing middleware (gracefully skipped if DSN not set)
 if (env.SENTRY_DSN) {
   try {
@@ -37,6 +40,17 @@ if (env.SENTRY_DSN) {
 }
 
 // ─── Security ─────────────────────────────────────────────────────────────────
+// Enforce HTTPS in production (rely on X-Forwarded-Proto from reverse proxy)
+if (env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    if (forwardedProto === 'http') {
+      const host = req.headers.host || '';
+      return res.redirect(301, `https://${host}${req.originalUrl}`);
+    }
+    next();
+  });
+}
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },

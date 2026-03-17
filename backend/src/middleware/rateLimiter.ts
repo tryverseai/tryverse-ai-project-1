@@ -1,7 +1,15 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
+import { logger } from '../config/logger';
 
-const rateLimitResponse = (_req: Request, res: Response) => {
+const rateLimitResponse = (req: Request, res: Response) => {
+  logger.warn('Rate limit exceeded', {
+    path: req.path,
+    ip: req.ip,
+    identifier: (req as Request & { user?: { id: string }; apiKey?: { userId: string } }).user?.id
+      || (req as Request & { apiKey?: { id: string } }).apiKey?.id
+      || req.ip,
+  });
   res.status(429).json({
     error: 'Too many requests. Please slow down.',
     retryAfter: 60,

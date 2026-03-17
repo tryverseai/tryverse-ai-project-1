@@ -34,8 +34,18 @@ router.post(
   requireApiKey,
   validateDomain,
   [
-    body('personImagePath').isString().notEmpty().withMessage('personImagePath is required'),
-    body('productImagePath').isString().notEmpty().withMessage('productImagePath is required'),
+    body('personImagePath')
+      .isString()
+      .notEmpty()
+      .isLength({ max: 200 })
+      .matches(/^[a-zA-Z0-9_-]+\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$|^anonymous\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$/i)
+      .withMessage('personImagePath must be a valid storage path from upload'),
+    body('productImagePath')
+      .isString()
+      .notEmpty()
+      .isLength({ max: 200 })
+      .matches(/^[a-zA-Z0-9_-]+\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$/i)
+      .withMessage('productImagePath must be a valid storage path from upload'),
     body('category')
       .isIn(VALID_CATEGORIES)
       .withMessage(`category must be one of: ${VALID_CATEGORIES.join(', ')}`),
