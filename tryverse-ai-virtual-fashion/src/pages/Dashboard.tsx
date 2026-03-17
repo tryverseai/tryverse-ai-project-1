@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Package, BarChart3, Settings, Key, Code, LayoutDashboard, Cpu, CreditCard
+  Package, BarChart3, Settings, Key, Code, LayoutDashboard, CreditCard
 } from "lucide-react";
 import { OverviewTab } from "@/components/dashboard/OverviewTab";
 import { ApiKeysTab } from "@/components/dashboard/ApiKeysTab";
@@ -11,8 +11,6 @@ import { AnalyticsTab } from "@/components/dashboard/AnalyticsTab";
 import { ProductsTab } from "@/components/dashboard/ProductsTab";
 import { SettingsTab } from "@/components/dashboard/SettingsTab";
 import { BillingTab } from "@/components/dashboard/BillingTab";
-import { TechnologySection } from "@/components/TechnologySection";
-
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Overview" },
   { icon: BarChart3, label: "Analytics" },
@@ -20,7 +18,6 @@ const sidebarItems = [
   { icon: Key, label: "API Keys" },
   { icon: Code, label: "Widget" },
   { icon: CreditCard, label: "Billing" },
-  { icon: Cpu, label: "Technology" },
   { icon: Settings, label: "Settings" },
 ];
 
@@ -40,9 +37,6 @@ const Dashboard = () => {
   const brandName = user?.user_metadata?.brand_name || "Your Brand";
 
   const renderContent = () => {
-    if (activeTab === "Technology") {
-      return <TechnologySection />;
-    }
     const ActiveComponent = tabComponents[activeTab] || OverviewTab;
     return <ActiveComponent />;
   };

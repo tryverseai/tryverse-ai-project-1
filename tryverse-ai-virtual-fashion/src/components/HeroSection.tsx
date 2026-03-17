@@ -1,6 +1,6 @@
 import { AutoPlayVideo } from "@/components/AutoPlayVideo";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import heroVideo1 from "@/assets/hero-video-1.mp4";
@@ -13,6 +13,7 @@ import heroModel3 from "@/assets/hero-model-3.jpg";
 import heroModel4 from "@/assets/hero-model-4.jpg";
 
 export function HeroSection() {
+  const shouldReduceMotion = useReducedMotion();
   const models = [
     { video: heroVideo1, poster: heroModel1 },
     { video: heroVideo2, poster: heroModel2 },
@@ -24,9 +25,9 @@ export function HeroSection() {
     <section className="relative pt-28 pb-20 md:pt-36 md:pb-28 overflow-hidden">
       <div className="relative max-w-7xl mx-auto px-6">
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={shouldReduceMotion ? false : { opacity: 1, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
           className="text-center max-w-3xl mx-auto"
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border text-foreground text-xs font-medium mb-8">
@@ -72,9 +73,9 @@ export function HeroSection() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={shouldReduceMotion ? false : { opacity: 1, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+          transition={{ duration: 0.5, delay: shouldReduceMotion ? 0 : 0.1, ease: "easeOut" }}
           className="mt-16"
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

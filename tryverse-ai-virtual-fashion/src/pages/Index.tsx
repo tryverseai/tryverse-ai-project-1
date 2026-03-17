@@ -5,6 +5,7 @@ import { HowItWorks } from "@/components/HowItWorks";
 import { JewelryShowcase } from "@/components/JewelryShowcase";
 import { FeaturesSection } from "@/components/FeaturesSection";
 import { ForBrandsSection } from "@/components/ForBrandsSection";
+import { TechnologySection } from "@/components/TechnologySection";
 import { PartnerSection } from "@/components/PartnerSection";
 import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
@@ -25,6 +26,7 @@ const Index = () => {
       <JewelryShowcase />
       <FeaturesSection />
       <ForBrandsSection />
+      <TechnologySection />
       <PartnerSection />
       <CTASection />
       <Footer />

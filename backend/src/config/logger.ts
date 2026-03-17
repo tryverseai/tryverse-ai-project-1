@@ -1,5 +1,6 @@
 import winston from 'winston';
 import { env } from './env';
+import { MemoryTransport } from './logBuffer';
 
 export const logger = winston.createLogger({
   level: env.NODE_ENV === 'production' ? 'info' : 'debug',
@@ -18,6 +19,7 @@ export const logger = winston.createLogger({
   ),
   transports: [
     new winston.transports.Console(),
+    new MemoryTransport(),
     ...(env.NODE_ENV === 'production'
       ? [
           new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),

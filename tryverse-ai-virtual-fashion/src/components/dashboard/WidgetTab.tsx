@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Code, Copy, Check, ExternalLink, Upload, Sparkles, ImageIcon, User } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Code, Copy, Check, ExternalLink, Upload, Sparkles, ImageIcon, User, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -189,9 +190,17 @@ export function WidgetTab() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="mb-8">
-        <h1 className="font-display text-2xl font-bold text-foreground">Widget</h1>
-        <p className="text-sm text-muted-foreground mt-1">Preview the try-on experience or install the widget</p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-foreground">Widget</h1>
+          <p className="text-sm text-muted-foreground mt-1">Preview the try-on experience or install the widget</p>
+        </div>
+        <Link
+          to="/widget-guide"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <FileText className="h-4 w-4" /> Full documentation
+        </Link>
       </div>
 
       {/* View toggle */}

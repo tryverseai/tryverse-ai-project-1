@@ -1,0 +1,221 @@
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Search, Users, Ban, Unlock, Loader2, Plus, Minus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { getAdminUsers, banAdminUser, adjustUserCredits } from "@/lib/backendApi";
+import { toast } from "sonner";
+
+interface AdminUsersTabProps {
+  adminKey: string;
+}
+
+interface AdminUser {
+  id: string;
+  brand_name: string;
+  full_name: string;
+  contact_email: string | null;
+  plan_id?: string;
+  current_plan_id?: string;
+  free_credits_remaining: number;
+  monthly_credits_remaining: number;
+  monthly_credits_total: number;
+  widget_activated: boolean;
+  created_at: string;
+}
+
+export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 1 });
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [creditsDialog, setCreditsDialog] = useState<AdminUser | null>(null);
+  const [freeCredits, setFreeCredits] = useState(0);
+  const [monthlyCredits, setMonthlyCredits] = useState(0);
+  const [saving, setSaving] = useState(false);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getAdminUsers(adminKey, pagination.page, pagination.limit, search || undefined);
+      setUsers(res.users || []);
+      setPagination((p) => ({ ...p, ...res.pagination }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch users");
+      toast.error("Failed to fetch users");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [adminKey, pagination.page, search]);
+
+  const handleBan = async (u: AdminUser) => {
+    if (!confirm(`Ban ${u.brand_name}?`)) return;
+    try {
+      await banAdminUser(adminKey, u.id);
+      toast.success("User banned");
+      fetchUsers();
+    } catch {
+      toast.error("Failed to ban user");
+    }
+  };
+
+  const handleUnban = async (u: AdminUser) => {
+    try {
+      await banAdminUser(adminKey, u.id, true);
+      toast.success("User unbanned");
+      fetchUsers();
+    } catch {
+      toast.error("Failed to unban user");
+    }
+  };
+
+  const openCreditsDialog = (u: AdminUser) => {
+    setCreditsDialog(u);
+    setFreeCredits(u.free_credits_remaining);
+    setMonthlyCredits(u.monthly_credits_remaining);
+  };
+
+  const handleSaveCredits = async () => {
+    if (!creditsDialog) return;
+    setSaving(true);
+    try {
+      await adjustUserCredits(adminKey, creditsDialog.id, {
+        freeCredits: freeCredits,
+        monthlyCredits: monthlyCredits,
+      });
+      toast.success("Credits updated");
+      setCreditsDialog(null);
+      fetchUsers();
+    } catch {
+      toast.error("Failed to update credits");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by brand or email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && fetchUsers()}
+            className="pl-10"
+          />
+        </div>
+        <Button variant="outline" onClick={fetchUsers}>Refresh</Button>
+      </div>
+
+      {error && (
+        <div className="mb-6 p-4 rounded-lg bg-destructive/10 text-destructive flex items-center justify-between">
+          <p className="text-sm">{error}</p>
+          <Button variant="outline" size="sm" onClick={fetchUsers}>Retry</Button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <div className="bg-card rounded-xl border border-border/50 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Brand</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Plan</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Credits</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Widget</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Joined</th>
+                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-b border-border/50 last:border-0 hover:bg-muted/30">
+                    <td className="px-5 py-4">
+                      <div>
+                        <p className="font-medium text-foreground">{u.brand_name || "—"}</p>
+                        <p className="text-xs text-muted-foreground">{u.contact_email || u.full_name || u.id.slice(0, 8)}</p>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-sm capitalize">{u.plan_id || u.current_plan_id || "free"}</td>
+                    <td className="px-5 py-4 text-sm">
+                      {u.free_credits_remaining + (u.monthly_credits_remaining || 0)} total
+                    </td>
+                    <td className="px-5 py-4">
+                      {u.widget_activated ? (
+                        <span className="text-xs px-2 py-0.5 rounded bg-green-500/20 text-green-600 dark:text-green-400">On</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Off</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-muted-foreground">
+                      {new Date(u.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openCreditsDialog(u)} className="h-8 gap-1">
+                          <Plus className="h-3.5 w-3.5" /> Credits
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleBan(u)} className="h-8 text-destructive hover:text-destructive">
+                          <Ban className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {pagination.pages > 1 && (
+            <div className="flex justify-between px-5 py-3 border-t border-border">
+              <p className="text-xs text-muted-foreground">{pagination.total} users</p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={pagination.page <= 1} onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}>Prev</Button>
+                <Button variant="outline" size="sm" disabled={pagination.page >= pagination.pages} onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}>Next</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <Dialog open={!!creditsDialog} onOpenChange={() => setCreditsDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add or remove credits for {creditsDialog?.brand_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium">Free credits</label>
+              <Input type="number" min={0} value={freeCredits} onChange={(e) => setFreeCredits(parseInt(e.target.value) || 0)} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Monthly credits remaining</label>
+              <Input type="number" min={0} value={monthlyCredits} onChange={(e) => setMonthlyCredits(parseInt(e.target.value) || 0)} className="mt-1" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreditsDialog(null)}>Cancel</Button>
+            <Button onClick={handleSaveCredits} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </motion.div>
+  );
+}

@@ -164,7 +164,7 @@ export interface Product {
   image_display_url?: string | null;
   category: TryOnCategory;
   product_url: string | null;
-  tryons_count: number;
+  tryons_count?: number;
   created_at: string;
   updated_at?: string;
 }
@@ -243,6 +243,124 @@ export async function getSupportedCategories() {
   return handleResponse<{
     categories: Array<{ id: TryOnCategory; label: string; description: string; modelFamily: string }>;
   }>(res);
+}
+
+// ─── Admin (requires X-Admin-Key) ──────────────────────────────────────────────
+
+const ADMIN_KEY_STORAGE = 'tryverse_admin_key';
+
+export function getStoredAdminKey(): string | null {
+  try {
+    return sessionStorage.getItem(ADMIN_KEY_STORAGE);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredAdminKey(key: string): void {
+  sessionStorage.setItem(ADMIN_KEY_STORAGE, key);
+}
+
+export function clearStoredAdminKey(): void {
+  sessionStorage.removeItem(ADMIN_KEY_STORAGE);
+}
+
+async function adminFetch(path: string, adminKey: string, options?: RequestInit) {
+  const res = await fetch(`${BACKEND_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-admin-key': adminKey,
+      ...options?.headers,
+    },
+  });
+  if (res.status === 403) throw new Error('Invalid admin key');
+  if (!res.ok) throw new Error(`Admin API error: ${res.status}`);
+  return res.json();
+}
+
+export async function getAdminMetrics(adminKey: string) {
+  return adminFetch('/api/admin/metrics', adminKey);
+}
+
+export async function getAdminUsers(adminKey: string, page = 1, limit = 50, search?: string) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (search) params.append('search', search);
+  return adminFetch(`/api/admin/users?${params}`, adminKey);
+}
+
+export async function getAdminTryons(adminKey: string, page = 1, limit = 50, status?: string) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (status) params.append('status', status);
+  return adminFetch(`/api/admin/tryons?${params}`, adminKey);
+}
+
+export async function getAdminRevenue(adminKey: string, days = 30) {
+  return adminFetch(`/api/admin/revenue?days=${days}`, adminKey);
+}
+
+export async function getAdminQueue(adminKey: string) {
+  return adminFetch('/api/admin/queue', adminKey);
+}
+
+export async function banAdminUser(adminKey: string, userId: string, unban = false) {
+  const url = unban ? `/api/admin/users/${userId}/ban?none=1` : `/api/admin/users/${userId}/ban`;
+  return adminFetch(url, adminKey, { method: 'DELETE' });
+}
+
+export async function adjustUserCredits(adminKey: string, userId: string, credits: { freeCredits?: number; monthlyCredits?: number }) {
+  return adminFetch(`/api/admin/users/${userId}/credits`, adminKey, {
+    method: 'PATCH',
+    body: JSON.stringify(credits),
+  });
+}
+
+export async function retryTryOn(adminKey: string, tryonId: string) {
+  return adminFetch(`/api/admin/tryons/${tryonId}/retry`, adminKey, { method: 'POST' });
+}
+
+export async function pauseAdminQueue(adminKey: string) {
+  return adminFetch('/api/admin/queue/pause', adminKey, { method: 'POST' });
+}
+
+export async function resumeAdminQueue(adminKey: string) {
+  return adminFetch('/api/admin/queue/resume', adminKey, { method: 'POST' });
+}
+
+export async function getAdminSettings(adminKey: string) {
+  return adminFetch('/api/admin/settings', adminKey);
+}
+
+export async function getAdminHealth(adminKey: string) {
+  return adminFetch('/api/admin/health', adminKey);
+}
+
+export async function getAdminActivity(adminKey: string, limit = 20) {
+  return adminFetch(`/api/admin/activity?limit=${limit}`, adminKey);
+}
+
+export async function getAdminApiKeys(adminKey: string) {
+  return adminFetch('/api/admin/api-keys', adminKey);
+}
+
+export async function revokeAdminApiKey(adminKey: string, keyId: string) {
+  return adminFetch(`/api/admin/api-keys/${keyId}/revoke`, adminKey, { method: 'POST' });
+}
+
+export async function getAdminDomains(adminKey: string) {
+  return adminFetch('/api/admin/domains', adminKey);
+}
+
+export async function getAdminLogs(adminKey: string, limit = 200, level?: string) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (level) params.append('level', level);
+  return adminFetch(`/api/admin/logs?${params}`, adminKey);
+}
+
+export async function getAdminAudit(adminKey: string, limit = 100, offset = 0, eventType?: string) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (eventType) params.append('event_type', eventType);
+  return adminFetch(`/api/admin/audit?${params}`, adminKey);
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────

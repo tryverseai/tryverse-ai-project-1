@@ -71,8 +71,14 @@ export function ProductsTab() {
     setLoading(true);
     try {
       const res = await getProducts(pagination.page, pagination.limit, categoryFilter || undefined);
-      setProducts(res.products);
-      setPagination((p) => ({ ...p, ...res.pagination }));
+      setProducts(res.products ?? []);
+      setPagination((p) => ({
+        ...p,
+        page: res.pagination?.page ?? p.page,
+        limit: res.pagination?.limit ?? p.limit,
+        total: res.pagination?.total ?? 0,
+        pages: res.pagination?.pages ?? 1,
+      }));
     } catch (err) {
       toast.error("Failed to fetch products");
       setProducts([]);
@@ -305,12 +311,14 @@ export function ProductsTab() {
                       {p.category}
                     </td>
                     <td className="px-5 py-4 text-sm font-medium">
-                      {p.tryons_count.toLocaleString()}
+                      {(p.tryons_count ?? 0).toLocaleString()}
                     </td>
                     <td className="px-5 py-4 text-sm text-muted-foreground">
                       {p.updated_at
                         ? new Date(p.updated_at).toLocaleDateString()
-                        : new Date(p.created_at).toLocaleDateString()}
+                        : p.created_at
+                        ? new Date(p.created_at).toLocaleDateString()
+                        : "—"}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">

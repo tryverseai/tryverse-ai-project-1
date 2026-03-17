@@ -124,6 +124,16 @@ export async function validateDomain(req: Request, res: Response, next: NextFunc
     });
 
     if (!isAllowed) {
+      const { logAudit } = await import('../services/audit');
+      logAudit({
+        event_type: 'api_key_blocked',
+        actor: `api_key:${req.apiKey.id}`,
+        action: 'domain_not_allowed',
+        target_id: req.apiKey.id,
+        details: { domain: requestDomain, apiKeyId: req.apiKey.id },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
       logger.warn('Domain not allowed for API key', { domain: requestDomain, apiKeyId: req.apiKey.id });
       res.status(403).json({ error: `Domain ${requestDomain} is not authorized for this API key` });
       return;

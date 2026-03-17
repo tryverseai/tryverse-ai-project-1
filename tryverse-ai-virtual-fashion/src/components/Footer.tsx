@@ -33,11 +33,13 @@ export function Footer() {
             {
               title: "Resources",
               links: [
-                { label: "Documentation", href: "https://docs.tryverse.ai", external: true },
+                { label: "Widget Guide", href: "/widget-guide" },
+                { label: "API Docs", href: "/api-docs" },
                 { label: "Support", href: "mailto:support@tryverse.ai", external: true },
                 { label: "Privacy", href: "/privacy" },
                 { label: "Terms", href: "/terms" },
                 { label: "Data Processing", href: "/data-processing" },
+                { label: "Admin", href: "/admin" },
               ],
             },
           ].map((col) => (

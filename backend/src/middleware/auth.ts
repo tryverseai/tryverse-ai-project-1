@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { supabaseAdmin } from '../config/supabase';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
+import { logAudit } from '../services/audit';
 
 /**
  * Verifies a Supabase JWT from the Authorization header.
@@ -11,6 +12,14 @@ import { logger } from '../config/logger';
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
+    logAudit({
+      event_type: 'failed_login',
+      actor: req.ip ? `ip:${req.ip}` : undefined,
+      action: 'missing_auth_header',
+      details: { path: req.path },
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    });
     logger.warn('Auth failed: missing or invalid authorization header', {
       path: req.path,
       ip: req.ip,
@@ -23,6 +32,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   try {
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
     if (error || !user) {
+      logAudit({
+        event_type: 'failed_login',
+        actor: req.ip ? `ip:${req.ip}` : undefined,
+        action: 'invalid_token',
+        details: { path: req.path, error: error?.message },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
       logger.warn('Auth failed: invalid or expired token', {
         path: req.path,
         ip: req.ip,
@@ -67,6 +84,14 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   const adminKey = req.headers['x-admin-key'];
   if (!adminKey || adminKey !== env.ADMIN_SECRET_KEY) {
+    logAudit({
+      event_type: 'failed_login',
+      actor: req.ip ? `ip:${req.ip}` : undefined,
+      action: 'admin_access_denied',
+      details: { path: req.path },
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    });
     logger.warn('Admin access denied', { path: req.path, ip: req.ip });
     res.status(403).json({ error: 'Admin access required' });
     return;

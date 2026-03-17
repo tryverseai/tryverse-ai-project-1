@@ -111,6 +111,22 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   UNIQUE(user_id)
 );
 
+-- ─── ADMIN AUDIT LOG ─────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  event_type  TEXT NOT NULL,
+  actor       TEXT,
+  action      TEXT NOT NULL,
+  target_id   TEXT,
+  details     JSONB DEFAULT '{}',
+  ip_address  TEXT,
+  user_agent  TEXT,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_created_at ON admin_audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_event_type ON admin_audit_log(event_type);
+ALTER TABLE admin_audit_log ENABLE ROW LEVEL SECURITY;
+
 -- ─── PRODUCTS (Brand product catalog) ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS products (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -148,7 +164,11 @@ CREATE TABLE IF NOT EXISTS rate_limits (
 
 -- ─── AUTO-CREATE PROFILE ON SIGNUP ───────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   INSERT INTO public.profiles (
     id,
@@ -176,7 +196,7 @@ BEGIN
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -185,20 +205,24 @@ CREATE TRIGGER on_auth_user_created
 
 -- ─── API KEY GENERATION FUNCTION ─────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.generate_api_key(p_name TEXT DEFAULT 'Default')
-RETURNS SETOF api_keys AS $$
+RETURNS SETOF public.api_keys
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
   v_key    TEXT;
-  v_result api_keys;
+  v_result public.api_keys;
 BEGIN
   v_key := 'TV_' || encode(gen_random_bytes(32), 'hex');
 
-  INSERT INTO api_keys (user_id, key_value, name, status)
+  INSERT INTO public.api_keys (user_id, key_value, name, status)
   VALUES (auth.uid(), v_key, p_name, 'active')
   RETURNING * INTO v_result;
 
   RETURN NEXT v_result;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- ─── ROW LEVEL SECURITY ──────────────────────────────────────────────────────
 

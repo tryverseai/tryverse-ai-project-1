@@ -1,13 +1,13 @@
 import { motion } from "framer-motion";
-import { Brain, Scan, Box, Layers, Cpu, Globe } from "lucide-react";
+import { Scan, Brain, Box, Layers, Cpu, Globe } from "lucide-react";
 
 const techs = [
-  { icon: Brain, title: "Computer Vision", description: "Advanced image recognition and body detection for precise virtual fitting." },
-  { icon: Scan, title: "Diffusion Models", description: "State-of-the-art generative AI creates photorealistic try-on visualizations." },
-  { icon: Box, title: "Pose Estimation", description: "Accurate body pose and landmark detection from a single photograph." },
-  { icon: Layers, title: "Fit Prediction", description: "ML models predict garment fit based on body proportions and product data." },
-  { icon: Cpu, title: "GPU Inference", description: "Cloud GPU infrastructure for fast inference and smooth user experiences." },
-  { icon: Globe, title: "CDN Delivery", description: "Global edge network ensures fast delivery of try-on results worldwide." },
+  { icon: Scan, title: "Computer Vision", description: "High-precision image understanding for accurate body and product detection." },
+  { icon: Brain, title: "Generative AI", description: "State-of-the-art models create realistic, human-like try-on experiences." },
+  { icon: Box, title: "Pose Intelligence", description: "Advanced body and landmark detection from a single image." },
+  { icon: Layers, title: "Fit Prediction", description: "Machine learning models estimate garment fit based on proportions and context." },
+  { icon: Cpu, title: "High-Performance Inference", description: "Optimized GPU processing ensures fast and seamless results." },
+  { icon: Globe, title: "Global Delivery Network", description: "Edge infrastructure delivers results quickly to users worldwide." },
 ];
 
 export function TechnologySection() {
@@ -22,10 +22,10 @@ export function TechnologySection() {
         >
           <p className="text-xs font-medium text-muted-foreground mb-3 tracking-[0.2em] uppercase">Technology</p>
           <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Built on Cutting-Edge AI
+            Built on Advanced AI Infrastructure
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Modern AI infrastructure designed for speed, accuracy, and reliability.
+            Designed for speed, realism, and reliability at scale.
           </p>
         </motion.div>
 

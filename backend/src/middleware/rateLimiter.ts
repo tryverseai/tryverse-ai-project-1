@@ -1,14 +1,24 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
 import { logger } from '../config/logger';
+import { logAudit } from '../services/audit';
 
 const rateLimitResponse = (req: Request, res: Response) => {
+  const identifier = (req as Request & { user?: { id: string }; apiKey?: { id: string; userId: string } }).user?.id
+    || (req as Request & { apiKey?: { id: string } }).apiKey?.id
+    || req.ip;
+  logAudit({
+    event_type: 'rate_limit',
+    actor: typeof identifier === 'string' ? identifier : `ip:${req.ip}`,
+    action: 'rate_limit_exceeded',
+    details: { path: req.path, ip: req.ip },
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent'],
+  });
   logger.warn('Rate limit exceeded', {
     path: req.path,
     ip: req.ip,
-    identifier: (req as Request & { user?: { id: string }; apiKey?: { userId: string } }).user?.id
-      || (req as Request & { apiKey?: { id: string } }).apiKey?.id
-      || req.ip,
+    identifier,
   });
   res.status(429).json({
     error: 'Too many requests. Please slow down.',

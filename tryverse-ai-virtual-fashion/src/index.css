@@ -119,3 +119,16 @@
     @apply bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-card;
   }
 }
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
