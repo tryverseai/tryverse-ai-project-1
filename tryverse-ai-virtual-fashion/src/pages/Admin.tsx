@@ -26,6 +26,8 @@ import {
   setStoredAdminKey,
   clearStoredAdminKey,
   getAdminMetrics,
+  isAdminSessionExpired,
+  setAdminKeyLastActive,
 } from "@/lib/backendApi";
 import { toast } from "sonner";
 import { AdminOverviewTab } from "@/components/admin/AdminOverviewTab";
@@ -59,7 +61,23 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState("Overview");
 
   useEffect(() => {
-    setStoredKey(getStoredAdminKey());
+    const key = getStoredAdminKey();
+    if (!key) {
+      setStoredKey(null);
+      return;
+    }
+    // If away from admin page for too long, require re-auth
+    if (isAdminSessionExpired()) {
+      clearStoredAdminKey();
+      setStoredKey(null);
+      toast.info("Admin session expired. Please sign in again.");
+      return;
+    }
+    setStoredKey(key);
+    setAdminKeyLastActive();
+    // Heartbeat: keep session alive while actively on admin page
+    const interval = setInterval(setAdminKeyLastActive, 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleUnlock = async (e: React.FormEvent) => {

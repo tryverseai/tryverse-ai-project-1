@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Key, Copy, RefreshCw, Plus, Eye, EyeOff, Check, Shield, Trash2, Loader2 } from "lucide-react";
+import { Key, Copy, RefreshCw, Plus, Eye, EyeOff, Check, Shield, Trash2, Loader2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -121,14 +122,21 @@ export function ApiKeysTab() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">API Keys</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage your integration credentials</p>
         </div>
-        <Button onClick={() => setShowNewForm(true)} className="gradient-primary text-primary-foreground shadow-soft gap-2">
-          <Plus className="h-4 w-4" /> Generate New Key
-        </Button>
+        <div className="flex gap-2">
+          <Link to="/api-docs">
+            <Button variant="outline" className="gap-2">
+              <FileText className="h-4 w-4" /> API Reference
+            </Button>
+          </Link>
+          <Button onClick={() => setShowNewForm(true)} className="gradient-primary text-primary-foreground shadow-soft gap-2">
+            <Plus className="h-4 w-4" /> Generate New Key
+          </Button>
+        </div>
       </div>
 
       {/* Security notice */}

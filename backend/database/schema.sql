@@ -43,9 +43,10 @@ CREATE TABLE IF NOT EXISTS profiles (
   free_credits_total         INTEGER DEFAULT 3,
   monthly_credits_remaining  INTEGER DEFAULT 0,
   monthly_credits_total      INTEGER DEFAULT 0,
-  widget_activated           BOOLEAN DEFAULT false,
-  created_at                 TIMESTAMPTZ DEFAULT NOW(),
-  updated_at                 TIMESTAMPTZ DEFAULT NOW()
+  widget_activated                   BOOLEAN DEFAULT false,
+  compliance_onboarding_completed_at TIMESTAMPTZ DEFAULT NULL,
+  created_at                         TIMESTAMPTZ DEFAULT NOW(),
+  updated_at                         TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ─── API KEYS ────────────────────────────────────────────────────────────────

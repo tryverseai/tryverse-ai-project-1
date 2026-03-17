@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { HelmetProvider } from "react-helmet-async";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ScrollToTop } from "@/components/ScrollToTop";
+import { ComplianceOnboardingGate } from "@/components/ComplianceOnboardingGate";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Pricing from "./pages/Pricing";
@@ -33,6 +35,8 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <ScrollToTop />
+          <ComplianceOnboardingGate>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -46,12 +50,13 @@ const App = () => (
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/data-processing" element={<DataProcessing />} />
-            <Route path="/api-docs" element={<ApiDocs />} />
+            <Route path="/api-docs" element={<ProtectedRoute><ApiDocs /></ProtectedRoute>} />
             <Route path="/studio" element={<ProtectedRoute><TryOnStudio /></ProtectedRoute>} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/try-on-studio" element={<ProtectedRoute><TryOnStudio /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </ComplianceOnboardingGate>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

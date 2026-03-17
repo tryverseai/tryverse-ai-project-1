@@ -51,8 +51,11 @@ const endpoints = [
   },
 ];
 
-const curlExample = `curl -X POST \\
-  'https://YOUR_PROJECT.supabase.co/functions/v1/generate-tryon' \\
+const getApiBaseUrl = () =>
+  (import.meta.env.VITE_SUPABASE_URL || "https://YOUR_PROJECT.supabase.co").replace(/\/$/, "");
+
+const curlExample = () => `curl -X POST \\
+  '${getApiBaseUrl()}/functions/v1/generate-tryon' \\
   -H 'x-api-key: tv_live_your_api_key_here' \\
   -H 'Content-Type: application/json' \\
   -d '{
@@ -61,8 +64,8 @@ const curlExample = `curl -X POST \\
     "category": "clothing"
   }'`;
 
-const jsExample = `const response = await fetch(
-  'https://YOUR_PROJECT.supabase.co/functions/v1/generate-tryon',
+const jsExample = () => `const response = await fetch(
+  '${getApiBaseUrl()}/functions/v1/generate-tryon',
   {
     method: 'POST',
     headers: {
@@ -155,8 +158,8 @@ const ApiDocs = () => {
             </h2>
             <div className="space-y-4">
               {[
-                { label: "cURL", code: curlExample },
-                { label: "JavaScript", code: jsExample },
+                { label: "cURL", code: curlExample() },
+                { label: "JavaScript", code: jsExample() },
               ].map(({ label, code }) => (
                 <div key={label} className="bg-card rounded-xl border border-border/50 overflow-hidden shadow-card">
                   <div className="flex items-center justify-between px-5 py-3 border-b border-border/50">

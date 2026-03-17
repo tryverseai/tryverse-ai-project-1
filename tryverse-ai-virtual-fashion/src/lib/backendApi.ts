@@ -248,6 +248,10 @@ export async function getSupportedCategories() {
 // ─── Admin (requires X-Admin-Key) ──────────────────────────────────────────────
 
 const ADMIN_KEY_STORAGE = 'tryverse_admin_key';
+const ADMIN_KEY_LAST_ACTIVE = 'tryverse_admin_key_last_active';
+
+/** Minutes of inactivity (away from admin page) before auto sign-out. No timeout while on admin page. */
+const ADMIN_IDLE_TIMEOUT_MINUTES = 15;
 
 export function getStoredAdminKey(): string | null {
   try {
@@ -258,11 +262,41 @@ export function getStoredAdminKey(): string | null {
 }
 
 export function setStoredAdminKey(key: string): void {
-  sessionStorage.setItem(ADMIN_KEY_STORAGE, key);
+  try {
+    sessionStorage.setItem(ADMIN_KEY_STORAGE, key);
+    setAdminKeyLastActive();
+  } catch {
+    /* ignore */
+  }
 }
 
 export function clearStoredAdminKey(): void {
-  sessionStorage.removeItem(ADMIN_KEY_STORAGE);
+  try {
+    sessionStorage.removeItem(ADMIN_KEY_STORAGE);
+    sessionStorage.removeItem(ADMIN_KEY_LAST_ACTIVE);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function setAdminKeyLastActive(): void {
+  try {
+    sessionStorage.setItem(ADMIN_KEY_LAST_ACTIVE, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** True if admin has been away longer than the idle timeout (should re-enter key). */
+export function isAdminSessionExpired(): boolean {
+  try {
+    const lastActive = sessionStorage.getItem(ADMIN_KEY_LAST_ACTIVE);
+    if (!lastActive) return true;
+    const elapsed = Date.now() - parseInt(lastActive, 10);
+    return elapsed > ADMIN_IDLE_TIMUTES * 60 * 1000;
+  } catch {
+    return true;
+  }
 }
 
 async function adminFetch(path: string, adminKey: string, options?: RequestInit) {
