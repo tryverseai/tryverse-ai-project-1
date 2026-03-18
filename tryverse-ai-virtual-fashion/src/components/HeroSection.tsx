@@ -22,7 +22,7 @@ export function HeroSection() {
   ];
 
   return (
-    <section className="relative pt-28 pb-20 md:pt-36 md:pb-28 overflow-hidden">
+    <section className="relative pt-[var(--navbar-height)] pb-20 md:pt-[calc(var(--navbar-height)+1rem)] md:pb-28 overflow-hidden">
       <div className="relative max-w-7xl mx-auto px-6">
         <motion.div
           initial={shouldReduceMotion ? false : { opacity: 1, y: 15 }}

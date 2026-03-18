@@ -1,21 +1,48 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import { TryVerseLogo } from "@/components/TryVerseLogo";
 
 const publicLinks = [
   { label: "Product", href: "/#features" },
-  { label: "For Brands", href: "/#for-brands" },
+  { label: "Partner with us", href: "/partner" },
   { label: "About", href: "/about" },
 ];
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
+  const lastScrollY = useRef(0);
+  const ticking = useRef(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+
+  useEffect(() => {
+    const updateCompact = () => {
+      const currentY = window.scrollY;
+      if (currentY <= 20) {
+        setIsCompact(false);
+      } else if (currentY > lastScrollY.current) {
+        setIsCompact(true);
+      } else {
+        setIsCompact(false);
+      }
+      lastScrollY.current = currentY;
+      ticking.current = false;
+    };
+    const handleScroll = () => {
+      if (!ticking.current) {
+        requestAnimationFrame(updateCompact);
+        ticking.current = true;
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const isRoute = (href: string) => !href.includes("#");
 
@@ -24,20 +51,47 @@ export function Navbar() {
     navigate("/");
   };
 
+  const spring = { type: "spring" as const, stiffness: 260, damping: 22 };
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border/40">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link to="/" className="font-display text-xl font-bold tracking-tight text-foreground">
-          TryVerse<span className="text-muted-foreground">.AI</span>
+    <motion.nav
+      className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border/40"
+      initial={false}
+      animate={{
+        boxShadow: isCompact
+          ? "0 4px 20px -4px rgba(0,0,0,0.12)"
+          : "0 1px 0 0 rgba(0,0,0,0.06)",
+      }}
+      transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+    >
+      <motion.div
+        className="mx-auto flex items-center justify-between px-6 min-h-[72px] py-4"
+        animate={{
+          maxWidth: isCompact ? 720 : 1280,
+        }}
+        transition={spring}
+        style={{ width: "100%" }}
+      >
+        <Link
+          to="/"
+          onClick={() => {
+            if (location.pathname === "/") {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
+          className="flex items-center flex-shrink-0 text-foreground hover:opacity-90 transition-opacity"
+          style={{ maxWidth: "none", overflow: "visible" }}
+        >
+          <TryVerseLogo height={110} />
         </Link>
 
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-10">
           {publicLinks.map((link) =>
             isRoute(link.href) ? (
               <Link
                 key={link.href}
                 to={link.href}
-                className={`text-sm font-medium transition-colors ${
+                className={`text-sm font-medium transition-colors whitespace-nowrap px-1 ${
                   location.pathname === link.href
                     ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -49,7 +103,7 @@ export function Navbar() {
               <a
                 key={link.href}
                 href={link.href}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap px-1"
               >
                 {link.label}
               </a>
@@ -57,7 +111,11 @@ export function Navbar() {
           )}
         </div>
 
-        <div className="hidden md:flex items-center gap-3">
+        <motion.div
+          className="hidden md:flex items-center"
+          animate={{ gap: isCompact ? 6 : 12 }}
+          transition={spring}
+        >
           {user ? (
             <>
               <Link to="/studio">
@@ -88,12 +146,12 @@ export function Navbar() {
               </Link>
             </>
           )}
-        </div>
+        </motion.div>
 
         <button className="md:hidden" onClick={() => setOpen(!open)}>
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
-      </div>
+      </motion.div>
 
       <AnimatePresence>
         {open && (
@@ -152,6 +210,6 @@ export function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
-    </nav>
+    </motion.nav>
   );
 }

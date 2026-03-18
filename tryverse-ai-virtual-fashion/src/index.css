@@ -44,6 +44,7 @@
 
     --font-display: 'Space Grotesk', sans-serif;
     --font-body: 'Inter', sans-serif;
+    --navbar-height: 10rem; /* 160px - matches fixed navbar (logo 110px + padding) */
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -87,6 +88,9 @@
 }
 
 @layer base {
+  html {
+    scroll-padding-top: var(--navbar-height);
+  }
   * {
     @apply border-border;
   }
@@ -131,4 +135,11 @@
 
 .animate-marquee {
   animation: marquee 40s linear infinite;
+}
+
+/* Force TryVerse logo to render at correct size - overrides Tailwind preflight img styles */
+.tryverse-logo-img {
+  max-width: none !important;
+  flex-shrink: 0 !important;
+  object-fit: contain !important;
 }

@@ -44,10 +44,10 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="pt-20">
+      <main className="pt-[var(--navbar-height)]">
         <div className="flex">
           {/* Sidebar */}
-          <aside className="hidden lg:flex flex-col w-60 min-h-[calc(100vh-5rem)] border-r border-border p-4 pt-6 sticky top-20">
+          <aside className="hidden lg:flex flex-col w-60 min-h-[calc(100vh-var(--navbar-height))] border-r border-border p-4 pt-6 sticky top-[var(--navbar-height)]">
             <div className="mb-6">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Brand Dashboard</p>
               <p className="text-sm font-semibold text-foreground">{brandName}</p>
@@ -71,7 +71,7 @@ const Dashboard = () => {
           </aside>
 
           {/* Mobile tabs */}
-          <div className="lg:hidden fixed top-20 left-0 right-0 z-30 bg-background border-b border-border overflow-x-auto">
+          <div className="lg:hidden fixed left-0 right-0 z-30 bg-background border-b border-border overflow-x-auto" style={{ top: 'var(--navbar-height)' }}>
             <div className="flex px-4 py-2 gap-1">
               {sidebarItems.map((item) => (
                 <button
@@ -91,7 +91,7 @@ const Dashboard = () => {
           </div>
 
           {/* Main content */}
-          <div className="flex-1 p-6 md:p-8 lg:pt-8 pt-20">
+          <div className="flex-1 p-6 md:p-8 lg:pt-8 pt-[calc(var(--navbar-height)+4rem)]">
             {renderContent()}
           </div>
         </div>

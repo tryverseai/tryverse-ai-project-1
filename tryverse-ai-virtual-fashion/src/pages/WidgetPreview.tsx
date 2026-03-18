@@ -278,7 +278,7 @@ const WidgetPreview = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="pt-24 pb-20">
+      <main className="pt-[var(--navbar-height)] pb-20">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-10">
             <p className="text-xs font-medium text-muted-foreground mb-3 tracking-[0.2em] uppercase">Integration Preview</p>

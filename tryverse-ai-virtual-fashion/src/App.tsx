@@ -8,10 +8,12 @@ import { HelmetProvider } from "react-helmet-async";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { ComplianceOnboardingGate } from "@/components/ComplianceOnboardingGate";
+import { CookieConsent } from "@/components/CookieConsent";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Pricing from "./pages/Pricing";
 import About from "./pages/About";
+import PartnerWithUs from "./pages/PartnerWithUs";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -20,6 +22,7 @@ import WidgetGuide from "./pages/WidgetGuide";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import DataProcessing from "./pages/DataProcessing";
+import Support from "./pages/Support";
 import ApiDocs from "./pages/ApiDocs";
 import TryOnStudio from "./pages/TryOnStudio";
 import Admin from "./pages/Admin";
@@ -34,6 +37,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <CookieConsent />
         <BrowserRouter>
           <ScrollToTop />
           <ComplianceOnboardingGate>
@@ -42,14 +46,16 @@ const App = () => (
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
             <Route path="/about" element={<About />} />
+            <Route path="/partner" element={<PartnerWithUs />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/widget-preview" element={<WidgetPreview />} />
+            <Route path="/widget-preview" element={<ProtectedRoute><WidgetPreview /></ProtectedRoute>} />
             <Route path="/widget-guide" element={<WidgetGuide />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/data-processing" element={<DataProcessing />} />
+            <Route path="/support" element={<Support />} />
             <Route path="/api-docs" element={<ProtectedRoute><ApiDocs /></ProtectedRoute>} />
             <Route path="/studio" element={<ProtectedRoute><TryOnStudio /></ProtectedRoute>} />
             <Route path="/admin" element={<Admin />} />

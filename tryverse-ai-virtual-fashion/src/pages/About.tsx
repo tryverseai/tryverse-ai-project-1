@@ -26,7 +26,7 @@ const About = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="pt-28 pb-0">
+      <main className="pt-[var(--navbar-height)] pb-0">
         <div className="max-w-7xl mx-auto px-6">
           {/* Hero */}
           <motion.div

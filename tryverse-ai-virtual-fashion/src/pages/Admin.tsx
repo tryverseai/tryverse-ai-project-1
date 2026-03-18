@@ -49,8 +49,8 @@ const sidebarItems = [
   { icon: Key, label: "API & Widget" },
   { icon: Settings, label: "Settings" },
   { icon: ScrollText, label: "Logs" },
-  { icon: Server, label: "Technology" },
   { icon: FileText, label: "Audit" },
+  { icon: Server, label: "Technology" },
 ];
 
 const Admin = () => {
@@ -187,10 +187,10 @@ const Admin = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="pt-20">
+      <main className="pt-[var(--navbar-height)]">
         <div className="flex">
           {/* Sidebar */}
-          <aside className="hidden lg:flex flex-col w-60 min-h-[calc(100vh-5rem)] border-r border-border p-4 pt-6 sticky top-20">
+          <aside className="hidden lg:flex flex-col w-60 min-h-[calc(100vh-var(--navbar-height))] border-r border-border p-4 pt-6 sticky top-[var(--navbar-height)]">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Platform Admin</p>
@@ -247,7 +247,7 @@ const Admin = () => {
           </div>
 
           {/* Main content */}
-          <div className="flex-1 p-6 md:p-8 lg:pt-8 pt-36">
+          <div className="flex-1 p-6 md:p-8 lg:pt-8 pt-[calc(var(--navbar-height)+4rem)]">
             {renderContent()}
           </div>
         </div>

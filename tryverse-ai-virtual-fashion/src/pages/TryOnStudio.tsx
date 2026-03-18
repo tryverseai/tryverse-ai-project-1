@@ -169,7 +169,7 @@ const TryOnStudio = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="pt-24 pb-20">
+      <main className="pt-[var(--navbar-height)] pb-20">
         <div className="max-w-7xl mx-auto px-6">
 
           {/* Header */}

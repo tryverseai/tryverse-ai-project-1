@@ -150,6 +150,51 @@ export type Database = {
         }
         Relationships: []
       }
+      support_requests: {
+        Row: {
+          id: string
+          name: string | null
+          first_name: string | null
+          last_name: string | null
+          company_name: string | null
+          email: string
+          phone_number: string | null
+          category: string
+          subject: string
+          message: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name?: string | null
+          first_name?: string | null
+          last_name?: string | null
+          company_name?: string | null
+          email: string
+          phone_number?: string | null
+          category: string
+          subject: string
+          message: string
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string | null
+          first_name?: string | null
+          last_name?: string | null
+          company_name?: string | null
+          email?: string
+          phone_number?: string | null
+          category?: string
+          subject?: string
+          message?: string
+          status?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           brand_name: string

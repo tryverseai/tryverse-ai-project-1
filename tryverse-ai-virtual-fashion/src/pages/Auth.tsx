@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Eye, EyeOff, Building2, Mail, Lock, User, Briefcase } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
+import { TryVerseLogo } from "@/components/TryVerseLogo";
 import {
   Select,
   SelectContent,
@@ -27,6 +28,8 @@ const roles = [
 const Auth = () => {
   const [searchParams] = useSearchParams();
   const [isSignUp, setIsSignUp] = useState(searchParams.get("signup") === "true");
+  const redirectParam = searchParams.get("redirect");
+  const redirectTo = redirectParam || sessionStorage.getItem("tryverse_redirect") || "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [brandName, setBrandName] = useState("");
@@ -42,6 +45,10 @@ const Auth = () => {
   useEffect(() => {
     if (searchParams.get("signup") === "true") setIsSignUp(true);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (redirectParam) sessionStorage.setItem("tryverse_redirect", redirectParam);
+  }, [redirectParam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +67,8 @@ const Auth = () => {
       if (error) {
         toast({ title: "Error", description: error.message, variant: "destructive" });
       } else {
-        navigate("/dashboard");
+        if (redirectParam) sessionStorage.removeItem("tryverse_redirect");
+        navigate(redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`, { replace: true });
       }
     }
     setLoading(false);
@@ -69,12 +77,13 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left side - branding */}
-      <div className="hidden lg:flex lg:w-1/2 gradient-primary items-center justify-center p-12 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_50%)]" />
+      <div className="hidden lg:flex lg:w-1/2 bg-black items-center justify-center p-12 relative overflow-hidden">
         <div className="relative z-10 max-w-md">
-          <Link to="/" className="font-display text-2xl font-bold text-primary-foreground mb-8 block">
-            TryVerse<span className="text-primary-foreground/60">.AI</span>
-          </Link>
+          <div className="flex justify-center mb-8">
+            <Link to="/" className="inline-block">
+              <TryVerseLogo height={205} invert />
+            </Link>
+          </div>
           <h2 className="font-display text-4xl font-bold text-primary-foreground mb-4 leading-tight">
             The AI infrastructure for virtual try-on
           </h2>
@@ -103,12 +112,6 @@ const Auth = () => {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
         >
-          <div className="lg:hidden mb-8">
-            <Link to="/" className="font-display text-xl font-bold text-foreground">
-              TryVerse<span className="text-muted-foreground">.AI</span>
-            </Link>
-          </div>
-
           <h1 className="font-display text-2xl font-bold text-foreground mb-2">
             {isSignUp ? "Start your free account" : "Welcome back"}
           </h1>
