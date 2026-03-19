@@ -4,6 +4,7 @@ import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 import { supabaseAdmin } from '../../config/supabase';
 import { allocateCredits } from '../credits';
+import { sendPaymentConfirmationEmail, sendFailedPaymentEmail } from '../email';
 import type { PaystackWebhookEvent } from '../../types';
 
 const PAYSTACK_API = 'https://api.paystack.co';
@@ -149,6 +150,23 @@ export async function handlePaystackWebhook(event: PaystackWebhookEvent): Promis
     // Allocate credits
     await allocateCredits(metadata.user_id, metadata.plan_id, 'paystack');
 
+    // Send payment confirmation email
+    try {
+      const { data: plan } = await supabaseAdmin.from('plans').select('name, tryons_per_month').eq('id', metadata.plan_id).single();
+      const { data: profile } = await supabaseAdmin.from('profiles').select('full_name, brand_name').eq('id', metadata.user_id).single();
+      const name = profile?.full_name || profile?.brand_name || '';
+      await sendPaymentConfirmationEmail({
+        email: customer.email,
+        name,
+        planName: plan?.name || metadata.plan_id,
+        amount: String(amount / 100),
+        currency,
+        credits: plan?.tryons_per_month ?? 0,
+      });
+    } catch (e) {
+      logger.warn('Failed to send payment confirmation email', { error: String(e) });
+    }
+
     // Log usage event
     await supabaseAdmin.from('usage_events').insert({
       user_id: metadata.user_id,
@@ -167,6 +185,23 @@ export async function handlePaystackWebhook(event: PaystackWebhookEvent): Promis
       userId: metadata.user_id,
       planId: metadata.plan_id,
     });
+  }
+
+  if (event.event === 'charge.failed') {
+    const { metadata, customer } = event.data;
+    if (customer?.email && metadata?.user_id) {
+      try {
+        const { data: profile } = await supabaseAdmin.from('profiles').select('full_name, brand_name').eq('id', metadata.user_id).single();
+        const name = profile?.full_name || profile?.brand_name || '';
+        await sendFailedPaymentEmail({
+          email: customer.email,
+          name,
+          reason: 'Please check your payment method and try again.',
+        });
+      } catch (e) {
+        logger.warn('Failed to send payment failure email', { error: String(e) });
+      }
+    }
   }
 
   if (event.event === 'subscription.disable') {

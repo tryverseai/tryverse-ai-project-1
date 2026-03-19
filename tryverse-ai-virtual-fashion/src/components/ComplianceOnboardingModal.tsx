@@ -2,13 +2,21 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, FileText, Shield, Database, X } from "lucide-react";
+import { ChevronRight, FileText, Shield, Database, Target, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { TermsContent, PrivacyContent, DataProcessingContent } from "@/content/policyContent";
 import { toast } from "sonner";
+
+const GOALS_OPTIONS = [
+  "Make my brand look more premium",
+  "Create professional model photos instantly",
+  "Increase conversions on my product pages",
+  "Reduce photoshoot costs and time",
+  "Create high-fashion content for ads and social media",
+];
 
 const STEPS = [
   {
@@ -17,6 +25,7 @@ const STEPS = [
     subtitle: "Last updated: March 9, 2026",
     icon: FileText,
     content: TermsContent,
+    isLegal: true,
   },
   {
     id: "privacy",
@@ -24,6 +33,7 @@ const STEPS = [
     subtitle: "Last updated: March 9, 2026",
     icon: Shield,
     content: PrivacyContent,
+    isLegal: true,
   },
   {
     id: "data",
@@ -31,6 +41,15 @@ const STEPS = [
     subtitle: "Last updated: March 9, 2026",
     icon: Database,
     content: DataProcessingContent,
+    isLegal: true,
+  },
+  {
+    id: "goals",
+    title: "What are your goals?",
+    subtitle: "Help us personalize your experience",
+    icon: Target,
+    content: null,
+    isLegal: false,
   },
 ] as const;
 
@@ -46,6 +65,7 @@ export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: 
   const contentRef = useRef<HTMLDivElement>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Scroll content to top when step changes
@@ -55,34 +75,50 @@ export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: 
 
   const step = STEPS[stepIndex];
   const isLastStep = stepIndex === STEPS.length - 1;
+  const isGoalsStep = step.id === "goals";
   const StepIcon = step.icon;
   const ContentComponent = step.content;
 
+  const canProceed = isGoalsStep ? selectedGoals.length > 0 : acknowledged;
+
   const handleNext = async () => {
-    if (!acknowledged) return;
+    if (!canProceed) return;
 
     if (isLastStep) {
       setSaving(true);
       try {
         const { error } = await supabase
           .from("profiles")
-          .update({ compliance_onboarding_completed_at: new Date().toISOString() })
-          .eq("id", userId);
+          .upsert(
+            {
+              id: userId,
+              compliance_onboarding_completed_at: new Date().toISOString(),
+              onboarding_goals: selectedGoals.length > 0 ? selectedGoals : [],
+            },
+            { onConflict: "id" }
+          );
 
         if (error) throw error;
         onComplete();
         navigate("/dashboard");
         toast.success("Welcome to TryVerse! Your dashboard is ready.");
       } catch (err) {
+        console.error("Compliance save failed:", err);
         toast.error("Failed to save. Please try again.");
-        console.error(err);
       } finally {
         setSaving(false);
       }
     } else {
       setStepIndex((i) => i + 1);
       setAcknowledged(false);
+      if (!isGoalsStep) setSelectedGoals([]);
     }
+  };
+
+  const toggleGoal = (goal: string) => {
+    setSelectedGoals((prev) =>
+      prev.includes(goal) ? prev.filter((g) => g !== goal) : [...prev, goal]
+    );
   };
 
   const handleExit = async () => {
@@ -154,29 +190,59 @@ export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: 
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <ContentComponent />
+                {isGoalsStep ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Select all that apply. This helps us tailor TryVerse for your needs.
+                    </p>
+                    <div className="space-y-2">
+                      {GOALS_OPTIONS.map((goal) => (
+                        <label
+                          key={goal}
+                          className={cn(
+                            "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                            selectedGoals.includes(goal)
+                              ? "border-foreground bg-muted"
+                              : "border-border hover:bg-muted/50"
+                          )}
+                        >
+                          <Checkbox
+                            checked={selectedGoals.includes(goal)}
+                            onCheckedChange={() => toggleGoal(goal)}
+                            className="mt-0.5"
+                          />
+                          <span className="text-sm font-medium text-foreground">{goal}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  ContentComponent && <ContentComponent />
+                )}
               </motion.div>
             </AnimatePresence>
           </div>
 
-          {/* Footer: checkbox + Next */}
+          {/* Footer: checkbox (legal only) + Next */}
           <div className="px-6 py-4 border-t border-border shrink-0 space-y-4">
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <Checkbox
-                checked={acknowledged}
-                onCheckedChange={(checked) => setAcknowledged(checked === true)}
-                className="mt-0.5"
-              />
-              <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                I have read and agree to the {step.title}
-              </span>
-            </label>
+            {!isGoalsStep && (
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <Checkbox
+                  checked={acknowledged}
+                  onCheckedChange={(checked) => setAcknowledged(checked === true)}
+                  className="mt-0.5"
+                />
+                <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                  I have read and agree to the {step.title}
+                </span>
+              </label>
+            )}
             <Button
               onClick={handleNext}
-              disabled={!acknowledged || saving}
+              disabled={!canProceed || saving}
               className="w-full gap-2"
             >
-              {saving ? "Saving..." : isLastStep ? "Accept & Open Dashboard" : "Next"}
+              {saving ? "Saving..." : isLastStep ? "Finish & Open Dashboard" : "Next"}
               {!isLastStep && <ChevronRight className="h-4 w-4" />}
             </Button>
           </div>

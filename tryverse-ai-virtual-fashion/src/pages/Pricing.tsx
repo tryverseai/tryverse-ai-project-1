@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { initializePaystackPayment, initializeFlutterwavePayment } from "@/lib/backendApi";
+import { captureSentryException } from "@/lib/sentry";
 
 const plans = [
   {
@@ -18,11 +19,13 @@ const plans = [
     priceValue: 150000,
     priceValueUsd: 100,
     period: "/month",
-    description: "For emerging brands testing virtual try-on.",
+    description: "For testing and small-scale use.",
+    goodFor: "Individuals · Small brands testing",
     features: [
-      "Up to 100 products",
-      "100 try-ons/month",
-      "Basic fit prediction",
+      "Image try-on only",
+      "Downloads enabled",
+      "Optional watermark",
+      "Limited monthly credits",
       "Widget embed",
       "Email support",
     ],
@@ -37,13 +40,14 @@ const plans = [
     priceValue: 500000,
     priceValueUsd: 350,
     period: "/month",
-    description: "For scaling brands serious about conversion.",
+    description: "For brands creating content.",
+    goodFor: "Growing brands · Social media teams",
     features: [
-      "Up to 1,000 products",
-      "1,000 try-ons/month",
-      "Advanced fit prediction",
-      "AI marketing content",
-      "Catalog import (URL)",
+      "Image try-on",
+      "Downloads (no watermark)",
+      "Turn try-on images into short, realistic product videos for ads and social media",
+      "Higher usage limits",
+      "Faster processing",
       "Priority support",
       "Analytics dashboard",
     ],
@@ -58,16 +62,16 @@ const plans = [
     priceValue: 0,
     priceValueUsd: 0,
     period: "",
-    description: "For global brands needing full infrastructure.",
+    description: "For brands at scale.",
+    goodFor: "Large brands · E-commerce",
     features: [
-      "Unlimited products",
-      "Unlimited try-ons",
-      "AI video generation",
-      "Custom model training",
-      "Dedicated API access",
+      "Everything in Growth",
+      "Unlimited or custom credits",
+      "API access (for integrations)",
+      "Bulk processing",
+      "Priority GPU queue",
+      "Dedicated onboarding",
       "SLA & uptime guarantee",
-      "Dedicated account manager",
-      "Custom integrations",
     ],
     cta: "Contact Sales",
     featured: false,
@@ -119,7 +123,9 @@ const Pricing = () => {
       }
     } catch (error: any) {
       console.error('Payment error:', error);
-      toast.error(error.message || "Failed to initialize payment. Please try again.");
+      const err = error instanceof Error ? error : new Error(String(error?.message || "Failed to initialize payment"));
+      captureSentryException(err, { tags: { feature: "payment" }, extra: { plan: plan.id, provider } });
+      toast.error(err.message || "Failed to initialize payment. Please try again.");
     } finally {
       setLoadingPlan(null);
     }
@@ -194,9 +200,14 @@ const Pricing = () => {
                 )}
                 <div className="mb-6">
                   <h3 className="font-display text-lg font-semibold mb-1">{plan.name}</h3>
-                  <p className={`text-sm mb-4 ${plan.featured ? "text-background/70" : "text-muted-foreground"}`}>
+                  <p className={`text-sm mb-1 ${plan.featured ? "text-background/70" : "text-muted-foreground"}`}>
                     {plan.description}
                   </p>
+                  {"goodFor" in plan && (
+                    <p className={`text-xs mb-4 ${plan.featured ? "text-background/60" : "text-muted-foreground/80"}`}>
+                      Good for: {plan.goodFor}
+                    </p>
+                  )}
                   <div className="flex items-baseline gap-1">
                     <span className="font-display text-4xl font-bold">
                       {provider === "flutterwave" && plan.priceUsd !== "Custom" ? plan.priceUsd : plan.price}

@@ -150,6 +150,50 @@ export type Database = {
         }
         Relationships: []
       }
+      products: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          image_url: string | null
+          category: string
+          product_url: string | null
+          tryons_count: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          image_url?: string | null
+          category: string
+          product_url?: string | null
+          tryons_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          image_url?: string | null
+          category?: string
+          product_url?: string | null
+          tryons_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_requests: {
         Row: {
           id: string
@@ -198,6 +242,7 @@ export type Database = {
       profiles: {
         Row: {
           brand_name: string
+          compliance_onboarding_completed_at: string | null
           contact_email: string | null
           created_at: string
           current_plan_id: string | null
@@ -207,6 +252,7 @@ export type Database = {
           id: string
           monthly_credits_remaining: number
           monthly_credits_total: number
+          onboarding_goals: string[] | null
           role: string | null
           updated_at: string
           website_url: string | null
@@ -218,6 +264,7 @@ export type Database = {
         }
         Insert: {
           brand_name?: string
+          compliance_onboarding_completed_at?: string | null
           contact_email?: string | null
           created_at?: string
           current_plan_id?: string | null
@@ -227,6 +274,7 @@ export type Database = {
           id: string
           monthly_credits_remaining?: number
           monthly_credits_total?: number
+          onboarding_goals?: string[] | null
           role?: string | null
           updated_at?: string
           website_url?: string | null
@@ -238,6 +286,7 @@ export type Database = {
         }
         Update: {
           brand_name?: string
+          compliance_onboarding_completed_at?: string | null
           contact_email?: string | null
           created_at?: string
           current_plan_id?: string | null
@@ -247,6 +296,7 @@ export type Database = {
           id?: string
           monthly_credits_remaining?: number
           monthly_credits_total?: number
+          onboarding_goals?: string[] | null
           role?: string | null
           updated_at?: string
           website_url?: string | null

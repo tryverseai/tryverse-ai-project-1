@@ -20,7 +20,7 @@ export function TryVerseLogo({ className = "", height = 48, invert = false }: Tr
         alt="TryVerse"
         className={`tryverse-logo-img ${className}`}
         style={{
-          height: `${height}px`,
+          ...(height != null ? { height: `${height}px` } : {}),
           width: "auto",
           display: "block",
         }}

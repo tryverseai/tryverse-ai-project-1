@@ -1,7 +1,10 @@
 import { supabaseAdmin } from '../config/supabase';
 import { getRedisClient } from '../config/redis';
 import { logger } from '../config/logger';
+import { sendLowCreditsWarningEmail } from './email';
 import type { CreditCheckResult } from '../types';
+
+const LOW_CREDITS_THRESHOLD = 5;
 
 /** Plan limits: Free=3/month, Pro/starter=100, Enterprise=unlimited (-1) */
 const PLAN_LIMITS: Record<string, number> = {
@@ -193,7 +196,13 @@ export async function decrementCredits(userId: string): Promise<void> {
   if (error) {
     logger.error('Failed to decrement credits', { userId, error: error.message });
   } else {
+    const newRemaining = Object.values(updatePayload)[0];
     logger.info('Credit deducted', { userId, creditType: Object.keys(updatePayload)[0] });
+    if (newRemaining > 0 && newRemaining <= LOW_CREDITS_THRESHOLD) {
+      sendLowCreditsWarningEmail(userId, newRemaining).catch((e) =>
+        logger.warn('Low credits email failed', { userId, error: String(e) })
+      );
+    }
   }
 }
 

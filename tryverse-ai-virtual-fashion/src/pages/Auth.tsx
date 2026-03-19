@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { posthogCapture } from "@/lib/posthog";
 
 const roles = [
   "Founder",
@@ -58,15 +59,19 @@ const Auth = () => {
       const finalRole = role === "Other" ? customRole : role;
       const { error } = await signUp(email, password, brandName, fullName, finalRole);
       if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
+        console.error("Signup error:", error);
+        toast({ title: "Sign up failed", description: error.message, variant: "destructive", duration: 6000 });
       } else {
+        posthogCapture("user_signed_up", { email });
         toast({ title: "Account created!", description: "Check your email to confirm your account." });
       }
     } else {
       const { error } = await signIn(email, password);
       if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
+        console.error("Sign in error:", error);
+        toast({ title: "Sign in failed", description: error.message, variant: "destructive", duration: 6000 });
       } else {
+        posthogCapture("user_logged_in", { email });
         if (redirectParam) sessionStorage.removeItem("tryverse_redirect");
         navigate(redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`, { replace: true });
       }

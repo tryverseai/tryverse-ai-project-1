@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Upload, User, ShoppingBag, Star, Heart, ChevronRight, Scan, Check, RotateCcw, AlertCircle, Loader2 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { posthogCapture } from "@/lib/posthog";
 import { toast } from "sonner";
 
 import modelFemaleBefore from "@/assets/model-female-before.jpg";
@@ -22,6 +23,10 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const WidgetPreview = () => {
   const [searchParams] = useSearchParams();
   const isWidgetMode = searchParams.get('mode') === 'widget';
+
+  useEffect(() => {
+    posthogCapture("brand_page_viewed", { source: "widget_preview", mode: isWidgetMode ? "widget" : "preview" });
+  }, [isWidgetMode]);
   const apiKeyParam = searchParams.get('apiKey');
   const productImageParam = searchParams.get('productImage');
   const productTypeParam = searchParams.get('productType') || 'clothing';
@@ -36,6 +41,7 @@ const WidgetPreview = () => {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    posthogCapture("upload_photo_clicked", { source: "widget_preview" });
 
     // Validate file type
     if (!ALLOWED_TYPES.includes(file.type)) {
@@ -84,6 +90,7 @@ const WidgetPreview = () => {
 
     setPhase("processing");
     setErrorMessage(null);
+    posthogCapture("try_on_started", { source: "widget_preview", category: productTypeParam });
 
     try {
       if (apiKey) {
@@ -110,6 +117,7 @@ const WidgetPreview = () => {
         if (data.resultImage) {
           setResultImage(data.resultImage);
           setPhase("result");
+          posthogCapture("try_on_completed", { source: "widget_preview", category: productTypeParam });
         } else {
           throw new Error('No result image received');
         }
@@ -118,10 +126,14 @@ const WidgetPreview = () => {
         await new Promise(r => setTimeout(r, 2000));
         setResultImage(modelShirtTryon);
         setPhase("result");
+        posthogCapture("try_on_completed", { source: "widget_preview", category: productTypeParam });
       }
     } catch (error: any) {
       console.error('Try-on error:', error);
-      setErrorMessage(error.message || 'Something went wrong. Please try again.');
+      const err = error instanceof Error ? error : new Error(String(error?.message || 'Unknown'));
+      posthogCapture("try_on_failed", { source: "widget_preview", category: productTypeParam, error: err.message });
+      captureSentryException(err, { tags: { feature: "try_on", source: "widget_preview" }, extra: { category: productTypeParam } });
+      setErrorMessage(err.message || 'Something went wrong. Please try again.');
       setPhase("error");
     }
   };

@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Upload, Camera, User, Scan, Check, RotateCcw, ArrowRight, Glasses, ShoppingBag, Shirt, AlertCircle, X } from "lucide-react";
 import { toast } from "sonner";
 import { uploadImage, startTryOn, type TryOnCategory } from "@/lib/backendApi";
+import { posthogCapture } from "@/lib/posthog";
+import { captureSentryException } from "@/lib/sentry";
 
 import modelMaleBefore from "@/assets/model-male-before.jpg";
 import modelFemaleBefore from "@/assets/model-female-before.jpg";
@@ -106,6 +108,7 @@ const TryOnStudio = () => {
       // Step 3: Start AI inference
       setUploadProgress("Starting AI try-on…");
       setPhase("processing");
+      posthogCapture("try_on_started", { category: selectedCategory, source: "try_on_studio" });
 
       const result = await startTryOn({
         personImagePath: personUpload.filePath,
@@ -118,6 +121,7 @@ const TryOnStudio = () => {
         setResultUrl(result.resultUrl);
         setProcessingTime(result.processingTimeMs || null);
         setPhase("result");
+        posthogCapture("try_on_completed", { category: selectedCategory, source: "try_on_studio" });
         toast.success("Virtual try-on complete!");
       } else if (result.status === 'failed') {
         throw new Error(result.error || "AI processing failed. Please try again.");
@@ -127,6 +131,7 @@ const TryOnStudio = () => {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      posthogCapture("try_on_failed", { category: selectedCategory, source: "try_on_studio", error: msg });
       setErrorMsg(msg);
       setPhase("error");
       toast.error(msg);
@@ -143,11 +148,18 @@ const TryOnStudio = () => {
         setResultUrl(status.resultUrl);
         setProcessingTime(status.processingTimeMs || null);
         setPhase("result");
+        posthogCapture("try_on_completed", { category: selectedCategory, source: "try_on_studio" });
         toast.success("Virtual try-on complete!");
         return;
       }
       if (status.status === 'failed') {
-        throw new Error(status.error || "Processing failed");
+        const err = new Error(status.error || "Processing failed");
+        posthogCapture("try_on_failed", { category: selectedCategory, source: "try_on_studio", error: status.error });
+        captureSentryException(err, {
+          tags: { feature: "try_on", source: "try_on_studio" },
+          extra: { category: selectedCategory, tryonId },
+        });
+        throw err;
       }
     }
     throw new Error("Try-on timed out. Please try again.");
@@ -251,7 +263,7 @@ const TryOnStudio = () => {
                     ) : (
                       <div
                         className="border-2 border-dashed border-border rounded-xl p-10 text-center hover:border-foreground/30 transition-colors cursor-pointer"
-                        onClick={() => personInputRef.current?.click()}
+                        onClick={() => { posthogCapture("upload_photo_clicked", { source: "try_on_studio" }); personInputRef.current?.click(); }}
                         onDrop={(e) => handleDrop(e, setPersonImage)}
                         onDragOver={(e) => e.preventDefault()}
                       >
@@ -414,6 +426,7 @@ const TryOnStudio = () => {
                         href={resultUrl}
                         download="tryverse-result.jpg"
                         className="text-sm font-medium text-foreground hover:underline"
+                        onClick={() => posthogCapture("download_result_clicked", { source: "try_on_studio" })}
                       >
                         Download result
                       </a>

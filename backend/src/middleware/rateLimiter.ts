@@ -2,6 +2,8 @@ import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
 import { logger } from '../config/logger';
 import { logAudit } from '../services/audit';
+import { Sentry } from '../config/sentry';
+import { env } from '../config/env';
 
 const rateLimitResponse = (req: Request, res: Response) => {
   const identifier = (req as Request & { user?: { id: string }; apiKey?: { id: string; userId: string } }).user?.id
@@ -20,6 +22,13 @@ const rateLimitResponse = (req: Request, res: Response) => {
     ip: req.ip,
     identifier,
   });
+  if (env.SENTRY_DSN) {
+    Sentry.captureMessage('Rate limit exceeded', {
+      level: 'warning',
+      tags: { feature: 'rate_limit', environment: env.NODE_ENV },
+      extra: { path: req.path, ip: req.ip, identifier },
+    });
+  }
   res.status(429).json({
     error: 'Too many requests. Please slow down.',
     retryAfter: 60,

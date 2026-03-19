@@ -11,6 +11,8 @@ import {
   getCredits,
   type TryOnCategory,
 } from "@/lib/backendApi";
+import { posthogCapture } from "@/lib/posthog";
+import { captureSentryException } from "@/lib/sentry";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -78,6 +80,12 @@ export function WidgetTab() {
   const [apiKey, setApiKey] = useState<string | null>(null);
 
   useEffect(() => {
+    if (activeView === "preview") {
+      posthogCapture("brand_page_viewed", { source: "widget_tab" });
+    }
+  }, [activeView]);
+
+  useEffect(() => {
     if (!user) return;
 
     const fetchUserData = async () => {
@@ -126,6 +134,7 @@ export function WidgetTab() {
   const handlePersonUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      posthogCapture("upload_photo_clicked", { source: "widget_tab" });
       const reader = new FileReader();
       reader.onload = () => setPersonImage(reader.result as string);
       reader.readAsDataURL(file);
@@ -149,6 +158,7 @@ export function WidgetTab() {
 
     setProcessing(true);
     setTryOnResult(null);
+    posthogCapture("try_on_started", { source: "widget_tab", category: "clothing" });
 
     try {
       const productFile = await dataUrlToFile(productImage);
@@ -176,7 +186,10 @@ export function WidgetTab() {
         throw new Error(result.error || "Generation failed");
       }
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to generate try-on.");
+      const err = error instanceof Error ? error : new Error(String(error));
+      posthogCapture("try_on_failed", { source: "widget_tab", category: "clothing", error: err.message });
+      captureSentryException(err, { tags: { feature: "try_on", source: "widget_tab" } });
+      toast.error(err.message);
     } finally {
       setProcessing(false);
     }

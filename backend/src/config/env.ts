@@ -46,6 +46,12 @@ export const env = {
     'REPLICATE_MODEL_ACCESSORIES',
     'fashn/tryon:54bb2780ade1e2584e29a1b634a59571e59ddc65958fcfad8514a30c7d5d4ea5'
   ),
+  // Optional: flux-kontext for dynamic prompt-based try-on (set to enable)
+  REPLICATE_MODEL_FLUX_KONTEXT: optionalEnv(
+    'REPLICATE_MODEL_FLUX_KONTEXT',
+    'flux-kontext-apps/multi-image-kontext-pro:6d14f9b3d25a9400c4a5e5f0f6842ae7537fefcf68df86dad9533f66204f2bb2'
+  ),
+  REPLICATE_USE_FLUX_KONTEXT: optionalBool('REPLICATE_USE_FLUX_KONTEXT', false),
 
   // Preprocessing — background removal (rembg)
   REPLICATE_MODEL_REMBG: optionalEnv(
@@ -83,9 +89,14 @@ export const env = {
 
   // ── Monitoring (Sentry) ───────────────────────────────────────────────────
   SENTRY_DSN: optionalEnv('SENTRY_DSN', ''),
+  SENTRY_ISSUES_URL: optionalEnv('SENTRY_ISSUES_URL', ''),
 
   // ── Frontend ─────────────────────────────────────────────────────────────
   FRONTEND_URL: optionalEnv('FRONTEND_URL', 'http://localhost:8080'),
+
+  // ── Email (Resend) ─────────────────────────────────────────────────────
+  RESEND_API_KEY: optionalEnv('RESEND_API_KEY', ''),
+  EMAIL_FROM: optionalEnv('EMAIL_FROM', 'TryVerse <onboarding@resend.dev>'),
 
   // ── Storage ───────────────────────────────────────────────────────────────
   STORAGE_BUCKET_INPUTS: optionalEnv('STORAGE_BUCKET_INPUTS', 'tryon-inputs'),

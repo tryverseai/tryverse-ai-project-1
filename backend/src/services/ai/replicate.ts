@@ -1,6 +1,7 @@
 import Replicate from 'replicate';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
+import { buildTryOnPrompt } from './promptBuilder';
 import type { ProductCategory } from '../../types';
 
 const replicate = new Replicate({ auth: env.REPLICATE_API_TOKEN });
@@ -10,6 +11,9 @@ export interface VtonInput {
   productImageUrl: string;
   category: ProductCategory;
   productDescription?: string;
+  /** For dynamic prompt building (flux-kontext) */
+  bodyDetected?: boolean;
+  poseType?: 'full_body' | 'half_body' | 'face_only';
 }
 
 export interface VtonOutput {
@@ -104,10 +108,87 @@ function parseRetryAfter(err: unknown): number {
 }
 
 /**
+ * Flux Kontext: prompt-based multi-image try-on.
+ * Uses dynamic prompts (user never sees them).
+ */
+export async function runFluxKontextInference(input: VtonInput): Promise<VtonOutput> {
+  const startTime = Date.now();
+  const model = env.REPLICATE_MODEL_FLUX_KONTEXT;
+  const prompt = buildTryOnPrompt({
+    category: input.category,
+    productDescription: input.productDescription,
+    bodyDetected: input.bodyDetected ?? true,
+    poseType: input.poseType,
+    garmentHint: input.productDescription,
+  });
+
+  logger.info('Starting flux-kontext inference', { category: input.category, promptLength: prompt.length });
+
+  await waitForReplicateSlot();
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+    try {
+      const output = await replicate.run(
+        model as `${string}/${string}:${string}`,
+        {
+          input: {
+            prompt,
+            input_image_1: input.personImageUrl,
+            input_image_2: input.productImageUrl,
+            aspect_ratio: 'match_input_image',
+          },
+        }
+      );
+
+      const processingTimeMs = Date.now() - startTime;
+      const resultUrl = extractResultUrl(output);
+
+      if (!resultUrl || !resultUrl.startsWith('http')) {
+        throw new Error('Invalid output URL from flux-kontext');
+      }
+
+      logger.info('Flux-kontext inference complete', {
+        category: input.category,
+        processingTimeMs,
+      });
+      return {
+        resultUrl,
+        processingTimeMs,
+        modelUsed: 'flux-kontext',
+        category: input.category,
+      };
+    } catch (err: unknown) {
+      lastError = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      const is429 = msg.includes('429') || msg.includes('Too Many Requests') || msg.includes('throttled');
+
+      if (is429 && attempt <= MAX_RETRIES) {
+        const waitMs = parseRetryAfter(err);
+        logger.warn('Replicate rate limited, retrying', { attempt, waitMs });
+        await sleep(waitMs);
+      } else {
+        throw new Error(
+          is429
+            ? 'AI service is busy. Please try again in about 30 seconds.'
+            : `AI inference failed: ${msg}`
+        );
+      }
+    }
+  }
+  throw lastError;
+}
+
+/**
  * Runs the appropriate AI try-on inference for the given category.
+ * Uses flux-kontext when REPLICATE_USE_FLUX_KONTEXT=true, otherwise legacy models.
  * Retries automatically on 429 (rate limit) with backoff.
  */
 export async function runVtonInference(input: VtonInput): Promise<VtonOutput> {
+  if (env.REPLICATE_USE_FLUX_KONTEXT) {
+    return runFluxKontextInference(input);
+  }
+
   const startTime = Date.now();
   const { model, buildInput } = getModelConfig(input.category);
   const modelShortName = model.split('/')[1]?.split(':')[0] || model;

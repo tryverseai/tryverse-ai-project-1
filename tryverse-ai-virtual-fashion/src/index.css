@@ -44,8 +44,7 @@
 
     --font-display: 'Space Grotesk', sans-serif;
     --font-body: 'Inter', sans-serif;
-    --navbar-height: 10rem; /* 160px - matches fixed navbar (logo 110px + padding) */
-
+    --navbar-height: 10rem; /* 160px - desktop: logo 110px + padding */
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -54,6 +53,11 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 220 20% 10%;
+  }
+  @media (max-width: 1023px) {
+    :root {
+      --navbar-height: 4.5rem; /* 72px - mobile: smaller logo + padding */
+    }
   }
 
   .dark {
@@ -78,7 +82,7 @@
     --ring: 0 0% 90%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224 76% 48%;
+    --sidebar-primary: 0 0% 10%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
@@ -88,6 +92,10 @@
 }
 
 @layer base {
+  select option {
+    background: black;
+    color: white;
+  }
   html {
     scroll-padding-top: var(--navbar-height);
   }

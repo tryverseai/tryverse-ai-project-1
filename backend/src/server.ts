@@ -20,6 +20,7 @@ import widgetRouter from './routes/widget';
 import productsRouter from './routes/products';
 import adminRouter from './routes/admin';
 import analyticsRouter from './routes/analytics';
+import emailsRouter from './routes/emails';
 
 // ─── Sentry (must init before everything else) ────────────────────────────────
 initSentry();
@@ -156,6 +157,7 @@ app.use('/api/widget',    widgetRouter);
 app.use('/api/products',  productsRouter);
 app.use('/api/admin',     adminRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/emails',    emailsRouter);
 
 // ─── Sentry error handler ────────────────────────────────────────────────────
 try {

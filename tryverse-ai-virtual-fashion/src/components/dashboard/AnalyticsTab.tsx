@@ -123,7 +123,7 @@ export function AnalyticsTab() {
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
-          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          className="rounded-lg border border-black bg-black text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-black [&>option]:bg-black [&>option]:text-white"
         >
           <option value={7}>Last 7 days</option>
           <option value={30}>Last 30 days</option>

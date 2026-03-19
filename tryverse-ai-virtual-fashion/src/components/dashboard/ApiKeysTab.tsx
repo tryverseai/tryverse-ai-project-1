@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { sendApiKeyDeliveryEmail } from "@/lib/backendApi";
 
 interface ApiKey {
   id: string;
@@ -57,6 +58,8 @@ export function ApiKeysTab() {
       toast.error("Failed to generate key");
       console.error(error);
     } else {
+      const keyPreview = data?.key_value ? data.key_value.slice(0, 12) + "••••••••••••" : "••••••••••••••••";
+      sendApiKeyDeliveryEmail({ keyName: newKeyName.trim(), keyPreview }).catch(() => {});
       toast.success("API key generated successfully");
       setShowNewForm(false);
       setNewKeyName("");
@@ -80,10 +83,12 @@ export function ApiKeysTab() {
 
   const regenerateKey = async (id: string, name: string) => {
     await revokeKey(id);
-    const { error } = await supabase.rpc("generate_api_key", { p_name: name });
+    const { data, error } = await supabase.rpc("generate_api_key", { p_name: name });
     if (error) {
       toast.error("Failed to regenerate key");
     } else {
+      const keyPreview = data?.key_value ? data.key_value.slice(0, 12) + "••••••••••••" : "••••••••••••••••";
+      sendApiKeyDeliveryEmail({ keyName: name, keyPreview }).catch(() => {});
       toast.success("New API key generated");
       await fetchKeys();
     }

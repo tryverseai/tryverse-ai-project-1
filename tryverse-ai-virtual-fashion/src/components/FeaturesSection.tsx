@@ -23,7 +23,7 @@ const features = [
   {
     icon: Video,
     title: "AI Product Videos",
-    description: "Transform static product images into dynamic product videos that simulate movement, fit, and texture.",
+    description: "Turn try-on images into short, realistic product videos for ads and social media — no extra shoots required.",
   },
   {
     icon: Code2,

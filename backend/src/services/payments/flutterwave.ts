@@ -4,6 +4,7 @@ import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 import { supabaseAdmin } from '../../config/supabase';
 import { allocateCredits } from '../credits';
+import { sendPaymentConfirmationEmail, sendFailedPaymentEmail } from '../email';
 import type { FlutterwaveWebhookEvent } from '../../types';
 
 const FLW_API = 'https://api.flutterwave.com/v3';
@@ -151,6 +152,23 @@ export async function handleFlutterwaveWebhook(event: FlutterwaveWebhookEvent): 
     // Allocate credits
     await allocateCredits(meta.user_id, meta.plan_id, 'flutterwave');
 
+    // Send payment confirmation email
+    try {
+      const { data: plan } = await supabaseAdmin.from('plans').select('name, tryons_per_month').eq('id', meta.plan_id).single();
+      const { data: profile } = await supabaseAdmin.from('profiles').select('full_name, brand_name').eq('id', meta.user_id).single();
+      const name = profile?.full_name || profile?.brand_name || '';
+      await sendPaymentConfirmationEmail({
+        email: customer.email,
+        name,
+        planName: plan?.name || meta.plan_id,
+        amount: String(amount),
+        currency,
+        credits: plan?.tryons_per_month ?? 0,
+      });
+    } catch (e) {
+      logger.warn('Failed to send payment confirmation email', { error: String(e) });
+    }
+
     // Log usage event
     await supabaseAdmin.from('usage_events').insert({
       user_id: meta.user_id,
@@ -169,5 +187,24 @@ export async function handleFlutterwaveWebhook(event: FlutterwaveWebhookEvent): 
       userId: meta.user_id,
       planId: meta.plan_id,
     });
+  }
+
+  if (event.event === 'charge.failed' || (event.event === 'charge.completed' && event.data.status !== 'successful')) {
+    const { meta, customer } = event.data;
+    const email = customer?.email;
+    const userId = meta?.user_id;
+    if (email && userId) {
+      try {
+        const { data: profile } = await supabaseAdmin.from('profiles').select('full_name, brand_name').eq('id', userId).single();
+        const name = profile?.full_name || profile?.brand_name || '';
+        await sendFailedPaymentEmail({
+          email,
+          name,
+          reason: 'Please check your payment method and try again.',
+        });
+      } catch (e) {
+        logger.warn('Failed to send payment failure email', { error: String(e) });
+      }
+    }
   }
 }

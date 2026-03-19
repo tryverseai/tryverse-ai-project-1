@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../config/logger';
+import { Sentry } from '../config/sentry';
+import { env } from '../config/env';
 
 export class AppError extends Error {
   constructor(
@@ -40,10 +42,31 @@ export function errorHandler(
     userId: req.user?.id,
   });
 
+  if (env.SENTRY_DSN) {
+    Sentry.withScope((scope) => {
+      scope.setTag('environment', env.NODE_ENV);
+      scope.setTag('feature', inferFeatureFromPath(req.path));
+      scope.setContext('request', {
+        method: req.method,
+        path: req.path,
+        userId: (req as Request & { user?: { id: string } }).user?.id,
+      });
+      Sentry.captureException(err);
+    });
+  }
+
   res.status(500).json({
     error: 'Internal server error',
     ...(process.env.NODE_ENV !== 'production' && { details: err.message }),
   });
+}
+
+function inferFeatureFromPath(path: string): string {
+  if (path.includes('/tryon')) return 'try_on';
+  if (path.includes('/payment')) return 'payment';
+  if (path.includes('/auth') || path.includes('/upload')) return 'auth';
+  if (path.includes('/admin')) return 'admin';
+  return 'api';
 }
 
 export function notFoundHandler(req: Request, res: Response): void {

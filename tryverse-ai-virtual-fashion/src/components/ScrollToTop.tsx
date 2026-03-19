@@ -3,14 +3,16 @@ import { useLocation } from "react-router-dom";
 
 /**
  * Scrolls to top whenever the route changes.
- * Fixes the issue where navigating between pages (About, Terms, etc.)
- * would show the bottom of the page instead of the top.
+ * Defers scroll to next frame to avoid blocking initial paint.
  */
 export function ScrollToTop() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    const id = requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(id);
   }, [pathname]);
 
   return null;

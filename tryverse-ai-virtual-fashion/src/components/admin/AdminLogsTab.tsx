@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { FileText, Loader2, RefreshCw, Filter, Maximize2 } from "lucide-react";
+import { FileText, Loader2, RefreshCw, Filter, Maximize2, ExternalLink, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getAdminLogs } from "@/lib/backendApi";
+import { getAdminLogs, getAdminSentryConfig } from "@/lib/backendApi";
 import { toast } from "sonner";
 
 interface AdminLogsTabProps {
@@ -64,6 +64,7 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
   const [levelFilter, setLevelFilter] = useState<string>("");
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [sentryConfig, setSentryConfig] = useState<{ enabled: boolean; issuesUrl?: string } | null>(null);
 
   const fetch = async () => {
     setLoading(true);
@@ -80,6 +81,12 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
   useEffect(() => {
     fetch();
   }, [adminKey, levelFilter]);
+
+  useEffect(() => {
+    getAdminSentryConfig(adminKey)
+      .then(setSentryConfig)
+      .catch(() => setSentryConfig({ enabled: false }));
+  }, [adminKey]);
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -124,6 +131,37 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
           Expand
         </Button>
       </div>
+
+      {sentryConfig?.enabled && (
+        <div className="bg-card rounded-xl border border-border p-5 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-foreground/10 flex items-center justify-center">
+              <AlertTriangle className="h-5 w-5 text-foreground" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-display text-sm font-semibold text-foreground">Error monitoring (Sentry)</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Errors are automatically reported. View issues, stack traces, and performance data in Sentry.
+              </p>
+            </div>
+            {sentryConfig.issuesUrl ? (
+              <a
+                href={sentryConfig.issuesUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border hover:bg-muted text-sm font-medium"
+              >
+                <ExternalLink className="h-4 w-4" />
+                View in Sentry
+              </a>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Set SENTRY_ISSUES_URL in backend .env to add a direct link.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center gap-2">

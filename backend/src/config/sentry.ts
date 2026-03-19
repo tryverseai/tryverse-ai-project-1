@@ -22,14 +22,14 @@ export function initSentry(): void {
   Sentry.init({
     dsn: env.SENTRY_DSN,
     environment: env.NODE_ENV,
-    tracesSampleRate: env.NODE_ENV === 'production' ? 0.2 : 1.0,
+    tracesSampleRate: 0.2,
     profilesSampleRate: 0.1,
     integrations: [
       Sentry.httpIntegration(),
       Sentry.expressIntegration(),
     ],
     beforeSend(event) {
-      // Scrub sensitive data before sending to Sentry
+      event.tags = { ...event.tags, environment: env.NODE_ENV };
       if (event.request?.headers) {
         delete event.request.headers['authorization'];
         delete event.request.headers['x-api-key'];
@@ -74,9 +74,22 @@ export function captureJobFailure(err: Error, jobData: Record<string, unknown>):
   if (!env.SENTRY_DSN) return;
 
   Sentry.captureException(err, {
-    tags: { type: 'queue_job_failure' },
+    tags: { type: 'queue_job_failure', feature: 'try_on' },
     level: 'error',
     extra: jobData,
+  });
+}
+
+/**
+ * Captures an authentication error.
+ */
+export function captureAuthError(msg: string, context: Record<string, unknown>): void {
+  if (!env.SENTRY_DSN) return;
+
+  Sentry.captureMessage(msg, {
+    level: 'warning',
+    tags: { feature: 'auth', type: 'auth_error' },
+    extra: context,
   });
 }
 

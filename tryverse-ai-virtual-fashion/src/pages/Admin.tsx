@@ -17,6 +17,7 @@ import {
   FileText,
   Key,
   ScrollText,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,9 +40,11 @@ import { AdminSettingsTab } from "@/components/admin/AdminSettingsTab";
 import { AdminApiKeysTab } from "@/components/admin/AdminApiKeysTab";
 import { AdminLogsTab } from "@/components/admin/AdminLogsTab";
 import { AdminAuditTab } from "@/components/admin/AdminAuditTab";
+import { AdminAnalyticsTab } from "@/components/admin/AdminAnalyticsTab";
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Overview" },
+  { icon: BarChart3, label: "Analytics" },
   { icon: Users, label: "Users" },
   { icon: Zap, label: "Try-ons" },
   { icon: Cpu, label: "Queue" },
@@ -113,6 +116,8 @@ const Admin = () => {
     switch (activeTab) {
       case "Overview":
         return <AdminOverviewTab adminKey={storedKey} />;
+      case "Analytics":
+        return <AdminAnalyticsTab adminKey={storedKey} />;
       case "Users":
         return <AdminUsersTab adminKey={storedKey} />;
       case "Try-ons":

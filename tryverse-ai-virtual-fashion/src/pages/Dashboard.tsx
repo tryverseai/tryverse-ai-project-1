@@ -11,6 +11,7 @@ import { AnalyticsTab } from "@/components/dashboard/AnalyticsTab";
 import { ProductsTab } from "@/components/dashboard/ProductsTab";
 import { SettingsTab } from "@/components/dashboard/SettingsTab";
 import { BillingTab } from "@/components/dashboard/BillingTab";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Overview" },
   { icon: BarChart3, label: "Analytics" },
@@ -38,7 +39,11 @@ const Dashboard = () => {
 
   const renderContent = () => {
     const ActiveComponent = tabComponents[activeTab] || OverviewTab;
-    return <ActiveComponent />;
+    return (
+      <ErrorBoundary>
+        <ActiveComponent />
+      </ErrorBoundary>
+    );
   };
 
   return (
@@ -91,8 +96,10 @@ const Dashboard = () => {
           </div>
 
           {/* Main content */}
-          <div className="flex-1 p-6 md:p-8 lg:pt-8 pt-[calc(var(--navbar-height)+4rem)]">
-            {renderContent()}
+          <div className="flex-1 min-h-0 p-6 md:p-8 lg:pt-8 pt-[calc(var(--navbar-height)+4rem)]">
+            <div className="min-h-[400px]">
+              {renderContent()}
+            </div>
           </div>
         </div>
       </main>

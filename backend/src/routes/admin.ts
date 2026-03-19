@@ -640,9 +640,9 @@ router.post(
         event_type: 'admin_action',
         actor: 'admin',
         action: 'api_key_revoked',
-        target_id: id,
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
+        target_id: typeof id === 'string' ? id : Array.isArray(id) ? id[0] : undefined,
+        ip_address: typeof req.ip === 'string' ? req.ip : undefined,
+        user_agent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
       });
       logger.info('Admin: API key revoked', { keyId: id });
       res.json({ success: true });
@@ -689,6 +689,17 @@ router.get('/domains', async (_req: Request, res: Response, next: NextFunction):
   } catch (err) {
     next(err);
   }
+});
+
+/**
+ * GET /api/admin/sentry-config
+ * Returns Sentry configuration for the Logs/Errors UI.
+ */
+router.get('/sentry-config', (_req: Request, res: Response): void => {
+  res.json({
+    enabled: !!env.SENTRY_DSN,
+    issuesUrl: env.SENTRY_ISSUES_URL || undefined,
+  });
 });
 
 /**

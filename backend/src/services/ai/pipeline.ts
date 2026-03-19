@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../../config/supabase';
 import { runVtonInference } from './replicate';
+import { inferPoseType } from './promptBuilder';
 import { preprocessPersonImage, preprocessProductImage } from './preprocessing';
 import { preserveFace } from './facePreservation';
 import { postProcessResult, addGarmentShadow } from './postprocessing';
@@ -9,6 +10,7 @@ import { optimizeImageForAI, bufferToDataUrl } from './imageOptimizer';
 import { getCdnUrl, getResponsiveImageUrls } from '../cdn/cloudflare';
 import { getSignedUrl, INPUT_BUCKET, RESULT_BUCKET } from '../storage/images';
 import { decrementCredits, restoreCredits } from '../credits';
+import { sendTryOnCompletedEmail } from '../email';
 import { captureAiError } from '../../config/sentry';
 import { logger } from '../../config/logger';
 import { env } from '../../config/env';
@@ -82,7 +84,12 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
         completed_at: new Date().toISOString(),
       }).eq('id', tryonDbId);
 
-      if (userId) await decrementCredits(userId);
+      if (userId) {
+        await decrementCredits(userId);
+        sendTryOnCompletedEmail(userId, cachedResultUrl).catch((e) =>
+          logger.warn('Try-on completed email failed (cache hit)', { userId, error: String(e) })
+        );
+      }
 
       logger.info('Cache hit — served without AI', { tryonDbId, category });
       return {
@@ -122,12 +129,15 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       logger.warn('Body not clearly detected in person image', { tryonDbId });
     }
 
-    // ── STEP 5: AI Inference ────────────────────────────────────────────────
+    // ── STEP 5: AI Inference (hidden dynamic prompts when using flux-kontext) ─
+    const poseType = inferPoseType(personOptimized.width, personOptimized.height);
     const { resultUrl: rawResultUrl, processingTimeMs, modelUsed } = await runVtonInference({
       personImageUrl: personPreprocessed.processedImageUrl,
       productImageUrl: productPreprocessed.processedImageUrl,
       category,
       productDescription,
+      bodyDetected: personPreprocessed.bodyDetected,
+      poseType,
     });
 
     // ── STEP 6: Face Preservation (GFPGAN) ─────────────────────────────────
@@ -185,6 +195,13 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
 
     // ── STEP 12: Decrement credits ──────────────────────────────────────────
     if (userId) await decrementCredits(userId);
+
+    // ── STEP 12b: Send try-on completed email ──────────────────────────────
+    if (userId) {
+      sendTryOnCompletedEmail(userId, cdnUrl).catch((e) =>
+        logger.warn('Try-on completed email failed', { userId, error: String(e) })
+      );
+    }
 
     // ── STEP 13: Log usage event ────────────────────────────────────────────
     if (userId) {

@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../config/supabase';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { logAudit } from '../services/audit';
+import { captureAuthError, Sentry } from '../config/sentry';
 
 /**
  * Verifies a Supabase JWT from the Authorization header.
@@ -20,6 +21,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
     });
+    captureAuthError('Missing or invalid authorization header', { path: req.path, ip: req.ip });
     logger.warn('Auth failed: missing or invalid authorization header', {
       path: req.path,
       ip: req.ip,
@@ -40,6 +42,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         ip_address: req.ip,
         user_agent: req.headers['user-agent'],
       });
+      captureAuthError('Invalid or expired token', { path: req.path, ip: req.ip, error: error?.message });
       logger.warn('Auth failed: invalid or expired token', {
         path: req.path,
         ip: req.ip,
@@ -51,6 +54,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     req.user = { id: user.id, email: user.email || '' };
     next();
   } catch (err) {
+    const errObj = err instanceof Error ? err : new Error(String(err));
+    if (env.SENTRY_DSN) {
+      Sentry.captureException(errObj, {
+        tags: { feature: 'auth', type: 'auth_middleware_error' },
+        extra: { path: req.path },
+      });
+    }
     logger.error('Auth middleware error', { error: String(err), path: req.path });
     res.status(500).json({ error: 'Authentication service error' });
   }

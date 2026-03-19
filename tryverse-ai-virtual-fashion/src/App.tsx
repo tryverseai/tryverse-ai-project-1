@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { PostHogProvider } from "@/components/PostHogProvider";
 import { HelmetProvider } from "react-helmet-async";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ScrollToTop } from "@/components/ScrollToTop";
@@ -15,6 +16,7 @@ import Pricing from "./pages/Pricing";
 import About from "./pages/About";
 import PartnerWithUs from "./pages/PartnerWithUs";
 import Auth from "./pages/Auth";
+import AuthConfirm from "./pages/AuthConfirm";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import WidgetPreview from "./pages/WidgetPreview";
@@ -34,6 +36,7 @@ const App = () => (
   <HelmetProvider>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <PostHogProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -48,6 +51,7 @@ const App = () => (
             <Route path="/about" element={<About />} />
             <Route path="/partner" element={<PartnerWithUs />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/confirm" element={<AuthConfirm />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/widget-preview" element={<ProtectedRoute><WidgetPreview /></ProtectedRoute>} />
@@ -65,6 +69,7 @@ const App = () => (
           </ComplianceOnboardingGate>
         </BrowserRouter>
       </TooltipProvider>
+      </PostHogProvider>
     </AuthProvider>
   </QueryClientProvider>
   </HelmetProvider>

@@ -22,7 +22,16 @@ export function Navbar() {
   const { user, signOut } = useAuth();
 
   useEffect(() => {
+    let rafId: number;
+    let lastUpdate = 0;
+    const THROTTLE_MS = 120;
     const updateCompact = () => {
+      const now = Date.now();
+      if (now - lastUpdate < THROTTLE_MS) {
+        ticking.current = false;
+        return;
+      }
+      lastUpdate = now;
       const currentY = window.scrollY;
       if (currentY <= 20) {
         setIsCompact(false);
@@ -36,12 +45,17 @@ export function Navbar() {
     };
     const handleScroll = () => {
       if (!ticking.current) {
-        requestAnimationFrame(updateCompact);
         ticking.current = true;
+        rafId = requestAnimationFrame(updateCompact);
       }
     };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    const attach = () => window.addEventListener("scroll", handleScroll, { passive: true });
+    const id = requestAnimationFrame(attach);
+    return () => {
+      cancelAnimationFrame(rafId);
+      cancelAnimationFrame(id);
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
   const isRoute = (href: string) => !href.includes("#");
@@ -55,7 +69,7 @@ export function Navbar() {
 
   return (
     <motion.nav
-      className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border/40"
+      className="fixed top-0 left-0 right-0 z-50 bg-background/98 backdrop-blur-md border-b border-border/40"
       initial={false}
       animate={{
         boxShadow: isCompact
@@ -65,7 +79,7 @@ export function Navbar() {
       transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
     >
       <motion.div
-        className="mx-auto flex items-center justify-between px-6 min-h-[72px] py-4"
+        className="mx-auto flex items-center justify-between px-6 min-h-[56px] md:min-h-[72px] py-3 md:py-4"
         animate={{
           maxWidth: isCompact ? 720 : 1280,
         }}
@@ -82,7 +96,7 @@ export function Navbar() {
           className="flex items-center flex-shrink-0 text-foreground hover:opacity-90 transition-opacity"
           style={{ maxWidth: "none", overflow: "visible" }}
         >
-          <TryVerseLogo height={110} />
+          <TryVerseLogo className="h-11 md:h-[110px]" />
         </Link>
 
         <div className="hidden md:flex items-center gap-10">

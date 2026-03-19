@@ -66,9 +66,11 @@ export function ProductsTab() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchProducts = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const res = await getProducts(pagination.page, pagination.limit, categoryFilter || undefined);
       setProducts(res.products ?? []);
@@ -80,8 +82,10 @@ export function ProductsTab() {
         pages: res.pagination?.pages ?? 1,
       }));
     } catch (err) {
-      toast.error("Failed to fetch products");
+      const msg = err instanceof Error ? err.message : "Failed to load products";
+      setFetchError(msg);
       setProducts([]);
+      toast.error("Failed to fetch products");
     } finally {
       setLoading(false);
     }
@@ -213,14 +217,14 @@ export function ProductsTab() {
           />
         </div>
         <Select
-          value={categoryFilter}
-          onValueChange={(v) => setCategoryFilter(v as TryOnCategory | "")}
+          value={categoryFilter || "all"}
+          onValueChange={(v) => setCategoryFilter(v === "all" ? "" : (v as TryOnCategory))}
         >
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="All categories" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All categories</SelectItem>
+            <SelectItem value="all">All categories</SelectItem>
             {CATEGORIES.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.label}
@@ -231,8 +235,25 @@ export function ProductsTab() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Loading products…</p>
+        </div>
+      ) : fetchError ? (
+        <div className="text-center py-16 bg-card rounded-xl border border-border/50">
+          <Package className="h-8 w-8 text-destructive/60 mx-auto mb-3" />
+          <p className="text-sm font-medium text-foreground mb-1">Could not load products</p>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto mb-4 font-mono">
+            {fetchError}
+          </p>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto mb-4">
+            {fetchError.includes("exist") || fetchError.includes("relation")
+              ? "Make sure the products table exists. Run the migration in Supabase Dashboard → SQL Editor."
+              : "Check your connection and try again."}
+          </p>
+          <Button onClick={fetchProducts} variant="outline">
+            Retry
+          </Button>
         </div>
       ) : products.length === 0 ? (
         <div className="text-center py-16 bg-card rounded-xl border border-border/50">

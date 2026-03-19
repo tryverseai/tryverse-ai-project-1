@@ -20,16 +20,47 @@ async function getAuthToken(): Promise<string | null> {
   return session?.access_token || null;
 }
 
-async function handleResponse<T>(res: Response): Promise<T> {
+async function handleResponse<T>(res: Response, context?: { feature?: string }): Promise<T> {
   if (!res.ok) {
     let message = `Request failed: ${res.status}`;
     try {
       const body = await res.json();
       message = body.error || body.message || message;
     } catch { /* ignore parse error */ }
-    throw new Error(message);
+    const err = new Error(message);
+    try {
+      const { captureSentryException } = await import('@/lib/sentry');
+      captureSentryException(err, {
+        tags: { feature: context?.feature || 'api', type: 'api_error' },
+        extra: { url: res.url, status: res.status },
+      });
+    } catch { /* Sentry not loaded or disabled */ }
+    throw err;
   }
   return res.json() as Promise<T>;
+}
+
+// ─── Emails ───────────────────────────────────────────────────────────────────
+
+export async function sendWelcomeEmail(params: { email: string; name?: string; brandName?: string }) {
+  const res = await fetch(`${BACKEND_URL}/api/emails/welcome`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) return;
+  await res.json();
+}
+
+export async function sendApiKeyDeliveryEmail(params: { keyName: string; keyPreview: string }) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/emails/api-key-delivery`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) return;
+  await res.json();
 }
 
 // ─── Upload ───────────────────────────────────────────────────────────────────
@@ -78,13 +109,13 @@ export async function startTryOn(params: TryOnRequest): Promise<TryOnResponse> {
     headers,
     body: JSON.stringify({ ...params, async: false }), // sync for immediate result
   });
-  return handleResponse<TryOnResponse>(res);
+  return handleResponse<TryOnResponse>(res, { feature: 'try_on' });
 }
 
 export async function pollTryOnStatus(tryonId: string): Promise<TryOnResponse> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${BACKEND_URL}/api/tryon/${tryonId}`, { headers });
-  return handleResponse<TryOnResponse>(res);
+  return handleResponse<TryOnResponse>(res, { feature: 'try_on' });
 }
 
 export async function getSignedImageUrl(path: string): Promise<string> {
@@ -137,7 +168,7 @@ export async function initializePaystackPayment(
     headers,
     body: JSON.stringify({ planId, amount, callbackUrl }),
   });
-  return handleResponse(res);
+  return handleResponse(res, { feature: 'payment' });
 }
 
 export async function initializeFlutterwavePayment(
@@ -152,10 +183,11 @@ export async function initializeFlutterwavePayment(
     headers,
     body: JSON.stringify({ planId, amount, currency, callbackUrl }),
   });
-  return handleResponse(res);
+  return handleResponse(res, { feature: 'payment' });
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────────
+// Uses Supabase directly (RLS) so Products page works without backend dependency
 
 export interface Product {
   id: string;
@@ -169,15 +201,58 @@ export interface Product {
   updated_at?: string;
 }
 
+async function getImageDisplayUrl(pathOrUrl: string | null): Promise<string | null> {
+  if (!pathOrUrl) return null;
+  if (pathOrUrl.startsWith('http')) return pathOrUrl;
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(
+      `${BACKEND_URL}/api/upload/signed-url?path=${encodeURIComponent(pathOrUrl)}`,
+      { headers }
+    );
+    if (!res.ok) return null;
+    const { url } = await res.json();
+    return url || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getProducts(page = 1, limit = 20, category?: TryOnCategory) {
-  const headers = await getAuthHeaders();
-  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-  if (category) params.append('category', category);
-  const res = await fetch(`${BACKEND_URL}/api/products?${params}`, { headers });
-  return handleResponse<{
-    products: Product[];
-    pagination: { page: number; limit: number; total: number; pages: number };
-  }>(res);
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (!user) throw new Error('Not authenticated');
+
+  let q = supabase
+    .from('products')
+    .select('id, name, image_url, category, product_url, tryons_count, created_at, updated_at', { count: 'exact' })
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (category) q = q.eq('category', category);
+
+  const from = (page - 1) * limit;
+  const { data: rows, error, count } = await q.range(from, from + limit - 1);
+
+  if (error) throw new Error(error.message);
+
+  const products: Product[] = await Promise.all(
+    (rows || []).map(async (p) => ({
+      ...p,
+      category: p.category as TryOnCategory,
+      image_display_url: await getImageDisplayUrl(p.image_url),
+    }))
+  );
+
+  return {
+    products,
+    pagination: {
+      page,
+      limit,
+      total: count ?? 0,
+      pages: Math.ceil((count ?? 0) / limit) || 1,
+    },
+  };
 }
 
 export async function createProduct(data: {
@@ -186,34 +261,66 @@ export async function createProduct(data: {
   category: TryOnCategory;
   product_url?: string;
 }) {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`${BACKEND_URL}/api/products`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(data),
-  });
-  return handleResponse<Product>(res);
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: product, error } = await supabase
+    .from('products')
+    .insert({
+      user_id: user.id,
+      name: data.name,
+      image_url: data.image_url || null,
+      category: data.category,
+      product_url: data.product_url || null,
+    })
+    .select('id, name, image_url, category, product_url, tryons_count, created_at, updated_at')
+    .single();
+
+  if (error) throw new Error(error.message);
+  const image_display_url = await getImageDisplayUrl(product.image_url);
+  return { ...product, image_display_url } as Product;
 }
 
 export async function updateProduct(
   id: string,
   data: { name?: string; image_url?: string; category?: TryOnCategory; product_url?: string }
 ) {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`${BACKEND_URL}/api/products/${id}`, {
-    method: 'PUT',
-    headers,
-    body: JSON.stringify(data),
-  });
-  return handleResponse<Product>(res);
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (!user) throw new Error('Not authenticated');
+
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (data.name !== undefined) updates.name = data.name;
+  if (data.image_url !== undefined) updates.image_url = data.image_url;
+  if (data.category !== undefined) updates.category = data.category;
+  if (data.product_url !== undefined) updates.product_url = data.product_url;
+
+  const { data: product, error } = await supabase
+    .from('products')
+    .update(updates)
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select('id, name, image_url, category, product_url, tryons_count, created_at, updated_at')
+    .single();
+
+  if (error) throw new Error(error.message);
+  const image_display_url = await getImageDisplayUrl(product.image_url);
+  return { ...product, image_display_url } as Product;
 }
 
 export async function deleteProduct(id: string) {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`${BACKEND_URL}/api/products/${id}`, { method: 'DELETE', headers });
-  if (res.status === 204) return;
-  const body = await res.json().catch(() => ({}));
-  throw new Error(body.error || `Delete failed: ${res.status}`);
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (!user) throw new Error('Not authenticated');
+
+  const { error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id);
+
+  if (error) throw new Error(error.message);
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
@@ -389,6 +496,10 @@ export async function getAdminLogs(adminKey: string, limit = 200, level?: string
   const params = new URLSearchParams({ limit: String(limit) });
   if (level) params.append('level', level);
   return adminFetch(`/api/admin/logs?${params}`, adminKey);
+}
+
+export async function getAdminSentryConfig(adminKey: string): Promise<{ enabled: boolean; issuesUrl?: string }> {
+  return adminFetch('/api/admin/sentry-config', adminKey);
 }
 
 export async function getAdminAudit(adminKey: string, limit = 100, offset = 0, eventType?: string) {

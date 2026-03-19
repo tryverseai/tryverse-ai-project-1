@@ -11,9 +11,8 @@ export function CTASection() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="relative overflow-hidden rounded-3xl gradient-primary p-12 md:p-20 text-center"
+          className="relative overflow-hidden rounded-3xl bg-black p-12 md:p-20 text-center"
         >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_50%)]" />
           <div className="relative z-10">
             <h2 className="font-display text-3xl md:text-5xl font-bold text-primary-foreground mb-5">
               Ready to Transform Fashion Commerce?
