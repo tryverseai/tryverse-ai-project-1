@@ -44,7 +44,7 @@
 
     --font-display: 'Space Grotesk', sans-serif;
     --font-body: 'Inter', sans-serif;
-    --navbar-height: 10rem; /* 160px - desktop: logo 110px + padding */
+    --navbar-height: 10rem; /* desktop: logo 105px + padding */
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -56,7 +56,7 @@
   }
   @media (max-width: 1023px) {
     :root {
-      --navbar-height: 4.5rem; /* 72px - mobile: smaller logo + padding */
+      --navbar-height: 8.5rem; /* ~136px - mobile: logo 105px + padding */
     }
   }
 

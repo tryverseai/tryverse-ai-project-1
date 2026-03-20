@@ -19,7 +19,7 @@ export function AdminQueueTab({ adminKey }: AdminQueueTabProps) {
   const [pausing, setPausing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetch = () => {
+  const loadQueue = () => {
     setLoading(true);
     setError(null);
     getAdminQueue(adminKey)
@@ -33,14 +33,16 @@ export function AdminQueueTab({ adminKey }: AdminQueueTabProps) {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetch(); }, [adminKey]);
+  useEffect(() => {
+    loadQueue();
+  }, [adminKey]);
 
   const handlePause = async () => {
     setPausing(true);
     try {
       await pauseAdminQueue(adminKey);
       toast.success("Queue paused");
-      fetch();
+      loadQueue();
     } catch {
       toast.error("Failed to pause");
     } finally {
@@ -53,7 +55,7 @@ export function AdminQueueTab({ adminKey }: AdminQueueTabProps) {
     try {
       await resumeAdminQueue(adminKey);
       toast.success("Queue resumed");
-      fetch();
+      loadQueue();
     } catch {
       toast.error("Failed to resume");
     } finally {
@@ -99,10 +101,12 @@ export function AdminQueueTab({ adminKey }: AdminQueueTabProps) {
           <div>
             <h2 className="font-display text-lg font-semibold text-foreground">Queue Status</h2>
             <p className="text-sm text-muted-foreground">
-              {isUnavailable ? "Redis not connected — running in sync mode" : `Status: ${data?.status || "healthy"}`}
+              {isUnavailable
+                ? data?.message || "Redis not connected — running in sync mode"
+                : `Status: ${data?.status || "healthy"}`}
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={fetch} className="ml-auto">Refresh</Button>
+          <Button variant="outline" size="sm" onClick={loadQueue} className="ml-auto">Refresh</Button>
         </div>
 
         {!isUnavailable && data?.counts && (
@@ -141,7 +145,10 @@ export function AdminQueueTab({ adminKey }: AdminQueueTabProps) {
         {isUnavailable && (
           <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
             <AlertCircle className="h-5 w-5 flex-shrink-0" />
-            <p className="text-sm">Redis is not connected. Try-ons run synchronously. Configure REDIS_URL in backend .env for queue support.</p>
+            <p className="text-sm">
+              {data?.message ||
+                "Redis is not connected. Try-ons run synchronously. Configure REDIS_URL in backend .env for queue support."}
+            </p>
           </div>
         )}
       </div>

@@ -45,9 +45,9 @@ export function HeroSection() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/auth?signup=true">
+            <Link to="/early-access">
               <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12 w-full sm:w-auto">
-                Start Free
+                Get Early Access
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>

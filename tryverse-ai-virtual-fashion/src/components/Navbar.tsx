@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, LogOut } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 
@@ -15,6 +16,10 @@ const publicLinks = [
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
+  /** Narrow “focus” layout only on md+ — on mobile full width avoids broken menu / tap targets */
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 768px)").matches : false
+  );
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
   const location = useLocation();
@@ -22,10 +27,23 @@ export function Navbar() {
   const { user, signOut } = useAuth();
 
   useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const onMq = () => setIsDesktop(mq.matches);
+    onMq();
+    mq.addEventListener("change", onMq);
+    return () => mq.removeEventListener("change", onMq);
+  }, []);
+
+  useEffect(() => {
     let rafId: number;
     let lastUpdate = 0;
     const THROTTLE_MS = 120;
     const updateCompact = () => {
+      if (!isDesktop) {
+        setIsCompact(false);
+        ticking.current = false;
+        return;
+      }
       const now = Date.now();
       if (now - lastUpdate < THROTTLE_MS) {
         ticking.current = false;
@@ -49,14 +67,16 @@ export function Navbar() {
         rafId = requestAnimationFrame(updateCompact);
       }
     };
-    const attach = () => window.addEventListener("scroll", handleScroll, { passive: true });
-    const id = requestAnimationFrame(attach);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       cancelAnimationFrame(rafId);
-      cancelAnimationFrame(id);
       window.removeEventListener("scroll", handleScroll);
     };
-  }, []);
+  }, [isDesktop]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
 
   const isRoute = (href: string) => !href.includes("#");
 
@@ -81,7 +101,7 @@ export function Navbar() {
       <motion.div
         className="mx-auto flex items-center justify-between px-6 min-h-[56px] md:min-h-[72px] py-3 md:py-4"
         animate={{
-          maxWidth: isCompact ? 720 : 1280,
+          maxWidth: isDesktop ? (isCompact ? 720 : 1280) : "100%",
         }}
         transition={spring}
         style={{ width: "100%" }}
@@ -96,7 +116,7 @@ export function Navbar() {
           className="flex items-center flex-shrink-0 text-foreground hover:opacity-90 transition-opacity"
           style={{ maxWidth: "none", overflow: "visible" }}
         >
-          <TryVerseLogo className="h-11 md:h-[110px]" />
+          <TryVerseLogo height={105} />
         </Link>
 
         <div className="hidden md:flex items-center gap-10">
@@ -153,77 +173,94 @@ export function Navbar() {
                   Log In
                 </Button>
               </Link>
-              <Link to="/auth?signup=true">
+              <Link to="/early-access">
                 <Button size="sm" className="gradient-primary text-primary-foreground text-sm shadow-soft">
-                  Start Free
+                  Get Early Access
                 </Button>
               </Link>
             </>
           )}
         </motion.div>
 
-        <button className="md:hidden" onClick={() => setOpen(!open)}>
+        <button
+          type="button"
+          className="md:hidden p-2 -mr-2 rounded-md hover:bg-muted/80 text-foreground"
+          aria-expanded={open}
+          aria-label={open ? "Close menu" : "Open menu"}
+          onClick={() => setOpen((v) => !v)}
+        >
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </motion.div>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="md:hidden overflow-hidden bg-background border-b border-border"
-          >
-            <div className="px-6 py-4 flex flex-col gap-3">
-              {publicLinks.map((link) =>
-                isRoute(link.href) ? (
-                  <Link
-                    key={link.href}
-                    to={link.href}
-                    onClick={() => setOpen(false)}
-                    className="text-sm font-medium text-muted-foreground hover:text-foreground py-2"
-                  >
-                    {link.label}
-                  </Link>
-                ) : (
-                  <a
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setOpen(false)}
-                    className="text-sm font-medium text-muted-foreground hover:text-foreground py-2"
-                  >
-                    {link.label}
-                  </a>
-                )
-              )}
-              {user ? (
-                <>
-                  <Link to="/studio" onClick={() => setOpen(false)}>
-                    <Button variant="outline" className="w-full mt-2">
-                      Try-On Studio
-                    </Button>
-                  </Link>
-                  <Link to="/dashboard" onClick={() => setOpen(false)}>
-                    <Button className="gradient-primary text-primary-foreground w-full">
-                      Dashboard
-                    </Button>
-                  </Link>
-                  <Button variant="outline" onClick={() => { handleSignOut(); setOpen(false); }} className="w-full gap-1.5">
-                    <LogOut className="h-3.5 w-3.5" /> Sign Out
-                  </Button>
-                </>
-              ) : (
-                <Link to="/auth?signup=true" onClick={() => setOpen(false)}>
-                  <Button className="gradient-primary text-primary-foreground w-full mt-2">
-                    Start Free
-                  </Button>
-                </Link>
-              )}
-            </div>
-          </motion.div>
+      {/* CSS transition menu — avoids framer “height: auto” glitches on mobile */}
+      <div
+        className={cn(
+          "md:hidden overflow-hidden bg-background border-b border-border transition-all duration-300 ease-out",
+          open ? "max-h-[85vh] opacity-100 border-border" : "max-h-0 opacity-0 border-transparent pointer-events-none"
         )}
-      </AnimatePresence>
+      >
+        <div className="px-6 py-4 flex flex-col gap-3">
+          {publicLinks.map((link) =>
+            isRoute(link.href) ? (
+              <Link
+                key={link.href}
+                to={link.href}
+                onClick={() => setOpen(false)}
+                className="text-sm font-medium text-muted-foreground hover:text-foreground py-2"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                key={link.href}
+                href={link.href}
+                onClick={() => setOpen(false)}
+                className="text-sm font-medium text-muted-foreground hover:text-foreground py-2"
+              >
+                {link.label}
+              </a>
+            )
+          )}
+          {user ? (
+            <>
+              <Link to="/studio" onClick={() => setOpen(false)}>
+                <Button variant="outline" className="w-full mt-2">
+                  Try-On Studio
+                </Button>
+              </Link>
+              <Link to="/dashboard" onClick={() => setOpen(false)}>
+                <Button className="gradient-primary text-primary-foreground w-full">
+                  Dashboard
+                </Button>
+              </Link>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  void handleSignOut();
+                  setOpen(false);
+                }}
+                className="w-full gap-1.5"
+              >
+                <LogOut className="h-3.5 w-3.5" /> Sign Out
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link to="/auth" onClick={() => setOpen(false)}>
+                <Button variant="outline" className="w-full mt-2">
+                  Log In
+                </Button>
+              </Link>
+              <Link to="/early-access" onClick={() => setOpen(false)}>
+                <Button className="gradient-primary text-primary-foreground w-full">
+                  Get Early Access
+                </Button>
+              </Link>
+            </>
+          )}
+        </div>
+      </div>
     </motion.nav>
   );
 }

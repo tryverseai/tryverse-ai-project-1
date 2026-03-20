@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, Users, Ban, Unlock, Loader2, Plus, Minus } from "lucide-react";
+import { Search, Ban, Unlock, Loader2, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +29,8 @@ interface AdminUser {
   monthly_credits_total: number;
   widget_activated: boolean;
   created_at: string;
+  is_banned?: boolean;
+  banned_until?: string | null;
 }
 
 export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
@@ -61,24 +63,25 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
     fetchUsers();
   }, [adminKey, pagination.page, search]);
 
-  const handleBan = async (u: AdminUser) => {
-    if (!confirm(`Ban ${u.brand_name}?`)) return;
+  const handleBlock = async (u: AdminUser) => {
+    if (!confirm(`Block ${u.brand_name || u.contact_email || "this user"}? They will not be able to use the API.`)) return;
     try {
-      await banAdminUser(adminKey, u.id);
-      toast.success("User banned");
-      fetchUsers();
-    } catch {
-      toast.error("Failed to ban user");
+      await banAdminUser(adminKey, u.id, false);
+      toast.success("User blocked");
+      await fetchUsers();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to block user");
     }
   };
 
-  const handleUnban = async (u: AdminUser) => {
+  const handleUnblock = async (u: AdminUser) => {
+    if (!confirm(`Unblock ${u.brand_name || u.contact_email || "this user"}?`)) return;
     try {
       await banAdminUser(adminKey, u.id, true);
-      toast.success("User unbanned");
-      fetchUsers();
-    } catch {
-      toast.error("Failed to unban user");
+      toast.success("User unblocked");
+      await fetchUsers();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to unblock user");
     }
   };
 
@@ -141,6 +144,7 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
                   <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Plan</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Credits</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Widget</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Status</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Joined</th>
                   <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">Actions</th>
                 </tr>
@@ -165,6 +169,13 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
                         <span className="text-xs text-muted-foreground">Off</span>
                       )}
                     </td>
+                    <td className="px-5 py-4">
+                      {u.is_banned ? (
+                        <span className="text-xs px-2 py-0.5 rounded bg-destructive/15 text-destructive font-medium">Blocked</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Active</span>
+                      )}
+                    </td>
                     <td className="px-5 py-4 text-sm text-muted-foreground">
                       {new Date(u.created_at).toLocaleDateString()}
                     </td>
@@ -173,9 +184,29 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
                         <Button variant="ghost" size="sm" onClick={() => openCreditsDialog(u)} className="h-8 gap-1">
                           <Plus className="h-3.5 w-3.5" /> Credits
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleBan(u)} className="h-8 text-destructive hover:text-destructive">
-                          <Ban className="h-3.5 w-3.5" />
-                        </Button>
+                        {u.is_banned ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleUnblock(u)}
+                            className="h-8 gap-1 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                            title="Unblock user"
+                          >
+                            <Unlock className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Unblock</span>
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleBlock(u)}
+                            className="h-8 gap-1 text-destructive hover:text-destructive"
+                            title="Block user"
+                          >
+                            <Ban className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Block</span>
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

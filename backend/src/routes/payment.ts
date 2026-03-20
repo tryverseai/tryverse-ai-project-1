@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import { requireAuth } from '../middleware/auth';
 import { paymentRateLimit } from '../middleware/rateLimiter';
 import { handleValidationErrors } from '../middleware/validate';
+import { AppError } from '../middleware/errorHandler';
 import { env } from '../config/env';
 import {
   initializePaystackPayment,
@@ -22,9 +23,36 @@ import type { PaystackWebhookEvent, FlutterwaveWebhookEvent } from '../types';
 
 const router = Router();
 
+function assertValidCallbackUrl(callbackUrl: string): void {
+  try {
+    const allowed = new URL(env.FRONTEND_URL);
+    const given = new URL(callbackUrl);
+    if (allowed.hostname !== given.hostname) {
+      throw new Error('callbackUrl host must match FRONTEND_URL');
+    }
+    if (env.NODE_ENV === 'production' && allowed.origin !== given.origin) {
+      throw new Error('callbackUrl must match application origin in production');
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith('callbackUrl')) throw e;
+    throw new Error('Invalid callbackUrl');
+  }
+}
+
+/**
+ * GET /api/payment/providers
+ * Which payment rails are configured (no secrets exposed).
+ */
+router.get('/providers', (_req: Request, res: Response): void => {
+  res.json({
+    paystack: Boolean(env.PAYSTACK_SECRET_KEY),
+    flutterwave: Boolean(env.FLUTTERWAVE_SECRET_KEY),
+  });
+});
+
 /**
  * POST /api/payment/initialize/paystack
- * Initializes a Paystack checkout for a plan subscription.
+ * NGN — amount is taken from DB (plans.price_ngn), not the client.
  */
 router.post(
   '/initialize/paystack',
@@ -32,40 +60,37 @@ router.post(
   requireAuth,
   [
     body('planId').isString().notEmpty().isLength({ max: 50 }).withMessage('planId is required'),
-    body('amount').isNumeric().withMessage('amount must be a number'),
     body('callbackUrl')
       .isURL()
       .withMessage('callbackUrl must be a valid URL')
       .custom((url) => {
-        try {
-          const allowed = new URL(env.FRONTEND_URL);
-          const given = new URL(url);
-          if (allowed.hostname !== given.hostname) {
-            throw new Error('callbackUrl host must match FRONTEND_URL');
-          }
-          // In production, require same origin; in dev allow localhost on any port
-          if (env.NODE_ENV === 'production' && allowed.origin !== given.origin) {
-            throw new Error('callbackUrl must match application origin in production');
-          }
-        } catch (e) {
-          if (e instanceof Error && e.message.startsWith('callbackUrl')) throw e;
-          throw new Error('Invalid callbackUrl');
-        }
+        assertValidCallbackUrl(url);
         return true;
       }),
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { planId, amount, callbackUrl } = req.body;
-      const userId = req.user!.id;
-      const email = req.user!.email;
+      if (!env.PAYSTACK_SECRET_KEY) {
+        res.status(503).json({ error: 'Paystack is not configured' });
+        return;
+      }
+      const { planId, callbackUrl } = req.body;
+      const { data: plan, error } = await supabaseAdmin
+        .from('plans')
+        .select('price_ngn, id')
+        .eq('id', planId)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (error || !plan || plan.price_ngn <= 0) {
+        throw new AppError('Plan not available for Paystack checkout', 400);
+      }
 
       const result = await initializePaystackPayment({
-        email,
-        amount,
+        email: req.user!.email,
+        amount: plan.price_ngn,
         planId,
-        userId,
+        userId: req.user!.id,
         callbackUrl,
       });
 
@@ -78,7 +103,7 @@ router.post(
 
 /**
  * POST /api/payment/initialize/flutterwave
- * Initializes a Flutterwave checkout.
+ * Amount from DB: USD → price_usd, NGN → price_ngn (other currencies not server-priced).
  */
 router.post(
   '/initialize/flutterwave',
@@ -86,47 +111,57 @@ router.post(
   requireAuth,
   [
     body('planId').isString().notEmpty().isLength({ max: 50 }).withMessage('planId is required'),
-    body('amount').isNumeric().withMessage('amount must be a number'),
-    body('currency').isString().isLength({ min: 3, max: 3 }).withMessage('currency must be 3-letter code'),
+    body('currency')
+      .isString()
+      .isLength({ min: 3, max: 3 })
+      .withMessage('currency must be 3-letter code')
+      .custom((c) => {
+        if (!['USD', 'NGN'].includes(String(c).toUpperCase())) {
+          throw new Error('Use USD or NGN for Flutterwave (amounts are taken from your plan)');
+        }
+        return true;
+      }),
     body('callbackUrl')
       .isURL()
       .withMessage('callbackUrl must be a valid URL')
       .custom((url) => {
-        try {
-          const allowed = new URL(env.FRONTEND_URL);
-          const given = new URL(url);
-          if (allowed.hostname !== given.hostname) {
-            throw new Error('callbackUrl host must match FRONTEND_URL');
-          }
-          if (env.NODE_ENV === 'production' && allowed.origin !== given.origin) {
-            throw new Error('callbackUrl must match application origin in production');
-          }
-        } catch (e) {
-          if (e instanceof Error && e.message.startsWith('callbackUrl')) throw e;
-          throw new Error('Invalid callbackUrl');
-        }
+        assertValidCallbackUrl(url);
         return true;
       }),
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { planId, amount, currency, callbackUrl } = req.body;
-      const userId = req.user!.id;
-      const email = req.user!.email;
+      if (!env.FLUTTERWAVE_SECRET_KEY) {
+        res.status(503).json({ error: 'Flutterwave is not configured' });
+        return;
+      }
+      const { planId, currency, callbackUrl } = req.body;
+      const cur = String(currency).toUpperCase();
 
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('full_name')
-        .eq('id', userId)
-        .single();
+      const { data: plan, error } = await supabaseAdmin
+        .from('plans')
+        .select('price_usd, price_ngn, id')
+        .eq('id', planId)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (error || !plan) {
+        throw new AppError('Plan not found or inactive', 404);
+      }
+
+      const amount = cur === 'USD' ? plan.price_usd : plan.price_ngn;
+      if (amount <= 0) {
+        throw new AppError('This plan is not available for self-checkout in this currency', 400);
+      }
+
+      const { data: profile } = await supabaseAdmin.from('profiles').select('full_name').eq('id', req.user!.id).single();
 
       const result = await initializeFlutterwavePayment({
-        email,
+        email: req.user!.email,
         amount,
-        currency,
+        currency: cur,
         planId,
-        userId,
+        userId: req.user!.id,
         callbackUrl,
         fullName: profile?.full_name || undefined,
       });
@@ -140,8 +175,6 @@ router.post(
 
 /**
  * POST /api/payment/webhook/paystack
- * Receives and verifies Paystack webhook events.
- * Uses express.text (raw string) for HMAC verification — mounted in server.ts.
  */
 router.post(
   '/webhook/paystack',
@@ -158,7 +191,6 @@ router.post(
       }
 
       const event = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as PaystackWebhookEvent;
-      // Respond immediately to Paystack, process async
       res.status(200).json({ received: true });
 
       handlePaystackWebhook(event).catch((err) => {
@@ -172,7 +204,6 @@ router.post(
 
 /**
  * POST /api/payment/webhook/flutterwave
- * Receives and verifies Flutterwave webhook events.
  */
 router.post(
   '/webhook/flutterwave',
@@ -202,14 +233,16 @@ router.post(
 
 /**
  * GET /api/payment/verify/paystack/:reference
- * Manually verify a Paystack transaction (called after redirect).
- * Verifies the payment belongs to the authenticated user (IDOR prevention).
  */
 router.get(
   '/verify/paystack/:reference',
   requireAuth,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      if (!env.PAYSTACK_SECRET_KEY) {
+        res.status(503).json({ error: 'Paystack is not configured' });
+        return;
+      }
       const reference = String(req.params.reference || '').trim();
       if (!reference) {
         res.status(400).json({ error: 'Reference required' });
@@ -234,14 +267,16 @@ router.get(
 
 /**
  * GET /api/payment/verify/flutterwave/:transactionId
- * Manually verify a Flutterwave transaction.
- * Verifies the payment belongs to the authenticated user (IDOR prevention).
  */
 router.get(
   '/verify/flutterwave/:transactionId',
   requireAuth,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      if (!env.FLUTTERWAVE_SECRET_KEY) {
+        res.status(503).json({ error: 'Flutterwave is not configured' });
+        return;
+      }
       const transactionId = String(req.params.transactionId || '').trim();
       if (!transactionId) {
         res.status(400).json({ error: 'Transaction ID required' });

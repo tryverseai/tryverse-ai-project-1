@@ -73,6 +73,72 @@ export type Database = {
         }
         Relationships: []
       }
+      early_access_requests: {
+        Row: {
+          biggest_challenge: string
+          brand_name: string
+          created_at: string
+          customer_confidence: string
+          email: string
+          first_name: string
+          heard_about: string | null
+          id: string
+          monthly_revenue: string
+          must_have_features: Json
+          platform: string
+          prior_solution_notes: string | null
+          product_range: string
+          return_rate: string
+          role: string
+          timeline: string
+          top_return_reason: string
+          tried_solutions: Json
+          website_url: string
+        }
+        Insert: {
+          biggest_challenge: string
+          brand_name: string
+          created_at?: string
+          customer_confidence: string
+          email: string
+          first_name: string
+          heard_about?: string | null
+          id?: string
+          monthly_revenue: string
+          must_have_features?: Json
+          platform: string
+          prior_solution_notes?: string | null
+          product_range: string
+          return_rate: string
+          role: string
+          timeline: string
+          top_return_reason: string
+          tried_solutions?: Json
+          website_url: string
+        }
+        Update: {
+          biggest_challenge?: string
+          brand_name?: string
+          created_at?: string
+          customer_confidence?: string
+          email?: string
+          first_name?: string
+          heard_about?: string | null
+          id?: string
+          monthly_revenue?: string
+          must_have_features?: Json
+          platform?: string
+          prior_solution_notes?: string | null
+          product_range?: string
+          return_rate?: string
+          role?: string
+          timeline?: string
+          top_return_reason?: string
+          tried_solutions?: Json
+          website_url?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -250,6 +316,7 @@ export type Database = {
           free_credits_total: number
           full_name: string | null
           id: string
+          is_blocked: boolean
           monthly_credits_remaining: number
           monthly_credits_total: number
           onboarding_goals: string[] | null
@@ -272,6 +339,7 @@ export type Database = {
           free_credits_total?: number
           full_name?: string | null
           id: string
+          is_blocked?: boolean
           monthly_credits_remaining?: number
           monthly_credits_total?: number
           onboarding_goals?: string[] | null
@@ -294,6 +362,7 @@ export type Database = {
           free_credits_total?: number
           full_name?: string | null
           id?: string
+          is_blocked?: boolean
           monthly_credits_remaining?: number
           monthly_credits_total?: number
           onboarding_goals?: string[] | null

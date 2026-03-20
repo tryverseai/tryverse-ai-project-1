@@ -21,9 +21,9 @@ export function CTASection() {
               Start with 3 free AI try-ons. No credit card required. Experience TryVerse before committing to a plan.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/auth?signup=true">
+              <Link to="/early-access">
                 <Button size="lg" className="bg-background text-foreground hover:bg-background/90 text-base h-12 px-8 shadow-lg">
-                  Start Free
+                  Get Early Access
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>

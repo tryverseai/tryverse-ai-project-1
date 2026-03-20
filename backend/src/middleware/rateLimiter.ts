@@ -76,6 +76,15 @@ export const paymentRateLimit = rateLimit({
   handler: rateLimitResponse,
 });
 
+// Public early-access form — tight limit per IP
+export const earlyAccessRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitResponse,
+});
+
 // Auth endpoints — 10 per 15 minutes (brute force protection)
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,

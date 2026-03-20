@@ -22,6 +22,9 @@ export async function initializeFlutterwavePayment(params: {
   callbackUrl: string;
   fullName?: string;
 }): Promise<{ authorization_url: string; tx_ref: string }> {
+  if (!env.FLUTTERWAVE_SECRET_KEY) {
+    throw new Error('Flutterwave is not configured');
+  }
   const tx_ref = `TV_FLW_${params.userId.slice(0, 8)}_${Date.now()}`;
 
   const response = await axios.post(
@@ -73,6 +76,9 @@ export async function verifyFlutterwaveTransaction(transactionId: string): Promi
   currency: string;
   meta: { user_id: string; plan_id: string };
 }> {
+  if (!env.FLUTTERWAVE_SECRET_KEY) {
+    throw new Error('Flutterwave is not configured');
+  }
   const response = await axios.get(`${FLW_API}/transactions/${transactionId}/verify`, {
     headers: { Authorization: `Bearer ${env.FLUTTERWAVE_SECRET_KEY}` },
   });
@@ -92,7 +98,9 @@ export async function verifyFlutterwaveTransaction(transactionId: string): Promi
  * Compare: incoming verif-hash must equal FLUTTERWAVE_WEBHOOK_SECRET.
  */
 export function validateFlutterwaveSignature(_payload: string, verifHash: string): boolean {
-  return verifHash === env.FLUTTERWAVE_WEBHOOK_SECRET && verifHash.length > 0;
+  return (
+    Boolean(env.FLUTTERWAVE_WEBHOOK_SECRET) && verifHash === env.FLUTTERWAVE_WEBHOOK_SECRET && verifHash.length > 0
+  );
 }
 
 /**

@@ -52,6 +52,35 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return;
     }
     req.user = { id: user.id, email: user.email || '' };
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('is_blocked')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (profileError) {
+      logger.warn('Auth: profile lookup failed (is_blocked)', {
+        userId: user.id,
+        error: profileError.message,
+      });
+      // If column missing until migration, continue; otherwise surface error
+      if (!profileError.message?.includes('column') && !profileError.message?.includes('schema cache')) {
+        res.status(500).json({ error: 'Profile check failed' });
+        return;
+      }
+    } else if (profile?.is_blocked) {
+      logAudit({
+        event_type: 'failed_login',
+        actor: user.id,
+        action: 'account_suspended',
+        details: { path: req.path },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+      res.status(403).json({ error: 'Account suspended', code: 'ACCOUNT_SUSPENDED' });
+      return;
+    }
+
     next();
   } catch (err) {
     const errObj = err instanceof Error ? err : new Error(String(err));
@@ -79,6 +108,15 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (user) {
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('is_blocked')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!profileError && profile?.is_blocked) {
+        res.status(403).json({ error: 'Account suspended', code: 'ACCOUNT_SUSPENDED' });
+        return;
+      }
       req.user = { id: user.id, email: user.email || '' };
     }
   } catch {

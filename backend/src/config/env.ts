@@ -72,11 +72,11 @@ export const env = {
   ENABLE_POST_PROCESSING: optionalBool('ENABLE_POST_PROCESSING', true),
   ENABLE_IMAGE_MODERATION: optionalBool('ENABLE_IMAGE_MODERATION', false),
 
-  // ── Payments ─────────────────────────────────────────────────────────────
-  PAYSTACK_SECRET_KEY: requireEnv('PAYSTACK_SECRET_KEY'),
-  PAYSTACK_WEBHOOK_SECRET: requireEnv('PAYSTACK_WEBHOOK_SECRET'),
-  FLUTTERWAVE_SECRET_KEY: requireEnv('FLUTTERWAVE_SECRET_KEY'),
-  FLUTTERWAVE_WEBHOOK_SECRET: requireEnv('FLUTTERWAVE_WEBHOOK_SECRET'),
+  // ── Payments (Paystack · Flutterwave) ────────────────────────────────────
+  PAYSTACK_SECRET_KEY: optionalEnv('PAYSTACK_SECRET_KEY', ''),
+  PAYSTACK_WEBHOOK_SECRET: optionalEnv('PAYSTACK_WEBHOOK_SECRET', ''),
+  FLUTTERWAVE_SECRET_KEY: optionalEnv('FLUTTERWAVE_SECRET_KEY', ''),
+  FLUTTERWAVE_WEBHOOK_SECRET: optionalEnv('FLUTTERWAVE_WEBHOOK_SECRET', ''),
 
   // ── Image Moderation (Hive) ───────────────────────────────────────────────
   HIVE_API_KEY: optionalEnv('HIVE_API_KEY', ''),

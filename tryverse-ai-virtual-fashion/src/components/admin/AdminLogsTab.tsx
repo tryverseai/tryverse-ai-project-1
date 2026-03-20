@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { FileText, Loader2, RefreshCw, Filter, Maximize2, ExternalLink, AlertTriangle } from "lucide-react";
+import { FileText, Loader2, RefreshCw, Filter, Maximize2, ExternalLink, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -29,31 +30,74 @@ interface LogEntry {
   meta?: Record<string, unknown>;
 }
 
-const levelColors: Record<string, string> = {
-  error: "text-destructive",
-  warn: "text-amber-600 dark:text-amber-400",
-  info: "text-foreground",
-  debug: "text-muted-foreground",
-};
+function levelBadgeVariant(level: string): "default" | "secondary" | "destructive" | "outline" {
+  const l = level.toLowerCase();
+  if (l === "error") return "destructive";
+  if (l === "warn" || l === "warning") return "outline";
+  if (l === "debug") return "secondary";
+  return "secondary";
+}
+
+function formatMeta(meta?: Record<string, unknown>): string {
+  if (!meta || Object.keys(meta).length === 0) return "";
+  try {
+    return JSON.stringify(meta, null, 2);
+  } catch {
+    return String(meta);
+  }
+}
 
 function LogEntries({ logs, compact = false }: { logs: LogEntry[]; compact?: boolean }) {
   return (
-    <div className={`divide-y divide-border/50 font-mono ${compact ? "text-xs" : "text-sm"}`}>
-      {logs.map((entry, i) => (
-        <div
-          key={`${entry.timestamp}-${i}`}
-          className={`hover:bg-muted/30 flex gap-3 items-start ${compact ? "px-5 py-2" : "px-4 py-3"}`}
-        >
-          <span className="text-muted-foreground shrink-0">{new Date(entry.timestamp).toLocaleTimeString()}</span>
-          <span className={`shrink-0 font-semibold ${levelColors[entry.level] || "text-foreground"}`}>
-            [{entry.level}]
-          </span>
-          <span className="text-foreground break-all flex-1">{entry.message}</span>
-          {entry.meta && Object.keys(entry.meta).length > 0 && (
-            <span className="text-muted-foreground shrink-0"> {JSON.stringify(entry.meta)}</span>
-          )}
-        </div>
-      ))}
+    <div className={compact ? "space-y-2 p-3" : "space-y-3 p-4"}>
+      {logs.map((entry, i) => {
+        const metaStr = formatMeta(entry.meta);
+        const isHttpLine = /^\S+ - - \[\d{2}\//.test(entry.message.trim());
+        return (
+          <div
+            key={`${entry.timestamp}-${i}`}
+            className={`rounded-lg border border-border/70 bg-muted/15 hover:bg-muted/25 transition-colors ${
+              compact ? "p-3" : "p-4"
+            } ${isHttpLine ? "opacity-95" : ""}`}
+          >
+            <div className="flex flex-wrap items-center gap-2 gap-y-2 mb-2">
+              <time
+                className={`text-muted-foreground tabular-nums shrink-0 ${
+                  compact ? "text-[11px]" : "text-xs"
+                }`}
+                dateTime={entry.timestamp}
+              >
+                {new Date(entry.timestamp).toLocaleString(undefined, {
+                  dateStyle: "short",
+                  timeStyle: "medium",
+                })}
+              </time>
+              <Badge variant={levelBadgeVariant(entry.level)} className="uppercase text-[10px] tracking-wide">
+                {entry.level}
+              </Badge>
+              {isHttpLine && (
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wide">HTTP</span>
+              )}
+            </div>
+            <p
+              className={`font-mono text-foreground break-words whitespace-pre-wrap leading-relaxed ${
+                compact ? "text-[11px]" : "text-xs"
+              }`}
+            >
+              {entry.message}
+            </p>
+            {metaStr ? (
+              <pre
+                className={`mt-3 rounded-md bg-background/80 border border-border/50 overflow-x-auto text-muted-foreground ${
+                  compact ? "text-[10px] p-2 max-h-40" : "text-xs p-3 max-h-56"
+                }`}
+              >
+                {metaStr}
+              </pre>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -65,8 +109,9 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [sentryConfig, setSentryConfig] = useState<{ enabled: boolean; issuesUrl?: string } | null>(null);
+  const [hideHttp, setHideHttp] = useState(false);
 
-  const fetch = async () => {
+  const fetchLogs = async () => {
     setLoading(true);
     try {
       const res = await getAdminLogs(adminKey, 300, levelFilter || undefined);
@@ -79,7 +124,7 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
   };
 
   useEffect(() => {
-    fetch();
+    fetchLogs();
   }, [adminKey, levelFilter]);
 
   useEffect(() => {
@@ -98,50 +143,72 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
     return () => clearInterval(id);
   }, [autoRefresh, adminKey, levelFilter]);
 
+  const displayLogs = useMemo(() => {
+    if (!hideHttp) return logs;
+    return logs.filter((e) => !/^\S+ - - \[\d{2}\//.test(String(e.message || "").trim()));
+  }, [logs, hideHttp]);
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <Select value={levelFilter || "all"} onValueChange={(v) => setLevelFilter(v === "all" ? "" : v)}>
-          <SelectTrigger className="w-40">
-            <Filter className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="All levels" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All levels</SelectItem>
-            <SelectItem value="error">Error</SelectItem>
-            <SelectItem value="warn">Warn</SelectItem>
-            <SelectItem value="info">Info</SelectItem>
-            <SelectItem value="debug">Debug</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button variant="outline" size="sm" onClick={fetch} disabled={loading} className="gap-2">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Refresh
-        </Button>
-        <Button
-          variant={autoRefresh ? "default" : "outline"}
-          size="sm"
-          onClick={() => setAutoRefresh(!autoRefresh)}
-          className="gap-2"
-        >
-          {autoRefresh ? "Auto-refresh ON (5s)" : "Auto-refresh OFF"}
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => setExpanded(true)} className="gap-2 ml-auto">
-          <Maximize2 className="h-4 w-4" />
-          Expand
-        </Button>
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:items-end">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Log level</label>
+            <Select value={levelFilter || "all"} onValueChange={(v) => setLevelFilter(v === "all" ? "" : v)}>
+              <SelectTrigger className="w-[200px]">
+                <Filter className="h-4 w-4 mr-2 shrink-0" />
+                <SelectValue placeholder="All levels" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All levels</SelectItem>
+                <SelectItem value="error">Error</SelectItem>
+                <SelectItem value="warn">Warn</SelectItem>
+                <SelectItem value="info">Info</SelectItem>
+                <SelectItem value="debug">Debug</SelectItem>
+                <SelectItem value="verbose">Verbose</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer sm:pb-2">
+            <input
+              type="checkbox"
+              className="rounded border-input"
+              checked={hideHttp}
+              onChange={(e) => setHideHttp(e.target.checked)}
+            />
+            Hide HTTP access lines
+          </label>
+          <div className="flex flex-wrap gap-2 sm:ml-auto">
+            <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading} className="gap-2">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Refresh
+            </Button>
+            <Button
+              variant={autoRefresh ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className="gap-2"
+            >
+              {autoRefresh ? "Auto (5s) on" : "Auto off"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setExpanded(true)} className="gap-2">
+              <Maximize2 className="h-4 w-4" />
+              Expand
+            </Button>
+          </div>
+        </div>
       </div>
 
       {sentryConfig?.enabled && (
         <div className="bg-card rounded-xl border border-border p-5 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-foreground/10 flex items-center justify-center">
-              <AlertTriangle className="h-5 w-5 text-foreground" />
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <Info className="h-5 w-5 text-muted-foreground" />
             </div>
-            <div className="flex-1">
-              <h3 className="font-display text-sm font-semibold text-foreground">Error monitoring (Sentry)</h3>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-display text-sm font-semibold text-foreground">Sentry monitoring</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Errors are automatically reported. View issues, stack traces, and performance data in Sentry.
+                Backend errors are sent to Sentry. Open your Sentry project to see issues and stack traces.
               </p>
             </div>
             {sentryConfig.issuesUrl ? (
@@ -149,34 +216,47 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
                 href={sentryConfig.issuesUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border hover:bg-muted text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border hover:bg-muted text-sm font-medium shrink-0"
               >
                 <ExternalLink className="h-4 w-4" />
-                View in Sentry
+                Open issues
               </a>
             ) : (
-              <p className="text-xs text-muted-foreground">
-                Set SENTRY_ISSUES_URL in backend .env to add a direct link.
-              </p>
+              <div className="text-xs text-muted-foreground shrink-0 max-w-xs text-right space-y-1">
+                <p>
+                  Optional shortcut: add{" "}
+                  <code className="px-1 py-0.5 rounded bg-muted text-[10px]">SENTRY_ISSUES_URL</code> to{" "}
+                  <code className="px-1 py-0.5 rounded bg-muted text-[10px]">backend/.env</code>, restart the API.
+                </p>
+                <p className="text-[10px] opacity-90">
+                  In Sentry, open <strong>Issues</strong>, then copy the URL from the address bar (must be the web UI, not
+                  the DSN ingest host).
+                </p>
+              </div>
             )}
           </div>
         </div>
       )}
 
       <div className="bg-card rounded-xl border border-border overflow-hidden">
-        <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <FileText className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium text-foreground">Recent logs ({logs.length})</span>
+        <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2 justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">
+              Recent logs ({displayLogs.length}
+              {hideHttp && logs.length !== displayLogs.length ? ` / ${logs.length} total` : ""})
+            </span>
+          </div>
         </div>
-        <div className="max-h-[60vh] overflow-y-auto">
+        <div className="max-h-[min(70vh,720px)] overflow-y-auto">
           {loading ? (
             <div className="flex justify-center py-20">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : logs.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">No logs yet. Activity will appear here.</div>
+          ) : displayLogs.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">No logs match the current filters.</div>
           ) : (
-            <LogEntries logs={logs} compact />
+            <LogEntries logs={displayLogs} compact />
           )}
         </div>
       </div>
@@ -184,13 +264,13 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
       <Dialog open={expanded} onOpenChange={setExpanded}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-[90vh] flex flex-col p-0 gap-0">
           <DialogHeader className="px-6 py-4 border-b border-border shrink-0">
-            <DialogTitle>Logs — Expanded view</DialogTitle>
+            <DialogTitle>Logs — expanded</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-auto min-h-0">
-            {logs.length === 0 ? (
+            {displayLogs.length === 0 ? (
               <div className="p-12 text-center text-muted-foreground">No logs to display.</div>
             ) : (
-              <LogEntries logs={logs} />
+              <LogEntries logs={displayLogs} />
             )}
           </div>
         </DialogContent>

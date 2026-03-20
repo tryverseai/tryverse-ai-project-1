@@ -15,11 +15,15 @@ const PAYSTACK_API = 'https://api.paystack.co';
  */
 export async function initializePaystackPayment(params: {
   email: string;
-  amount: number;        // in kobo (NGN * 100)
+  /** Whole naira (minor units applied inside); must match DB plan price server-side */
+  amount: number;
   planId: string;
   userId: string;
   callbackUrl: string;
 }): Promise<{ authorization_url: string; reference: string }> {
+  if (!env.PAYSTACK_SECRET_KEY) {
+    throw new Error('Paystack is not configured');
+  }
   const reference = `TV_PS_${params.userId.slice(0, 8)}_${Date.now()}`;
 
   const response = await axios.post(
@@ -63,6 +67,9 @@ export async function verifyPaystackTransaction(reference: string): Promise<{
   currency: string;
   metadata: { user_id: string; plan_id: string };
 }> {
+  if (!env.PAYSTACK_SECRET_KEY) {
+    throw new Error('Paystack is not configured');
+  }
   const response = await axios.get(
     `${PAYSTACK_API}/transaction/verify/${reference}`,
     {
@@ -83,6 +90,7 @@ export async function verifyPaystackTransaction(reference: string): Promise<{
  * Validates Paystack webhook signature.
  */
 export function validatePaystackSignature(payload: string, signature: string): boolean {
+  if (!env.PAYSTACK_WEBHOOK_SECRET) return false;
   const hash = crypto
     .createHmac('sha512', env.PAYSTACK_WEBHOOK_SECRET)
     .update(payload)

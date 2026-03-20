@@ -28,8 +28,12 @@ export class MemoryTransport extends Transport {
   }
 }
 
+/** Match Winston levels (info, warn, error, debug, verbose, silly, http). */
 export function getRecentLogs(limit = 200, level?: string): LogEntry[] {
   let entries = [...logBuffer].reverse();
-  if (level) entries = entries.filter((e) => e.level === level);
+  if (level) {
+    const norm = level.toLowerCase();
+    entries = entries.filter((e) => String(e.level).toLowerCase() === norm);
+  }
   return entries.slice(0, limit);
 }

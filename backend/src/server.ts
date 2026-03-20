@@ -21,6 +21,7 @@ import productsRouter from './routes/products';
 import adminRouter from './routes/admin';
 import analyticsRouter from './routes/analytics';
 import emailsRouter from './routes/emails';
+import earlyAccessRouter from './routes/earlyAccess';
 
 // ─── Sentry (must init before everything else) ────────────────────────────────
 initSentry();
@@ -113,6 +114,8 @@ app.get('/health', (_req, res) => {
       imageModeration: env.ENABLE_IMAGE_MODERATION,
       cdnEnabled: !!env.CLOUDFLARE_CDN_DOMAIN,
       sentryEnabled: !!env.SENTRY_DSN,
+      paystackEnabled: !!env.PAYSTACK_SECRET_KEY,
+      flutterwaveEnabled: !!env.FLUTTERWAVE_SECRET_KEY,
     },
   });
 });
@@ -148,6 +151,7 @@ async function mountBullBoard(): Promise<void> {
 }
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
+app.use('/api/early-access', earlyAccessRouter);
 app.use('/api/upload',    uploadRouter);
 app.use('/api/tryon',     tryonRouter);
 app.use('/api/credits',   creditsRouter);

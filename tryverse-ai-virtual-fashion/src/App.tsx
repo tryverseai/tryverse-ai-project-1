@@ -28,6 +28,7 @@ import Support from "./pages/Support";
 import ApiDocs from "./pages/ApiDocs";
 import TryOnStudio from "./pages/TryOnStudio";
 import Admin from "./pages/Admin";
+import EarlyAccess from "./pages/EarlyAccess";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
             <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
             <Route path="/about" element={<About />} />
             <Route path="/partner" element={<PartnerWithUs />} />
+            <Route path="/early-access" element={<EarlyAccess />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/confirm" element={<AuthConfirm />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />

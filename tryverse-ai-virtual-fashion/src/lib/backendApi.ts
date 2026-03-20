@@ -157,23 +157,34 @@ export async function getCredits() {
 
 // ─── Payments ─────────────────────────────────────────────────────────────────
 
+export async function getPaymentProviders(): Promise<{
+  paystack: boolean;
+  flutterwave: boolean;
+}> {
+  const res = await fetch(`${BACKEND_URL}/api/payment/providers`);
+  if (!res.ok) {
+    return { paystack: false, flutterwave: false };
+  }
+  return res.json();
+}
+
+/** Amount is set on the server from plans.price_ngn. */
 export async function initializePaystackPayment(
   planId: string,
-  amount: number,
   callbackUrl: string
 ): Promise<{ authorization_url: string; reference: string }> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${BACKEND_URL}/api/payment/initialize/paystack`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ planId, amount, callbackUrl }),
+    body: JSON.stringify({ planId, callbackUrl }),
   });
   return handleResponse(res, { feature: 'payment' });
 }
 
+/** Amount from server: USD → price_usd, NGN → price_ngn. */
 export async function initializeFlutterwavePayment(
   planId: string,
-  amount: number,
   currency: string,
   callbackUrl: string
 ): Promise<{ authorization_url: string; tx_ref: string }> {
@@ -181,9 +192,42 @@ export async function initializeFlutterwavePayment(
   const res = await fetch(`${BACKEND_URL}/api/payment/initialize/flutterwave`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ planId, amount, currency, callbackUrl }),
+    body: JSON.stringify({ planId, currency, callbackUrl }),
   });
   return handleResponse(res, { feature: 'payment' });
+}
+
+// ─── Early access (public; saves via backend + Resend confirmation) ──────────
+
+export interface EarlyAccessPayload {
+  first_name: string;
+  email: string;
+  brand_name: string;
+  role: string;
+  website_url: string;
+  platform: string;
+  product_range: string;
+  monthly_revenue: string;
+  return_rate: string;
+  top_return_reason: string;
+  customer_confidence: string;
+  tried_solutions: string[];
+  must_have_features: string[];
+  biggest_challenge: string;
+  timeline: string;
+  heard_about?: string | null;
+  prior_solution_notes?: string | null;
+}
+
+export async function submitEarlyAccessRequest(
+  payload: EarlyAccessPayload
+): Promise<{ success: boolean; id?: string; emailSent?: boolean }> {
+  const res = await fetch(`${BACKEND_URL}/api/early-access`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res, { feature: 'early_access' });
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────────
@@ -416,7 +460,20 @@ async function adminFetch(path: string, adminKey: string, options?: RequestInit)
     },
   });
   if (res.status === 403) throw new Error('Invalid admin key');
-  if (!res.ok) throw new Error(`Admin API error: ${res.status}`);
+  if (!res.ok) {
+    let message = `Admin API error (${res.status})`;
+    try {
+      const body = await res.json();
+      if (typeof body?.error === 'string') message = body.error;
+      const details = body?.details as { message?: string }[] | undefined;
+      if (Array.isArray(details) && details[0]?.message) {
+        message = `${message}: ${details[0].message}`;
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
   return res.json();
 }
 
@@ -444,9 +501,12 @@ export async function getAdminQueue(adminKey: string) {
   return adminFetch('/api/admin/queue', adminKey);
 }
 
+/** Block or unblock a user (profiles.is_blocked + Supabase auth). */
 export async function banAdminUser(adminKey: string, userId: string, unban = false) {
-  const url = unban ? `/api/admin/users/${userId}/ban?none=1` : `/api/admin/users/${userId}/ban`;
-  return adminFetch(url, adminKey, { method: 'DELETE' });
+  return adminFetch(`/api/admin/users/${userId}/block`, adminKey, {
+    method: 'POST',
+    body: JSON.stringify({ blocked: !unban }),
+  });
 }
 
 export async function adjustUserCredits(adminKey: string, userId: string, credits: { freeCredits?: number; monthlyCredits?: number }) {
@@ -502,9 +562,15 @@ export async function getAdminSentryConfig(adminKey: string): Promise<{ enabled:
   return adminFetch('/api/admin/sentry-config', adminKey);
 }
 
-export async function getAdminAudit(adminKey: string, limit = 100, offset = 0, eventType?: string) {
+export async function getAdminAudit(
+  adminKey: string,
+  limit = 100,
+  offset = 0,
+  filters?: { eventType?: string; severity?: 'error' | 'warn' | 'info' }
+) {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-  if (eventType) params.append('event_type', eventType);
+  if (filters?.eventType) params.append('event_type', filters.eventType);
+  else if (filters?.severity) params.append('severity', filters.severity);
   return adminFetch(`/api/admin/audit?${params}`, adminKey);
 }
 

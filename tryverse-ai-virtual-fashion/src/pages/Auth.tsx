@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
-import { ArrowRight, Eye, EyeOff, Building2, Mail, Lock, User, Briefcase } from "lucide-react";
+import { ArrowRight, ChevronLeft, Eye, EyeOff, Building2, Mail, Lock, User, Briefcase } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
@@ -25,6 +25,35 @@ const roles = [
   "Product Manager",
   "Other",
 ];
+
+/** Supabase often surfaces raw SMTP/confirmation failures — steer users to Early Access / waitlist. */
+function signUpErrorToast(error: Error): {
+  title: string;
+  description: string;
+  variant: "default" | "destructive";
+} {
+  const msg = (error.message || "").toLowerCase();
+  const isEmailDeliveryIssue =
+    msg.includes("confirmation email") ||
+    msg.includes("sending confirmation") ||
+    msg.includes("error sending") ||
+    (msg.includes("email") && (msg.includes("could not") || msg.includes("failed to send") || msg.includes("smtp")));
+
+  if (isEmailDeliveryIssue) {
+    return {
+      title: "Early access only for now",
+      description:
+        "We're onboarding through the waitlist first. Use Get Early Access on the site to join; full self-serve sign-up will open once we're ready.",
+      variant: "default",
+    };
+  }
+
+  return {
+    title: "Sign up failed",
+    description: error.message,
+    variant: "destructive",
+  };
+}
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
@@ -60,7 +89,8 @@ const Auth = () => {
       const { error } = await signUp(email, password, brandName, fullName, finalRole);
       if (error) {
         console.error("Signup error:", error);
-        toast({ title: "Sign up failed", description: error.message, variant: "destructive", duration: 6000 });
+        const t = signUpErrorToast(error);
+        toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
       } else {
         posthogCapture("user_signed_up", { email });
         toast({ title: "Account created!", description: "Check your email to confirm your account." });
@@ -111,18 +141,38 @@ const Auth = () => {
       </div>
 
       {/* Right side - form */}
-      <div className="flex-1 flex items-center justify-center p-6">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 pt-8 sm:pt-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
         >
+          <div className="mb-6 lg:hidden">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 min-h-11 min-w-11 -ml-2 px-2 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/70 active:bg-muted transition-colors"
+            >
+              <ChevronLeft className="h-5 w-5 shrink-0" aria-hidden />
+              Back to home
+            </Link>
+          </div>
+
           <h1 className="font-display text-2xl font-bold text-foreground mb-2">
             {isSignUp ? "Start your free account" : "Welcome back"}
           </h1>
-          <p className="text-muted-foreground mb-8">
+          <p className="text-muted-foreground mb-4">
             {isSignUp ? "Get 3 free AI try-ons to test our platform" : "Sign in to your brand dashboard"}
           </p>
+
+          {isSignUp && (
+            <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
+              <span className="font-medium text-foreground">Prefer to join first?</span> We&apos;re onboarding via{" "}
+              <Link to="/early-access" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
+                Early Access / waitlist
+              </Link>
+              . Full self-serve sign-up may be limited while we scale email delivery.
+            </p>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSignUp && (

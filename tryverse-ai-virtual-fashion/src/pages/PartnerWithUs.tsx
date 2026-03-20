@@ -67,13 +67,13 @@ const PartnerWithUs = () => (
           </div>
 
           <div className="text-center space-y-4">
-            <Link to="/auth?signup=true&redirect=/widget-preview">
+            <Link to="/early-access">
               <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12">
-                View Demo <ArrowRight className="ml-2 h-4 w-4" />
+                Get Early Access <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
             <p className="text-sm text-muted-foreground">
-              Explore our try-on experience in a simulated e-commerce environment. Sign up to try the demo.
+              Request early access — we&apos;ll reach out with demo options when it fits your brand.
             </p>
           </div>
         </div>
@@ -117,9 +117,9 @@ const PartnerWithUs = () => (
                 ))}
               </div>
 
-              <Link to="/auth?signup=true">
+              <Link to="/early-access">
                 <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft">
-                  Partner With Us <ArrowRight className="ml-2 h-4 w-4" />
+                  Get Early Access <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
             </motion.div>

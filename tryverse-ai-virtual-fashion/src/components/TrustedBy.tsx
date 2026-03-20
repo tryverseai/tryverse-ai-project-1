@@ -33,7 +33,7 @@ export function TrustedBy() {
               {duplicated.map((item, i) => (
                 <div
                   key={`${item.name}-${i}`}
-                  className="flex items-center justify-center shrink-0 mx-8 w-24 h-12 opacity-90 hover:opacity-100 transition-opacity duration-300"
+                  className="flex items-center justify-center shrink-0 mx-3 sm:mx-4 w-24 h-12 opacity-90 hover:opacity-100 transition-opacity duration-300"
                 >
                   <img
                     src={item.logo}

@@ -10,8 +10,71 @@ import { executeTryOnPipeline } from '../services/ai/pipeline';
 import { env } from '../config/env';
 import { getRecentLogs } from '../config/logBuffer';
 import { logAudit } from '../services/audit';
+import { AppError } from '../middleware/errorHandler';
 
 const router = Router();
+
+/**
+ * Block/unblock: always updates profiles.is_blocked (enforced in requireAuth) and
+ * sets Supabase auth ban_duration when the hosted Auth API supports it.
+ */
+async function setUserBlockedState(userId: string, blocked: boolean, req: Request): Promise<void> {
+  const { data: profileRow, error: exErr } = await supabaseAdmin
+    .from('profiles')
+    .select('id, brand_name, contact_email, full_name')
+    .eq('id', userId)
+    .maybeSingle();
+  if (exErr) throw exErr;
+  if (!profileRow) {
+    throw new AppError('User not found', 404);
+  }
+
+  const { error: pe } = await supabaseAdmin.from('profiles').update({ is_blocked: blocked }).eq('id', userId);
+  if (pe) throw pe;
+
+  const { error: ae } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    ban_duration: blocked ? '876000h' : 'none',
+  });
+  if (ae) {
+    await supabaseAdmin.from('profiles').update({ is_blocked: !blocked }).eq('id', userId);
+    logger.error('Admin: auth ban failed after profile update; reverted is_blocked', {
+      userId,
+      blocked,
+      authError: ae.message,
+    });
+    throw new AppError(
+      ae.message || 'Auth could not apply ban (profile was reverted). Try again or check Supabase Auth.',
+      400
+    );
+  }
+
+  const brand = profileRow.brand_name?.trim() || null;
+  const email = profileRow.contact_email?.trim() || null;
+  const fullName = profileRow.full_name?.trim() || null;
+  const displayLabel = [brand, email || fullName].filter(Boolean).join(' · ') || userId;
+  const summary = blocked
+    ? `Blocked user ${displayLabel}: API access denied (profiles.is_blocked) and Supabase auth ban applied (~100y).`
+    : `Unblocked user ${displayLabel}: profiles.is_blocked cleared and Supabase auth ban removed.`;
+
+  await logAudit({
+    event_type: 'admin_action',
+    actor: 'admin',
+    action: blocked ? 'user_banned' : 'user_unbanned',
+    target_id: userId,
+    details: {
+      summary,
+      target_user_id: userId,
+      target_brand_name: brand,
+      target_email: email,
+      target_full_name: fullName,
+      blocked,
+      ban_duration: blocked ? '876000h' : 'none',
+    },
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent'],
+  });
+  logger.info(`Admin: User ${blocked ? 'banned' : 'unbanned'}`, { userId, displayLabel });
+}
 
 // All admin routes require X-Admin-Key header
 router.use(requireAdmin);
@@ -137,7 +200,7 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction): Pr
     let query = supabaseAdmin
       .from('profiles')
       .select(
-        'id, brand_name, full_name, contact_email, plan_id, free_credits_remaining, monthly_credits_remaining, monthly_credits_total, widget_activated, created_at',
+        'id, brand_name, full_name, contact_email, plan_id, free_credits_remaining, monthly_credits_remaining, monthly_credits_total, widget_activated, created_at, is_blocked',
         { count: 'exact' }
       )
       .order('created_at', { ascending: false })
@@ -154,8 +217,14 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction): Pr
       throw error;
     }
 
+    const profiles = data || [];
+    const usersWithBan = profiles.map((profile: { id: string; is_blocked?: boolean } & Record<string, unknown>) => ({
+      ...profile,
+      is_banned: Boolean(profile.is_blocked),
+    }));
+
     res.json({
-      users: data || [],
+      users: usersWithBan,
       pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
     });
   } catch (err) {
@@ -280,6 +349,9 @@ router.get('/revenue', async (req: Request, res: Response, next: NextFunction): 
   }
 });
 
+/** Bull queue stats — never hang waiting on Redis (common when REDIS_URL points at nothing). */
+const QUEUE_STATS_TIMEOUT_MS = 5000;
+
 /**
  * GET /api/admin/queue
  * Bull queue health and stats.
@@ -292,13 +364,33 @@ router.get('/queue', async (_req: Request, res: Response, next: NextFunction): P
       return;
     }
 
-    const [waiting, active, completed, failed, delayed] = await Promise.all([
+    const statsPromise = Promise.all([
       queue.getWaitingCount(),
       queue.getActiveCount(),
       queue.getCompletedCount(),
       queue.getFailedCount(),
       queue.getDelayedCount(),
     ]);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('queue_stats_timeout')), QUEUE_STATS_TIMEOUT_MS);
+    });
+
+    let waiting: number;
+    let active: number;
+    let completed: number;
+    let failed: number;
+    let delayed: number;
+    try {
+      [waiting, active, completed, failed, delayed] = await Promise.race([statsPromise, timeoutPromise]);
+    } catch (raceErr) {
+      const msg = raceErr instanceof Error ? raceErr.message : String(raceErr);
+      logger.warn('Admin queue stats unavailable (Redis slow or down)', { error: msg });
+      res.json({
+        status: 'unavailable',
+        message: 'Redis is not responding — queue stats timed out. Try-ons still run in sync mode without Redis.',
+      });
+      return;
+    }
 
     res.json({ status: 'healthy', counts: { waiting, active, completed, failed, delayed } });
   } catch (err) {
@@ -307,33 +399,40 @@ router.get('/queue', async (_req: Request, res: Response, next: NextFunction): P
 });
 
 /**
+ * POST /api/admin/users/:userId/block
+ * Body: { "blocked": true | false } — updates profiles.is_blocked + Supabase auth ban.
+ */
+router.post(
+  '/users/:userId/block',
+  [param('userId').isUUID(), body('blocked').isBoolean()],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.params.userId as string;
+      const blocked = Boolean(req.body?.blocked);
+      await setUserBlockedState(userId, blocked, req);
+      res.json({ success: true, userId, action: blocked ? 'banned' : 'unbanned' });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
  * DELETE /api/admin/users/:userId/ban
- * Suspends a user account.
+ * Legacy: same as POST block (blocked=true) or ?none / ?unblock=1 for unblock.
  */
 router.delete(
   '/users/:userId/ban',
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.params.userId as string;
-      const banDuration: string = 'none' in req.query ? 'none' : '876600h';
-      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-        ban_duration: banDuration,
-      });
-
-      if (error) throw error;
-
-      const action = banDuration === 'none' ? 'unbanned' : 'banned';
-      await logAudit({
-        event_type: 'admin_action',
-        actor: 'admin',
-        action: action === 'unbanned' ? 'user_unbanned' : 'user_banned',
-        target_id: userId,
-        details: { banDuration },
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-      });
-      logger.info(`Admin: User ${action}`, { userId });
-      res.json({ success: true, userId, action });
+      const unban =
+        'none' in req.query ||
+        req.query.unblock === '1' ||
+        req.query.unblock === 'true';
+      await setUserBlockedState(userId, !unban, req);
+      res.json({ success: true, userId, action: unban ? 'unbanned' : 'banned' });
     } catch (err) {
       next(err);
     }
@@ -721,7 +820,14 @@ router.get('/audit', async (req: Request, res: Response, next: NextFunction): Pr
   try {
     const limit = Math.min(parseInt(String(req.query.limit || '100'), 10), 500);
     const eventType = req.query.event_type as string | undefined;
+    const severity = req.query.severity as string | undefined;
     const offset = Math.max(parseInt(String(req.query.offset || '0'), 10), 0);
+
+    const severityGroups: Record<string, string[]> = {
+      error: ['failed_login', 'api_key_anomaly'],
+      warn: ['rate_limit', 'api_key_blocked'],
+      info: ['admin_action'],
+    };
 
     let query = supabaseAdmin
       .from('admin_audit_log')
@@ -731,13 +837,66 @@ router.get('/audit', async (req: Request, res: Response, next: NextFunction): Pr
 
     if (eventType) {
       query = query.eq('event_type', eventType);
+    } else if (severity && severityGroups[severity]) {
+      query = query.in('event_type', severityGroups[severity]);
     }
 
     const { data, error, count } = await query;
     if (error) throw error;
 
+    const entries = data || [];
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const profileActions = new Set(['user_banned', 'user_unbanned']);
+    const targetIds = [
+      ...new Set(
+        entries
+          .filter((e) => e.target_id && uuidRe.test(String(e.target_id)))
+          .map((e) => String(e.target_id))
+      ),
+    ];
+    let profileMap: Record<string, { brand_name: string | null; contact_email: string | null; full_name: string | null }> =
+      {};
+    if (targetIds.length > 0) {
+      const { data: profiles } = await supabaseAdmin
+        .from('profiles')
+        .select('id, brand_name, contact_email, full_name')
+        .in('id', targetIds);
+      profileMap = (profiles || []).reduce(
+        (acc, p) => {
+          acc[p.id] = {
+            brand_name: p.brand_name ?? null,
+            contact_email: p.contact_email ?? null,
+            full_name: p.full_name ?? null,
+          };
+          return acc;
+        },
+        {} as Record<string, { brand_name: string | null; contact_email: string | null; full_name: string | null }>
+      );
+    }
+
+    const enriched = entries.map((e) => {
+      const tid = e.target_id ? String(e.target_id) : null;
+      const prof = tid && profileMap[tid] ? profileMap[tid] : null;
+      const details = (e.details && typeof e.details === 'object' ? e.details : {}) as Record<string, unknown>;
+      let displaySummary = typeof details.summary === 'string' ? details.summary : null;
+      if (!displaySummary && prof && profileActions.has(e.action)) {
+        const label = [prof.brand_name, prof.contact_email || prof.full_name].filter(Boolean).join(' · ') || tid;
+        if (e.action === 'user_banned') {
+          const dur = details.ban_duration ?? details.banDuration ?? '—';
+          displaySummary = `Blocked user ${label}. Auth ban duration: ${dur}.`;
+        } else if (e.action === 'user_unbanned') {
+          displaySummary = `Unblocked user ${label}.`;
+        }
+      }
+      return {
+        ...e,
+        target_profile: prof,
+        display_summary: displaySummary,
+      };
+    });
+
     res.json({
-      entries: data || [],
+      entries: enriched,
       total: count ?? (data?.length ?? 0),
       pagination: { offset, limit },
     });
