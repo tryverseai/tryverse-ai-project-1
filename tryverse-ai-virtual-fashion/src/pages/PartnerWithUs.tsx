@@ -1,6 +1,8 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { GLASS_EASE, glassOuter, glassInner, glassInnerCard } from "@/lib/glassFrame";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, TrendingDown, TrendingUp, ShieldCheck, Code2, Sparkles, Globe, Zap, Shield } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -47,21 +49,24 @@ const PartnerWithUs = () => (
             </p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12">
             {reasons.map((item, i) => (
               <motion.div
                 key={item.title}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.08 }}
-                className="p-7 rounded-2xl border border-border/50 hover:border-foreground/10 hover:shadow-elevated transition-all duration-300 group text-center bg-card"
+                transition={{ delay: i * 0.08, ease: GLASS_EASE }}
+                whileHover={{ y: -4, transition: { duration: 0.65, ease: GLASS_EASE } }}
+                className={glassOuter}
               >
-                <div className="w-11 h-11 rounded-xl bg-foreground/[0.06] flex items-center justify-center mb-5 mx-auto group-hover:gradient-primary group-hover:shadow-soft transition-all duration-300">
-                  <item.icon className="h-5 w-5 text-foreground group-hover:text-primary-foreground transition-colors" />
+                <div className={cn(glassInnerCard, "items-center text-center px-6 py-7 sm:px-7")}>
+                  <div className="relative z-[2] w-11 h-11 rounded-xl bg-foreground/[0.06] flex items-center justify-center mb-5 mx-auto group-hover:gradient-primary group-hover:shadow-soft transition-all duration-300">
+                    <item.icon className="h-5 w-5 text-foreground group-hover:text-primary-foreground transition-colors" />
+                  </div>
+                  <h3 className="relative z-[2] font-display text-lg font-semibold text-foreground mb-2">{item.title}</h3>
+                  <p className="relative z-[2] text-sm text-muted-foreground leading-relaxed">{item.description}</p>
                 </div>
-                <h3 className="font-display text-lg font-semibold text-foreground mb-2">{item.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
               </motion.div>
             ))}
           </div>
@@ -129,8 +134,9 @@ const PartnerWithUs = () => (
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="bg-card rounded-2xl p-6 border border-border/50 shadow-card"
+              className={glassOuter}
             >
+              <div className={cn(glassInner, "p-5 sm:p-6")}>
               <div className="rounded-xl bg-foreground/[0.03] p-5 font-mono text-sm">
                 <p className="text-muted-foreground mb-2">{"<!-- Add to your product page -->"}</p>
                 <p className="text-foreground">
@@ -158,6 +164,7 @@ const PartnerWithUs = () => (
                     <p className="text-xs text-muted-foreground">{stat.label}</p>
                   </div>
                 ))}
+              </div>
               </div>
             </motion.div>
           </div>

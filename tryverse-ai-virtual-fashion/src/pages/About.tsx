@@ -2,6 +2,8 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { CTASection } from "@/components/CTASection";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { GLASS_EASE, glassOuter, glassInner, glassInnerCard } from "@/lib/glassFrame";
 import { Globe, Target, Zap } from "lucide-react";
 
 const values = [
@@ -48,8 +50,9 @@ const About = () => {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="bg-card rounded-2xl border border-border/50 p-10 md:p-14 mb-20"
+            className={`${glassOuter} mb-20`}
           >
+            <div className={cn(glassInner, "p-8 md:p-10 lg:p-14")}>
             <div className="grid md:grid-cols-2 gap-10 items-center">
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-3 tracking-[0.2em] uppercase">Our Mission</p>
@@ -74,6 +77,7 @@ const About = () => {
                 ))}
               </div>
             </div>
+            </div>
           </motion.div>
 
           {/* Values */}
@@ -86,21 +90,24 @@ const About = () => {
             >
               <h2 className="font-display text-3xl font-bold text-foreground mb-3">What We Stand For</h2>
             </motion.div>
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
               {values.map((v, i) => (
                 <motion.div
                   key={v.title}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                  className="p-7 rounded-2xl border border-border/50"
+                  transition={{ delay: i * 0.1, ease: GLASS_EASE }}
+                  whileHover={{ y: -4, transition: { duration: 0.65, ease: GLASS_EASE } }}
+                  className={glassOuter}
                 >
-                  <div className="w-11 h-11 rounded-xl gradient-primary flex items-center justify-center mb-5 shadow-soft">
-                    <v.icon className="h-5 w-5 text-primary-foreground" />
+                  <div className={glassInnerCard}>
+                    <div className="relative z-[2] w-11 h-11 rounded-xl gradient-primary flex items-center justify-center mb-5 shadow-soft">
+                      <v.icon className="h-5 w-5 text-primary-foreground" />
+                    </div>
+                    <h3 className="relative z-[2] font-display text-lg font-semibold text-foreground mb-2">{v.title}</h3>
+                    <p className="relative z-[2] text-sm text-muted-foreground leading-relaxed flex-1">{v.description}</p>
                   </div>
-                  <h3 className="font-display text-lg font-semibold text-foreground mb-2">{v.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{v.description}</p>
                 </motion.div>
               ))}
             </div>

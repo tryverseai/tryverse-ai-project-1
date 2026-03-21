@@ -17,11 +17,13 @@ import creditsRouter from './routes/credits';
 import usageRouter from './routes/usage';
 import paymentRouter from './routes/payment';
 import widgetRouter from './routes/widget';
+import modelsRouter from './routes/models';
 import productsRouter from './routes/products';
 import adminRouter from './routes/admin';
 import analyticsRouter from './routes/analytics';
 import emailsRouter from './routes/emails';
 import earlyAccessRouter from './routes/earlyAccess';
+import supportRouter from './routes/support';
 
 // ─── Sentry (must init before everything else) ────────────────────────────────
 initSentry();
@@ -152,12 +154,14 @@ async function mountBullBoard(): Promise<void> {
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
 app.use('/api/early-access', earlyAccessRouter);
+app.use('/api/support', supportRouter);
 app.use('/api/upload',    uploadRouter);
 app.use('/api/tryon',     tryonRouter);
 app.use('/api/credits',   creditsRouter);
 app.use('/api/usage',     usageRouter);
 app.use('/api/payment',   paymentRouter);
 app.use('/api/widget',    widgetRouter);
+app.use('/api/models',    modelsRouter);
 app.use('/api/products',  productsRouter);
 app.use('/api/admin',     adminRouter);
 app.use('/api/analytics', analyticsRouter);

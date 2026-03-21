@@ -37,3 +37,8 @@ export function getRecentLogs(limit = 200, level?: string): LogEntry[] {
   }
   return entries.slice(0, limit);
 }
+
+/** Clear in-memory log ring (admin only). */
+export function clearLogBuffer(): void {
+  logBuffer.length = 0;
+}

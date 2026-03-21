@@ -118,6 +118,46 @@ export async function pollTryOnStatus(tryonId: string): Promise<TryOnResponse> {
   return handleResponse<TryOnResponse>(res, { feature: 'try_on' });
 }
 
+/** Shared catalog (Try-On Studio + widget when enabled). */
+export interface TryverseModel {
+  id: string;
+  slug: string;
+  display_name: string;
+  gender: 'female' | 'male';
+  body_type: string | null;
+  appearance_tag: string | null;
+  image_url: string;
+  sort_order: number;
+}
+
+export async function getTryverseModels(): Promise<TryverseModel[]> {
+  const res = await fetch(`${BACKEND_URL}/api/models`, { cache: 'no-store' });
+  if (!res.ok) {
+    let msg = 'Failed to load model library';
+    try {
+      const j = (await res.json()) as { error?: string };
+      if (j.error) msg = j.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  const data = (await res.json()) as { models?: TryverseModel[] };
+  return data.models || [];
+}
+
+/** Store a library model image as your person shot (dashboard JWT). */
+export async function createPersonPathFromModel(modelId: string): Promise<string> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/models/person-path`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ modelId }),
+  });
+  const data = await handleResponse<{ filePath: string }>(res, { feature: 'try_on' });
+  return data.filePath;
+}
+
 export async function getSignedImageUrl(path: string): Promise<string> {
   if (path.startsWith('http')) return path;
   const token = await getAuthToken();
@@ -228,6 +268,37 @@ export async function submitEarlyAccessRequest(
     body: JSON.stringify(payload),
   });
   return handleResponse(res, { feature: 'early_access' });
+}
+
+/** Contact / Support form — saved via backend to avoid PostgREST schema issues. */
+export interface SupportContactPayload {
+  first_name: string;
+  last_name: string;
+  company_name?: string | null;
+  email: string;
+  phone_number?: string | null;
+  category: string;
+  subject: string;
+  message: string;
+}
+
+export async function submitSupportContact(payload: SupportContactPayload): Promise<{ ok: boolean }> {
+  const res = await fetch(`${BACKEND_URL}/api/support/contact`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let message = 'Failed to submit';
+    try {
+      const body = await res.json();
+      message = (body as { error?: string }).error || message;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  return res.json() as Promise<{ ok: boolean }>;
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────────
@@ -481,6 +552,12 @@ export async function getAdminMetrics(adminKey: string) {
   return adminFetch('/api/admin/metrics', adminKey);
 }
 
+export async function getAdminModelLibrary(adminKey: string) {
+  return adminFetch<{
+    models: (TryverseModel & { is_active: boolean; created_at: string })[];
+  }>('/api/admin/model-library', adminKey, { cache: 'no-store' });
+}
+
 export async function getAdminUsers(adminKey: string, page = 1, limit = 50, search?: string) {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (search) params.append('search', search);
@@ -572,6 +649,14 @@ export async function getAdminAudit(
   if (filters?.eventType) params.append('event_type', filters.eventType);
   else if (filters?.severity) params.append('severity', filters.severity);
   return adminFetch(`/api/admin/audit?${params}`, adminKey);
+}
+
+export async function clearAdminLogs(adminKey: string): Promise<{ ok: boolean; message?: string }> {
+  return adminFetch('/api/admin/logs/clear', adminKey, { method: 'POST' });
+}
+
+export async function clearAdminAudit(adminKey: string): Promise<{ ok: boolean; message?: string }> {
+  return adminFetch('/api/admin/audit/clear', adminKey, { method: 'POST' });
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { FileText, Loader2, RefreshCw, Filter, Maximize2, ExternalLink, Info } from "lucide-react";
+import { FileText, Loader2, RefreshCw, Filter, Maximize2, ExternalLink, Info, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getAdminLogs, getAdminSentryConfig } from "@/lib/backendApi";
+import { clearAdminLogs, getAdminLogs, getAdminSentryConfig } from "@/lib/backendApi";
 import { toast } from "sonner";
 
 interface AdminLogsTabProps {
@@ -110,6 +110,7 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
   const [expanded, setExpanded] = useState(false);
   const [sentryConfig, setSentryConfig] = useState<{ enabled: boolean; issuesUrl?: string } | null>(null);
   const [hideHttp, setHideHttp] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -147,6 +148,26 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
     if (!hideHttp) return logs;
     return logs.filter((e) => !/^\S+ - - \[\d{2}\//.test(String(e.message || "").trim()));
   }, [logs, hideHttp]);
+
+  const handleClearLogs = async () => {
+    if (
+      !confirm(
+        "Clear the in-memory log buffer? New requests will still be logged. This cannot be undone for the current buffer."
+      )
+    ) {
+      return;
+    }
+    setClearing(true);
+    try {
+      await clearAdminLogs(adminKey);
+      setLogs([]);
+      toast.success("Log buffer cleared");
+    } catch {
+      toast.error("Failed to clear logs");
+    } finally {
+      setClearing(false);
+    }
+  };
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -194,6 +215,16 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
             <Button variant="outline" size="sm" onClick={() => setExpanded(true)} className="gap-2">
               <Maximize2 className="h-4 w-4" />
               Expand
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleClearLogs}
+              disabled={clearing || loading}
+              className="gap-2"
+            >
+              {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Clear logs
             </Button>
           </div>
         </div>

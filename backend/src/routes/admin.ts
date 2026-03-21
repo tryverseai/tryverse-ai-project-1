@@ -8,9 +8,10 @@ import { getTryOnQueue } from '../services/queue/producer';
 import { enqueueTryOnJob } from '../services/queue/producer';
 import { executeTryOnPipeline } from '../services/ai/pipeline';
 import { env } from '../config/env';
-import { getRecentLogs } from '../config/logBuffer';
+import { getRecentLogs, clearLogBuffer } from '../config/logBuffer';
 import { logAudit } from '../services/audit';
 import { AppError } from '../middleware/errorHandler';
+import { listAllModelsForAdmin } from '../services/models/modelLibrary';
 
 const router = Router();
 
@@ -78,6 +79,20 @@ async function setUserBlockedState(userId: string, blocked: boolean, req: Reques
 
 // All admin routes require X-Admin-Key header
 router.use(requireAdmin);
+
+/**
+ * GET /api/admin/model-library
+ * Full model catalog (active + inactive) for admin review.
+ */
+router.get('/model-library', async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    const models = await listAllModelsForAdmin();
+    res.json({ models });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * GET /api/admin/metrics
@@ -813,6 +828,15 @@ router.get('/logs', (req: Request, res: Response): void => {
 });
 
 /**
+ * POST /api/admin/logs/clear
+ * Clears the in-memory Winston log buffer (runtime logs only).
+ */
+router.post('/logs/clear', (_req: Request, res: Response): void => {
+  clearLogBuffer();
+  res.json({ ok: true, message: 'In-memory log buffer cleared' });
+});
+
+/**
  * GET /api/admin/audit
  * Security audit log (admin actions, failed logins, rate limits, etc).
  */
@@ -900,6 +924,23 @@ router.get('/audit', async (req: Request, res: Response, next: NextFunction): Pr
       total: count ?? (data?.length ?? 0),
       pagination: { offset, limit },
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/admin/audit/clear
+ * Deletes all rows in admin_audit_log (use with care).
+ */
+router.post('/audit/clear', async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { error } = await supabaseAdmin
+      .from('admin_audit_log')
+      .delete()
+      .gte('created_at', '1970-01-01T00:00:00.000Z');
+    if (error) throw error;
+    res.json({ ok: true, message: 'Audit log cleared' });
   } catch (err) {
     next(err);
   }

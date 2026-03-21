@@ -305,6 +305,45 @@ export type Database = {
         }
         Relationships: []
       }
+      tryverse_model_library: {
+        Row: {
+          id: string
+          slug: string
+          display_name: string
+          gender: string
+          body_type: string | null
+          appearance_tag: string | null
+          image_url: string
+          sort_order: number
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          display_name: string
+          gender: string
+          body_type?: string | null
+          appearance_tag?: string | null
+          image_url: string
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          display_name?: string
+          gender?: string
+          body_type?: string | null
+          appearance_tag?: string | null
+          image_url?: string
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           brand_name: string

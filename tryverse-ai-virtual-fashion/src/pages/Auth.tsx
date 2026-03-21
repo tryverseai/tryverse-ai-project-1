@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { posthogCapture } from "@/lib/posthog";
+import { inviteSignupEnabled } from "@/lib/featureFlags";
 
 const roles = [
   "Founder",
@@ -41,9 +42,9 @@ function signUpErrorToast(error: Error): {
 
   if (isEmailDeliveryIssue) {
     return {
-      title: "Early access only for now",
+      title: "Check your email settings",
       description:
-        "We're onboarding through the waitlist first. Use Get Early Access on the site to join; full self-serve sign-up will open once we're ready.",
+        "We couldn’t send the confirmation email. If you were invited, try again or contact us. New brands can request access via Get Early Access.",
       variant: "default",
     };
   }
@@ -55,9 +56,20 @@ function signUpErrorToast(error: Error): {
   };
 }
 
+/** Invite-only signup: show registration only when opened with ?signup=true (link you send to invited brands). */
+function hasInviteSignupParam(searchParams: URLSearchParams) {
+  return searchParams.get("signup") === "true" || searchParams.get("invite") === "true";
+}
+
 const Auth = () => {
   const [searchParams] = useSearchParams();
-  const [isSignUp, setIsSignUp] = useState(searchParams.get("signup") === "true");
+  const wantsInviteSignup = hasInviteSignupParam(searchParams);
+  /** Invite link signup form — only when VITE_ENABLE_INVITE_SIGNUP=true */
+  const showSignupForm = wantsInviteSignup && inviteSignupEnabled;
+  /** User opened /auth?signup=true while signups are paused — show waitlist message only */
+  const signupPaused = wantsInviteSignup && !inviteSignupEnabled;
+  const signupPausedToastSent = useRef(false);
+
   const redirectParam = searchParams.get("redirect");
   const redirectTo = redirectParam || sessionStorage.getItem("tryverse_redirect") || "/dashboard";
   const [email, setEmail] = useState("");
@@ -73,18 +85,26 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (searchParams.get("signup") === "true") setIsSignUp(true);
-  }, [searchParams]);
-
-  useEffect(() => {
     if (redirectParam) sessionStorage.setItem("tryverse_redirect", redirectParam);
   }, [redirectParam]);
+
+  /** Same notification users saw when sign-up wasn’t available: waitlist + no account creation */
+  useEffect(() => {
+    if (!signupPaused || signupPausedToastSent.current) return;
+    signupPausedToastSent.current = true;
+    toast({
+      title: "Sign up isn’t open yet",
+      description:
+        "Join the waitlist first. When we approve your brand, we’ll email you a link to create your TryVerse account.",
+      duration: 11000,
+    });
+  }, [signupPaused, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    if (isSignUp) {
+    if (showSignupForm) {
       const finalRole = role === "Other" ? customRole : role;
       const { error } = await signUp(email, password, brandName, fullName, finalRole);
       if (error) {
@@ -93,7 +113,10 @@ const Auth = () => {
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
       } else {
         posthogCapture("user_signed_up", { email });
-        toast({ title: "Account created!", description: "Check your email to confirm your account." });
+        toast({
+          title: "Account created",
+          description: "Check your email to confirm your account, then sign in.",
+        });
       }
     } else {
       const { error } = await signIn(email, password);
@@ -157,25 +180,79 @@ const Auth = () => {
             </Link>
           </div>
 
+          {signupPaused ? (
+            <>
+              <h1 className="font-display text-2xl font-bold text-foreground mb-2">Sign up isn&apos;t open yet</h1>
+              <p className="text-muted-foreground mb-4">
+                New accounts are invite-only. Right now we&apos;re only accepting brands through the waitlist — when yours is
+                approved, we&apos;ll email you a link to create your account.
+              </p>
+              <div className="rounded-lg border border-border bg-muted/40 px-4 py-4 space-y-4 mb-6">
+                <p className="text-sm text-foreground leading-relaxed">
+                  <span className="font-medium">Next step:</span> request access and tell us about your store. We&apos;ll
+                  follow up and send a signup link when you&apos;re cleared.
+                </p>
+                <Button asChild className="w-full gradient-primary text-primary-foreground h-12 shadow-soft">
+                  <Link to="/early-access">
+                    Join the waitlist
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+                <p className="text-sm text-muted-foreground text-center">
+                  Already have an account?{" "}
+                  <Link to="/auth" className="text-foreground font-medium hover:underline">
+                    Sign in
+                  </Link>
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
           <h1 className="font-display text-2xl font-bold text-foreground mb-2">
-            {isSignUp ? "Start your free account" : "Welcome back"}
+            {showSignupForm ? "Create your TryVerse account" : "Welcome back"}
           </h1>
           <p className="text-muted-foreground mb-4">
-            {isSignUp ? "Get 3 free AI try-ons to test our platform" : "Sign in to your brand dashboard"}
+            {showSignupForm
+              ? "For invited brands only — use the email we approved for your workspace."
+              : "Sign in to your brand dashboard"}
           </p>
 
-          {isSignUp && (
+          {showSignupForm && (
             <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
-              <span className="font-medium text-foreground">Prefer to join first?</span> We&apos;re onboarding via{" "}
+              <span className="font-medium text-foreground">Not invited yet?</span> Anyone can request to join via{" "}
               <Link to="/early-access" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
-                Early Access / waitlist
+                Get Early Access
               </Link>
-              . Full self-serve sign-up may be limited while we scale email delivery.
+              . We only enable sign-up for brands we&apos;ve invited.
+            </p>
+          )}
+
+          {!showSignupForm && (
+            <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 leading-relaxed">
+              <span className="font-medium text-foreground">New to TryVerse?</span>{" "}
+              <Link to="/early-access" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
+                Request early access (waitlist)
+              </Link>
+              .
+              {inviteSignupEnabled ? (
+                <>
+                  {" "}
+                  If we already sent you an invite, use{" "}
+                  <Link to="/auth?signup=true" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
+                    create account
+                  </Link>
+                  .
+                </>
+              ) : (
+                <span className="block mt-2 text-muted-foreground">
+                  Account creation is paused — we&apos;ll email you a signup link after waitlist approval.
+                </span>
+              )}
             </p>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {isSignUp && (
+            {showSignupForm && (
               <>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -256,12 +333,12 @@ const Auth = () => {
             </div>
 
             <Button type="submit" className="w-full gradient-primary text-primary-foreground h-12 shadow-soft" disabled={loading}>
-              {loading ? "Please wait..." : isSignUp ? "Start Free" : "Sign In"}
+              {loading ? "Please wait..." : showSignupForm ? "Create account" : "Sign In"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </form>
 
-          {!isSignUp && (
+          {!showSignupForm && (
             <p className="text-sm text-muted-foreground text-center mt-4">
               <Link to="/forgot-password" className="text-foreground font-medium hover:underline">
                 Forgot your password?
@@ -269,15 +346,16 @@ const Auth = () => {
             </p>
           )}
 
-          <p className="text-sm text-muted-foreground text-center mt-4">
-            {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-            <button
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-foreground font-medium hover:underline"
-            >
-              {isSignUp ? "Sign in" : "Sign up"}
-            </button>
-          </p>
+          {showSignupForm ? (
+            <p className="text-sm text-muted-foreground text-center mt-4">
+              Already have an account?{" "}
+              <Link to="/auth" className="text-foreground font-medium hover:underline">
+                Sign in
+              </Link>
+            </p>
+          ) : null}
+            </>
+          )}
         </motion.div>
       </div>
     </div>

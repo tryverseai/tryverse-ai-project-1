@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
+import { inviteSignupEnabled } from "@/lib/featureFlags";
 
 interface AuthContextType {
   user: User | null;
@@ -35,6 +36,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, brandName: string, fullName?: string, role?: string) => {
+    if (!inviteSignupEnabled) {
+      return {
+        error: new Error(
+          "New accounts are not open yet. Join the waitlist — we’ll email you a link when your brand is approved."
+        ),
+      };
+    }
     const { error } = await supabase.auth.signUp({
       email,
       password,

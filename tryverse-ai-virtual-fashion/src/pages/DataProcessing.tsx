@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 
 const DataProcessing = () => (
   <div className="min-h-screen bg-background">
@@ -54,7 +55,13 @@ const DataProcessing = () => (
 
             <section>
               <h2 className="font-display text-lg font-semibold text-foreground mb-3">9. Contact</h2>
-              <p>For DPA inquiries, contact <a href="mailto:dpa@tryverse.ai" className="text-foreground underline">dpa@tryverse.ai</a>.</p>
+              <p>
+                For DPA inquiries, please use our{" "}
+                <Link to="/support" className="text-foreground underline font-medium">
+                  Contact us
+                </Link>{" "}
+                page.
+              </p>
             </section>
           </div>
         </motion.div>

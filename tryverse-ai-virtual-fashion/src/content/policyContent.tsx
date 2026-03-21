@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 /**
  * Shared policy content used in full pages and compliance onboarding modal.
  */
@@ -41,7 +43,13 @@ export const TermsContent = () => (
     </section>
     <section>
       <h2 className="font-display text-lg font-semibold text-foreground mb-3">10. Contact</h2>
-      <p>For questions about these Terms, contact us at <a href="mailto:legal@tryverse.ai" className="text-foreground underline">legal@tryverse.ai</a>.</p>
+      <p>
+        For questions about these Terms, please use our{" "}
+        <Link to="/support" className="text-foreground underline font-medium">
+          Contact us
+        </Link>{" "}
+        page.
+      </p>
     </section>
   </div>
 );
@@ -82,7 +90,13 @@ export const PrivacyContent = () => (
     </section>
     <section>
       <h2 className="font-display text-lg font-semibold text-foreground mb-3">9. Contact</h2>
-      <p>For privacy inquiries, contact our Data Protection Officer at <a href="mailto:privacy@tryverse.ai" className="text-foreground underline">privacy@tryverse.ai</a>.</p>
+      <p>
+        For privacy inquiries, please use our{" "}
+        <Link to="/support" className="text-foreground underline font-medium">
+          Contact us
+        </Link>{" "}
+        page.
+      </p>
     </section>
   </div>
 );
@@ -123,7 +137,13 @@ export const DataProcessingContent = () => (
     </section>
     <section>
       <h2 className="font-display text-lg font-semibold text-foreground mb-3">9. Contact</h2>
-      <p>For DPA inquiries, contact <a href="mailto:dpa@tryverse.ai" className="text-foreground underline">dpa@tryverse.ai</a>.</p>
+      <p>
+        For DPA inquiries, please use our{" "}
+        <Link to="/support" className="text-foreground underline font-medium">
+          Contact us
+        </Link>{" "}
+        page.
+      </p>
     </section>
   </div>
 );

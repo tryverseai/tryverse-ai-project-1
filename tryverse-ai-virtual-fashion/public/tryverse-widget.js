@@ -64,6 +64,37 @@
     });
   }
 
+  function fetchWidgetConfig(backendUrl, apiKey) {
+    return fetch(backendUrl + '/api/widget/config', {
+      headers: { 'x-api-key': apiKey },
+    }).then(function (r) {
+      if (!r.ok) {
+        return r.json().then(function (d) {
+          throw new Error(d.error || 'Config failed');
+        });
+      }
+      return r.json();
+    });
+  }
+
+  function resolveModelPersonPath(backendUrl, apiKey, modelId) {
+    return fetch(backendUrl + '/api/models/person-path', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      },
+      body: JSON.stringify({ modelId: modelId }),
+    }).then(function (r) {
+      if (!r.ok) {
+        return r.json().then(function (d) {
+          throw new Error(d.error || 'Could not use model');
+        });
+      }
+      return r.json();
+    });
+  }
+
   function startTryOn(backendUrl, apiKey, personPath, productPath, category, productDescription) {
     return fetch(backendUrl + '/api/widget/request', {
       method: 'POST',
@@ -123,7 +154,17 @@
     });
   }
 
-  function createModal(backendUrl, apiKey, productImageUrl, category, productDescription, inlineContainer) {
+  function escapeAttr(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;');
+  }
+
+  function createModal(backendUrl, apiKey, productImageUrl, category, productDescription, inlineContainer, widgetCfg) {
+    var cfg = widgetCfg || { showModels: false, models: [] };
+    var showModels = cfg.showModels && cfg.models && cfg.models.length > 0;
+
     var overlay = document.createElement('div');
     var box = document.createElement('div');
     if (inlineContainer) {
@@ -138,9 +179,33 @@
         'background:white;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);';
     }
 
+    var modelsHtml = '';
+    if (showModels) {
+      modelsHtml =
+        '<p style="font-size:0.8rem;color:#6b7280;margin:12px 0 8px;">Or pick a model</p>' +
+        '<div id="tryverse-models" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;max-height:140px;overflow-y:auto;">';
+      for (var mi = 0; mi < cfg.models.length; mi++) {
+        var mod = cfg.models[mi];
+        modelsHtml +=
+          '<button type="button" class="tryverse-model-btn" data-model-id="' +
+          escapeAttr(mod.id) +
+          '" style="padding:0;border:2px solid #e5e7eb;border-radius:8px;overflow:hidden;width:56px;height:74px;cursor:pointer;background:#f9fafb;">' +
+          '<img src="' +
+          escapeAttr(mod.image_url) +
+          '" alt="' +
+          escapeAttr(mod.display_name) +
+          '" style="width:100%;height:100%;object-fit:cover;" />' +
+          '</button>';
+      }
+      modelsHtml += '</div>';
+    }
+
     var html =
       '<h2 style="margin:0 0 16px;font-size:1.25rem;">Virtual Try-On</h2>' +
-      '<p style="color:#666;font-size:0.875rem;margin-bottom:20px;">Upload your photo to see how this item looks on you.</p>' +
+      '<p style="color:#666;font-size:0.875rem;margin-bottom:16px;">Upload your photo' +
+      (showModels ? ', or choose a model below,' : '') +
+      ' to see how this item looks.</p>' +
+      modelsHtml +
       '<div id="tryverse-person-preview" style="width:120px;height:160px;border:2px dashed #ccc;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;background:#f9fafb;overflow:hidden;">' +
       '<span style="color:#9ca3af;font-size:0.75rem;">Your photo</span></div>' +
       '<input type="file" id="tryverse-person-input" accept="image/*" style="margin-bottom:20px;font-size:0.875rem;" />' +
@@ -162,10 +227,46 @@
     var closeBtn = box.querySelector('#tryverse-close');
 
     var personFile = null;
+    var selectedModelId = null;
+
+    function updateModelButtonsHighlight() {
+      var btns = box.querySelectorAll('.tryverse-model-btn');
+      for (var i = 0; i < btns.length; i++) {
+        var b = btns[i];
+        if (b.getAttribute('data-model-id') === selectedModelId) {
+          b.style.borderColor = '#000';
+          b.style.boxShadow = '0 0 0 1px #000';
+        } else {
+          b.style.borderColor = '#e5e7eb';
+          b.style.boxShadow = 'none';
+        }
+      }
+    }
+
+    if (showModels) {
+      var modelBtns = box.querySelectorAll('.tryverse-model-btn');
+      for (var j = 0; j < modelBtns.length; j++) {
+        modelBtns[j].addEventListener('click', function (ev) {
+          var btn = ev.currentTarget;
+          selectedModelId = btn.getAttribute('data-model-id');
+          personFile = null;
+          personInput.value = '';
+          var img = btn.querySelector('img');
+          if (img && img.src) {
+            personPreview.innerHTML =
+              '<img src="' + img.src + '" style="width:100%;height:100%;object-fit:cover;" />';
+          }
+          updateModelButtonsHighlight();
+          statusEl.textContent = '';
+        });
+      }
+    }
 
     personInput.addEventListener('change', function (e) {
       var f = e.target.files[0];
       if (!f) return;
+      selectedModelId = null;
+      updateModelButtonsHighlight();
       personFile = f;
       var reader = new FileReader();
       reader.onload = function () {
@@ -175,8 +276,8 @@
     });
 
     runBtn.addEventListener('click', function () {
-      if (!personFile) {
-        statusEl.textContent = 'Please upload your photo first.';
+      if (!personFile && !selectedModelId) {
+        statusEl.textContent = 'Please upload your photo or select a model.';
         statusEl.style.color = '#dc2626';
         return;
       }
@@ -190,20 +291,27 @@
           })
         : Promise.resolve(productImageUrl);
 
-      productPathPromise
-        .then(function (productPath) {
-          statusEl.textContent = 'Uploading your photo...';
-          return uploadImage(backendUrl, apiKey, personFile, 'person').then(function (d) {
-            return { personPath: d.filePath, productPath: productPath };
-          });
-        })
+      var personPathPromise;
+      if (selectedModelId) {
+        personPathPromise = resolveModelPersonPath(backendUrl, apiKey, selectedModelId).then(function (d) {
+          return d.filePath;
+        });
+      } else {
+        personPathPromise = uploadImage(backendUrl, apiKey, personFile, 'person').then(function (d) {
+          return d.filePath;
+        });
+      }
+
+      Promise.all([productPathPromise, personPathPromise])
         .then(function (paths) {
+          var productPath = paths[0];
+          var personPath = paths[1];
           statusEl.textContent = 'Generating try-on...';
           return startTryOn(
             backendUrl,
             apiKey,
-            paths.personPath,
-            paths.productPath,
+            personPath,
+            productPath,
             category,
             productDescription
           );
@@ -284,7 +392,16 @@
       category = 'clothing';
     }
 
-    createModal(backendUrl, apiKey, productImage, category, productDescription);
+    fetchWidgetConfig(backendUrl, apiKey)
+      .then(function (cfg) {
+        createModal(backendUrl, apiKey, productImage, category, productDescription, null, cfg);
+      })
+      .catch(function () {
+        createModal(backendUrl, apiKey, productImage, category, productDescription, null, {
+          showModels: false,
+          models: [],
+        });
+      });
   }
 
   function embed(opts) {
@@ -303,7 +420,17 @@
       return;
     }
     if (!['clothing', 'bags', 'glasses'].includes(category)) category = 'clothing';
-    createModal(backendUrl, apiKey, productImage, category, opts.productDescription || '', container);
+
+    fetchWidgetConfig(backendUrl, apiKey)
+      .then(function (cfg) {
+        createModal(backendUrl, apiKey, productImage, category, opts.productDescription || '', container, cfg);
+      })
+      .catch(function () {
+        createModal(backendUrl, apiKey, productImage, category, opts.productDescription || '', container, {
+          showModels: false,
+          models: [],
+        });
+      });
   }
 
   window.TryVerse = {

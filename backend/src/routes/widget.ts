@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import { v4 as uuidv4 } from 'uuid';
 import { requireAuth } from '../middleware/auth';
 import { requireApiKey, validateDomain } from '../middleware/apiKey';
+import { listActiveModels } from '../services/models/modelLibrary';
 import { widgetRateLimit } from '../middleware/rateLimiter';
 import { handleValidationErrors } from '../middleware/validate';
 import { checkCredits } from '../services/credits';
@@ -175,11 +176,12 @@ router.get(
 router.get(
   '/config',
   requireApiKey,
+  validateDomain,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { data: profile } = await supabaseAdmin
         .from('profiles')
-        .select('brand_name, widget_activated')
+        .select('brand_name, widget_activated, widget_show_models')
         .eq('id', req.widgetUserId!)
         .single();
 
@@ -193,8 +195,20 @@ router.get(
         return;
       }
 
+      const showModels = profile.widget_show_models !== false;
+      let models: Awaited<ReturnType<typeof listActiveModels>> = [];
+      if (showModels) {
+        try {
+          models = await listActiveModels();
+        } catch {
+          models = [];
+        }
+      }
+
       res.json({
         brandName: profile.brand_name,
+        showModels,
+        models,
         settings: { autoDetect: true, collectAnalytics: true },
       });
     } catch (err) {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Shield, Loader2, RefreshCw, Filter, Maximize2 } from "lucide-react";
+import { Shield, Loader2, RefreshCw, Filter, Maximize2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getAdminAudit } from "@/lib/backendApi";
+import { clearAdminAudit, getAdminAudit } from "@/lib/backendApi";
 import { toast } from "sonner";
 
 interface AdminAuditTabProps {
@@ -207,6 +207,7 @@ export function AdminAuditTab({ adminKey }: AdminAuditTabProps) {
   const [eventFilter, setEventFilter] = useState<string>("");
   const [severityFilter, setSeverityFilter] = useState<"" | "error" | "warn" | "info">("");
   const [expanded, setExpanded] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const loadAudit = async () => {
     setLoading(true);
@@ -227,6 +228,26 @@ export function AdminAuditTab({ adminKey }: AdminAuditTabProps) {
   useEffect(() => {
     loadAudit();
   }, [adminKey, eventFilter, severityFilter]);
+
+  const handleClearAudit = async () => {
+    if (
+      !confirm(
+        "Delete ALL rows in the admin audit log? This is permanent and cannot be undone."
+      )
+    ) {
+      return;
+    }
+    setClearing(true);
+    try {
+      await clearAdminAudit(adminKey);
+      setEntries([]);
+      toast.success("Audit log cleared");
+    } catch {
+      toast.error("Failed to clear audit log");
+    } finally {
+      setClearing(false);
+    }
+  };
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -290,6 +311,16 @@ export function AdminAuditTab({ adminKey }: AdminAuditTabProps) {
             <Button variant="outline" size="sm" onClick={() => setExpanded(true)} className="gap-2">
               <Maximize2 className="h-4 w-4" />
               Expand
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleClearAudit}
+              disabled={clearing || loading}
+              className="gap-2"
+            >
+              {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Clear audit
             </Button>
           </div>
         </div>

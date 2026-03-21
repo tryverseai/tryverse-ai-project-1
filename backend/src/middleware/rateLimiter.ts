@@ -85,6 +85,15 @@ export const earlyAccessRateLimit = rateLimit({
   handler: rateLimitResponse,
 });
 
+/** Public contact / support form */
+export const supportContactRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 12,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitResponse,
+});
+
 // Auth endpoints — 10 per 15 minutes (brute force protection)
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,

@@ -8,7 +8,7 @@ import { Mail, MessageSquare, Send, Building2, CheckCircle, ArrowLeft, Phone } f
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { supabase } from "@/integrations/supabase/client";
+import { submitSupportContact } from "@/lib/backendApi";
 import {
   Select,
   SelectContent,
@@ -42,25 +42,17 @@ const Support = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.from("support_requests").insert({
-      name: `${firstName} ${lastName}`.trim(),
-      first_name: firstName,
-      last_name: lastName,
-      company_name: companyName || null,
-      email,
-      phone_number: phone,
-      category,
-      subject,
-      message,
-    });
-    setLoading(false);
-    if (error) {
-      toast({
-        title: "Failed to submit",
-        description: error.message,
-        variant: "destructive",
+    try {
+      await submitSupportContact({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        company_name: companyName.trim() || null,
+        email: email.trim(),
+        phone_number: phone.trim() || null,
+        category,
+        subject: subject.trim(),
+        message: message.trim(),
       });
-    } else {
       setSubmitted(true);
       setFirstName("");
       setLastName("");
@@ -70,6 +62,14 @@ const Support = () => {
       setCategory("");
       setSubject("");
       setMessage("");
+    } catch (err) {
+      toast({
+        title: "Failed to submit",
+        description: err instanceof Error ? err.message : "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 

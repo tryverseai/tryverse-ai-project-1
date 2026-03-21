@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 
 const TermsOfService = () => (
   <div className="min-h-screen bg-background">
@@ -59,7 +60,13 @@ const TermsOfService = () => (
 
             <section>
               <h2 className="font-display text-lg font-semibold text-foreground mb-3">10. Contact</h2>
-              <p>For questions about these Terms, contact us at <a href="mailto:legal@tryverse.ai" className="text-foreground underline">legal@tryverse.ai</a>.</p>
+              <p>
+                For questions about these Terms, please use our{" "}
+                <Link to="/support" className="text-foreground underline font-medium">
+                  Contact us
+                </Link>{" "}
+                page.
+              </p>
             </section>
           </div>
         </motion.div>

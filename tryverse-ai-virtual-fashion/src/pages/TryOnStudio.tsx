@@ -1,16 +1,20 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, Camera, User, Scan, Check, RotateCcw, ArrowRight, Glasses, ShoppingBag, Shirt, AlertCircle, X } from "lucide-react";
 import { toast } from "sonner";
-import { uploadImage, startTryOn, type TryOnCategory } from "@/lib/backendApi";
+import {
+  uploadImage,
+  startTryOn,
+  getTryverseModels,
+  createPersonPathFromModel,
+  type TryOnCategory,
+  type TryverseModel,
+} from "@/lib/backendApi";
 import { posthogCapture } from "@/lib/posthog";
 import { captureSentryException } from "@/lib/sentry";
-
-import modelMaleBefore from "@/assets/model-male-before.jpg";
-import modelFemaleBefore from "@/assets/model-female-before.jpg";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Mode = "upload" | "ai-model";
@@ -27,16 +31,6 @@ const categories: { id: TryOnCategory; label: string; icon: typeof Shirt }[] = [
   { id: "clothing", label: "Clothing",  icon: Shirt        },
   { id: "bags",     label: "Bags",      icon: ShoppingBag  },
   { id: "glasses",  label: "Eyewear",   icon: Glasses      },
-];
-
-// ─── AI demo models ───────────────────────────────────────────────────────────
-const aiModels = [
-  { id: "female-slim",     name: "Ava",    bodyType: "Slim",      image: modelFemaleBefore, gender: "Female" },
-  { id: "female-athletic", name: "Maya",   bodyType: "Athletic",  image: modelFemaleBefore, gender: "Female" },
-  { id: "female-plus",     name: "Jordan", bodyType: "Plus Size", image: modelFemaleBefore, gender: "Female" },
-  { id: "male-slim",       name: "James",  bodyType: "Slim",      image: modelMaleBefore,   gender: "Male"   },
-  { id: "male-athletic",   name: "Marcus", bodyType: "Athletic",  image: modelMaleBefore,   gender: "Male"   },
-  { id: "male-tall",       name: "David",  bodyType: "Tall",      image: modelMaleBefore,   gender: "Male"   },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -57,8 +51,37 @@ const TryOnStudio = () => {
   const [processingTime, setProcessingTime] = useState<number | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string>("");
 
+  const [libraryModels, setLibraryModels] = useState<TryverseModel[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+  const [libraryProductImage, setLibraryProductImage] = useState<UploadedImage | null>(null);
+
   const personInputRef  = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
+  const libraryProductInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const models = await getTryverseModels();
+        if (!cancelled) {
+          setLibraryModels(models);
+          setModelsError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setLibraryModels([]);
+          setModelsError(e instanceof Error ? e.message : "Could not load model library");
+        }
+      } finally {
+        if (!cancelled) setModelsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ── Image selection helpers ──────────────────────────────────────────────
   const handleFileSelect = useCallback((
@@ -138,6 +161,52 @@ const TryOnStudio = () => {
     }
   };
 
+  const handleTryOnWithLibraryModel = async () => {
+    if (!selectedModel || !libraryProductImage) {
+      toast.error("Select a model and upload a product image");
+      return;
+    }
+
+    try {
+      setPhase("uploading");
+      setErrorMsg(null);
+      setUploadProgress("Preparing model photo…");
+      const personPath = await createPersonPathFromModel(selectedModel);
+
+      setUploadProgress("Uploading product image…");
+      const productUpload = await uploadImage(libraryProductImage.file, "product");
+
+      setUploadProgress("Starting AI try-on…");
+      setPhase("processing");
+      posthogCapture("try_on_started", { category: selectedCategory, source: "try_on_studio", mode: "library_model" });
+
+      const result = await startTryOn({
+        personImagePath: personPath,
+        productImagePath: productUpload.filePath,
+        category: selectedCategory,
+        productDescription: `${selectedCategory} item for virtual try-on`,
+      });
+
+      if (result.status === "completed" && result.resultUrl) {
+        setResultUrl(result.resultUrl);
+        setProcessingTime(result.processingTimeMs || null);
+        setPhase("result");
+        posthogCapture("try_on_completed", { category: selectedCategory, source: "try_on_studio" });
+        toast.success("Virtual try-on complete!");
+      } else if (result.status === "failed") {
+        throw new Error(result.error || "AI processing failed. Please try again.");
+      } else if (result.status === "queued" || result.status === "processing") {
+        await pollForResult(result.tryonId);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      posthogCapture("try_on_failed", { category: selectedCategory, source: "try_on_studio", error: msg });
+      setErrorMsg(msg);
+      setPhase("error");
+      toast.error(msg);
+    }
+  };
+
   const pollForResult = async (tryonId: string) => {
     const { pollTryOnStatus } = await import("@/lib/backendApi");
     const maxAttempts = 40;
@@ -173,10 +242,13 @@ const TryOnStudio = () => {
     setErrorMsg(null);
     setProcessingTime(null);
     setSelectedModel(null);
+    setLibraryProductImage(null);
     setUploadProgress("");
   };
 
-  const filteredModels = aiModels.filter((m) => m.gender === genderFilter);
+  const filteredModels = libraryModels.filter(
+    (m) => m.gender === (genderFilter === "Female" ? "female" : "male")
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -198,7 +270,7 @@ const TryOnStudio = () => {
           <div className="flex justify-center gap-2 mb-6">
             {([
               { id: "upload" as Mode,   label: "Upload Photo", icon: Upload },
-              { id: "ai-model" as Mode, label: "AI Model Demo", icon: User  },
+              { id: "ai-model" as Mode, label: "Model library", icon: User  },
             ] as const).map((m) => (
               <button
                 key={m.id}
@@ -209,9 +281,6 @@ const TryOnStudio = () => {
               >
                 <m.icon className="h-4 w-4" />
                 {m.label}
-                {m.id === "ai-model" && (
-                  <span className="text-[10px] bg-muted-foreground/20 rounded-full px-1.5 py-0.5">Demo</span>
-                )}
               </button>
             ))}
           </div>
@@ -221,7 +290,11 @@ const TryOnStudio = () => {
             {categories.map((cat) => (
               <button
                 key={cat.id}
-                onClick={() => { setSelectedCategory(cat.id); setProductImage(null); }}
+                onClick={() => {
+                  setSelectedCategory(cat.id);
+                  setProductImage(null);
+                  setLibraryProductImage(null);
+                }}
                 className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium transition-all ${
                   selectedCategory === cat.id
                     ? "bg-foreground/10 text-foreground border border-foreground/20"
@@ -328,48 +401,128 @@ const TryOnStudio = () => {
               {/* ── AI MODEL DEMO PHASE ───────────────────────────────────── */}
               {phase === "select" && mode === "ai-model" && (
                 <motion.div key="demo-select" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6 text-center">
-                    <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                      Demo mode — shows example results. Switch to Upload Photo for real AI try-on.
+                  <div className="bg-muted/50 border border-border rounded-xl p-4 mb-6 text-center">
+                    <p className="text-sm text-foreground/90">
+                      <span className="font-medium">Shared model library</span> — same presets shoppers can see in your{" "}
+                      <strong>embedded widget</strong> when <strong>Show AI Model Selection</strong> is enabled in Settings.
                     </p>
                   </div>
-                  <div className="grid md:grid-cols-2 gap-8">
-                    <div className="bg-card rounded-2xl border border-border/50 p-6">
-                      <h3 className="font-display text-lg font-semibold text-foreground mb-1">Choose a Model</h3>
-                      <p className="text-sm text-muted-foreground mb-4">Select an AI model for demonstration</p>
-                      <div className="flex gap-2 mb-4">
+                  <div className="grid lg:grid-cols-2 gap-8">
+                    <div className="bg-card rounded-2xl border border-border/50 p-6 space-y-4">
+                      <div>
+                        <h3 className="font-display text-lg font-semibold text-foreground mb-1">1. Choose a model</h3>
+                        <p className="text-sm text-muted-foreground">Different looks and body types — run the migration if the list is empty.</p>
+                      </div>
+                      <div className="flex gap-2">
                         {(["Female", "Male"] as const).map((g) => (
-                          <button key={g} onClick={() => { setGenderFilter(g); setSelectedModel(null); }}
-                            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${genderFilter === g ? "bg-foreground text-background" : "bg-muted text-muted-foreground"}`}>
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => {
+                              setGenderFilter(g);
+                              setSelectedModel(null);
+                            }}
+                            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                              genderFilter === g ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
+                            }`}
+                          >
                             {g}
                           </button>
                         ))}
                       </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        {filteredModels.map((model) => (
-                          <button key={model.id} onClick={() => setSelectedModel(model.id)}
-                            className={`rounded-xl overflow-hidden border-2 transition-all ${selectedModel === model.id ? "border-foreground shadow-soft" : "border-border/50 hover:border-foreground/20"}`}>
-                            <div className="aspect-[3/4] relative">
-                              <img src={model.image} alt={model.name} className="w-full h-full object-cover" />
-                              <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-foreground/50 to-transparent">
-                                <p className="text-primary-foreground text-xs font-medium">{model.name}</p>
-                                <p className="text-primary-foreground/70 text-[10px]">{model.bodyType}</p>
+                      {modelsLoading ? (
+                        <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading models…</div>
+                      ) : modelsError ? (
+                        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                          {modelsError}
+                        </div>
+                      ) : filteredModels.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-8 text-center">No models for this filter.</p>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[min(52vh,520px)] overflow-y-auto pr-1">
+                          {filteredModels.map((model) => (
+                            <button
+                              key={model.id}
+                              type="button"
+                              onClick={() => setSelectedModel(model.id)}
+                              className={`rounded-xl overflow-hidden border-2 text-left transition-all ${
+                                selectedModel === model.id
+                                  ? "border-foreground shadow-soft"
+                                  : "border-border/50 hover:border-foreground/20"
+                              }`}
+                            >
+                              <div className="aspect-[3/4] relative bg-muted">
+                                <img
+                                  src={`${model.image_url}${model.image_url.includes("?") ? "&" : "?"}tryverse_slug=${encodeURIComponent(model.slug)}`}
+                                  alt={model.display_name}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                />
+                                <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
+                                  <p className="text-white text-xs font-semibold">{model.display_name}</p>
+                                  <p className="text-white/80 text-[10px]">
+                                    {[model.body_type, model.appearance_tag].filter(Boolean).join(" · ")}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="bg-card rounded-2xl border border-border/50 p-6 flex flex-col items-center justify-center text-center gap-4">
-                      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                        <Upload className="h-7 w-7 text-muted-foreground" />
-                      </div>
+                    <div className="bg-card rounded-2xl border border-border/50 p-6 flex flex-col gap-4">
                       <div>
-                        <p className="font-display text-base font-semibold text-foreground mb-1">Real AI Try-On Available</p>
-                        <p className="text-sm text-muted-foreground">Switch to Upload Photo mode to try on your own products with live AI inference.</p>
+                        <h3 className="font-display text-lg font-semibold text-foreground mb-1">2. Product image</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Upload the item to try on, then run live AI (same pipeline as “Upload Photo”).
+                        </p>
                       </div>
-                      <Button onClick={() => { setMode("upload"); handleReset(); }} className="gradient-primary text-primary-foreground shadow-soft gap-2">
-                        <Upload className="h-4 w-4" /> Upload Your Photo
+                      {libraryProductImage ? (
+                        <div className="relative rounded-xl overflow-hidden border border-border/50">
+                          <img
+                            src={libraryProductImage.previewUrl}
+                            alt="Product"
+                            className="w-full aspect-[3/4] object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setLibraryProductImage(null)}
+                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-background/90 flex items-center justify-center"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-foreground/30 transition-colors"
+                          onClick={() => libraryProductInputRef.current?.click()}
+                          onDrop={(e) => handleDrop(e, setLibraryProductImage)}
+                          onDragOver={(e) => e.preventDefault()}
+                        >
+                          <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                          <p className="text-sm font-medium text-foreground">Drop product or click to upload</p>
+                          <p className="text-xs text-muted-foreground mt-1">JPG, PNG or WebP · up to 10MB</p>
+                        </button>
+                      )}
+                      <input
+                        ref={libraryProductInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={(e) =>
+                          e.target.files?.[0] && handleFileSelect(e.target.files[0], setLibraryProductImage)
+                        }
+                      />
+                      <Button
+                        onClick={handleTryOnWithLibraryModel}
+                        disabled={!selectedModel || !libraryProductImage || modelsLoading || !!modelsError}
+                        className="w-full gradient-primary text-primary-foreground shadow-soft"
+                      >
+                        Try it on <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                      <Button type="button" variant="outline" className="w-full gap-2" onClick={() => { setMode("upload"); handleReset(); }}>
+                        <Upload className="h-4 w-4" /> Use my own photo instead
                       </Button>
                     </div>
                   </div>

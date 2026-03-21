@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { glassOuter, glassInner } from "@/lib/glassFrame";
 import { ArrowRight, TrendingDown, TrendingUp, ShieldCheck, Code2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -60,8 +62,9 @@ export function ForBrandsSection() {
             initial={{ opacity: 0, x: 30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            className="bg-card rounded-2xl p-6 border border-border/50 shadow-card"
+            className={glassOuter}
           >
+            <div className={cn(glassInner, "p-5 sm:p-6")}>
             {/* Widget installation snippet */}
             <div className="rounded-xl bg-foreground/[0.03] p-5 font-mono text-sm">
               <p className="text-muted-foreground mb-2">{"<!-- Add to your product page -->"}</p>
@@ -90,6 +93,7 @@ export function ForBrandsSection() {
                   <p className="text-xs text-muted-foreground">{stat.label}</p>
                 </div>
               ))}
+            </div>
             </div>
           </motion.div>
         </div>
