@@ -77,11 +77,6 @@ export function AdminModelLibraryTab({ adminKey }: { adminKey: string }) {
               </div>
               <div className="p-3 space-y-1">
                 <p className="font-semibold text-foreground">{m.display_name}</p>
-                <p className="text-xs text-muted-foreground capitalize">
-                  {m.gender}
-                  {m.body_type ? ` · ${m.body_type}` : ""}
-                </p>
-                {m.appearance_tag && <p className="text-xs text-muted-foreground line-clamp-2">{m.appearance_tag}</p>}
                 <p className="text-[10px] font-mono text-muted-foreground truncate" title={m.slug}>
                   {m.slug}
                 </p>

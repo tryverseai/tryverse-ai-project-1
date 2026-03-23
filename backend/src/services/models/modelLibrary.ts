@@ -5,6 +5,22 @@ import { logger } from '../../config/logger';
 const SSRF_BLOCKED_HOSTS =
   /^(localhost|127\.|0\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1|\[::\]|0\.0\.0\.0)/i;
 
+/**
+ * DB may store absolute HTTPS URLs (e.g. Unsplash) or app-relative paths like `/model-library/zoe.png`.
+ * Relative paths are joined to FRONTEND_URL so the backend can fetch them and embeds get a full URL.
+ */
+export function resolveModelImageUrl(stored: string): string {
+  const trimmed = stored.trim();
+  if (trimmed.startsWith('/')) {
+    const base = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+    if (!base) {
+      throw new Error('FRONTEND_URL must be set when model library uses path-only image_url values');
+    }
+    return `${base}${trimmed}`;
+  }
+  return trimmed;
+}
+
 export interface PublicModelRow {
   id: string;
   slug: string;
@@ -17,15 +33,29 @@ export interface PublicModelRow {
 }
 
 function assertSafeImageUrl(url: string): void {
-  if (!url.startsWith('https://')) {
-    throw new Error('Model image URL must use HTTPS');
-  }
-  let host: string;
+  let parsed: URL;
   try {
-    host = new URL(url).hostname;
+    parsed = new URL(url);
   } catch {
     throw new Error('Invalid model image URL');
   }
+
+  const frontend = process.env.FRONTEND_URL;
+  if (frontend) {
+    try {
+      const allowedOrigin = new URL(frontend).origin;
+      if (parsed.origin === allowedOrigin) {
+        return;
+      }
+    } catch {
+      /* ignore invalid FRONTEND_URL */
+    }
+  }
+
+  if (!url.startsWith('https://')) {
+    throw new Error('Model image URL must use HTTPS (or match FRONTEND_URL for self-hosted assets)');
+  }
+  const host = parsed.hostname;
   if (SSRF_BLOCKED_HOSTS.test(host)) {
     throw new Error('Model image host not allowed');
   }
@@ -42,7 +72,10 @@ export async function listActiveModels(): Promise<PublicModelRow[]> {
     logger.error('listActiveModels failed', { message: error.message });
     throw new Error('Could not load model library');
   }
-  return (data || []) as PublicModelRow[];
+  return (data || []).map((row) => ({
+    ...row,
+    image_url: resolveModelImageUrl(row.image_url),
+  })) as PublicModelRow[];
 }
 
 export async function listAllModelsForAdmin(): Promise<
@@ -57,7 +90,10 @@ export async function listAllModelsForAdmin(): Promise<
     logger.error('listAllModelsForAdmin failed', { message: error.message });
     throw new Error('Could not load model library');
   }
-  return (data || []) as (PublicModelRow & { is_active: boolean; created_at: string })[];
+  return (data || []).map((row) => ({
+    ...row,
+    image_url: resolveModelImageUrl(row.image_url),
+  })) as (PublicModelRow & { is_active: boolean; created_at: string })[];
 }
 
 /**
@@ -74,9 +110,10 @@ export async function resolveModelToPersonPath(modelId: string, userId: string):
     throw new Error('Model not found or inactive');
   }
 
-  assertSafeImageUrl(row.image_url);
+  const absoluteUrl = resolveModelImageUrl(row.image_url);
+  assertSafeImageUrl(absoluteUrl);
 
-  const response = await fetch(row.image_url);
+  const response = await fetch(absoluteUrl);
   if (!response.ok) {
     throw new Error('Failed to fetch model image');
   }

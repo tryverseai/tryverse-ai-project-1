@@ -460,9 +460,6 @@ const TryOnStudio = () => {
                                 />
                                 <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
                                   <p className="text-white text-xs font-semibold">{model.display_name}</p>
-                                  <p className="text-white/80 text-[10px]">
-                                    {[model.body_type, model.appearance_tag].filter(Boolean).join(" · ")}
-                                  </p>
                                 </div>
                               </div>
                             </button>
