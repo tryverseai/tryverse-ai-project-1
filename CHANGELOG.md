@@ -20,6 +20,7 @@ All notable changes to this project are documented here.
 - **Early access email HTML** moved to **`backend/src/routes/earlyAccessEmailHtml.ts`** (escaped fields only) to satisfy static analysis; see **`docs/SECURITY_SCANNER_NOTES.md`** for Semgrep false-positive triage.
 - **Widget IDOR:** **`POST /api/widget/request`** now requires **`personImagePath`** and **`productImagePath`** to start with **`{API key owner user id}/`**, matching **`POST /api/tryon`** (prevents cross-account storage paths).
 - **Scanner noise:** Widget file header no longer mentions DOM sink names in comments; HTTPS redirect uses **`URL`** + safe path check; canonical link uses **`href="/"`**; Semgrep **`nosemgrep`** on early-access HTML helper.
+- **Security hardening (scanners):** HTTPS upgrade moved to **`middleware/httpsRedirect.ts`** (`res.location` + **301**, host allowlist + `req.hostname`); **Helmet** **`contentSecurityPolicy: false`** for JSON-only API; early-access email HTML passed through **`sanitize-html`**; **Docker** backend/worker **`no-new-privileges`**, **`read_only`**, **`tmpfs: /tmp`**; **`index.html`** og/twitter image URLs use same-origin paths.
 - **Docker**: `no-new-privileges: true` on Redis service.
 - **Vite dev**: `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` headers.
 

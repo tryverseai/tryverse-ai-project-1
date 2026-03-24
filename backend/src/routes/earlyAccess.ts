@@ -102,8 +102,6 @@ router.post(
 
       const to = String(email).toLowerCase();
 
-      // HTML email: arguments are escapeHtml() output; body is assembled in earlyAccessEmailHtml.ts
-      // nosemgrep: javascript.lang.security.audit.raw-html-format
       const html = buildEarlyAccessConfirmationHtml(
         escapeHtml(String(first_name)),
         escapeHtml(String(brand_name))

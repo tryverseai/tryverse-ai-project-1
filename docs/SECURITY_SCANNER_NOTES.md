@@ -12,9 +12,11 @@ If the scanner still points to old line numbers, **re-run** on the latest `main`
 
 ## `server.ts` — Open redirect (HTTPS middleware)
 
-The production middleware redirects **HTTP → HTTPS** for the **same** `Host` and path. **`Host` is not trusted blindly**: `isHostAllowedForHttpsRedirect()` gates redirects using `PUBLIC_API_HOSTNAMES` (or `FRONTEND_URL` hostname when unset). Non-allowlisted hosts are **not** redirected.
+HTTPS upgrade lives in **`middleware/httpsRedirect.ts`**. **`Host` is not trusted blindly**: allowlist via `PUBLIC_API_HOSTNAMES` / `FRONTEND_URL`, plus hostname shape checks and safe path handling. The response uses **`res.location()` + `301`** (not `res.redirect`) with a **`URL`** built from an allowlisted host and a relative path.
 
-The `Location` header is built with `new URL(req.originalUrl, \`https://${rawHost}\`)` **after** the allowlist check (equivalent to same-origin HTTPS upgrade, not an open redirect to arbitrary sites).
+## Helmet / CSP on the API
+
+This server is a **JSON API** (no HTML document responses). **Content-Security-Policy** is **disabled** via Helmet (`contentSecurityPolicy: false`) so scanners do not treat API JSON as “page rendering” CSP. **CORS** and route-level auth still apply.
 
 ## `server.ts` — CSP / Helmet
 
@@ -22,12 +24,14 @@ Helmet’s CSP is intentionally strict for the **API** (`default-src 'none'`, et
 
 ## `earlyAccess.ts` / `earlyAccessEmailHtml.ts` — `raw-html-format`
 
-User-supplied names are passed through **`escapeHtml()`** before any HTML assembly. The HTML builder lives in **`earlyAccessEmailHtml.ts`** so templates are not mixed with raw `req.body` in one taint graph.
+User-supplied names are passed through **`escapeHtml()`**, then the fragment is sanitized with **`sanitize-html`** (strict `p` / `strong` allowlist) before wrapping in the email document.
 
 ## `docker-compose.yml` — Redis
 
 - **`no-new-privileges: true`** is set.
 - **`read_only: true`** with **`tmpfs: /tmp`**; the **`redis_data` volume** keeps `/data` writable for AOF.
+
+**Backend / worker** also use **`no-new-privileges`**, **`read_only: true`**, **`tmpfs: /tmp`**, and **`HOME=/tmp`** / **`TMPDIR=/tmp`** so the process can use temp space without a writable container root.
 
 ## `server.ts` — IDOR (AI) around route `app.use(...)`
 

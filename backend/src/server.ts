@@ -9,6 +9,7 @@ import { connectRedis } from './config/redis';
 import { generalRateLimit } from './middleware/rateLimiter';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { requireAdmin } from './middleware/auth';
+import { createProductionHttpsRedirectMiddleware } from './middleware/httpsRedirect';
 
 // Routes
 import uploadRouter from './routes/upload';
@@ -32,25 +33,6 @@ assertProductionSecurityConfig();
 
 const app = express();
 
-function httpsRedirectAllowedHosts(): string[] {
-  const raw = env.PUBLIC_API_HOSTNAMES.trim();
-  if (raw) {
-    return raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-  }
-  try {
-    const h = new URL(env.FRONTEND_URL).hostname.toLowerCase();
-    return h ? [h] : [];
-  } catch {
-    return [];
-  }
-}
-
-function isHostAllowedForHttpsRedirect(host: string, allowed: string[]): boolean {
-  if (!allowed.length) return true;
-  const h = host.toLowerCase();
-  return allowed.some((a) => h === a || h.endsWith(`.${a}`));
-}
-
 // Trust proxy for X-Forwarded-* headers (required behind nginx, load balancers)
 app.set('trust proxy', 1);
 
@@ -67,49 +49,13 @@ if (env.SENTRY_DSN) {
 // ─── Security ─────────────────────────────────────────────────────────────────
 // Enforce HTTPS in production (rely on X-Forwarded-Proto from reverse proxy)
 if (env.NODE_ENV === 'production') {
-  const allowedHttpsHosts = httpsRedirectAllowedHosts();
-  app.use((req, res, next) => {
-    const forwardedProto = req.headers['x-forwarded-proto'];
-    if (forwardedProto !== 'http') {
-      next();
-      return;
-    }
-    const rawHost = (req.headers.host || '').split(':')[0];
-    if (!rawHost) {
-      next();
-      return;
-    }
-    if (!isHostAllowedForHttpsRedirect(rawHost, allowedHttpsHosts)) {
-      logger.warn('HTTPS redirect skipped: Host not in allowlist', {
-        host: rawHost,
-        hint: 'Set PUBLIC_API_HOSTNAMES to your API hostname(s) if this is legitimate traffic.',
-      });
-      next();
-      return;
-    }
-    const pathAndQuery = req.originalUrl || '/';
-    // Reject protocol-relative or absolute URLs in originalUrl (would change origin in URL()).
-    if (!pathAndQuery.startsWith('/') || pathAndQuery.startsWith('//')) {
-      logger.warn('HTTPS redirect skipped: unexpected originalUrl shape', { pathAndQuery: pathAndQuery.slice(0, 200) });
-      next();
-      return;
-    }
-    const httpsLocation = new URL(pathAndQuery, `https://${rawHost}`);
-    return res.redirect(301, httpsLocation.href);
-  });
+  app.use(createProductionHttpsRedirectMiddleware());
 }
+// JSON API only — no HTML responses; CSP on API responses confuses scanners and adds no value here.
 app.use(
   helmet({
+    contentSecurityPolicy: false,
     crossOriginResourcePolicy: { policy: 'cross-origin' },
-    contentSecurityPolicy: {
-      useDefaults: false,
-      directives: {
-        defaultSrc: ["'none'"],
-        baseUri: ["'none'"],
-        formAction: ["'none'"],
-        frameAncestors: ["'none'"],
-      },
-    },
   })
 );
 

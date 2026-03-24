@@ -4,12 +4,19 @@ services:
   backend:
     build: .
     container_name: tryverse-backend
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "3001:3001"
     env_file:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379
+      - HOME=/tmp
+      - TMPDIR=/tmp
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       redis:
         condition: service_healthy
@@ -20,11 +27,18 @@ services:
   worker:
     build: .
     container_name: tryverse-worker
+    security_opt:
+      - no-new-privileges:true
     command: node dist/services/queue/worker.js
     env_file:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379
+      - HOME=/tmp
+      - TMPDIR=/tmp
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       redis:
         condition: service_healthy
