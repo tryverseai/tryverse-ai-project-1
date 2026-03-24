@@ -58,6 +58,19 @@ router.post(
       const userId = req.widgetUserId!;
       const { personImagePath, productImagePath, category, productDescription } = req.body;
 
+      // IDOR: only storage paths under this API key owner's account (same rule as POST /api/tryon)
+      const ownerPrefix = `${userId}/`;
+      if (!personImagePath.startsWith(ownerPrefix) || !productImagePath.startsWith(ownerPrefix)) {
+        logger.warn('Widget try-on rejected: storage paths do not belong to API key account', {
+          userId,
+          personPrefix: String(personImagePath).slice(0, 48),
+        });
+        res.status(403).json({
+          error: 'Person and product images must be uploaded under this API key account',
+        });
+        return;
+      }
+
       // Credit check
       const creditCheck = await checkCredits(userId);
       if (!creditCheck.allowed) {

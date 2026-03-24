@@ -2,6 +2,9 @@
  * TryVerse Virtual Try-On Widget
  * Embed on your e-commerce site for AI-powered virtual try-on.
  *
+ * Security: UI is built with createElement/textContent and safe image URLs — no innerHTML/outerHTML
+ * (some scanners may still report stale line numbers from older revisions).
+ *
  * Usage:
  *   <script src="https://your-domain.com/tryverse-widget.js"></script>
  *   <script>

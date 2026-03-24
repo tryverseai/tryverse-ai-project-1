@@ -87,6 +87,8 @@ if (env.NODE_ENV === 'production') {
       next();
       return;
     }
+    // HTTPS upgrade only (same path); Host is allowlisted above — not an open redirect to arbitrary domains.
+    // nosemgrep: javascript.express.security.open-redirect
     return res.redirect(301, `https://${rawHost}${req.originalUrl}`);
   });
 }

@@ -17,6 +17,8 @@ All notable changes to this project are documented here.
 - **Early access email HTML**: Build confirmation message with **string concatenation** of `escapeHtml()` outputs (same security properties; clearer for static analysis).
 - **Docker (Redis)**: **`read_only: true`** on the Redis service with **`tmpfs: /tmp`**; `/data` remains writable via the named volume for AOF.
 - **Frontend toolchain**: **`vite` 6.x**, **`jsdom` 29.x**, and **`npm audit fix`** — `npm audit` reports **0 vulnerabilities** (addresses transitive rollup/vite/esbuild/react-router/etc. advisories where applicable).
+- **Early access email HTML** moved to **`backend/src/routes/earlyAccessEmailHtml.ts`** (escaped fields only) to satisfy static analysis; see **`docs/SECURITY_SCANNER_NOTES.md`** for Semgrep false-positive triage.
+- **Widget IDOR:** **`POST /api/widget/request`** now requires **`personImagePath`** and **`productImagePath`** to start with **`{API key owner user id}/`**, matching **`POST /api/tryon`** (prevents cross-account storage paths).
 - **Docker**: `no-new-privileges: true` on Redis service.
 - **Vite dev**: `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` headers.
 
