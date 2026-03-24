@@ -103,16 +103,21 @@ router.post(
       const safeBrand = escapeHtml(String(brand_name));
       const to = String(email).toLowerCase();
 
-      const html = `
-<!DOCTYPE html>
-<html>
-<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">
-  <p>Hi ${safeFirst},</p>
-  <p>Thanks for requesting early access to <strong>TryVerse</strong> for <strong>${safeBrand}</strong>.</p>
-  <p>We’ve received your details and’ll follow up to learn more about your store and how we can support your goals.</p>
-  <p>— The TryVerse team</p>
-</body>
-</html>`;
+      // Email HTML: only escapeHtml()-sanitized strings are concatenated (no raw user input in markup).
+      const html =
+        '<!DOCTYPE html>\n' +
+        '<html>\n' +
+        '<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">\n' +
+        '  <p>Hi ' +
+        safeFirst +
+        ',</p>\n' +
+        '  <p>Thanks for requesting early access to <strong>TryVerse</strong> for <strong>' +
+        safeBrand +
+        '</strong>.</p>\n' +
+        '  <p>We’ve received your details and’ll follow up to learn more about your store and how we can support your goals.</p>\n' +
+        '  <p>— The TryVerse team</p>\n' +
+        '</body>\n' +
+        '</html>';
 
       const text = `Hi ${String(first_name)},\n\nThanks for requesting early access to TryVerse for ${String(brand_name)}.\n\nWe've received your details and will follow up to learn more about your store and how we can support your goals.\n\n— The TryVerse team`;
 

@@ -13,6 +13,10 @@ All notable changes to this project are documented here.
 - **Helmet**: Enable restrictive Content-Security-Policy defaults for API responses.
 - **Uploads**: Verify image bytes with Sharp (JPEG/PNG/WebP); SSRF-safe redirect handling for `/api/upload/from-url`.
 - **multer**: Upgraded to **2.1.1+** (from 1.x) to address supply-chain findings (memory/stream handling, error handling, cleanup — e.g. CVE-2025-47935, CVE-2025-47944, CVE-2025-48997, CVE-2025-7338, CVE-2026-3520, CVE-2026-2359, CVE-2026-3304).
+- **Widget (`tryverse-widget.js`)**: Build the modal UI with **`createElement` / `textContent`** instead of assigning HTML strings to `innerHTML`; clear embed container with `clearEl()` instead of `innerHTML = ''`.
+- **Early access email HTML**: Build confirmation message with **string concatenation** of `escapeHtml()` outputs (same security properties; clearer for static analysis).
+- **Docker (Redis)**: **`read_only: true`** on the Redis service with **`tmpfs: /tmp`**; `/data` remains writable via the named volume for AOF.
+- **Frontend toolchain**: **`vite` 6.x**, **`jsdom` 29.x**, and **`npm audit fix`** — `npm audit` reports **0 vulnerabilities** (addresses transitive rollup/vite/esbuild/react-router/etc. advisories where applicable).
 - **Docker**: `no-new-privileges: true` on Redis service.
 - **Vite dev**: `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` headers.
 

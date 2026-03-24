@@ -154,13 +154,6 @@
     });
   }
 
-  function escapeAttr(s) {
-    return String(s || '')
-      .replace(/&/g, '&amp;')
-      .replace(/"/g, '&quot;')
-      .replace(/</g, '&lt;');
-  }
-
   /** Only https, localhost http, or data:image/*;base64 — avoids javascript: / unexpected schemes in img.src. */
   function isSafeImageDisplayUrl(url) {
     if (url == null || typeof url !== 'string') return false;
@@ -224,52 +217,106 @@
         'background:white;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);';
     }
 
-    var modelsHtml = '';
+    var h2 = document.createElement('h2');
+    h2.style.margin = '0 0 16px';
+    h2.style.fontSize = '1.25rem';
+    h2.textContent = 'Virtual Try-On';
+    box.appendChild(h2);
+
+    var intro = document.createElement('p');
+    intro.style.color = '#666';
+    intro.style.fontSize = '0.875rem';
+    intro.style.marginBottom = '16px';
+    intro.textContent =
+      'Upload your photo' +
+      (showModels ? ', or choose a model below,' : '') +
+      ' to see how this item looks.';
+    box.appendChild(intro);
+
     if (showModels) {
-      modelsHtml =
-        '<p style="font-size:0.8rem;color:#6b7280;margin:12px 0 8px;">Or pick a model</p>' +
-        '<div id="tryverse-models" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;max-height:140px;overflow-y:auto;">';
+      var pickLabel = document.createElement('p');
+      pickLabel.style.fontSize = '0.8rem';
+      pickLabel.style.color = '#6b7280';
+      pickLabel.style.margin = '12px 0 8px';
+      pickLabel.textContent = 'Or pick a model';
+      box.appendChild(pickLabel);
+
+      var modelsWrap = document.createElement('div');
+      modelsWrap.id = 'tryverse-models';
+      modelsWrap.style.cssText =
+        'display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;max-height:140px;overflow-y:auto;';
       for (var mi = 0; mi < cfg.models.length; mi++) {
         var mod = cfg.models[mi];
-        modelsHtml +=
-          '<button type="button" class="tryverse-model-btn" data-model-id="' +
-          escapeAttr(mod.id) +
-          '" style="padding:0;border:2px solid #e5e7eb;border-radius:8px;overflow:hidden;width:56px;height:74px;cursor:pointer;background:#f9fafb;">' +
-          '<img src="' +
-          escapeAttr(mod.image_url) +
-          '" alt="' +
-          escapeAttr(mod.display_name) +
-          '" style="width:100%;height:100%;object-fit:cover;" />' +
-          '</button>';
+        var mBtn = document.createElement('button');
+        mBtn.type = 'button';
+        mBtn.className = 'tryverse-model-btn';
+        mBtn.setAttribute('data-model-id', String(mod.id));
+        mBtn.style.cssText =
+          'padding:0;border:2px solid #e5e7eb;border-radius:8px;overflow:hidden;width:56px;height:74px;cursor:pointer;background:#f9fafb;';
+        var mImg = document.createElement('img');
+        if (isSafeImageDisplayUrl(mod.image_url)) {
+          mImg.src = mod.image_url;
+        }
+        mImg.alt = mod.display_name != null ? String(mod.display_name) : '';
+        mImg.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+        mBtn.appendChild(mImg);
+        modelsWrap.appendChild(mBtn);
       }
-      modelsHtml += '</div>';
+      box.appendChild(modelsWrap);
     }
 
-    var html =
-      '<h2 style="margin:0 0 16px;font-size:1.25rem;">Virtual Try-On</h2>' +
-      '<p style="color:#666;font-size:0.875rem;margin-bottom:16px;">Upload your photo' +
-      (showModels ? ', or choose a model below,' : '') +
-      ' to see how this item looks.</p>' +
-      modelsHtml +
-      '<div id="tryverse-person-preview" style="width:120px;height:160px;border:2px dashed #ccc;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;background:#f9fafb;overflow:hidden;">' +
-      '<span style="color:#9ca3af;font-size:0.75rem;">Your photo</span></div>' +
-      '<input type="file" id="tryverse-person-input" accept="image/*" style="margin-bottom:20px;font-size:0.875rem;" />' +
-      '<div id="tryverse-status" style="margin:16px 0;min-height:24px;font-size:0.875rem;color:#6b7280;"></div>' +
-      '<div id="tryverse-result" style="margin-top:16px;display:none;"></div>' +
-      '<div style="display:flex;gap:12px;margin-top:20px;">' +
-      '<button id="tryverse-run" style="flex:1;padding:12px 20px;background:#000;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;font-weight:500;">Try It On</button>' +
-      '<button id="tryverse-close" style="padding:12px 20px;background:#f3f4f6;color:#374151;border:none;border-radius:8px;font-size:1rem;cursor:pointer;">Close</button>' +
-      '</div>';
+    var personPreview = document.createElement('div');
+    personPreview.id = 'tryverse-person-preview';
+    personPreview.style.cssText =
+      'width:120px;height:160px;border:2px dashed #ccc;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;background:#f9fafb;overflow:hidden;';
+    var previewPlaceholder = document.createElement('span');
+    previewPlaceholder.style.color = '#9ca3af';
+    previewPlaceholder.style.fontSize = '0.75rem';
+    previewPlaceholder.textContent = 'Your photo';
+    personPreview.appendChild(previewPlaceholder);
+    box.appendChild(personPreview);
 
-    box.innerHTML = html;
+    var personInput = document.createElement('input');
+    personInput.type = 'file';
+    personInput.id = 'tryverse-person-input';
+    personInput.accept = 'image/*';
+    personInput.style.marginBottom = '20px';
+    personInput.style.fontSize = '0.875rem';
+    box.appendChild(personInput);
+
+    var statusEl = document.createElement('div');
+    statusEl.id = 'tryverse-status';
+    statusEl.style.margin = '16px 0';
+    statusEl.style.minHeight = '24px';
+    statusEl.style.fontSize = '0.875rem';
+    statusEl.style.color = '#6b7280';
+    box.appendChild(statusEl);
+
+    var resultEl = document.createElement('div');
+    resultEl.id = 'tryverse-result';
+    resultEl.style.marginTop = '16px';
+    resultEl.style.display = 'none';
+    box.appendChild(resultEl);
+
+    var btnRow = document.createElement('div');
+    btnRow.style.display = 'flex';
+    btnRow.style.gap = '12px';
+    btnRow.style.marginTop = '20px';
+    var runBtn = document.createElement('button');
+    runBtn.id = 'tryverse-run';
+    runBtn.style.cssText =
+      'flex:1;padding:12px 20px;background:#000;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;font-weight:500;';
+    runBtn.textContent = 'Try It On';
+    var closeBtn = document.createElement('button');
+    closeBtn.id = 'tryverse-close';
+    closeBtn.style.cssText =
+      'padding:12px 20px;background:#f3f4f6;color:#374151;border:none;border-radius:8px;font-size:1rem;cursor:pointer;';
+    closeBtn.textContent = 'Close';
+    btnRow.appendChild(runBtn);
+    btnRow.appendChild(closeBtn);
+    box.appendChild(btnRow);
+
     overlay.appendChild(box);
-
-    var personPreview = box.querySelector('#tryverse-person-preview');
-    var personInput = box.querySelector('#tryverse-person-input');
-    var statusEl = box.querySelector('#tryverse-status');
-    var resultEl = box.querySelector('#tryverse-result');
-    var runBtn = box.querySelector('#tryverse-run');
-    var closeBtn = box.querySelector('#tryverse-close');
 
     var personFile = null;
     var selectedModelId = null;
@@ -404,7 +451,7 @@
     }
 
     if (inlineContainer) {
-      inlineContainer.innerHTML = '';
+      clearEl(inlineContainer);
       inlineContainer.appendChild(overlay);
     } else {
       document.body.appendChild(overlay);
