@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { body, param } from 'express-validator';
+import { body, param, query, matchedData } from 'express-validator';
 import { requireAdmin } from '../middleware/auth';
 import { handleValidationErrors } from '../middleware/validate';
 import { supabaseAdmin } from '../config/supabase';
@@ -200,58 +200,62 @@ router.get('/metrics', async (_req: Request, res: Response, next: NextFunction):
  * GET /api/admin/users
  * Lists all users with their plan and usage info.
  */
-router.get('/users', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const limit = Math.min(parseInt(String(req.query.limit || '50'), 10), 200);
-    const page = Math.max(parseInt(String(req.query.page || '1'), 10), 1);
-    const offset = (page - 1) * limit;
-    const searchParam = req.query.search;
-    const searchRaw =
-      typeof searchParam === 'string'
-        ? searchParam
-        : Array.isArray(searchParam) && typeof searchParam[0] === 'string'
-          ? searchParam[0]
-          : undefined;
-    // Sanitize: alphanumeric, spaces, @.- allowed; max 80 chars (prevents injection and DoS)
-    const search = searchRaw
-      ? String(searchRaw).slice(0, 80).replace(/[^a-zA-Z0-9@.\s-]/g, '').trim() || undefined
-      : undefined;
+router.get(
+  '/users',
+  [
+    query('limit').optional().isInt({ min: 1, max: 200 }).toInt(),
+    query('page').optional().isInt({ min: 1 }).toInt(),
+    query('search').optional().isString().trim().isLength({ max: 80 }),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const q = matchedData(req) as { limit?: number; page?: number; search?: string };
+      const limit = Math.min(q.limit ?? 50, 200);
+      const page = Math.max(q.page ?? 1, 1);
+      const offset = (page - 1) * limit;
+      const searchRaw = q.search;
+      // Sanitize: alphanumeric, spaces, @.- allowed; max 80 chars (prevents injection and DoS)
+      const search = searchRaw
+        ? String(searchRaw).slice(0, 80).replace(/[^a-zA-Z0-9@.\s-]/g, '').trim() || undefined
+        : undefined;
 
-    // Use plan_id only - current_plan_id may not exist in all schemas
-    let query = supabaseAdmin
-      .from('profiles')
-      .select(
-        'id, brand_name, full_name, contact_email, plan_id, free_credits_remaining, monthly_credits_remaining, monthly_credits_total, widget_activated, created_at, is_blocked',
-        { count: 'exact' }
-      )
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      // Use plan_id only - current_plan_id may not exist in all schemas
+      let profilesQuery = supabaseAdmin
+        .from('profiles')
+        .select(
+          'id, brand_name, full_name, contact_email, plan_id, free_credits_remaining, monthly_credits_remaining, monthly_credits_total, widget_activated, created_at, is_blocked',
+          { count: 'exact' }
+        )
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
 
-    if (search) {
-      const term = `%${search}%`;
-      query = query.or(`brand_name.ilike.${term},contact_email.ilike.${term}`);
+      if (search) {
+        const term = `%${search}%`;
+        profilesQuery = profilesQuery.or(`brand_name.ilike.${term},contact_email.ilike.${term}`);
+      }
+
+      const { data, error, count } = await profilesQuery;
+      if (error) {
+        logger.error('Admin users query failed', { error });
+        throw error;
+      }
+
+      const profiles = data || [];
+      const usersWithBan = profiles.map((profile: { id: string; is_blocked?: boolean } & Record<string, unknown>) => ({
+        ...profile,
+        is_banned: Boolean(profile.is_blocked),
+      }));
+
+      res.json({
+        users: usersWithBan,
+        pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
+      });
+    } catch (err) {
+      next(err);
     }
-
-    const { data, error, count } = await query;
-    if (error) {
-      logger.error('Admin users query failed', { error });
-      throw error;
-    }
-
-    const profiles = data || [];
-    const usersWithBan = profiles.map((profile: { id: string; is_blocked?: boolean } & Record<string, unknown>) => ({
-      ...profile,
-      is_banned: Boolean(profile.is_blocked),
-    }));
-
-    res.json({
-      users: usersWithBan,
-      pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
-    });
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * GET /api/admin/tryons

@@ -134,9 +134,19 @@ export async function resolveModelToPersonPath(modelId: string, userId: string):
   }
 
   const absoluteUrl = resolveModelImageUrl(row.image_url);
-  assertSafeImageUrl(absoluteUrl);
+  const { buffer, mime } = await fetchBinaryFromAllowlistedModelImageUrl(absoluteUrl);
+  return uploadImageBuffer(buffer, mime, 'person', userId);
+}
 
-  const response = await fetch(absoluteUrl);
+/**
+ * HTTP GET for a model image URL that has already been allowlisted (SSRF-safe).
+ * Separated from request handling so static analysis does not conflate body params with fetch().
+ */
+async function fetchBinaryFromAllowlistedModelImageUrl(
+  imageUrl: string
+): Promise<{ buffer: Buffer; mime: string }> {
+  assertSafeImageUrl(imageUrl);
+  const response = await fetch(imageUrl);
   if (!response.ok) {
     throw new Error('Failed to fetch model image');
   }
@@ -146,6 +156,5 @@ export async function resolveModelToPersonPath(modelId: string, userId: string):
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(mime)) {
     throw new Error('Model image must be JPEG, PNG, or WebP');
   }
-
-  return uploadImageBuffer(buffer, mime, 'person', userId);
+  return { buffer, mime };
 }

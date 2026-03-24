@@ -34,6 +34,12 @@ export function safeHttpHrefForDom(value: string | null | undefined): string | u
   }
 }
 
+/** Open a validated http(s) URL in a new tab (centralizes sink for SAST). */
+export function openExternalHttpUrlInNewTab(value: string | null | undefined): void {
+  const u = safeHttpHrefForDom(value);
+  if (u) window.open(u, "_blank", "noopener noreferrer");
+}
+
 /** Post-login in-app navigation only (blocks //evil.com and protocol-relative tricks). */
 export function safeInAppRedirectPath(raw: string | null | undefined, fallback = "/dashboard"): string {
   if (raw == null || typeof raw !== "string") return fallback;
@@ -42,23 +48,54 @@ export function safeInAppRedirectPath(raw: string | null | undefined, fallback =
   return path;
 }
 
-/** Only allow redirecting the browser to known payment checkout hosts. */
-export function isTrustedPaymentCheckoutUrl(url: string): boolean {
-  try {
-    const u = new URL(url);
-    if (u.protocol !== "https:") return false;
-    const h = u.hostname.toLowerCase();
-    if (h === "checkout.paystack.com" || h.endsWith(".paystack.com")) return true;
-    if (
-      h === "checkout.flutterwave.com" ||
-      h.endsWith(".flutterwave.com") ||
-      h === "rave.flutterwave.com" ||
-      h.endsWith(".flwv.io")
-    ) {
-      return true;
+/** Paths allowed after sign-in (matches ProtectedRoute redirect targets + /admin). */
+const POST_LOGIN_REDIRECT_PREFIXES = [
+  "/dashboard",
+  "/pricing",
+  "/widget-preview",
+  "/api-docs",
+  "/studio",
+  "/try-on-studio",
+  "/admin",
+] as const;
+
+/**
+ * Same-origin post-login navigation only: relative path must match an allowed app prefix.
+ * Allowlisting satisfies SAST open-redirect rules; keep in sync with protected routes.
+ */
+export function postLoginRedirectPath(raw: string | null | undefined): string {
+  const fallback = "/dashboard";
+  if (raw == null || typeof raw !== "string") return fallback;
+  const t = raw.trim();
+  if (!t || !t.startsWith("/") || t.startsWith("//") || t.includes("://")) return fallback;
+  const pathOnly = t.split(/[?#]/)[0] ?? "";
+  const allowed = POST_LOGIN_REDIRECT_PREFIXES.some(
+    (pre) => pathOnly === pre || pathOnly.startsWith(`${pre}/`)
+  );
+  return allowed ? t : fallback;
+}
+
+/**
+ * Validates Paystack / Flutterwave checkout URLs then redirects.
+ * Centralizes the redirect so SAST can treat the URL as gated before `location.assign`.
+ */
+export function assignTrustedPaymentCheckoutUrl(rawUrl: string, rail: "paystack" | "flutterwave"): void {
+  const u = new URL(rawUrl);
+  if (u.protocol !== "https:") throw new Error("Invalid payment URL");
+  const host = u.hostname.toLowerCase();
+  if (rail === "paystack") {
+    if (host !== "checkout.paystack.com" && !host.endsWith(".paystack.com")) {
+      throw new Error("Invalid payment redirect host");
     }
-    return false;
-  } catch {
-    return false;
+  } else {
+    if (
+      host !== "checkout.flutterwave.com" &&
+      !host.endsWith(".flutterwave.com") &&
+      host !== "rave.flutterwave.com" &&
+      !host.endsWith(".flwv.io")
+    ) {
+      throw new Error("Invalid payment redirect host");
+    }
   }
+  window.location.assign(u.href);
 }

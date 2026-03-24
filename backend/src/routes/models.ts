@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { body } from 'express-validator';
+import { body, matchedData } from 'express-validator';
 import { optionalAuth } from '../middleware/auth';
 import { optionalApiKey } from '../middleware/apiKey';
 import { handleValidationErrors } from '../middleware/validate';
@@ -40,7 +40,8 @@ router.post(
         res.status(401).json({ error: 'Sign in or provide a valid API key' });
         return;
       }
-      const { modelId } = req.body as { modelId: string };
+      const validated = matchedData(req) as { modelId: string };
+      const modelId = validated.modelId;
       const filePath = await resolveModelToPersonPath(modelId, userId);
       res.status(201).json({ success: true, filePath });
     } catch (err) {

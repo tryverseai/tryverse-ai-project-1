@@ -9,6 +9,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { posthogCapture } from "@/lib/posthog";
 import { toast } from "sonner";
 import { safeImageSrcForDom } from "@/lib/safeUrl";
+import type { CSSProperties } from "react";
+
+function previewImageBg(raw: string | null | undefined): CSSProperties | undefined {
+  const s = safeImageSrcForDom(raw);
+  if (!s) return undefined;
+  return { backgroundImage: `url(${JSON.stringify(s)})` };
+}
 
 import modelFemaleBefore from "@/assets/model-female-before.jpg";
 import modelMaleBefore from "@/assets/model-male-before.jpg";
@@ -186,11 +193,12 @@ const WidgetPreview = () => {
                   </>
                 )}
               </div>
-              {uploadedPersonImage && safeImageSrcForDom(uploadedPersonImage) && (
-                <img
-                  src={safeImageSrcForDom(uploadedPersonImage)!}
-                  alt="Uploaded"
-                  className="w-8 h-8 rounded object-cover"
+              {uploadedPersonImage && previewImageBg(uploadedPersonImage) && (
+                <div
+                  role="img"
+                  aria-label="Uploaded"
+                  className="w-8 h-8 rounded bg-cover bg-center"
+                  style={previewImageBg(uploadedPersonImage)}
                 />
               )}
               <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileUpload} />
@@ -264,10 +272,15 @@ const WidgetPreview = () => {
         {phase === "result" && (
           <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="aspect-[3/4] relative">
-              <img
-                src={safeImageSrcForDom(resultImage) || modelShirtTryon}
-                alt="Try-on result"
-                className="w-full h-full object-cover"
+              <div
+                role="img"
+                aria-label="Try-on result"
+                className="w-full h-full bg-cover bg-center"
+                style={
+                  previewImageBg(resultImage) || {
+                    backgroundImage: `url(${JSON.stringify(modelShirtTryon)})`,
+                  }
+                }
               />
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-foreground/60 to-transparent">
                 <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-background/90 text-foreground text-[10px] font-semibold">

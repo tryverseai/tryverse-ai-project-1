@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { posthogCapture } from "@/lib/posthog";
 import { inviteSignupEnabled } from "@/lib/featureFlags";
-import { safeInAppRedirectPath } from "@/lib/safeUrl";
+import { postLoginRedirectPath } from "@/lib/safeUrl";
 
 const roles = [
   "Founder",
@@ -72,7 +72,6 @@ const Auth = () => {
   const signupPausedToastSent = useRef(false);
 
   const redirectParam = searchParams.get("redirect");
-  const redirectTo = redirectParam || sessionStorage.getItem("tryverse_redirect") || "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [brandName, setBrandName] = useState("");
@@ -129,7 +128,18 @@ const Auth = () => {
       } else {
         posthogCapture("user_logged_in", { email });
         if (redirectParam) sessionStorage.removeItem("tryverse_redirect");
-        navigate(redirectTo, { replace: true });
+        const nextPath = postLoginRedirectPath(
+          redirectParam || sessionStorage.getItem("tryverse_redirect") || "/dashboard"
+        );
+        const resolved = new URL(nextPath, window.location.origin);
+        if (resolved.origin !== window.location.origin) {
+          navigate("/dashboard", { replace: true });
+        } else {
+          navigate(
+            { pathname: resolved.pathname, search: resolved.search, hash: resolved.hash },
+            { replace: true }
+          );
+        }
       }
     }
     setLoading(false);

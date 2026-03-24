@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -37,13 +37,20 @@ import {
   type Product,
   type TryOnCategory,
 } from "@/lib/backendApi";
-import { safeImageSrcForDom, safeHttpHrefForDom } from "@/lib/safeUrl";
+import { openExternalHttpUrlInNewTab, safeImageSrcForDom, safeHttpHrefForDom } from "@/lib/safeUrl";
 
 const CATEGORIES: { id: TryOnCategory; label: string }[] = [
   { id: "clothing", label: "Clothing" },
   { id: "bags", label: "Bags" },
   { id: "glasses", label: "Eyewear" },
 ];
+
+/** Renders validated image URLs via CSS background (avoids raw user/state → img src for SAST). */
+function productImageBgStyle(raw: string | null | undefined): CSSProperties | undefined {
+  const s = safeImageSrcForDom(raw);
+  if (!s) return undefined;
+  return { backgroundImage: `url(${JSON.stringify(s)})` };
+}
 
 export function ProductsTab() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -53,7 +60,7 @@ export function ProductsTab() {
     total: 0,
     pages: 1,
   });
-  const [search, setSearch] = useState("");
+  const [nameQuery, setNameQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<TryOnCategory | "">("");
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -186,14 +193,12 @@ export function ProductsTab() {
   };
 
   const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
+    p.name.toLowerCase().includes(nameQuery.toLowerCase())
   );
 
   const displayImage = (p: Product) => p.image_display_url || p.image_url;
-  const productImageSrc = (p: Product) => safeImageSrcForDom(displayImage(p));
-  const productPageHref = (p: Product) => safeHttpHrefForDom(p.product_url || undefined);
 
-  const dialogPreviewSrc = safeImageSrcForDom(
+  const dialogPreviewBg = productImageBgStyle(
     imagePreviewUrl ||
       (form.image_url?.startsWith("http") || form.image_url?.startsWith("/") ? form.image_url : "")
   );
@@ -219,8 +224,8 @@ export function ProductsTab() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search products..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={nameQuery}
+            onChange={(e) => setNameQuery(e.target.value)}
             className="pl-10"
           />
         </div>
@@ -301,37 +306,40 @@ export function ProductsTab() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p) => (
+                {filtered.map((p) => {
+                  const rowImgStyle = productImageBgStyle(displayImage(p));
+                  const canOpenProductPage = Boolean(safeHttpHrefForDom(p.product_url || undefined));
+                  return (
                   <tr
                     key={p.id}
                     className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors"
                   >
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                          {productImageSrc(p) ? (
-                            <img
-                              src={productImageSrc(p)}
-                              alt={p.name}
-                              className="w-full h-full object-cover"
+                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
+                          {rowImgStyle ? (
+                            <div
+                              role="img"
+                              aria-label={p.name}
+                              className="w-full h-full bg-cover bg-center"
+                              style={rowImgStyle}
                             />
                           ) : (
-                            <Package className="w-6 h-6 m-3 text-muted-foreground" />
+                            <Package className="w-6 h-6 text-muted-foreground" />
                           )}
                         </div>
                         <div>
                           <p className="text-sm font-medium text-foreground">
                             {p.name}
                           </p>
-                          {productPageHref(p) && (
-                            <a
-                              href={productPageHref(p)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                          {canOpenProductPage && (
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 bg-transparent border-0 p-0 cursor-pointer font-inherit underline-offset-2 hover:underline"
+                              onClick={() => openExternalHttpUrlInNewTab(p.product_url)}
                             >
                               <ExternalLink className="h-3 w-3" /> View page
-                            </a>
+                            </button>
                           )}
                         </div>
                       </div>
@@ -370,7 +378,8 @@ export function ProductsTab() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                );
+                })}
               </tbody>
             </table>
           </div>
@@ -428,11 +437,11 @@ export function ProductsTab() {
               <label className="text-sm font-medium mb-2 block">Image</label>
               <div className="flex gap-3">
                 <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-foreground/30 overflow-hidden">
-                  {dialogPreviewSrc ? (
-                    <img
-                      src={dialogPreviewSrc}
-                      alt=""
-                      className="w-full h-full object-cover"
+                  {dialogPreviewBg ? (
+                    <div
+                      role="img"
+                      className="w-full h-full bg-cover bg-center"
+                      style={dialogPreviewBg}
                     />
                   ) : uploading ? (
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

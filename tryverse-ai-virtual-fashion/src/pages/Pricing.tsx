@@ -13,7 +13,7 @@ import {
   getPaymentProviders,
 } from "@/lib/backendApi";
 import { captureSentryException } from "@/lib/sentry";
-import { isTrustedPaymentCheckoutUrl } from "@/lib/safeUrl";
+import { assignTrustedPaymentCheckoutUrl } from "@/lib/safeUrl";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -181,20 +181,14 @@ const Pricing = () => {
       const callbackUrl = `${window.location.origin}/dashboard`;
       if (usePaystack) {
         const data = await initializePaystackPayment(plan.id, callbackUrl);
-        const authUrl = data?.authorization_url;
-        if (typeof authUrl === "string" && isTrustedPaymentCheckoutUrl(authUrl)) {
-          window.location.href = authUrl;
-        } else {
-          throw new Error("No payment URL received");
-        }
+        const rawUrl = data?.authorization_url;
+        if (typeof rawUrl !== "string") throw new Error("No payment URL received");
+        assignTrustedPaymentCheckoutUrl(rawUrl, "paystack");
       } else {
         const data = await initializeFlutterwavePayment(plan.id, effectiveCurrency, callbackUrl);
-        const authUrl = data?.authorization_url;
-        if (typeof authUrl === "string" && isTrustedPaymentCheckoutUrl(authUrl)) {
-          window.location.href = authUrl;
-        } else {
-          throw new Error("No payment URL received");
-        }
+        const rawUrl = data?.authorization_url;
+        if (typeof rawUrl !== "string") throw new Error("No payment URL received");
+        assignTrustedPaymentCheckoutUrl(rawUrl, "flutterwave");
       }
     } catch (error: unknown) {
       console.error("Payment error:", error);
