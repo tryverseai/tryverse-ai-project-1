@@ -1,16 +1,23 @@
 import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 
-// Brand colors from official guidelines. Magento: fallback to local SVG if CDN fails.
+// Brand colors from official guidelines. Magento/Amazon: CDN + local fallback. Wix, Canva, Figma, etc.: assets in /public/logos.
 const integrations = [
   { name: "Shopify", logo: "https://cdn.simpleicons.org/shopify/7AB55C" },
   { name: "WooCommerce", logo: "https://cdn.simpleicons.org/woocommerce/96588A" },
   { name: "Magento", logo: "https://static.cdnlogo.com/logos/m/21/magento.svg", fallback: "/logos/magento.svg" },
   { name: "BigCommerce", logo: "https://cdn.simpleicons.org/bigcommerce/0F834D" },
-  { name: "Wix", logo: "https://cdn.simpleicons.org/wix/0C6EFC" },
+  { name: "Wix", logo: "/logos/wix.png" },
   { name: "Squarespace", logo: "https://cdn.simpleicons.org/squarespace/333333" },
   { name: "PrestaShop", logo: "https://cdn.simpleicons.org/prestashop/DF0067" },
   { name: "Webflow", logo: "https://cdn.simpleicons.org/webflow/146EF5" },
+  { name: "Framer", logo: "https://cdn.simpleicons.org/framer/0055FF" },
+  { name: "Canva", logo: "/logos/canva.png" },
+  { name: "Figma", logo: "/logos/figma.png" },
+  { name: "Lovable", logo: "/logos/lovable.png" },
+  { name: "Base44", logo: "/logos/base44.png" },
+  { name: "WordPress", logo: "/logos/wordpress.png" },
+  { name: "Hostinger", logo: "/logos/hostinger.png" },
   { name: "Amazon", logo: "https://static.cdnlogo.com/logos/a/83/amazon-com.svg", fallback: "/logos/amazon.svg" },
 ];
 
@@ -23,9 +30,10 @@ function bandTransform(cx: number, viewportCenterX: number, halfViewportW: numbe
   const t = Math.max(-1, Math.min(1, tRaw));
   // Circular falloff: w=1 at center, w=0 at left/right (cos(±π/2)=0)
   const w = Math.cos((Math.PI / 2) * t);
-  const scale = 0.74 + 0.26 * w;
-  const translateZ = 52 * w;
-  const rotateY = t * -20;
+  // Medium band: slight depth without shrinking edge logos too much
+  const scale = 0.9 + 0.1 * w;
+  const translateZ = 48 * w;
+  const rotateY = t * -16;
   return { scale, translateZ, rotateY };
 }
 
@@ -74,7 +82,7 @@ export function TrustedBy() {
           </p>
 
           {/* Extra vertical padding so translateZ doesn’t clip against overflow */}
-          <div className="trusted-by-stage relative w-full overflow-hidden py-6 sm:py-8">
+          <div className="trusted-by-stage relative w-full overflow-hidden py-7 sm:py-8">
             <div className="trusted-by-track flex w-max animate-marquee will-change-transform">
               {duplicated.map((item, i) => (
                 <div
@@ -82,12 +90,12 @@ export function TrustedBy() {
                   ref={(el) => {
                     itemRefs.current[i] = el;
                   }}
-                  className="trusted-by-logo-item flex items-center justify-center shrink-0 mx-3 sm:mx-4 w-24 h-12"
+                  className="trusted-by-logo-item flex items-center justify-center shrink-0 mx-3.5 sm:mx-4 w-28 h-14 sm:w-[7.5rem] sm:h-[3.625rem]"
                 >
                   <img
                     src={item.logo}
                     alt={item.name}
-                    className="h-8 w-auto max-w-full object-contain pointer-events-none select-none"
+                    className="h-9 w-auto max-w-full max-h-full object-contain sm:h-11 pointer-events-none select-none"
                     onError={(e) => {
                       if (item.fallback) {
                         e.currentTarget.src = item.fallback;
