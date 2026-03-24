@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../../config/supabase';
+import { env } from '../../config/env';
 import { uploadImageBuffer } from '../storage/images';
 import { logger } from '../../config/logger';
 
@@ -32,6 +33,35 @@ export interface PublicModelRow {
   sort_order: number;
 }
 
+function hostnameAllowedForModelImageFetch(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (SSRF_BLOCKED_HOSTS.test(h)) return false;
+
+  try {
+    const fe = new URL(env.FRONTEND_URL);
+    if (h === fe.hostname || h.endsWith(`.${fe.hostname}`)) return true;
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const su = new URL(env.SUPABASE_URL);
+    if (h === su.hostname || h.endsWith(`.${su.hostname}`)) return true;
+  } catch {
+    /* ignore */
+  }
+
+  const trustedImageHosts = new Set([
+    'images.unsplash.com',
+    'images.pexels.com',
+    'cdn.pixabay.com',
+    'res.cloudinary.com',
+  ]);
+  if (trustedImageHosts.has(h)) return true;
+
+  return false;
+}
+
 function assertSafeImageUrl(url: string): void {
   let parsed: URL;
   try {
@@ -40,24 +70,17 @@ function assertSafeImageUrl(url: string): void {
     throw new Error('Invalid model image URL');
   }
 
-  const frontend = process.env.FRONTEND_URL;
-  if (frontend) {
-    try {
-      const allowedOrigin = new URL(frontend).origin;
-      if (parsed.origin === allowedOrigin) {
-        return;
-      }
-    } catch {
-      /* ignore invalid FRONTEND_URL */
+  if (parsed.protocol === 'http:') {
+    const h = parsed.hostname;
+    if (h !== 'localhost' && h !== '127.0.0.1') {
+      throw new Error('Model image URL must use HTTPS');
     }
+  } else if (parsed.protocol !== 'https:') {
+    throw new Error('Model image URL must use HTTP(S)');
   }
 
-  if (!url.startsWith('https://')) {
-    throw new Error('Model image URL must use HTTPS (or match FRONTEND_URL for self-hosted assets)');
-  }
-  const host = parsed.hostname;
-  if (SSRF_BLOCKED_HOSTS.test(host)) {
-    throw new Error('Model image host not allowed');
+  if (!hostnameAllowedForModelImageFetch(parsed.hostname)) {
+    throw new Error('Model image host is not in the allowlist (SSRF protection)');
   }
 }
 

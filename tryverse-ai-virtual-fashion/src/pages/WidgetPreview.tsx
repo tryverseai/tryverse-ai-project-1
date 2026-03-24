@@ -8,6 +8,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { posthogCapture } from "@/lib/posthog";
 import { toast } from "sonner";
+import { safeImageSrcForDom } from "@/lib/safeUrl";
 
 import modelFemaleBefore from "@/assets/model-female-before.jpg";
 import modelMaleBefore from "@/assets/model-male-before.jpg";
@@ -85,7 +86,8 @@ const WidgetPreview = () => {
     const personImg = uploadedPersonImage || (selectedModel ? models.find(m => m.id === selectedModel)?.image : null);
     if (!personImg) return;
 
-    const productImg = productImageParam || shirtProduct;
+    const productImg =
+      (productImageParam && safeImageSrcForDom(productImageParam)) || String(shirtProduct);
     const apiKey = apiKeyParam;
 
     setPhase("processing");
@@ -184,8 +186,12 @@ const WidgetPreview = () => {
                   </>
                 )}
               </div>
-              {uploadedPersonImage && (
-                <img src={uploadedPersonImage} alt="Uploaded" className="w-8 h-8 rounded object-cover" />
+              {uploadedPersonImage && safeImageSrcForDom(uploadedPersonImage) && (
+                <img
+                  src={safeImageSrcForDom(uploadedPersonImage)!}
+                  alt="Uploaded"
+                  className="w-8 h-8 rounded object-cover"
+                />
               )}
               <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileUpload} />
             </label>
@@ -258,7 +264,11 @@ const WidgetPreview = () => {
         {phase === "result" && (
           <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="aspect-[3/4] relative">
-              <img src={resultImage || modelShirtTryon} alt="Try-on result" className="w-full h-full object-cover" />
+              <img
+                src={safeImageSrcForDom(resultImage) || modelShirtTryon}
+                alt="Try-on result"
+                className="w-full h-full object-cover"
+              />
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-foreground/60 to-transparent">
                 <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-background/90 text-foreground text-[10px] font-semibold">
                   <Check className="h-2.5 w-2.5" /> Perfect Fit · Size M

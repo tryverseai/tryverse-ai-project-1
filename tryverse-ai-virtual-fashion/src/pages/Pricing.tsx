@@ -13,6 +13,7 @@ import {
   getPaymentProviders,
 } from "@/lib/backendApi";
 import { captureSentryException } from "@/lib/sentry";
+import { isTrustedPaymentCheckoutUrl } from "@/lib/safeUrl";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -180,15 +181,17 @@ const Pricing = () => {
       const callbackUrl = `${window.location.origin}/dashboard`;
       if (usePaystack) {
         const data = await initializePaystackPayment(plan.id, callbackUrl);
-        if (data?.authorization_url) {
-          window.location.href = data.authorization_url;
+        const authUrl = data?.authorization_url;
+        if (typeof authUrl === "string" && isTrustedPaymentCheckoutUrl(authUrl)) {
+          window.location.href = authUrl;
         } else {
           throw new Error("No payment URL received");
         }
       } else {
         const data = await initializeFlutterwavePayment(plan.id, effectiveCurrency, callbackUrl);
-        if (data?.authorization_url) {
-          window.location.href = data.authorization_url;
+        const authUrl = data?.authorization_url;
+        if (typeof authUrl === "string" && isTrustedPaymentCheckoutUrl(authUrl)) {
+          window.location.href = authUrl;
         } else {
           throw new Error("No payment URL received");
         }

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { posthogCapture } from "@/lib/posthog";
 import { inviteSignupEnabled } from "@/lib/featureFlags";
+import { safeInAppRedirectPath } from "@/lib/safeUrl";
 
 const roles = [
   "Founder",
@@ -85,7 +86,9 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (redirectParam) sessionStorage.setItem("tryverse_redirect", redirectParam);
+    if (redirectParam) {
+      sessionStorage.setItem("tryverse_redirect", safeInAppRedirectPath(redirectParam, "/dashboard"));
+    }
   }, [redirectParam]);
 
   /** Same notification users saw when sign-up wasn’t available: waitlist + no account creation */
@@ -126,7 +129,7 @@ const Auth = () => {
       } else {
         posthogCapture("user_logged_in", { email });
         if (redirectParam) sessionStorage.removeItem("tryverse_redirect");
-        navigate(redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`, { replace: true });
+        navigate(redirectTo, { replace: true });
       }
     }
     setLoading(false);

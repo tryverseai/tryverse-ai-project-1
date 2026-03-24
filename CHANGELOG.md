@@ -21,6 +21,7 @@ All notable changes to this project are documented here.
 - **Widget IDOR:** **`POST /api/widget/request`** now requires **`personImagePath`** and **`productImagePath`** to start with **`{API key owner user id}/`**, matching **`POST /api/tryon`** (prevents cross-account storage paths).
 - **Scanner noise:** Widget file header no longer mentions DOM sink names in comments; HTTPS redirect uses **`URL`** + safe path check; canonical link uses **`href="/"`**; Semgrep **`nosemgrep`** on early-access HTML helper.
 - **Security hardening (scanners):** HTTPS upgrade moved to **`middleware/httpsRedirect.ts`** (`res.location` + **301**, host allowlist + `req.hostname`); **Helmet** **`contentSecurityPolicy: false`** for JSON-only API; early-access email HTML passed through **`sanitize-html`**; **Docker** backend/worker **`no-new-privileges`**, **`read_only`**, **`tmpfs: /tmp`**; **`index.html`** og/twitter image URLs use same-origin paths.
+- **Snyk Code:** Stricter **`req.query.search`** typing (**admin**); **`domain`** body type check (**widget**); model **`fetch`** URLs use hostname allowlist (**modelLibrary** + **`env`**); UI **`safeUrl`** helpers for **img**/**href**/redirects; **sidebar** cookie **`Secure`** on HTTPS; **Pricing** payment redirects allowlisted hosts only.
 - **Docker**: `no-new-privileges: true` on Redis service.
 - **Vite dev**: `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` headers.
 

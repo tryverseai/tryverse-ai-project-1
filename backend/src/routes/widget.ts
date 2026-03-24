@@ -243,7 +243,11 @@ router.post(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user!.id;
-      const { domain } = req.body;
+      const { domain } = req.body as { domain?: unknown };
+      if (typeof domain !== 'string') {
+        res.status(400).json({ error: 'domain must be a string' });
+        return;
+      }
       const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
 
       const { data: apiKey } = await supabaseAdmin

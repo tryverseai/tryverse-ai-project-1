@@ -37,6 +37,7 @@ import {
   type Product,
   type TryOnCategory,
 } from "@/lib/backendApi";
+import { safeImageSrcForDom, safeHttpHrefForDom } from "@/lib/safeUrl";
 
 const CATEGORIES: { id: TryOnCategory; label: string }[] = [
   { id: "clothing", label: "Clothing" },
@@ -189,6 +190,13 @@ export function ProductsTab() {
   );
 
   const displayImage = (p: Product) => p.image_display_url || p.image_url;
+  const productImageSrc = (p: Product) => safeImageSrcForDom(displayImage(p));
+  const productPageHref = (p: Product) => safeHttpHrefForDom(p.product_url || undefined);
+
+  const dialogPreviewSrc = safeImageSrcForDom(
+    imagePreviewUrl ||
+      (form.image_url?.startsWith("http") || form.image_url?.startsWith("/") ? form.image_url : "")
+  );
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -301,9 +309,9 @@ export function ProductsTab() {
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                          {displayImage(p) ? (
+                          {productImageSrc(p) ? (
                             <img
-                              src={displayImage(p)!}
+                              src={productImageSrc(p)}
                               alt={p.name}
                               className="w-full h-full object-cover"
                             />
@@ -315,9 +323,9 @@ export function ProductsTab() {
                           <p className="text-sm font-medium text-foreground">
                             {p.name}
                           </p>
-                          {p.product_url && (
+                          {productPageHref(p) && (
                             <a
-                              href={p.product_url}
+                              href={productPageHref(p)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
@@ -420,12 +428,9 @@ export function ProductsTab() {
               <label className="text-sm font-medium mb-2 block">Image</label>
               <div className="flex gap-3">
                 <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-foreground/30 overflow-hidden">
-                  {imagePreviewUrl || form.image_url?.startsWith("http") ? (
+                  {dialogPreviewSrc ? (
                     <img
-                      src={
-                        imagePreviewUrl ||
-                        (form.image_url?.startsWith("http") ? form.image_url : "")
-                      }
+                      src={dialogPreviewSrc}
                       alt=""
                       className="w-full h-full object-cover"
                     />
