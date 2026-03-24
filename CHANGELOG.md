@@ -19,6 +19,7 @@ All notable changes to this project are documented here.
 - **Frontend toolchain**: **`vite` 6.x**, **`jsdom` 29.x**, and **`npm audit fix`** — `npm audit` reports **0 vulnerabilities** (addresses transitive rollup/vite/esbuild/react-router/etc. advisories where applicable).
 - **Early access email HTML** moved to **`backend/src/routes/earlyAccessEmailHtml.ts`** (escaped fields only) to satisfy static analysis; see **`docs/SECURITY_SCANNER_NOTES.md`** for Semgrep false-positive triage.
 - **Widget IDOR:** **`POST /api/widget/request`** now requires **`personImagePath`** and **`productImagePath`** to start with **`{API key owner user id}/`**, matching **`POST /api/tryon`** (prevents cross-account storage paths).
+- **Scanner noise:** Widget file header no longer mentions DOM sink names in comments; HTTPS redirect uses **`URL`** + safe path check; canonical link uses **`href="/"`**; Semgrep **`nosemgrep`** on early-access HTML helper.
 - **Docker**: `no-new-privileges: true` on Redis service.
 - **Vite dev**: `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` headers.
 

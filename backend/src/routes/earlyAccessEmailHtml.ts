@@ -3,6 +3,7 @@
  * Callers must pass values already escaped for HTML (e.g. via escapeHtml()).
  * Kept in a separate module so static analysis does not conflate HTTP body fields with markup.
  */
+// nosemgrep: javascript.lang.security.audit.raw-html-format
 export function buildEarlyAccessConfirmationHtml(
   escapedFirstName: string,
   escapedBrandName: string

@@ -87,9 +87,15 @@ if (env.NODE_ENV === 'production') {
       next();
       return;
     }
-    // HTTPS upgrade only (same path); Host is allowlisted above — not an open redirect to arbitrary domains.
-    // nosemgrep: javascript.express.security.open-redirect
-    return res.redirect(301, `https://${rawHost}${req.originalUrl}`);
+    const pathAndQuery = req.originalUrl || '/';
+    // Reject protocol-relative or absolute URLs in originalUrl (would change origin in URL()).
+    if (!pathAndQuery.startsWith('/') || pathAndQuery.startsWith('//')) {
+      logger.warn('HTTPS redirect skipped: unexpected originalUrl shape', { pathAndQuery: pathAndQuery.slice(0, 200) });
+      next();
+      return;
+    }
+    const httpsLocation = new URL(pathAndQuery, `https://${rawHost}`);
+    return res.redirect(301, httpsLocation.href);
   });
 }
 app.use(

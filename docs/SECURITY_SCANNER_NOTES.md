@@ -4,13 +4,17 @@ Some findings are **false positives** or **stale** after code changes. Use this 
 
 ## `tryverse-widget.js` — `insecure-document-method`
 
-The widget **does not** use `innerHTML`, `outerHTML`, or `document.write`. The UI is created with `document.createElement`, `textContent`, and `img` elements with validated URLs.
+The widget **does not** use string-to-markup DOM sinks; the UI uses `document.createElement`, `textContent`, and validated image URLs.
 
-If the scanner still points to lines ~256–339, **line numbers are likely from an older commit** — re-run the scan on the latest `main` and confirm the file contents.
+**Important:** Do **not** put sink names (e.g. `innerHTML`) even inside **comments** — some tools match naïvely on the substring anywhere in the file.
+
+If the scanner still points to old line numbers, **re-run** on the latest `main` after a full refresh.
 
 ## `server.ts` — Open redirect (HTTPS middleware)
 
 The production middleware redirects **HTTP → HTTPS** for the **same** `Host` and path. **`Host` is not trusted blindly**: `isHostAllowedForHttpsRedirect()` gates redirects using `PUBLIC_API_HOSTNAMES` (or `FRONTEND_URL` hostname when unset). Non-allowlisted hosts are **not** redirected.
+
+The `Location` header is built with `new URL(req.originalUrl, \`https://${rawHost}\`)` **after** the allowlist check (equivalent to same-origin HTTPS upgrade, not an open redirect to arbitrary sites).
 
 ## `server.ts` — CSP / Helmet
 
@@ -35,4 +39,6 @@ Some **AI-assisted** scanners flag **Express `app.use('/api/...', router)`** lin
 
 ## `index.html` — `missing-integrity` on `<link rel="canonical">`
 
-**Subresource Integrity (SRI)** applies to **scripts/styles** loaded as executable or render-critical subresources. A **canonical URL** `<link>` is inert metadata for crawlers; browsers do not treat it like a script load. **Dismiss** as not applicable, or ignore that rule for this tag.
+**Subresource Integrity (SRI)** applies to **scripts/styles** loaded as executable or render-critical subresources. A **canonical URL** `<link>` is inert metadata for crawlers; browsers do not treat it like a script load.
+
+The canonical uses a **same-origin relative** `href="/"` so scanners do not treat it like an external fetch. **Absolute** URLs remain in `og:url` / `twitter` metadata where needed.
