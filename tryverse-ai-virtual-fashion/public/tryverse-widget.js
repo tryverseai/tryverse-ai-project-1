@@ -161,6 +161,51 @@
       .replace(/</g, '&lt;');
   }
 
+  /** Only https, localhost http, or data:image/*;base64 — avoids javascript: / unexpected schemes in img.src. */
+  function isSafeImageDisplayUrl(url) {
+    if (url == null || typeof url !== 'string') return false;
+    var s = String(url).trim();
+    if (s.length === 0 || s.length > 12 * 1024 * 1024) return false;
+    if (/^data:image\/(png|jpeg|jpg|webp);base64,/i.test(s)) return true;
+    try {
+      var u = new URL(s);
+      if (u.protocol === 'https:') return true;
+      if (u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1')) return true;
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function clearEl(el) {
+    while (el.firstChild) el.removeChild(el.firstChild);
+  }
+
+  function renderPreviewImg(container, url) {
+    clearEl(container);
+    if (!isSafeImageDisplayUrl(url)) return;
+    var img = document.createElement('img');
+    img.src = url;
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'cover';
+    container.appendChild(img);
+  }
+
+  function renderResultImg(container, url) {
+    clearEl(container);
+    if (!isSafeImageDisplayUrl(url)) {
+      container.textContent = 'Could not display result.';
+      return;
+    }
+    var img = document.createElement('img');
+    img.src = url;
+    img.style.maxWidth = '100%';
+    img.style.borderRadius = '8px';
+    img.style.border = '1px solid #e5e7eb';
+    container.appendChild(img);
+  }
+
   function createModal(backendUrl, apiKey, productImageUrl, category, productDescription, inlineContainer, widgetCfg) {
     var cfg = widgetCfg || { showModels: false, models: [] };
     var showModels = cfg.showModels && cfg.models && cfg.models.length > 0;
@@ -253,8 +298,7 @@
           personInput.value = '';
           var img = btn.querySelector('img');
           if (img && img.src) {
-            personPreview.innerHTML =
-              '<img src="' + img.src + '" style="width:100%;height:100%;object-fit:cover;" />';
+            renderPreviewImg(personPreview, img.src);
           }
           updateModelButtonsHighlight();
           statusEl.textContent = '';
@@ -270,7 +314,7 @@
       personFile = f;
       var reader = new FileReader();
       reader.onload = function () {
-        personPreview.innerHTML = '<img src="' + reader.result + '" style="width:100%;height:100%;object-fit:cover;" />';
+        renderPreviewImg(personPreview, reader.result);
       };
       reader.readAsDataURL(f);
     });
@@ -318,10 +362,7 @@
         })
         .then(function (data) {
           if (data.status === 'completed' && data.resultUrl) {
-            resultEl.innerHTML =
-              '<img src="' +
-              data.resultUrl +
-              '" style="max-width:100%;border-radius:8px;border:1px solid #e5e7eb;" />';
+            renderResultImg(resultEl, data.resultUrl);
             resultEl.style.display = 'block';
             statusEl.textContent = 'Done!';
             runBtn.style.display = 'none';
@@ -336,10 +377,7 @@
               statusEl.textContent = 'Status: ' + s + '...';
             }
           ).then(function (resultUrl) {
-            resultEl.innerHTML =
-              '<img src="' +
-              resultUrl +
-              '" style="max-width:100%;border-radius:8px;border:1px solid #e5e7eb;" />';
+            renderResultImg(resultEl, resultUrl);
             resultEl.style.display = 'block';
             statusEl.textContent = 'Done!';
             runBtn.style.display = 'none';

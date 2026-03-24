@@ -1,14 +1,27 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
+import { env } from '../config/env';
 import type { ApiKeyPayload } from '../types';
+
+function apiKeyFromQueryAllowed(): boolean {
+  return env.NODE_ENV !== 'production' || env.ALLOW_API_KEY_IN_QUERY;
+}
+
+function resolveApiKeyValue(req: Request): string | undefined {
+  const header = (req.headers['x-api-key'] as string) || undefined;
+  const query = typeof req.query.api_key === 'string' ? req.query.api_key : undefined;
+  if (header) return header;
+  if (!apiKeyFromQueryAllowed()) return undefined;
+  return query;
+}
 
 /**
  * Optionally resolves API key. Does not fail if missing.
  * Sets req.apiKey and req.widgetUserId when key is valid.
  */
 export async function optionalApiKey(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const keyValue = (req.headers['x-api-key'] as string) || (req.query.api_key as string);
+  const keyValue = resolveApiKeyValue(req);
   if (!keyValue) return next();
 
   try {
@@ -28,19 +41,23 @@ export async function optionalApiKey(req: Request, res: Response, next: NextFunc
 }
 
 /**
- * Authenticates requests via API key (x-api-key header or query param).
+ * Authenticates requests via API key (x-api-key header; query param only in dev or if ALLOW_API_KEY_IN_QUERY).
  * Used for widget and external brand integrations.
  * Sets req.apiKey and req.widgetUserId on success.
  */
 export async function requireApiKey(req: Request, res: Response, next: NextFunction): Promise<void> {
-  // Prefer header over query: query params may appear in logs, referrers
-  const keyValue =
-    (req.headers['x-api-key'] as string) ||
-    (req.query.api_key as string);
+  if (!apiKeyFromQueryAllowed() && req.query.api_key) {
+    res.status(400).json({
+      error: 'Do not pass API keys in the URL. Use the x-api-key header.',
+    });
+    return;
+  }
 
-  if (req.query.api_key && !req.headers['x-api-key']) {
+  if (apiKeyFromQueryAllowed() && req.query.api_key && !req.headers['x-api-key']) {
     logger.warn('API key passed via query string; prefer x-api-key header', { path: req.path });
   }
+
+  const keyValue = resolveApiKeyValue(req);
 
   if (!keyValue) {
     res.status(401).json({ error: 'API key required. Provide via x-api-key header.' });

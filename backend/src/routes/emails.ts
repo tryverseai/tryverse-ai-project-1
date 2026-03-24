@@ -8,19 +8,24 @@ const router = Router();
 
 /**
  * POST /api/emails/welcome
- * Sends welcome email after signup. Call from frontend after successful signUp.
+ * Sends welcome email to the **authenticated user's** email only (no arbitrary recipient).
  */
 router.post(
   '/welcome',
+  requireAuth,
   [
-    body('email').isEmail(),
     body('name').optional().isString().isLength({ max: 200 }),
     body('brandName').optional().isString().isLength({ max: 200 }),
   ],
   handleValidationErrors,
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const { email, name, brandName } = req.body;
+      const email = req.user!.email;
+      if (!email) {
+        res.status(400).json({ error: 'Account has no email address' });
+        return;
+      }
+      const { name, brandName } = req.body;
       await sendWelcomeEmail({ email, name, brandName });
       res.status(202).json({ success: true });
     } catch {

@@ -53,7 +53,6 @@ export default function AuthConfirm() {
       welcomeSentRef.current = true;
       const meta = user.user_metadata as { full_name?: string; brand_name?: string } | undefined;
       sendWelcomeEmail({
-        email: user.email,
         name: meta?.full_name,
         brandName: meta?.brand_name,
       }).catch((err) => {

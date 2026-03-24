@@ -49,14 +49,22 @@ Rate limit hits are logged.
 
 ---
 
+## No custom domain yet?
+
+Security rules apply whenever **`NODE_ENV=production`**, not only when you own a domain. Use your host’s HTTPS URL (e.g. `https://*.up.railway.app`) for `FRONTEND_URL` and `WIDGET_ALLOWED_ORIGINS`. See **`docs/GOING_TO_PRODUCTION.md`**.
+
+---
+
 ## Deployment Checklist
 
 1. **HTTPS**: Enforce in production. The app redirects HTTP → HTTPS when `X-Forwarded-Proto` is `http`. Ensure your reverse proxy sets `X-Forwarded-Proto` and `X-Forwarded-For`.
 2. **Trust proxy**: Set `trust proxy` (already configured).
 3. **Database**: Restrict Supabase (or Postgres) to private network. Do not expose DB port to the internet.
 4. **Environment variables**: Use secrets manager or platform env (e.g. Vercel, Railway). Never bake secrets into images.
-5. **CORS**: Set `FRONTEND_URL` and `WIDGET_ALLOWED_ORIGINS` to your production domains. Avoid `*` in production.
-6. **Logging**: Ensure auth failures, rate limits, and errors are captured (Sentry, CloudWatch, etc.).
+5. **CORS**: Set `FRONTEND_URL` and `WIDGET_ALLOWED_ORIGINS` to your production domains. **`WIDGET_ALLOWED_ORIGINS=*` is rejected at startup when `NODE_ENV=production`.**
+6. **API hostname**: Set `PUBLIC_API_HOSTNAMES` to your API’s public hostname(s) so HTTP→HTTPS upgrade only applies to expected `Host` values.
+7. **API keys**: In production, keys must be sent with the `x-api-key` header unless `ALLOW_API_KEY_IN_QUERY=true` (not recommended).
+8. **Logging**: Ensure auth failures, rate limits, and errors are captured (Sentry, CloudWatch, etc.).
 
 ---
 
@@ -64,7 +72,9 @@ Rate limit hits are logged.
 
 - **express-validator** on routes: `body`, `param`, `query` validation.
 - **Admin search**: Sanitized (alphanumeric, @, ., -, max 80 chars).
-- **Upload from-URL**: SSRF protection — blocks localhost, private IPs, `file://`, `ftp://`, etc.
+- **Upload from-URL**: SSRF protection — blocks localhost, private IPs, `file://`, `ftp://`, etc.; redirects are followed with the same host checks per hop.
+- **Multipart uploads**: Declared MIME type is not trusted; file bytes are verified with **sharp** (real JPEG/PNG/WebP only).
+- **Helmet**: Restrictive **Content-Security-Policy** on API responses (`default-src 'none'`, etc.) — safe for JSON APIs.
 - **Signed URL path**: Rejects `..`, `http`; enforces `{userId}/` prefix.
 
 ---

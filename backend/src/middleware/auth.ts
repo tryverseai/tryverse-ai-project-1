@@ -126,6 +126,20 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
 }
 
 /**
+ * Requires a logged-in user (JWT) or valid API key context (widgetUserId).
+ * Use after optionalApiKey + optionalAuth on routes that must not be anonymous.
+ */
+export function requireAuthenticatedActor(req: Request, res: Response, next: NextFunction): void {
+  if (req.user?.id || req.widgetUserId) {
+    next();
+    return;
+  }
+  res.status(401).json({
+    error: 'Authentication required. Sign in or provide a valid x-api-key to use this endpoint.',
+  });
+}
+
+/**
  * Admin-only guard — checks for X-Admin-Key header.
  * Uses centralized env config (never process.env directly).
  */

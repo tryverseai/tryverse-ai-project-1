@@ -144,6 +144,7 @@ const ApiDocs = () => {
             <div className="bg-card rounded-xl border border-border/50 p-6 shadow-card">
               <p className="text-sm text-muted-foreground mb-3">
                 All API requests require an <code className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono text-foreground">x-api-key</code> header with your TryVerse API key.
+                Do not pass the key in the URL (<code className="text-xs">?api_key=</code>) — in production the API rejects query-string keys (they leak in logs and referrers).
               </p>
               <p className="text-sm text-muted-foreground">
                 API keys are prefixed with <code className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono text-foreground">tv_live_</code> and can be managed from your dashboard.

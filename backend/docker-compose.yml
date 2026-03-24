@@ -37,6 +37,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: tryverse-redis
+    security_opt:
+      - no-new-privileges:true
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
       - "6379:6379"

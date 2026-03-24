@@ -5,6 +5,8 @@ import { optionalAuth, requireAuth } from '../middleware/auth';
 import { optionalApiKey } from '../middleware/apiKey';
 import { uploadRateLimit } from '../middleware/rateLimiter';
 import { logger } from '../config/logger';
+import { fetchWithSsrfRedirectChecks } from '../utils/ssrfFetch';
+import { validateImageBuffer } from '../utils/validateImageBuffer';
 
 const router = Router();
 
@@ -62,9 +64,18 @@ router.post(
       const storageFolder = type === 'product' ? 'garment' : 'person';
       const userId = (req as Request & { widgetUserId?: string }).widgetUserId || req.user?.id;
 
+      let verifiedMime: string;
+      try {
+        verifiedMime = await validateImageBuffer(req.file.buffer);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Invalid image';
+        res.status(400).json({ error: msg });
+        return;
+      }
+
       const filePath = await uploadImageBuffer(
         req.file.buffer,
-        req.file.mimetype,
+        verifiedMime,
         storageFolder as 'person' | 'garment',
         userId
       );
@@ -124,16 +135,29 @@ router.post(
         res.status(400).json({ error: 'URL not allowed' });
         return;
       }
-      const response = await fetch(url);
-      if (!response.ok) {
+
+      let remoteImage: globalThis.Response;
+      try {
+        remoteImage = await fetchWithSsrfRedirectChecks(url, (h) => SSRF_BLOCKED_HOSTS.test(h));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Fetch failed';
+        logger.warn('Image URL fetch blocked or failed', { url: url.slice(0, 80), msg });
+        res.status(400).json({ error: 'Could not fetch image from URL' });
+        return;
+      }
+
+      if (!remoteImage.ok) {
         res.status(400).json({ error: 'Failed to fetch image from URL' });
         return;
       }
-      const buffer = Buffer.from(await response.arrayBuffer());
-      const contentType = response.headers.get('content-type') || 'image/jpeg';
-      const mime = contentType.split(';')[0].trim();
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(mime)) {
-        res.status(400).json({ error: 'URL must point to JPEG, PNG, or WebP image' });
+      const buffer = Buffer.from(await remoteImage.arrayBuffer());
+
+      let mime: string;
+      try {
+        mime = await validateImageBuffer(buffer);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Invalid image';
+        res.status(400).json({ error: msg });
         return;
       }
       const userId = (req as Request & { widgetUserId?: string }).widgetUserId || req.user?.id;

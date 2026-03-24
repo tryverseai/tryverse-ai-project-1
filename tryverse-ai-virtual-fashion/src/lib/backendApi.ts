@@ -42,11 +42,12 @@ async function handleResponse<T>(res: Response, context?: { feature?: string }):
 
 // ─── Emails ───────────────────────────────────────────────────────────────────
 
-export async function sendWelcomeEmail(params: { email: string; name?: string; brandName?: string }) {
+export async function sendWelcomeEmail(params: { name?: string; brandName?: string }) {
+  const headers = await getAuthHeaders();
   const res = await fetch(`${BACKEND_URL}/api/emails/welcome`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
+    headers,
+    body: JSON.stringify({ name: params.name, brandName: params.brandName }),
   });
   if (!res.ok) return;
   await res.json();

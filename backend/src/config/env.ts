@@ -106,9 +106,25 @@ export const env = {
   // ── Security ──────────────────────────────────────────────────────────────
   ADMIN_SECRET_KEY: requireEnv('ADMIN_SECRET_KEY'),
   WIDGET_ALLOWED_ORIGINS: optionalEnv('WIDGET_ALLOWED_ORIGINS', '*'),
+  /** Comma-separated hostnames allowed for Host header on prod HTTPS upgrade (e.g. api.tryverse.ai). Empty = derive from FRONTEND_URL only. */
+  PUBLIC_API_HOSTNAMES: optionalEnv('PUBLIC_API_HOSTNAMES', ''),
+  /** Allow ?api_key= in production (default false — use x-api-key header). */
+  ALLOW_API_KEY_IN_QUERY: optionalBool('ALLOW_API_KEY_IN_QUERY', false),
 
   // ── Job queue ─────────────────────────────────────────────────────────────
   JOB_CONCURRENCY: parseInt(optionalEnv('JOB_CONCURRENCY', '3'), 10),
   JOB_TIMEOUT_MS: parseInt(optionalEnv('JOB_TIMEOUT_MS', '180000'), 10),
   JOB_MAX_RETRIES: parseInt(optionalEnv('JOB_MAX_RETRIES', '3'), 10),
 };
+
+/**
+ * Fail fast on unsafe production configuration.
+ */
+export function assertProductionSecurityConfig(): void {
+  if (env.NODE_ENV !== 'production') return;
+  if (env.WIDGET_ALLOWED_ORIGINS.trim() === '*') {
+    throw new Error(
+      'WIDGET_ALLOWED_ORIGINS cannot be "*" in production. Set comma-separated origins (e.g. https://yourstore.com,https://www.yourstore.com).'
+    );
+  }
+}

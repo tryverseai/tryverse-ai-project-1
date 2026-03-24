@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { body, param } from 'express-validator';
 import { v4 as uuidv4 } from 'uuid';
-import { requireAuth, optionalAuth } from '../middleware/auth';
+import { requireAuth, optionalAuth, requireAuthenticatedActor } from '../middleware/auth';
 import { optionalApiKey } from '../middleware/apiKey';
 import { tryonRateLimit } from '../middleware/rateLimiter';
 import { planAwareTryonRateLimit } from '../middleware/planRateLimit';
@@ -41,7 +41,9 @@ router.get('/categories', (_req: Request, res: Response) => {
 router.post(
   '/',
   tryonRateLimit,
+  optionalApiKey,
   optionalAuth,
+  requireAuthenticatedActor,
   planAwareTryonRateLimit,
   [
     body('personImagePath')
@@ -73,7 +75,7 @@ router.post(
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = req.user?.id || req.widgetUserId || null;
+      const userId = (req.user?.id || req.widgetUserId) as string;
       const {
         personImagePath,
         productImagePath,
@@ -82,22 +84,29 @@ router.post(
         async: asyncMode = true,
       } = req.body;
 
-      // Credit check (Enterprise bypasses)
-      if (userId) {
-        const creditCheck = await checkCredits(userId);
-        if (!creditCheck.allowed) {
-          logger.info('Credits exhausted', {
-            userId,
-            reason: creditCheck.reason,
-            creditsRemaining: creditCheck.creditsRemaining,
-          });
-          res.status(402).json({
-            error: creditCheck.reason || 'Insufficient credits',
-            code: 'CREDITS_EXHAUSTED',
-            creditsRemaining: creditCheck.creditsRemaining,
-          });
-          return;
-        }
+      const ownerPrefix = `${userId}/`;
+      if (!personImagePath.startsWith(ownerPrefix) || !productImagePath.startsWith(ownerPrefix)) {
+        logger.warn('Try-on rejected: storage paths do not belong to authenticated account', {
+          userId,
+          personImagePath: String(personImagePath).slice(0, 80),
+        });
+        res.status(403).json({ error: 'Person and product images must be uploaded under your account' });
+        return;
+      }
+
+      const creditCheck = await checkCredits(userId);
+      if (!creditCheck.allowed) {
+        logger.info('Credits exhausted', {
+          userId,
+          reason: creditCheck.reason,
+          creditsRemaining: creditCheck.creditsRemaining,
+        });
+        res.status(402).json({
+          error: creditCheck.reason || 'Insufficient credits',
+          code: 'CREDITS_EXHAUSTED',
+          creditsRemaining: creditCheck.creditsRemaining,
+        });
+        return;
       }
 
       // Create tryon record in DB
