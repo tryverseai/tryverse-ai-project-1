@@ -199,6 +199,13 @@ async function bootstrap(): Promise<void> {
       env: env.NODE_ENV,
       frontend: env.FRONTEND_URL,
     });
+    logger.info('Clothing try-on routing (effective)', {
+      clothingUseFashn: env.TRYON_CLOTHING_USE_FASHN,
+      fashnFallbackToIdm: env.TRYON_FASHN_FALLBACK_IDM,
+      fluxKontextAllClothing: env.REPLICATE_USE_FLUX_KONTEXT,
+      fashnModel: env.REPLICATE_MODEL_ACCESSORIES?.split(':')[0] ?? '(unset)',
+      idmClothingModel: env.REPLICATE_MODEL_CLOTHING?.split(':')[0] ?? '(unset)',
+    });
     logger.info(`Health:     http://localhost:${env.PORT}/health`);
     logger.info(`API:        http://localhost:${env.PORT}/api`);
     logger.info(`Queue UI:   http://localhost:${env.PORT}/admin/queues`);

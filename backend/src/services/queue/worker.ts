@@ -18,6 +18,10 @@ export function startWorker(): void {
   }
 
   logger.info('Worker starting', { concurrency: env.JOB_CONCURRENCY });
+  logger.info('Clothing try-on routing (worker — effective)', {
+    clothingUseFashn: env.TRYON_CLOTHING_USE_FASHN,
+    fashnFallbackToIdm: env.TRYON_FASHN_FALLBACK_IDM,
+  });
 
   queue.process(env.JOB_CONCURRENCY, async (job: Bull.Job<TryOnJob>): Promise<TryOnResult> => {
     logger.info('Processing job', { jobId: job.id, tryonDbId: job.data.tryonDbId });

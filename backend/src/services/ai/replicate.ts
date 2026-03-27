@@ -328,7 +328,8 @@ export async function runVtonInference(
   }
 
   if (input.category === 'clothing') {
-    const engine = opts?.clothingEngine ?? 'idm_vton';
+    const engine =
+      opts?.clothingEngine ?? (env.TRYON_CLOTHING_USE_FASHN ? 'fashn' : 'idm_vton');
     if (engine === 'fashn') {
       try {
         return await runFashnClothing(input);

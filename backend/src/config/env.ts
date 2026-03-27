@@ -18,7 +18,8 @@ function optionalEnv(key: string, defaultValue = ''): string {
 function optionalBool(key: string, defaultValue = false): boolean {
   const val = process.env[key];
   if (!val) return defaultValue;
-  return val.toLowerCase() === 'true' || val === '1';
+  const v = val.trim().toLowerCase();
+  return v === 'true' || v === '1' || v === 'yes' || v === 'on';
 }
 
 function optionalInt(key: string, defaultValue: number, min: number, max: number): number {
