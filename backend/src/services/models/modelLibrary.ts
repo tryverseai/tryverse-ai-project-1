@@ -35,27 +35,44 @@ export interface PublicModelRow {
 
 function hostnameAllowedForModelImageFetch(hostname: string): boolean {
   const h = hostname.toLowerCase();
-  if (SSRF_BLOCKED_HOSTS.test(h)) return false;
 
+  // Same-origin model assets (e.g. /model-library/* resolved against FRONTEND_URL) —
+  // must run before SSRF private-host block so localhost works in dev.
   try {
     const fe = new URL(env.FRONTEND_URL);
-    if (h === fe.hostname || h.endsWith(`.${fe.hostname}`)) return true;
+    const feHost = fe.hostname.toLowerCase();
+    if (h === feHost || h.endsWith(`.${feHost}`)) return true;
   } catch {
     /* ignore */
   }
 
   try {
     const su = new URL(env.SUPABASE_URL);
-    if (h === su.hostname || h.endsWith(`.${su.hostname}`)) return true;
+    const suHost = su.hostname.toLowerCase();
+    if (h === suHost || h.endsWith(`.${suHost}`)) return true;
   } catch {
     /* ignore */
   }
+
+  if (env.CLOUDFLARE_CDN_DOMAIN) {
+    const raw = env.CLOUDFLARE_CDN_DOMAIN.trim();
+    try {
+      const cdnUrl = raw.includes('://') ? raw : `https://${raw}`;
+      const cdnHost = new URL(cdnUrl).hostname.toLowerCase();
+      if (h === cdnHost || h.endsWith(`.${cdnHost}`)) return true;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (SSRF_BLOCKED_HOSTS.test(h)) return false;
 
   const trustedImageHosts = new Set([
     'images.unsplash.com',
     'images.pexels.com',
     'cdn.pixabay.com',
     'res.cloudinary.com',
+    'replicate.delivery',
   ]);
   if (trustedImageHosts.has(h)) return true;
 

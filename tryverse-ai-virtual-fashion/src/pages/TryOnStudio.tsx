@@ -1,7 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, Camera, User, Scan, Check, RotateCcw, ArrowRight, Glasses, ShoppingBag, Shirt, AlertCircle, X } from "lucide-react";
 import { toast } from "sonner";
@@ -10,6 +13,8 @@ import {
   startTryOn,
   getTryverseModels,
   createPersonPathFromModel,
+  isCreditsExhaustedApiError,
+  SHOPPER_TRYON_UNAVAILABLE_MESSAGE,
   type TryOnCategory,
   type TryverseModel,
 } from "@/lib/backendApi";
@@ -19,6 +24,23 @@ import { captureSentryException } from "@/lib/sentry";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Mode = "upload" | "ai-model";
 type Phase = "select" | "uploading" | "processing" | "result" | "error";
+type TryOnErrorKind = "credits" | "person_photo" | "generic";
+
+function classifyTryOnError(message: string, creditsOut: boolean): TryOnErrorKind {
+  if (creditsOut) return "credits";
+  const m = message.toLowerCase();
+  if (
+    m.includes("face") ||
+    m.includes("one clear subject") ||
+    m.includes("too small") ||
+    m.includes("landscape") ||
+    m.includes("invalid person photo") ||
+    m.includes("taller portrait")
+  ) {
+    return "person_photo";
+  }
+  return "generic";
+}
 
 interface UploadedImage {
   file: File;
@@ -48,6 +70,7 @@ const TryOnStudio = () => {
   // Result state
   const [resultUrl, setResultUrl]       = useState<string | null>(null);
   const [errorMsg, setErrorMsg]         = useState<string | null>(null);
+  const [errorKind, setErrorKind]       = useState<TryOnErrorKind | null>(null);
   const [processingTime, setProcessingTime] = useState<number | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string>("");
 
@@ -55,10 +78,27 @@ const TryOnStudio = () => {
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [libraryProductImage, setLibraryProductImage] = useState<UploadedImage | null>(null);
+  /** Sent to the API as `productDescription` — improves gowns, fit, and accessories. */
+  const [productDescription, setProductDescription] = useState("");
 
   const personInputRef  = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
   const libraryProductInputRef = useRef<HTMLInputElement>(null);
+
+  const [processElapsedSec, setProcessElapsedSec] = useState(0);
+
+  useEffect(() => {
+    if (phase !== "processing") {
+      setProcessElapsedSec(0);
+      return;
+    }
+    const t0 = Date.now();
+    setProcessElapsedSec(0);
+    const id = window.setInterval(() => {
+      setProcessElapsedSec(Math.floor((Date.now() - t0) / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [phase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +159,7 @@ const TryOnStudio = () => {
     try {
       setPhase("uploading");
       setErrorMsg(null);
+      setErrorKind(null);
 
       // Step 1: Upload person image
       setUploadProgress("Uploading your photo…");
@@ -137,7 +178,7 @@ const TryOnStudio = () => {
         personImagePath: personUpload.filePath,
         productImagePath: productUpload.filePath,
         category: selectedCategory,
-        productDescription: `${selectedCategory} item for virtual try-on`,
+        productDescription: productDescription.trim() || undefined,
       });
 
       if (result.status === 'completed' && result.resultUrl) {
@@ -154,10 +195,13 @@ const TryOnStudio = () => {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
-      posthogCapture("try_on_failed", { category: selectedCategory, source: "try_on_studio", error: msg });
-      setErrorMsg(msg);
+      const creditsOut = isCreditsExhaustedApiError(err);
+      const kind = classifyTryOnError(msg, creditsOut);
+      posthogCapture("try_on_failed", { category: selectedCategory, source: "try_on_studio", error: msg, credits_exhausted: creditsOut });
+      setErrorMsg(creditsOut ? SHOPPER_TRYON_UNAVAILABLE_MESSAGE : msg);
+      setErrorKind(kind);
       setPhase("error");
-      toast.error(msg);
+      toast.error(creditsOut ? SHOPPER_TRYON_UNAVAILABLE_MESSAGE : msg);
     }
   };
 
@@ -170,6 +214,7 @@ const TryOnStudio = () => {
     try {
       setPhase("uploading");
       setErrorMsg(null);
+      setErrorKind(null);
       setUploadProgress("Preparing model photo…");
       const personPath = await createPersonPathFromModel(selectedModel);
 
@@ -184,7 +229,7 @@ const TryOnStudio = () => {
         personImagePath: personPath,
         productImagePath: productUpload.filePath,
         category: selectedCategory,
-        productDescription: `${selectedCategory} item for virtual try-on`,
+        productDescription: productDescription.trim() || undefined,
       });
 
       if (result.status === "completed" && result.resultUrl) {
@@ -200,10 +245,13 @@ const TryOnStudio = () => {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
-      posthogCapture("try_on_failed", { category: selectedCategory, source: "try_on_studio", error: msg });
-      setErrorMsg(msg);
+      const creditsOut = isCreditsExhaustedApiError(err);
+      const kind = classifyTryOnError(msg, creditsOut);
+      posthogCapture("try_on_failed", { category: selectedCategory, source: "try_on_studio", error: msg, credits_exhausted: creditsOut });
+      setErrorMsg(creditsOut ? SHOPPER_TRYON_UNAVAILABLE_MESSAGE : msg);
+      setErrorKind(kind);
       setPhase("error");
-      toast.error(msg);
+      toast.error(creditsOut ? SHOPPER_TRYON_UNAVAILABLE_MESSAGE : msg);
     }
   };
 
@@ -240,9 +288,11 @@ const TryOnStudio = () => {
     setProductImage(null);
     setResultUrl(null);
     setErrorMsg(null);
+    setErrorKind(null);
     setProcessingTime(null);
     setSelectedModel(null);
     setLibraryProductImage(null);
+    setProductDescription("");
     setUploadProgress("");
   };
 
@@ -294,6 +344,7 @@ const TryOnStudio = () => {
                   setSelectedCategory(cat.id);
                   setProductImage(null);
                   setLibraryProductImage(null);
+                  setProductDescription("");
                 }}
                 className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium transition-all ${
                   selectedCategory === cat.id
@@ -318,6 +369,9 @@ const TryOnStudio = () => {
                   <div className="bg-card rounded-2xl border border-border/50 p-6">
                     <h3 className="font-display text-lg font-semibold text-foreground mb-1">Your Photo</h3>
                     <p className="text-sm text-muted-foreground mb-5">Upload a clear front-facing photo</p>
+                    <p className="text-xs text-muted-foreground mb-4 -mt-2 max-w-md">
+                      Prefer a shot with <strong>more than just your face</strong>—for example head-to-waist or full length—so the AI has enough context to place the item naturally on you.
+                    </p>
 
                     {personImage ? (
                       <div className="relative rounded-xl overflow-hidden">
@@ -386,6 +440,30 @@ const TryOnStudio = () => {
                     )}
                     <input ref={productInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
                       onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], setProductImage)} />
+
+                    <div className="mt-5 space-y-2">
+                      <Label htmlFor="studio-product-desc-upload" className="text-foreground">
+                        Product description <span className="font-normal text-muted-foreground">(optional)</span>
+                      </Label>
+                      <Textarea
+                        id="studio-product-desc-upload"
+                        placeholder={
+                          selectedCategory === "clothing"
+                            ? "e.g. Black floor-length mermaid gown, thin spaghetti straps, matte jersey"
+                            : selectedCategory === "bags"
+                              ? "e.g. Medium leather tote, tan, gold hardware"
+                              : "e.g. Oversized aviators, black acetate frame"
+                        }
+                        value={productDescription}
+                        maxLength={400}
+                        rows={3}
+                        className="resize-y min-h-[80px] text-sm"
+                        onChange={(e) => setProductDescription(e.target.value.slice(0, 400))}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Helps the AI match length, cut, and materials. For dresses and gowns, mention <strong>full-length</strong> or <strong>floor-length</strong> when the photo is cropped tight.
+                      </p>
+                    </div>
 
                     <Button
                       onClick={handleTryOn}
@@ -511,6 +589,29 @@ const TryOnStudio = () => {
                           e.target.files?.[0] && handleFileSelect(e.target.files[0], setLibraryProductImage)
                         }
                       />
+                      <div className="space-y-2">
+                        <Label htmlFor="studio-product-desc-library" className="text-foreground">
+                          Product description <span className="font-normal text-muted-foreground">(optional)</span>
+                        </Label>
+                        <Textarea
+                          id="studio-product-desc-library"
+                          placeholder={
+                            selectedCategory === "clothing"
+                              ? "e.g. Black floor-length mermaid gown, thin spaghetti straps"
+                              : selectedCategory === "bags"
+                                ? "e.g. Structured crossbody, croc-embossed, chain strap"
+                                : "e.g. Round metal frames, rose gold"
+                          }
+                          value={productDescription}
+                          maxLength={400}
+                          rows={3}
+                          className="resize-y min-h-[80px] text-sm"
+                          onChange={(e) => setProductDescription(e.target.value.slice(0, 400))}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Same hints as upload mode — especially useful for long dresses and gowns.
+                        </p>
+                      </div>
                       <Button
                         onClick={handleTryOnWithLibraryModel}
                         disabled={!selectedModel || !libraryProductImage || modelsLoading || !!modelsError}
@@ -547,11 +648,19 @@ const TryOnStudio = () => {
                   </motion.div>
                   <h3 className="font-display text-xl font-semibold text-foreground mb-2">AI is Working</h3>
                   <p className="text-sm text-muted-foreground">Preprocessing images · Running inference · Enhancing result</p>
-                  <div className="mt-6 h-1 bg-muted rounded-full overflow-hidden max-w-xs mx-auto">
-                    <motion.div className="h-full bg-foreground rounded-full" initial={{ width: "5%" }}
-                      animate={{ width: "92%" }} transition={{ duration: 25, ease: "easeInOut" }} />
+                  <p className="text-sm font-medium text-foreground mt-4 tabular-nums">
+                    {processElapsedSec}s elapsed
+                  </p>
+                  <div className="mt-4 h-1 bg-muted rounded-full overflow-hidden max-w-xs mx-auto relative">
+                    <motion.div
+                      className="h-full bg-foreground rounded-full absolute left-0 top-0 w-[32%]"
+                      animate={{ x: ["-20%", "220%"] }}
+                      transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }}
+                    />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-3">This usually takes 20–40 seconds</p>
+                  <p className="text-xs text-muted-foreground mt-3 max-w-sm mx-auto">
+                    Most runs finish in about one to three minutes (Replicate cold starts can be slower). Leave this tab open—closing it can cancel the request.
+                  </p>
                 </motion.div>
               )}
 
@@ -589,16 +698,49 @@ const TryOnStudio = () => {
               )}
 
               {/* ── ERROR PHASE ──────────────────────────────────────────── */}
-              {phase === "error" && (
+              {phase === "error" && errorKind && (
                 <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-md mx-auto text-center py-20">
-                  <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-6">
-                    <AlertCircle className="h-7 w-7 text-destructive" />
+                  <div
+                    className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 ${
+                      errorKind === "credits"
+                        ? "bg-primary/10"
+                        : errorKind === "person_photo"
+                          ? "bg-amber-500/10"
+                          : "bg-destructive/10"
+                    }`}
+                  >
+                    <AlertCircle
+                      className={`h-7 w-7 ${
+                        errorKind === "credits"
+                          ? "text-primary"
+                          : errorKind === "person_photo"
+                            ? "text-amber-600"
+                            : "text-destructive"
+                      }`}
+                    />
                   </div>
-                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">Something went wrong</h3>
+                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">
+                    {errorKind === "credits"
+                      ? "Try-on unavailable"
+                      : errorKind === "person_photo"
+                        ? "We couldn’t use this photo"
+                        : "Something went wrong"}
+                  </h3>
                   <p className="text-sm text-muted-foreground mb-6">{errorMsg || "Please try again."}</p>
-                  <Button onClick={handleReset} variant="outline" className="gap-2">
-                    <RotateCcw className="h-4 w-4" /> Try Again
-                  </Button>
+                  <div className="flex flex-col gap-3 items-center">
+                    <Button onClick={handleReset} variant="outline" className="gap-2">
+                      <RotateCcw className="h-4 w-4" /> Try again
+                    </Button>
+                    {errorKind === "credits" && (
+                      <p className="text-xs text-muted-foreground max-w-sm">
+                        Store team: add try-on credits under{" "}
+                        <Link to="/dashboard?tab=Billing" className="underline font-medium text-foreground/80 hover:text-foreground">
+                          Dashboard → Billing
+                        </Link>
+                        .
+                      </p>
+                    )}
+                  </div>
                 </motion.div>
               )}
 

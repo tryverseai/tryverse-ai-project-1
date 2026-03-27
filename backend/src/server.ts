@@ -63,7 +63,9 @@ app.use(
 const allowedOrigins = [
   env.FRONTEND_URL,
   'http://localhost:8080',
+  'http://127.0.0.1:8080',
   'http://localhost:3000',
+  'http://127.0.0.1:3000',
   ...(env.WIDGET_ALLOWED_ORIGINS === '*' ? [] : env.WIDGET_ALLOWED_ORIGINS.split(',')),
 ];
 
@@ -118,6 +120,7 @@ app.get('/health', (_req, res) => {
     features: {
       backgroundRemoval: env.ENABLE_BACKGROUND_REMOVAL,
       facePreservation: env.ENABLE_FACE_PRESERVATION,
+      faceLock: env.ENABLE_FACE_LOCK,
       postProcessing: env.ENABLE_POST_PROCESSING,
       imageModeration: env.ENABLE_IMAGE_MODERATION,
       cdnEnabled: !!env.CLOUDFLARE_CDN_DOMAIN,
@@ -186,6 +189,8 @@ app.use(errorHandler);
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 async function bootstrap(): Promise<void> {
   await connectRedis();
+  const { logStorageBucketStatus } = await import('./config/storageHealth');
+  await logStorageBucketStatus();
   await mountBullBoard();
 
   app.listen(env.PORT, () => {

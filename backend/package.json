@@ -10,13 +10,17 @@
     "start": "node dist/server.js",
     "start:worker": "node dist/services/queue/worker.js",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "cache:clear-tryon": "tsx scripts/clear-tryon-cache.ts"
   },
   "dependencies": {
     "@bull-board/api": "^6.20.5",
     "@bull-board/express": "^6.20.5",
     "@sentry/node": "^10.43.0",
     "@supabase/supabase-js": "^2.49.1",
+    "@tensorflow-models/blazeface": "^0.1.0",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-cpu": "^4.22.0",
     "axios": "^1.7.9",
     "bull": "^4.16.5",
     "cors": "^2.8.5",

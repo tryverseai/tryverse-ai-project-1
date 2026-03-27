@@ -113,7 +113,17 @@
     }).then(function (r) {
       if (!r.ok) {
         return r.json().then(function (d) {
-          throw new Error(d.error || 'Try-on failed');
+          var msg = d.error || 'Try-on failed';
+          if (r.status === 402 || d.code === 'CREDITS_EXHAUSTED') {
+            d.code = 'CREDITS_EXHAUSTED';
+            msg =
+              d.error ||
+              "Virtual try-on isn't available right now. Please try again later or contact the store.";
+          }
+          var err = new Error(msg);
+          err.code = d.code;
+          err.status = r.status;
+          throw err;
         });
       }
       return r.json();
@@ -254,7 +264,7 @@
         mBtn.className = 'tryverse-model-btn';
         mBtn.setAttribute('data-model-id', String(mod.id));
         mBtn.style.cssText =
-          'padding:0;border:2px solid #e5e7eb;border-radius:8px;overflow:hidden;width:56px;height:74px;cursor:pointer;background:#f9fafb;';
+          'padding:0;border:2px solid #e5e7eb;border-radius:8px;overflow:hidden;width:52px;height:86px;cursor:pointer;background:#f9fafb;';
         var mImg = document.createElement('img');
         if (isSafeImageDisplayUrl(mod.image_url)) {
           mImg.src = mod.image_url;

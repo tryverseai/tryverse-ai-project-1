@@ -81,7 +81,7 @@ export function AdminQueueTab({ adminKey }: AdminQueueTabProps) {
               <p className="font-medium">{error}</p>
               <p className="text-sm mt-1">Check ADMIN_SECRET_KEY and backend connectivity.</p>
             </div>
-            <Button variant="outline" size="sm" onClick={fetch}>Retry</Button>
+            <Button variant="outline" size="sm" onClick={loadQueue}>Retry</Button>
           </div>
         </div>
       </motion.div>

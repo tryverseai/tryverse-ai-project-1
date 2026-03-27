@@ -65,7 +65,8 @@ export function AdminSettingsTab({ adminKey }: AdminSettingsTabProps) {
 
   const flags = [
     { key: "enableBackgroundRemoval", label: "Background removal", desc: "Remove background from product images before try-on" },
-    { key: "enableFacePreservation", label: "Face preservation", desc: "GFPGAN face restoration after AI generation" },
+    { key: "enableFacePreservation", label: "Face preservation (GFPGAN)", desc: "Replicate GFPGAN — alters face; usually off when face lock is on" },
+    { key: "enableFaceLock", label: "Face lock (clothing)", desc: "Paste input face onto IDM-VTON output (BlazeFace + Sharp compositing)" },
     { key: "enablePostProcessing", label: "Post-processing", desc: "Color/lighting correction with Sharp" },
     { key: "enableImageModeration", label: "Image moderation", desc: "Hive content moderation (requires HIVE_API_KEY)" },
   ];

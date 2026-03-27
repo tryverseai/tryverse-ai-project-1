@@ -6,7 +6,7 @@ import { optionalApiKey } from '../middleware/apiKey';
 import { tryonRateLimit } from '../middleware/rateLimiter';
 import { planAwareTryonRateLimit } from '../middleware/planRateLimit';
 import { handleValidationErrors } from '../middleware/validate';
-import { checkCredits } from '../services/credits';
+import { checkCredits, SHOPPER_TRYON_UNAVAILABLE_MESSAGE } from '../services/credits';
 import { enqueueTryOnJob, getJobStatusForUser, getTryOnQueue } from '../services/queue/producer';
 import { executeTryOnPipeline } from '../services/ai/pipeline';
 import { getSupportedCategories } from '../services/ai/replicate';
@@ -35,7 +35,7 @@ router.get('/categories', (_req: Request, res: Response) => {
  *   - personImagePath: string       (path returned by POST /api/upload)
  *   - productImagePath: string      (path returned by POST /api/upload)
  *   - category: ProductCategory     (clothing|shoes|glasses|jewelry|earrings|bracelets|rings|hats|bags|accessories)
- *   - productDescription?: string   (optional: helps AI understand the product)
+ *   - productDescription?: string   (optional: extra detail; server always adds product-first instructions for every try-on)
  *   - async?: boolean               (default true)
  */
 router.post(
@@ -66,8 +66,8 @@ router.post(
     body('productDescription')
       .optional()
       .isString()
-      .isLength({ max: 200 })
-      .withMessage('productDescription must be a string under 200 characters'),
+      .isLength({ max: 400 })
+      .withMessage('productDescription must be a string under 400 characters'),
     body('async')
       .optional()
       .isBoolean(),
@@ -102,7 +102,7 @@ router.post(
           creditsRemaining: creditCheck.creditsRemaining,
         });
         res.status(402).json({
-          error: creditCheck.reason || 'Insufficient credits',
+          error: SHOPPER_TRYON_UNAVAILABLE_MESSAGE,
           code: 'CREDITS_EXHAUSTED',
           creditsRemaining: creditCheck.creditsRemaining,
         });

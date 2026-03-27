@@ -5,6 +5,7 @@
  */
 
 import type { ProductCategory } from '../../types';
+import { inferIsLongGarment } from './garmentDescriptor';
 
 export interface PromptContext {
   category: ProductCategory;
@@ -14,6 +15,8 @@ export interface PromptContext {
   poseType?: 'full_body' | 'half_body' | 'face_only';
   /** Optional: specific garment type (shirt, dress, glasses, etc.) from productDescription or category */
   garmentHint?: string;
+  /** Product image height/width for gown/dress prompts (flux-kontext). */
+  productHeightOverWidth?: number;
 }
 
 /**
@@ -22,6 +25,12 @@ export interface PromptContext {
  */
 export function buildTryOnPrompt(ctx: PromptContext): string {
   const parts: string[] = [];
+
+  // Every Flux-Kontext run: second image is authoritative for the product (all categories).
+  parts.push(
+    'The second image is the product ground truth: match its design, proportions, colors and materials. ' +
+      'Do not treat the person’s current outfit or accessories as the product unless they are the item being replaced.'
+  );
 
   // Core instruction
   if (ctx.category === 'glasses') {
@@ -37,6 +46,12 @@ export function buildTryOnPrompt(ctx: PromptContext): string {
   // Context layer — product type
   const garmentHint = (ctx.productDescription || ctx.garmentHint || '').toLowerCase();
   if (ctx.category === 'clothing') {
+    if (inferIsLongGarment(ctx.productHeightOverWidth, ctx.productDescription)) {
+      parts.push(
+        'The product is a full-length garment (dress or gown): cover the body from shoulders to feet like the second image—' +
+          'continuous fabric to the floor or ankles; do not shorten to a crop top, bodysuit, or waist band.'
+      );
+    }
     if (garmentHint.includes('dress') || garmentHint.includes('gown')) {
       parts.push('Ensure the dress flows naturally with the body shape and follows gravity and fabric draping.');
     } else if (

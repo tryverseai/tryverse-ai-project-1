@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import { logger } from '../../config/logger';
+import { env } from '../../config/env';
 
 /**
  * STAGE 4 — POST-PROCESSING
@@ -33,22 +34,9 @@ export async function postProcessResult(imageUrl: string): Promise<PostProcessRe
   try {
     const response = await fetch(imageUrl);
     if (!response.ok) throw new Error(`Failed to fetch result: ${response.statusText}`);
-
-    const inputBuffer = Buffer.from(await response.arrayBuffer());
-    const processed = await applyEnhancements(inputBuffer);
-    const meta = await sharp(processed).metadata();
-
-    logger.info('Post-processing complete', { width: meta.width, height: meta.height });
-
-    return {
-      buffer: processed,
-      mimeType: 'image/jpeg',
-      widthPx: meta.width || 768,
-      heightPx: meta.height || 1024,
-    };
+    return postProcessResultBuffer(Buffer.from(await response.arrayBuffer()));
   } catch (err) {
     logger.error('Post-processing failed, fetching original', { error: String(err) });
-    // Return original image buffer as fallback
     const response = await fetch(imageUrl);
     const buffer = Buffer.from(await response.arrayBuffer());
     const meta = await sharp(buffer).metadata();
@@ -57,41 +45,107 @@ export async function postProcessResult(imageUrl: string): Promise<PostProcessRe
 }
 
 /**
+ * Minimal pass for FASHN (and similar) outputs: no sharpen — global sharpen exaggerates soft facial regions.
+ */
+export async function postProcessResultBufferMinimal(inputBuffer: Buffer): Promise<PostProcessResult> {
+  try {
+    const processed = await sharp(inputBuffer)
+      .modulate({ saturation: 1.02, brightness: 1.005, hue: 0 })
+      .jpeg({
+        quality: 95,
+        progressive: true,
+        chromaSubsampling: '4:4:4',
+        mozjpeg: true,
+      })
+      .toBuffer();
+    const meta = await sharp(processed).metadata();
+    logger.info('Post-processing complete (minimal)', { width: meta.width, height: meta.height });
+    return {
+      buffer: processed,
+      mimeType: 'image/jpeg',
+      widthPx: meta.width || 768,
+      heightPx: meta.height || 1024,
+    };
+  } catch (err) {
+    logger.error('Minimal post-processing failed, returning input', { error: String(err) });
+    const meta = await sharp(inputBuffer).metadata();
+    return {
+      buffer: inputBuffer,
+      mimeType: 'image/jpeg',
+      widthPx: meta.width || 768,
+      heightPx: meta.height || 1024,
+    };
+  }
+}
+
+/** Same pipeline as {@link postProcessResult} without an intermediate fetch (e.g. after in-memory face lock). */
+export async function postProcessResultBuffer(inputBuffer: Buffer): Promise<PostProcessResult> {
+  try {
+    const processed = await applyEnhancements(inputBuffer);
+    const meta = await sharp(processed).metadata();
+    logger.info('Post-processing complete', { width: meta.width, height: meta.height });
+    return {
+      buffer: processed,
+      mimeType: 'image/jpeg',
+      widthPx: meta.width || 768,
+      heightPx: meta.height || 1024,
+    };
+  } catch (err) {
+    logger.error('Post-processing failed on buffer, returning input', { error: String(err) });
+    const meta = await sharp(inputBuffer).metadata();
+    return {
+      buffer: inputBuffer,
+      mimeType: 'image/jpeg',
+      widthPx: meta.width || 768,
+      heightPx: meta.height || 1024,
+    };
+  }
+}
+
+/**
  * Applies multi-step image enhancements using Sharp.
  */
 async function applyEnhancements(inputBuffer: Buffer): Promise<Buffer> {
   const pipeline = sharp(inputBuffer);
+  const vivid = env.TRYON_POST_PROCESS_STYLE === 'vivid';
+
+  if (!vivid) {
+    // Natural / editorial: minimal change so scene lighting and skin stay closer to the model output.
+    return pipeline
+      .modulate({ saturation: 1.03, brightness: 1.01, hue: 0 })
+      .gamma(1.02)
+      .linear(1.01, -1)
+      .sharpen({ sigma: 0.45, m1: 1.0, m2: 1.5, x1: 2.0, y2: 10.0, y3: 18.0 })
+      .jpeg({
+        quality: 96,
+        progressive: true,
+        chromaSubsampling: '4:4:4',
+        mozjpeg: true,
+      })
+      .toBuffer();
+  }
 
   return pipeline
-    // 1. Color correction — normalize by enhancing saturation slightly
-    //    and adjusting vibrance to remove the "washed out" AI look
     .modulate({
-      saturation: 1.08,    // +8% saturation for richer colors
-      brightness: 1.02,    // +2% brightness to lift shadows
-      hue: 0,              // no hue shift
+      saturation: 1.08,
+      brightness: 1.02,
+      hue: 0,
     })
-    // 2. Contrast + gamma — lift midtones for a more natural exposure
     .gamma(1.05)
-    // 3. Linear tone mapping — enhance white point clarity
-    .linear(
-      1.03,   // multiplier (slight contrast boost)
-      -3      // offset (darkens deep blacks slightly for depth)
-    )
-    // 4. Sharpness — crisp edges on garment borders
+    .linear(1.03, -3)
     .sharpen({
-      sigma: 0.8,           // subtle sharpening radius
-      m1: 1.0,              // flat area sharpening threshold
-      m2: 2.0,              // jagged area sharpening threshold
+      sigma: 0.8,
+      m1: 1.0,
+      m2: 2.0,
       x1: 2.0,
       y2: 10.0,
       y3: 20.0,
     })
-    // 5. Final output — high quality progressive JPEG for CDN
     .jpeg({
       quality: 93,
       progressive: true,
-      chromaSubsampling: '4:4:4',   // preserve color detail
-      mozjpeg: true,                 // better compression via mozjpeg
+      chromaSubsampling: '4:4:4',
+      mozjpeg: true,
     })
     .toBuffer();
 }
@@ -127,7 +181,12 @@ export async function addGarmentShadow(imageBuffer: Buffer): Promise<Buffer> {
       .composite([
         { input: Buffer.from(shadowSvg), blend: 'multiply', gravity: 'south' },
       ])
-      .jpeg({ quality: 93, progressive: true })
+      .jpeg({
+        quality: env.TRYON_POST_PROCESS_STYLE === 'vivid' ? 93 : 96,
+        progressive: true,
+        chromaSubsampling: '4:4:4',
+        mozjpeg: true,
+      })
       .toBuffer();
   } catch (err) {
     logger.warn('Shadow addition failed, returning without shadow', { error: String(err) });

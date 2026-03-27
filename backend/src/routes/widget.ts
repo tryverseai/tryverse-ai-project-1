@@ -6,7 +6,7 @@ import { requireApiKey, validateDomain } from '../middleware/apiKey';
 import { listActiveModels } from '../services/models/modelLibrary';
 import { widgetRateLimit } from '../middleware/rateLimiter';
 import { handleValidationErrors } from '../middleware/validate';
-import { checkCredits } from '../services/credits';
+import { checkCredits, SHOPPER_TRYON_UNAVAILABLE_MESSAGE } from '../services/credits';
 import { supabaseAdmin } from '../config/supabase';
 import { enqueueTryOnJob, getTryOnQueue } from '../services/queue/producer';
 import { executeTryOnPipeline } from '../services/ai/pipeline';
@@ -50,7 +50,7 @@ router.post(
     body('category')
       .isIn(VALID_CATEGORIES)
       .withMessage(`category must be one of: ${VALID_CATEGORIES.join(', ')}`),
-    body('productDescription').optional().isString().isLength({ max: 200 }),
+    body('productDescription').optional().isString().isLength({ max: 400 }),
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -75,7 +75,7 @@ router.post(
       const creditCheck = await checkCredits(userId);
       if (!creditCheck.allowed) {
         res.status(402).json({
-          error: creditCheck.reason || 'Insufficient credits',
+          error: SHOPPER_TRYON_UNAVAILABLE_MESSAGE,
           code: 'CREDITS_EXHAUSTED',
         });
         return;

@@ -11,16 +11,16 @@ import { toast } from "sonner";
 import { safeImageSrcForDom } from "@/lib/safeUrl";
 import type { CSSProperties } from "react";
 
+import modelFemaleBefore from "@/assets/model-female-before.jpg";
+import modelMaleBefore from "@/assets/model-male-before.jpg";
+import modelShirtTryon from "@/assets/model-shirt-tryon.jpg";
+import shirtProduct from "@/assets/shirt-product.jpg";
+
 function previewImageBg(raw: string | null | undefined): CSSProperties | undefined {
   const s = safeImageSrcForDom(raw);
   if (!s) return undefined;
   return { backgroundImage: `url(${JSON.stringify(s)})` };
 }
-
-import modelFemaleBefore from "@/assets/model-female-before.jpg";
-import modelMaleBefore from "@/assets/model-male-before.jpg";
-import modelShirtTryon from "@/assets/model-shirt-tryon.jpg";
-import shirtProduct from "@/assets/shirt-product.jpg";
 
 type WidgetMode = "popup" | "embedded";
 type WidgetPhase = "idle" | "open" | "uploading" | "processing" | "result" | "error";
@@ -156,8 +156,8 @@ const WidgetPreview = () => {
   };
 
   const models = [
-    { id: "f1", name: "Sarah", image: modelFemaleBefore },
-    { id: "m1", name: "James", image: modelMaleBefore },
+    { id: "f1", name: "Sarah", image: widgetPreviewDemoModelFemale },
+    { id: "m1", name: "James", image: widgetPreviewDemoModelMale },
   ];
 
   const WidgetContent = ({ onClose }: { onClose?: () => void }) => (

@@ -6,7 +6,8 @@ import type { ProductCategory } from '../../types';
 /**
  * CACHING LAYER — Repeat Try-On Results
  *
- * Cache key: tryon:{personHash}:{productHash}:{category}
+ * Cache key: tryon:{personHash}:{productHash}:{category}[:variant]
+ * Optional `variant` (e.g. idm vs fashn vs flux for clothing) avoids serving the wrong engine output.
  * Identical image combinations return cached result — no AI inference.
  * TTL: 24 hours (reduces AI costs for popular products).
  */
@@ -27,9 +28,11 @@ export function computeImageHash(buffer: Buffer): string {
 export function buildCacheKey(
   personImageHash: string,
   productImageHash: string,
-  category: ProductCategory
+  category: ProductCategory,
+  variant?: string
 ): string {
-  return `${CACHE_PREFIX}${personImageHash}:${productImageHash}:${category}`;
+  const v = variant ? `:${variant}` : '';
+  return `${CACHE_PREFIX}${personImageHash}:${productImageHash}:${category}${v}`;
 }
 
 /**
@@ -38,13 +41,14 @@ export function buildCacheKey(
 export async function getCachedResultByHash(
   personImageHash: string,
   productImageHash: string,
-  category: ProductCategory
+  category: ProductCategory,
+  variant?: string
 ): Promise<string | null> {
   try {
     const redis = getRedisClient();
     if (redis.status !== 'ready') return null;
 
-    const key = buildCacheKey(personImageHash, productImageHash, category);
+    const key = buildCacheKey(personImageHash, productImageHash, category, variant);
     const cached = await redis.get(key);
 
     if (cached) {
@@ -65,13 +69,14 @@ export async function setCachedResultByHash(
   personImageHash: string,
   productImageHash: string,
   category: ProductCategory,
-  resultPath: string
+  resultPath: string,
+  variant?: string
 ): Promise<void> {
   try {
     const redis = getRedisClient();
     if (redis.status !== 'ready') return;
 
-    const key = buildCacheKey(personImageHash, productImageHash, category);
+    const key = buildCacheKey(personImageHash, productImageHash, category, variant);
     await redis.setex(key, CACHE_TTL_SECONDS, resultPath);
     logger.info('Result cached', { key: key.slice(-24), ttl: CACHE_TTL_SECONDS });
   } catch (err) {
@@ -86,12 +91,13 @@ export async function setCachedResultByHash(
 export async function invalidateCacheEntry(
   personImageHash: string,
   productImageHash: string,
-  category: ProductCategory
+  category: ProductCategory,
+  variant?: string
 ): Promise<void> {
   try {
     const redis = getRedisClient();
     if (redis.status !== 'ready') return;
-    const key = buildCacheKey(personImageHash, productImageHash, category);
+    const key = buildCacheKey(personImageHash, productImageHash, category, variant);
     await redis.del(key);
     logger.info('Cache invalidated', { key: key.slice(-24) });
   } catch (err) {
@@ -117,5 +123,23 @@ export async function getCacheStats(): Promise<{ keys: number; memoryMb: number 
     return { keys: keyCount, memoryMb: Math.round(memBytes / 1024 / 1024) };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Deletes all `tryon:*` result cache keys (does not touch Bull queue keys).
+ */
+export async function clearAllTryonResultCache(): Promise<number> {
+  try {
+    const redis = getRedisClient();
+    if (redis.status !== 'ready') return 0;
+    const keys = await redis.keys(`${CACHE_PREFIX}*`);
+    if (!keys.length) return 0;
+    const n = await redis.del(...keys);
+    logger.info('Try-on result cache cleared', { keysDeleted: n });
+    return n;
+  } catch (err) {
+    logger.warn('Try-on cache clear failed', { error: String(err) });
+    return 0;
   }
 }

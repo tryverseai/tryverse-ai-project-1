@@ -3,12 +3,15 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Code, Copy, Check, ExternalLink, Upload, Sparkles, ImageIcon, User, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   uploadImage,
   startTryOn,
   getCredits,
+  isCreditsExhaustedApiError,
   type TryOnCategory,
 } from "@/lib/backendApi";
 import { posthogCapture } from "@/lib/posthog";
@@ -78,6 +81,7 @@ export function WidgetTab() {
   const [tryOnResult, setTryOnResult] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [productDescription, setProductDescription] = useState("");
 
   useEffect(() => {
     if (activeView === "preview") {
@@ -173,6 +177,7 @@ export function WidgetTab() {
         personImagePath: personUpload.filePath,
         productImagePath: productUpload.filePath,
         category: "clothing" as TryOnCategory,
+        productDescription: productDescription.trim() || undefined,
       });
 
       if (result.status === "completed" && result.resultUrl) {
@@ -187,9 +192,17 @@ export function WidgetTab() {
       }
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
-      posthogCapture("try_on_failed", { source: "widget_tab", category: "clothing", error: err.message });
-      captureSentryException(err, { tags: { feature: "try_on", source: "widget_tab" } });
-      toast.error(err.message);
+      const creditsOut = isCreditsExhaustedApiError(err);
+      posthogCapture("try_on_failed", { source: "widget_tab", category: "clothing", error: err.message, credits_exhausted: creditsOut });
+      if (!creditsOut) {
+        captureSentryException(err, { tags: { feature: "try_on", source: "widget_tab" } });
+      }
+      if (creditsOut) {
+        toast.error("No try-on credits left. Opening Billing…");
+        navigate("/dashboard?tab=Billing");
+      } else {
+        toast.error(err.message);
+      }
     } finally {
       setProcessing(false);
     }
@@ -310,6 +323,25 @@ export function WidgetTab() {
                 )}
               </div>
             </div>
+          </div>
+
+          <div className="bg-card rounded-xl border border-border/50 p-5 shadow-card space-y-2">
+            <Label htmlFor="widget-preview-product-desc" className="text-foreground">
+              Product description <span className="font-normal text-muted-foreground">(optional)</span>
+            </Label>
+            <Textarea
+              id="widget-preview-product-desc"
+              placeholder="e.g. Black floor-length evening gown, bodycon, spaghetti straps — helps AI match length and fit"
+              value={productDescription}
+              maxLength={400}
+              rows={3}
+              className="resize-y min-h-[80px] text-sm"
+              onChange={(e) => setProductDescription(e.target.value.slice(0, 400))}
+              disabled={processing}
+            />
+            <p className="text-xs text-muted-foreground">
+              Passed to the same API as the live widget&apos;s <code className="text-[11px]">productDescription</code> field. Use it for gowns, cuts, and fabric notes.
+            </p>
           </div>
 
           {/* Generate button */}

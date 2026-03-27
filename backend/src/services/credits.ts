@@ -1,10 +1,15 @@
 import { supabaseAdmin } from '../config/supabase';
 import { getRedisClient } from '../config/redis';
 import { logger } from '../config/logger';
+import { env } from '../config/env';
 import { sendLowCreditsWarningEmail } from './email';
 import type { CreditCheckResult } from '../types';
 
 const LOW_CREDITS_THRESHOLD = 5;
+
+/** Shown to end customers (widget, studio) — not billing/Replicate instructions for the store owner. */
+export const SHOPPER_TRYON_UNAVAILABLE_MESSAGE =
+  "Virtual try-on isn't available right now. Please try again later or contact the store.";
 
 /** Plan limits: Free=3/month, Pro/starter=100, Enterprise=unlimited (-1) */
 const PLAN_LIMITS: Record<string, number> = {
@@ -74,6 +79,11 @@ async function ensureMonthlyCreditReset(
  * Enterprise bypasses all checks.
  */
 export async function checkCredits(userId: string): Promise<CreditCheckResult> {
+  if (env.NODE_ENV !== 'production' && env.TRYON_SKIP_CREDIT_CHECK) {
+    logger.warn('Try-on credit check skipped (TRYON_SKIP_CREDIT_CHECK)', { userId });
+    return { allowed: true, creditsRemaining: 999999, creditType: 'monthly' };
+  }
+
   let { data: profile, error } = await supabaseAdmin
     .from('profiles')
     .select(
@@ -137,7 +147,8 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
       allowed: false,
       creditsRemaining: 0,
       creditType: 'monthly',
-      reason: 'Monthly credits exhausted. Upgrade your plan or wait for reset.',
+      reason:
+        'Your plan try-on credits are used up. Add more in Billing, or wait for your monthly reset. (This is separate from your Replicate account balance.)',
     };
   }
 
@@ -154,7 +165,8 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
     allowed: false,
     creditsRemaining: 0,
     creditType: 'free',
-    reason: 'Free credits exhausted. Subscribe to a plan to continue.',
+    reason:
+      'Your TryVerse try-on credits are used up (free tier is limited). Subscribe or upgrade in Billing for more. Note: your Replicate API wallet is separate and does not refill TryVerse credits.',
   };
 }
 
@@ -163,6 +175,10 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
  * Uses a Supabase RPC to ensure atomicity.
  */
 export async function decrementCredits(userId: string): Promise<void> {
+  if (env.NODE_ENV !== 'production' && env.TRYON_SKIP_CREDIT_CHECK) {
+    return;
+  }
+
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('monthly_credits_remaining, monthly_credits_total, free_credits_remaining, plan_id')

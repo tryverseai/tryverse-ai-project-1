@@ -7,6 +7,56 @@ import sharp from 'sharp';
 const INPUT_BUCKET = env.STORAGE_BUCKET_INPUTS;
 const RESULT_BUCKET = env.STORAGE_BUCKET_RESULTS;
 
+/** Maps Supabase "Bucket not found" to an actionable message. */
+const INFERENCE_SCRATCH_PREFIX = '_inference_scratch';
+
+/**
+ * Uploads a prepared JPEG buffer to the inputs bucket for Replicate (HTTPS signed URL).
+ * Does not re-encode; use buffers already sized by the pipeline.
+ */
+export async function uploadInferenceScratchJpeg(
+  buffer: Buffer,
+  role: 'person' | 'product',
+  userId: string | null
+): Promise<string> {
+  const base = userId ? `${userId}/${INFERENCE_SCRATCH_PREFIX}` : `anonymous/${INFERENCE_SCRATCH_PREFIX}`;
+  const filePath = `${base}/${uuidv4()}-${role}.jpg`;
+
+  const { error } = await supabaseAdmin.storage.from(INPUT_BUCKET).upload(filePath, buffer, {
+    contentType: 'image/jpeg',
+    cacheControl: '300',
+    upsert: false,
+  });
+
+  if (error) {
+    logger.error('Inference scratch upload failed', { error: error.message, filePath: filePath.slice(0, 80) });
+    throw new Error(storageFailureMessage('Inference scratch upload failed', INPUT_BUCKET, error.message));
+  }
+
+  return filePath;
+}
+
+/** Best-effort cleanup of temporary inference uploads. */
+export async function removeInferenceScratchPaths(paths: string[]): Promise<void> {
+  if (!paths.length) return;
+  const { error } = await supabaseAdmin.storage.from(INPUT_BUCKET).remove(paths);
+  if (error) {
+    logger.warn('Inference scratch removal failed', { error: error.message, count: paths.length });
+  }
+}
+
+export function storageFailureMessage(
+  label: string,
+  bucket: string,
+  errorMessage: string
+): string {
+  let msg = `${label}: ${errorMessage}`;
+  if (/bucket not found/i.test(errorMessage)) {
+    msg += ` Create bucket "${bucket}" in Supabase Dashboard → Storage (name must match your STORAGE_BUCKET_* env var).`;
+  }
+  return msg;
+}
+
 /**
  * Processes, optimizes, and uploads an image buffer to Supabase Storage.
  * Returns the stored path (not a public URL).
@@ -36,7 +86,7 @@ export async function uploadImageBuffer(
 
   if (error) {
     logger.error('Failed to upload image to storage', { error: error.message });
-    throw new Error(`Storage upload failed: ${error.message}`);
+    throw new Error(storageFailureMessage('Storage upload failed', INPUT_BUCKET, error.message));
   }
 
   return filePath;
@@ -59,7 +109,12 @@ export async function storeResultImage(
 
   // Optimize result too
   const optimized = await sharp(buffer)
-    .jpeg({ quality: 95, progressive: true })
+    .jpeg({
+      quality: 96,
+      progressive: true,
+      chromaSubsampling: '4:4:4',
+      mozjpeg: true,
+    })
     .toBuffer();
 
   const filePath = userId
@@ -76,7 +131,7 @@ export async function storeResultImage(
 
   if (error) {
     logger.error('Failed to store result image', { error: error.message });
-    throw new Error(`Result storage failed: ${error.message}`);
+    throw new Error(storageFailureMessage('Result storage failed', RESULT_BUCKET, error.message));
   }
 
   return filePath;

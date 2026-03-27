@@ -23,22 +23,39 @@ async function getAuthToken(): Promise<string | null> {
 async function handleResponse<T>(res: Response, context?: { feature?: string }): Promise<T> {
   if (!res.ok) {
     let message = `Request failed: ${res.status}`;
+    let code: string | undefined;
     try {
-      const body = await res.json();
+      const body = (await res.json()) as { error?: string; message?: string; code?: string };
       message = body.error || body.message || message;
+      if (typeof body.code === 'string') code = body.code;
     } catch { /* ignore parse error */ }
-    const err = new Error(message);
-    try {
-      const { captureSentryException } = await import('@/lib/sentry');
-      captureSentryException(err, {
-        tags: { feature: context?.feature || 'api', type: 'api_error' },
-        extra: { url: res.url, status: res.status },
-      });
-    } catch { /* Sentry not loaded or disabled */ }
+    const err = new Error(message) as Error & { status?: number; code?: string };
+    err.status = res.status;
+    if (code) err.code = code;
+    if (res.status !== 402) {
+      try {
+        const { captureSentryException } = await import('@/lib/sentry');
+        captureSentryException(err, {
+          tags: { feature: context?.feature || 'api', type: 'api_error' },
+          extra: { url: res.url, status: res.status, code: code ?? null },
+        });
+      } catch { /* Sentry not loaded or disabled */ }
+    }
     throw err;
   }
   return res.json() as Promise<T>;
 }
+
+/** Backend returns 402 + code CREDITS_EXHAUSTED when the account has no try-on credits left. */
+export function isCreditsExhaustedApiError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const e = err as Error & { status?: number; code?: string };
+  return e.status === 402 || e.code === 'CREDITS_EXHAUSTED';
+}
+
+/** Same wording the backend returns for 402 — use for studio UIs that need a fallback. */
+export const SHOPPER_TRYON_UNAVAILABLE_MESSAGE =
+  "Virtual try-on isn't available right now. Please try again later or contact the store.";
 
 // ─── Emails ───────────────────────────────────────────────────────────────────
 
@@ -516,21 +533,30 @@ export function isAdminSessionExpired(): boolean {
     const lastActive = sessionStorage.getItem(ADMIN_KEY_LAST_ACTIVE);
     if (!lastActive) return true;
     const elapsed = Date.now() - parseInt(lastActive, 10);
-    return elapsed > ADMIN_IDLE_TIMUTES * 60 * 1000;
+    return elapsed > ADMIN_IDLE_TIMEOUT_MINUTES * 60 * 1000;
   } catch {
     return true;
   }
 }
 
 async function adminFetch(path: string, adminKey: string, options?: RequestInit) {
-  const res = await fetch(`${BACKEND_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'x-admin-key': adminKey,
-      ...options?.headers,
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BACKEND_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': adminKey,
+        ...options?.headers,
+      },
+    });
+  } catch (e) {
+    const hint =
+      e instanceof TypeError
+        ? `Cannot reach backend at ${BACKEND_URL}. Start the API (npm run dev in backend), confirm VITE_BACKEND_URL in the frontend .env, and try http://localhost:8080 (not an offline Network tab URL if the API is only on this machine).`
+        : String(e);
+    throw new Error(`Failed to fetch (${new URL(BACKEND_URL).host}): ${hint}`);
+  }
   if (res.status === 403) throw new Error('Invalid admin key');
   if (!res.ok) {
     let message = `Admin API error (${res.status})`;

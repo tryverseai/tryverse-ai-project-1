@@ -1,9 +1,7 @@
 import sharp from 'sharp';
 import { logger } from '../../config/logger';
+import { env } from '../../config/env';
 import { computeImageHash } from '../cache/tryonCache';
-
-const MAX_SIZE = 1024;
-const JPEG_QUALITY = 85;
 
 export interface OptimizedImage {
   buffer: Buffer;
@@ -14,8 +12,8 @@ export interface OptimizedImage {
 
 /**
  * Fetches an image from URL, optimizes for AI inference, and returns buffer + hash.
- * - Resize to max 1024px (keep aspect ratio)
- * - Compress with Sharp (strip metadata, ensure RGB)
+ * - Resize to TRYON_AI_MAX_DIMENSION (keep aspect ratio)
+ * - JPEG at TRYON_AI_JPEG_QUALITY (preserve detail for downstream models)
  * - Compute SHA-256 hash for caching
  */
 export async function optimizeImageForAI(imageUrl: string): Promise<OptimizedImage> {
@@ -23,15 +21,18 @@ export async function optimizeImageForAI(imageUrl: string): Promise<OptimizedIma
   if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
 
   const inputBuffer = Buffer.from(await response.arrayBuffer());
+  const maxEdge = env.TRYON_AI_MAX_DIMENSION;
+  const jpegQ = env.TRYON_AI_JPEG_QUALITY;
 
   const pipeline = sharp(inputBuffer)
-    .resize(MAX_SIZE, MAX_SIZE, { fit: 'inside', withoutEnlargement: true })
+    .resize(maxEdge, maxEdge, { fit: 'inside', withoutEnlargement: true })
     .flatten({ background: { r: 255, g: 255, b: 255 } })
     .removeAlpha()
     .jpeg({
-      quality: JPEG_QUALITY,
+      quality: jpegQ,
       progressive: true,
       mozjpeg: true,
+      chromaSubsampling: '4:4:4',
     });
 
   const buffer = await pipeline.toBuffer();
@@ -47,8 +48,8 @@ export async function optimizeImageForAI(imageUrl: string): Promise<OptimizedIma
   return {
     buffer,
     hash,
-    width: meta.width || MAX_SIZE,
-    height: meta.height || MAX_SIZE,
+    width: meta.width || maxEdge,
+    height: meta.height || maxEdge,
   };
 }
 

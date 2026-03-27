@@ -11,7 +11,7 @@ Served at `https://<your-app>/model-library/<filename>`.
 | `min-ji.png`  | `min-ji`   | Min-Ji         |
 | `sophia.png`  | `sophia`   | Sophia         |
 | `camila.png`  | `camila`   | Camila         |
-| `priya.png`   | `priya`    | Priya          |
+| `rashna.png`  | `rashna`   | Rashna         |
 
 ## Male
 

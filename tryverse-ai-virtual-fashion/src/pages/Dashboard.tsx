@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -33,9 +34,22 @@ const tabComponents: Record<string, React.FC> = {
 };
 
 const Dashboard = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("Overview");
   const { user } = useAuth();
   const brandName = user?.user_metadata?.brand_name || "Your Brand";
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && tabComponents[tab]) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  const selectTab = (label: string) => {
+    setActiveTab(label);
+    setSearchParams({ tab: label }, { replace: true });
+  };
 
   const renderContent = () => {
     const ActiveComponent = tabComponents[activeTab] || OverviewTab;
@@ -61,7 +75,7 @@ const Dashboard = () => {
               {sidebarItems.map((item) => (
                 <button
                   key={item.label}
-                  onClick={() => setActiveTab(item.label)}
+                  onClick={() => selectTab(item.label)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     activeTab === item.label
                       ? "bg-foreground text-background"
@@ -81,7 +95,7 @@ const Dashboard = () => {
               {sidebarItems.map((item) => (
                 <button
                   key={item.label}
-                  onClick={() => setActiveTab(item.label)}
+                  onClick={() => selectTab(item.label)}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                     activeTab === item.label
                       ? "bg-foreground text-background"

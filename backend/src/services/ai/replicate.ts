@@ -2,6 +2,16 @@ import Replicate from 'replicate';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 import { buildTryOnPrompt } from './promptBuilder';
+import {
+  buildIdmGarmentDescription,
+  buildFashnBagDescription,
+  buildFashnGlassesDescription,
+  buildFashnClothingDescription,
+  inferIdmVtonGarmentCategory,
+  inferFashnGarmentCategory,
+  inferIsLongGarment,
+} from './garmentDescriptor';
+
 import type { ProductCategory } from '../../types';
 
 const replicate = new Replicate({ auth: env.REPLICATE_API_TOKEN });
@@ -11,6 +21,8 @@ export interface VtonInput {
   productImageUrl: string;
   category: ProductCategory;
   productDescription?: string;
+  /** Optimized product image height ÷ width — auto gown/dress hint for IDM-VTON. */
+  productHeightOverWidth?: number;
   /** For dynamic prompt building (flux-kontext) */
   bodyDetected?: boolean;
   poseType?: 'full_body' | 'half_body' | 'face_only';
@@ -23,6 +35,18 @@ export interface VtonOutput {
   category: ProductCategory;
 }
 
+/** Clothing-only: FASHN (default), IDM-VTON, or Flux Kontext hybrid routing. */
+export type ClothingTryOnEngine = 'idm_vton' | 'flux_kontext' | 'fashn';
+
+/** Viktorfa OOT / tryon-diffusion style APIs use model_image + garment_image (not IDM fields). */
+function clothingModelInputKind(modelRef: string): 'idm_vton' | 'oot_style' {
+  const m = modelRef.toLowerCase();
+  if (m.includes('oot_diffusion') || m.includes('tryon-diffusion')) {
+    return 'oot_style';
+  }
+  return 'idm_vton';
+}
+
 // ─── Category → Model routing ────────────────────────────────────────────────
 
 function getModelConfig(category: ProductCategory): {
@@ -30,22 +54,45 @@ function getModelConfig(category: ProductCategory): {
   buildInput: (input: VtonInput) => Record<string, unknown>;
 } {
   switch (category) {
-    // ── Clothing — IDM-VTON: fabric-aware, pose-aligned garment try-on ──────
     case 'clothing':
       return {
         model: env.REPLICATE_MODEL_CLOTHING,
-        buildInput: (input) => ({
-          human_img: input.personImageUrl,
-          garm_img: input.productImageUrl,
-          garment_des: input.productDescription || 'clothing item',
-          is_checked: true,
-          is_checked_crop: false,
-          denoise_steps: 30,
-          seed: randomSeed(),
-        }),
+        buildInput: (input) => {
+          const modelRef = env.REPLICATE_MODEL_CLOTHING;
+          const idmSlot = inferIdmVtonGarmentCategory(
+            input.productHeightOverWidth,
+            input.productDescription
+          );
+          const isDresses = idmSlot === 'dresses';
+
+          if (clothingModelInputKind(modelRef) === 'oot_style') {
+            return {
+              model_image: input.personImageUrl,
+              garment_image: input.productImageUrl,
+              steps: isDresses ? 35 : 25,
+              guidance_scale: isDresses ? 3.5 : 2,
+              seed: randomSeed(),
+            };
+          }
+
+          return {
+            human_img: input.personImageUrl,
+            garm_img: input.productImageUrl,
+            /** Replicate defaults to upper_body; must match long garments or IDM crops to torso and seams at the waist. */
+            category: idmSlot,
+            garment_des: buildIdmGarmentDescription(input.productDescription, {
+              productHeightOverWidth: input.productHeightOverWidth,
+              idmCategory: idmSlot,
+            }),
+            is_checked: true,
+            is_checked_crop: !isDresses,
+            denoise_steps: isDresses ? 60 : env.IDM_VTON_DENOISE_STEPS,
+            guidance_scale: isDresses ? 3.5 : env.IDM_VTON_GUIDANCE_SCALE,
+            seed: randomSeed(),
+          };
+        },
       };
 
-    // ── Bags — FASHN: accessory overlay with body context ────────────────────
     case 'bags':
       return {
         model: env.REPLICATE_MODEL_ACCESSORIES,
@@ -56,12 +103,11 @@ function getModelConfig(category: ProductCategory): {
           adjust_hands: false,
           restore_background: true,
           restore_clothes: true,
-          garment_description: input.productDescription || 'bag / handbag / accessory',
+          garment_description: buildFashnBagDescription(input.productDescription),
           long_top: false,
         }),
       };
 
-    // ── Glasses — FASHN: face-region overlay ─────────────────────────────────
     case 'glasses':
       return {
         model: env.REPLICATE_MODEL_ACCESSORIES,
@@ -72,28 +118,27 @@ function getModelConfig(category: ProductCategory): {
           adjust_hands: false,
           restore_background: true,
           restore_clothes: true,
-          garment_description: input.productDescription || 'glasses / eyewear',
+          garment_description: buildFashnGlassesDescription(input.productDescription),
           long_top: false,
         }),
       };
   }
 }
 
-// ─── Main inference function ─────────────────────────────────────────────────
+// ─── Main inference ──────────────────────────────────────────────────────────
 
-const MAX_RETRIES = 4;  // 5 attempts total
-const DEFAULT_RATE_LIMIT_WAIT_MS = 15_000;  // 15s when retry_after not in response
+const MAX_RETRIES = 4;
+const DEFAULT_RATE_LIMIT_WAIT_MS = 15_000;
 
-/** Minimum gap between Replicate API calls (burst of 1 = only 1 at a time) */
 let lastReplicateCallAt = 0;
-const MIN_GAP_MS = 12_000;
 
 /** Call before any Replicate API request to respect rate limits (burst of 1). */
 export async function waitForReplicateSlot(): Promise<void> {
+  const gap = env.REPLICATE_MIN_GAP_MS;
   const now = Date.now();
   const elapsed = now - lastReplicateCallAt;
-  if (elapsed < MIN_GAP_MS) {
-    const wait = MIN_GAP_MS - elapsed;
+  if (elapsed < gap) {
+    const wait = gap - elapsed;
     logger.info('Replicate throttle: waiting before next call', { waitMs: wait });
     await new Promise((r) => setTimeout(r, wait));
   }
@@ -109,7 +154,6 @@ function parseRetryAfter(err: unknown): number {
 
 /**
  * Flux Kontext: prompt-based multi-image try-on.
- * Uses dynamic prompts (user never sees them).
  */
 export async function runFluxKontextInference(input: VtonInput): Promise<VtonOutput> {
   const startTime = Date.now();
@@ -120,6 +164,7 @@ export async function runFluxKontextInference(input: VtonInput): Promise<VtonOut
     bodyDetected: input.bodyDetected ?? true,
     poseType: input.poseType,
     garmentHint: input.productDescription,
+    productHeightOverWidth: input.productHeightOverWidth,
   });
 
   logger.info('Starting flux-kontext inference', { category: input.category, promptLength: prompt.length });
@@ -179,31 +224,21 @@ export async function runFluxKontextInference(input: VtonInput): Promise<VtonOut
   throw lastError;
 }
 
-/**
- * Runs the appropriate AI try-on inference for the given category.
- * Uses flux-kontext when REPLICATE_USE_FLUX_KONTEXT=true, otherwise legacy models.
- * Retries automatically on 429 (rate limit) with backoff.
- */
-export async function runVtonInference(input: VtonInput): Promise<VtonOutput> {
-  if (env.REPLICATE_USE_FLUX_KONTEXT) {
-    return runFluxKontextInference(input);
-  }
-
+async function replicateRunWithRetry(
+  input: VtonInput,
+  model: string,
+  buildInput: (input: VtonInput) => Record<string, unknown>,
+  modelShortName: string
+): Promise<VtonOutput> {
   const startTime = Date.now();
-  const { model, buildInput } = getModelConfig(input.category);
-  const modelShortName = model.split('/')[1]?.split(':')[0] || model;
-
-  logger.info('Starting inference', { category: input.category, model: modelShortName });
-
   await waitForReplicateSlot();
 
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
     try {
-      const output = await replicate.run(
-        model as `${string}/${string}:${string}`,
-        { input: buildInput(input) }
-      );
+      const output = await replicate.run(model as `${string}/${string}:${string}`, {
+        input: buildInput(input),
+      });
 
       const processingTimeMs = Date.now() - startTime;
       const resultUrl = extractResultUrl(output);
@@ -236,6 +271,99 @@ export async function runVtonInference(input: VtonInput): Promise<VtonOutput> {
   throw lastError;
 }
 
+async function runIdmClothing(input: VtonInput): Promise<VtonOutput> {
+  const { model, buildInput } = getModelConfig('clothing');
+  const modelShortName = model.split('/')[1]?.split(':')[0] || model;
+  logger.info('Starting IDM-VTON', { category: 'clothing', model: modelShortName });
+  return replicateRunWithRetry(input, model, buildInput, modelShortName);
+}
+
+/** FASHN Try-On for clothing — same Replicate model as accessories; uses `one-pieces` for dresses/gowns. */
+async function runFashnClothing(input: VtonInput): Promise<VtonOutput> {
+  const model = env.REPLICATE_MODEL_ACCESSORIES;
+  const modelShortName = model.split('/')[1]?.split(':')[0] || model;
+
+  const inferOpts = { useAutoForGenericDescription: env.TRYON_FASHN_CATEGORY_AUTO };
+
+  const buildInput = (inp: VtonInput): Record<string, unknown> => {
+    const fashnCat = inferFashnGarmentCategory(inp.productHeightOverWidth, inp.productDescription, inferOpts);
+    const longTop =
+      fashnCat === 'one-pieces' ||
+      fashnCat === 'auto' ||
+      (fashnCat === 'tops' && inferIsLongGarment(inp.productHeightOverWidth, inp.productDescription));
+    return {
+      model_image: inp.personImageUrl,
+      garment_image: inp.productImageUrl,
+      category: fashnCat,
+      adjust_hands: false,
+      restore_background: true,
+      restore_clothes: true,
+      garment_description: buildFashnClothingDescription(inp.productDescription, {
+        productHeightOverWidth: inp.productHeightOverWidth,
+        fashnCategory: fashnCat,
+      }),
+      long_top: longTop,
+    };
+  };
+
+  const fashnCat = inferFashnGarmentCategory(
+    input.productHeightOverWidth,
+    input.productDescription,
+    inferOpts
+  );
+  logger.info('Starting FASHN clothing', { model: modelShortName, fashnCategory: fashnCat });
+  return replicateRunWithRetry(input, model, buildInput, modelShortName);
+}
+
+/**
+ * Multi-route try-on: FASHN (accessories), IDM-VTON (clothing default), Flux Kontext (full-body dresses when enabled).
+ * When `REPLICATE_USE_FLUX_KONTEXT=true`, all clothing uses Flux (legacy single-toggle).
+ */
+export async function runVtonInference(
+  input: VtonInput,
+  opts?: { clothingEngine?: ClothingTryOnEngine }
+): Promise<VtonOutput> {
+  if (env.REPLICATE_USE_FLUX_KONTEXT) {
+    return runFluxKontextInference(input);
+  }
+
+  if (input.category === 'clothing') {
+    const engine = opts?.clothingEngine ?? 'idm_vton';
+    if (engine === 'fashn') {
+      try {
+        return await runFashnClothing(input);
+      } catch (err) {
+        if (env.TRYON_FASHN_FALLBACK_IDM) {
+          logger.warn('tryon.engine: FASHN clothing failed; falling back to IDM-VTON', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return runIdmClothing(input);
+        }
+        throw err instanceof Error ? err : new Error(String(err));
+      }
+    }
+    if (engine === 'flux_kontext') {
+      try {
+        return await runFluxKontextInference(input);
+      } catch (err) {
+        if (env.TRYON_FULLBODY_FLUX_FALLBACK_IDM) {
+          logger.warn('tryon.engine: Flux Kontext failed; falling back to IDM-VTON', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return runIdmClothing(input);
+        }
+        throw err instanceof Error ? err : new Error(String(err));
+      }
+    }
+    return runIdmClothing(input);
+  }
+
+  const { model, buildInput } = getModelConfig(input.category);
+  const modelShortName = model.split('/')[1]?.split(':')[0] || model;
+  logger.info('Starting inference', { category: input.category, model: modelShortName });
+  return replicateRunWithRetry(input, model, buildInput, modelShortName);
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -251,9 +379,15 @@ export function getSupportedCategories(): Array<{
   active: boolean;
 }> {
   return [
-    { id: 'clothing', label: 'Clothing',  description: 'Tops, bottoms, dresses, jackets, outerwear', modelFamily: 'IDM-VTON', active: true },
-    { id: 'bags',     label: 'Bags',      description: 'Handbags, backpacks, clutches, totes',        modelFamily: 'FASHN',    active: true },
-    { id: 'glasses',  label: 'Eyewear',   description: 'Sunglasses, prescription glasses, goggles',   modelFamily: 'FASHN',    active: true },
+    {
+      id: 'clothing',
+      label: 'Clothing',
+      description: 'Tops, bottoms, dresses, jackets, outerwear',
+      modelFamily: env.TRYON_CLOTHING_USE_FASHN ? 'FASHN' : 'IDM-VTON',
+      active: true,
+    },
+    { id: 'bags', label: 'Bags', description: 'Handbags, backpacks, clutches, totes', modelFamily: 'FASHN', active: true },
+    { id: 'glasses', label: 'Eyewear', description: 'Sunglasses, prescription glasses, goggles', modelFamily: 'FASHN', active: true },
   ];
 }
 
