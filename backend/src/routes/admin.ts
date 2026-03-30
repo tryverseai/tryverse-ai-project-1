@@ -642,6 +642,7 @@ router.get('/settings', async (_req: Request, res: Response, next: NextFunction)
         fashnCategoryAuto: env.TRYON_FASHN_CATEGORY_AUTO,
         fashnLightPost: env.TRYON_FASHN_LIGHT_POST,
         fashnFaceLock: env.TRYON_FASHN_FACE_LOCK,
+        fashnRestoreClothes: env.TRYON_FASHN_RESTORE_CLOTHES,
       },
       plans: plans || [],
       maintenanceMode: false,

@@ -94,8 +94,16 @@ export const env = {
   TRYON_FASHN_CATEGORY_AUTO: optionalBool('TRYON_FASHN_CATEGORY_AUTO', true),
   /** FASHN output: skip aggressive sharpen (can worsen soft faces). */
   TRYON_FASHN_LIGHT_POST: optionalBool('TRYON_FASHN_LIGHT_POST', true),
-  /** Paste a tight face region from the person photo onto FASHN output (same as dressMode neck clamp). */
-  TRYON_FASHN_FACE_LOCK: optionalBool('TRYON_FASHN_FACE_LOCK', true),
+  /**
+   * Off by default: pasting face+neck from the original photo onto FASHN output often leaves seams / “combs”
+   * on sleeveless or light tops (original neckline vs generated garment). Enable only if identity needs a nudge.
+   */
+  TRYON_FASHN_FACE_LOCK: optionalBool('TRYON_FASHN_FACE_LOCK', false),
+  /**
+   * When false (default), FASHN does a full garment swap. `true` blends old outfit layers and often causes
+   * horizontal smear / edge bleed on tops (meant for accessories keeping the rest of the outfit).
+   */
+  TRYON_FASHN_RESTORE_CLOTHES: optionalBool('TRYON_FASHN_RESTORE_CLOTHES', false),
 
   // Preprocessing — background removal (rembg)
   REPLICATE_MODEL_REMBG: optionalEnv(

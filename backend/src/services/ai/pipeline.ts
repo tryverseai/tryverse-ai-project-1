@@ -299,7 +299,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
         if (clothingEngine === 'fashn') {
           if (env.TRYON_FASHN_FACE_LOCK) {
             const lock = await applyFaceLockFromPersonInput(personBuffer, compositeBuffer, {
-              dressMode: true,
+              faceOnlyMode: true,
             });
             compositeBuffer = Buffer.from(lock.buffer);
             faceLockApplied = lock.applied;

@@ -297,7 +297,7 @@ async function runFashnClothing(input: VtonInput): Promise<VtonOutput> {
       category: fashnCat,
       adjust_hands: false,
       restore_background: true,
-      restore_clothes: true,
+      restore_clothes: env.TRYON_FASHN_RESTORE_CLOTHES,
       garment_description: buildFashnClothingDescription(inp.productDescription, {
         productHeightOverWidth: inp.productHeightOverWidth,
         fashnCategory: fashnCat,

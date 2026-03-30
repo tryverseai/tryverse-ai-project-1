@@ -49,10 +49,10 @@ export async function postProcessResult(imageUrl: string): Promise<PostProcessRe
  */
 export async function postProcessResultBufferMinimal(inputBuffer: Buffer): Promise<PostProcessResult> {
   try {
+    /** No modulate/sharpen — avoids ringing on high-contrast garment edges (e.g. white on studio white). */
     const processed = await sharp(inputBuffer)
-      .modulate({ saturation: 1.02, brightness: 1.005, hue: 0 })
       .jpeg({
-        quality: 95,
+        quality: 96,
         progressive: true,
         chromaSubsampling: '4:4:4',
         mozjpeg: true,
