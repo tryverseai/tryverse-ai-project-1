@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import TryOnStudio from "@/pages/TryOnStudio";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Images, Compass, UserRound, Trash2, Download, Loader2 } from "lucide-react";
+import { Sparkles, Images, Compass, UserRound, Trash2, Download, Loader2, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getTryOnHistory, getCredits, deleteTryOn } from "@/lib/backendApi";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { Link } from "react-router-dom";
 
 const tabs = [
   { id: "studio", label: "Try on", icon: Sparkles },
+  { id: "models", label: "Models", icon: Users },
   { id: "creations", label: "My creations", icon: Images },
   { id: "explore", label: "Explore", icon: Compass },
   { id: "profile", label: "Profile", icon: UserRound },
@@ -153,7 +154,29 @@ const IndividualDashboard = () => {
             </div>
           </div>
 
-          {activeTab === "studio" && <TryOnStudio variant="embedded" />}
+          {activeTab === "studio" && <TryOnStudio variant="embedded" audience="individual" />}
+
+          {activeTab === "models" && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="font-display text-xl font-semibold text-foreground">Model library</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Pick a preset model and a product photo — uses the same try-on pipeline as{" "}
+                  <button type="button" className="text-foreground font-medium underline" onClick={() => selectTab("studio")}>
+                    Try on
+                  </button>
+                  . If you see “model not found”, ensure your backend can reach the preset image URLs (see{" "}
+                  <code className="text-xs bg-muted px-1 rounded">FRONTEND_URL</code> in the API env) and that models are active in Supabase.
+                </p>
+              </div>
+              <TryOnStudio
+                variant="embedded"
+                audience="individual"
+                initialMode="ai-model"
+                creditsHelpPath="/dashboard/individual?tab=profile"
+              />
+            </div>
+          )}
 
           {activeTab === "creations" && (
             <div className="space-y-4">

@@ -113,12 +113,28 @@ const Auth = () => {
     });
   }, [businessSignupPaused, toast]);
 
+  const goToDashboardAfterAuth = () => {
+    if (redirectParam) sessionStorage.removeItem("tryverse_redirect");
+    const nextPath = postLoginRedirectPath(
+      redirectParam || sessionStorage.getItem("tryverse_redirect") || "/dashboard"
+    );
+    const resolved = new URL(nextPath, window.location.origin);
+    if (resolved.origin !== window.location.origin) {
+      navigate("/dashboard", { replace: true });
+    } else {
+      navigate(
+        { pathname: resolved.pathname, search: resolved.search, hash: resolved.hash },
+        { replace: true }
+      );
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     if (showIndividualSignupForm) {
-      const { error } = await signUp(
+      const { error, session } = await signUp(
         email,
         password,
         fullName.trim() || "My Try-Ons",
@@ -128,27 +144,41 @@ const Auth = () => {
       );
       if (error) {
         console.error("Signup error:", error);
-        const t = signUpErrorToast(error);
+        const t = signUpErrorToast(error, "individual");
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
+      } else if (session) {
+        posthogCapture("user_signed_up", { email, account_type: "individual", immediate_session: true });
+        toast({
+          title: "Welcome",
+          description: "You're signed in — taking you to your dashboard.",
+        });
+        goToDashboardAfterAuth();
       } else {
-        posthogCapture("user_signed_up", { email, account_type: "individual" });
+        posthogCapture("user_signed_up", { email, account_type: "individual", immediate_session: false });
         toast({
           title: "Account created",
-          description: "Check your email to confirm your account, then sign in.",
+          description: "Confirm your email from the link we sent, then sign in here.",
         });
       }
     } else if (showBusinessSignupForm) {
       const finalRole = role === "Other" ? customRole : role;
-      const { error } = await signUp(email, password, brandName, fullName, finalRole, "business");
+      const { error, session } = await signUp(email, password, brandName, fullName, finalRole, "business");
       if (error) {
         console.error("Signup error:", error);
         const t = signUpErrorToast(error, "business");
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
+      } else if (session) {
+        posthogCapture("user_signed_up", { email, account_type: "business", immediate_session: true });
+        toast({
+          title: "Welcome",
+          description: "You're signed in — taking you to your dashboard.",
+        });
+        goToDashboardAfterAuth();
       } else {
-        posthogCapture("user_signed_up", { email, account_type: "business" });
+        posthogCapture("user_signed_up", { email, account_type: "business", immediate_session: false });
         toast({
           title: "Account created",
-          description: "Check your email to confirm your account, then sign in.",
+          description: "Confirm your email from the link we sent, then sign in here.",
         });
       }
     } else {
@@ -158,19 +188,7 @@ const Auth = () => {
         toast({ title: "Sign in failed", description: error.message, variant: "destructive", duration: 6000 });
       } else {
         posthogCapture("user_logged_in", { email });
-        if (redirectParam) sessionStorage.removeItem("tryverse_redirect");
-        const nextPath = postLoginRedirectPath(
-          redirectParam || sessionStorage.getItem("tryverse_redirect") || "/dashboard"
-        );
-        const resolved = new URL(nextPath, window.location.origin);
-        if (resolved.origin !== window.location.origin) {
-          navigate("/dashboard", { replace: true });
-        } else {
-          navigate(
-            { pathname: resolved.pathname, search: resolved.search, hash: resolved.hash },
-            { replace: true }
-          );
-        }
+        goToDashboardAfterAuth();
       }
     }
     setLoading(false);

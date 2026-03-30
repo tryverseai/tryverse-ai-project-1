@@ -136,15 +136,18 @@ export async function listAllModelsForAdmin(): Promise<
   })) as (PublicModelRow & { is_active: boolean; created_at: string })[];
 }
 
+export const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 /**
  * Fetch model image and store as person image for the given user (JWT or widget API key owner).
+ * Accepts a row UUID or a unique model slug (same identifiers returned by GET /api/models).
  */
-export async function resolveModelToPersonPath(modelId: string, userId: string): Promise<string> {
-  const { data: row, error } = await supabaseAdmin
-    .from('tryverse_model_library')
-    .select('id, image_url, is_active')
-    .eq('id', modelId)
-    .maybeSingle();
+export async function resolveModelToPersonPath(modelIdOrSlug: string, userId: string): Promise<string> {
+  const raw = modelIdOrSlug.trim();
+  let qb = supabaseAdmin.from('tryverse_model_library').select('id, image_url, is_active');
+  qb = UUID_RE.test(raw) ? qb.eq('id', raw) : qb.eq('slug', raw);
+  const { data: row, error } = await qb.maybeSingle();
 
   if (error || !row || !row.is_active) {
     throw new Error('Model not found or inactive');

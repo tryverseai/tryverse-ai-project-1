@@ -297,6 +297,21 @@ export async function submitEarlyAccessRequest(
   return handleResponse(res, { feature: 'early_access' });
 }
 
+export async function submitIndividualEarlyAccessRequest(payload: {
+  first_name: string;
+  email: string;
+  what_interests_you: string;
+  timeline: string;
+  heard_about?: string | null;
+}): Promise<{ success: boolean; id?: string; emailSent?: boolean }> {
+  const res = await fetch(`${BACKEND_URL}/api/early-access/individual`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res, { feature: 'early_access' });
+}
+
 /** Contact / Support form — saved via backend to avoid PostgREST schema issues. */
 export interface SupportContactPayload {
   first_name: string;
@@ -594,10 +609,28 @@ export async function getAdminModelLibrary(adminKey: string) {
   }>('/api/admin/model-library', adminKey, { cache: 'no-store' });
 }
 
-export async function getAdminUsers(adminKey: string, page = 1, limit = 50, search?: string) {
+export async function getAdminUsers(
+  adminKey: string,
+  page = 1,
+  limit = 50,
+  search?: string,
+  accountType?: 'all' | 'business' | 'individual'
+) {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (search) params.append('search', search);
+  if (accountType && accountType !== 'all') params.append('accountType', accountType);
   return adminFetch(`/api/admin/users?${params}`, adminKey);
+}
+
+export async function patchAdminUserAccountType(
+  adminKey: string,
+  userId: string,
+  account_type: 'business' | 'individual'
+) {
+  return adminFetch(`/api/admin/users/${userId}/profile`, adminKey, {
+    method: 'PATCH',
+    body: JSON.stringify({ account_type }),
+  });
 }
 
 export async function getAdminTryons(adminKey: string, page = 1, limit = 50, status?: string) {

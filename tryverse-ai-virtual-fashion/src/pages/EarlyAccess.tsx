@@ -16,9 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { submitEarlyAccessRequest } from "@/lib/backendApi";
+import { submitEarlyAccessRequest, submitIndividualEarlyAccessRequest } from "@/lib/backendApi";
 import { b2cSignupEnabled } from "@/lib/featureFlags";
-import { Building2, User } from "lucide-react";
 import { X } from "lucide-react";
 
 const ROLES = [
@@ -135,11 +134,21 @@ function Field({
   );
 }
 
+type AccessFlow = "pick" | "business" | "individual";
+
 const EarlyAccess = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [flow, setFlow] = useState<AccessFlow>("pick");
+  const [submissionKind, setSubmissionKind] = useState<"business" | "individual">("business");
+  const [pickSelection, setPickSelection] = useState<string>("");
+  const [indFirstName, setIndFirstName] = useState("");
+  const [indEmail, setIndEmail] = useState("");
+  const [indInterests, setIndInterests] = useState("");
+  const [indTimeline, setIndTimeline] = useState<string>("");
+  const [indHeardAbout, setIndHeardAbout] = useState<string>("");
 
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
@@ -166,6 +175,42 @@ const EarlyAccess = () => {
   const toggleMulti = (list: string[], id: string, setList: (v: string[]) => void) => {
     if (list.includes(id)) setList(list.filter((x) => x !== id));
     else setList([...list, id]);
+  };
+
+  const handlePickContinue = () => {
+    if (pickSelection === "business") setFlow("business");
+    else if (pickSelection === "individual") setFlow("individual");
+    else toast.error("Please select what you are registering as.");
+  };
+
+  const handleSubmitIndividual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!indFirstName.trim() || !indEmail.trim() || !indInterests.trim() || !indTimeline) {
+      toast.error("Please complete all required fields.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const result = await submitIndividualEarlyAccessRequest({
+        first_name: indFirstName.trim(),
+        email: indEmail.trim().toLowerCase(),
+        what_interests_you: indInterests.trim(),
+        timeline: indTimeline,
+        heard_about: indHeardAbout || null,
+      });
+      setSubmissionKind("individual");
+      setSubmitted(true);
+      toast.success(
+        result.emailSent === false
+          ? "Request received. Confirmation email wasn’t sent (check Resend / server logs)."
+          : "Request sent — check your inbox."
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -226,6 +271,7 @@ const EarlyAccess = () => {
         prior_solution_notes: priorNotes.trim() || null,
       });
 
+      setSubmissionKind("business");
       setSubmitted(true);
       toast.success(
         result.emailSent === false
@@ -265,7 +311,7 @@ const EarlyAccess = () => {
               TryVerse — Get early access for fashion brands
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">
-              Business waitlist for retailers and fashion brands. Personal accounts use a separate sign-up flow, not this form.
+              Waitlist and interest forms: choose business or individual, then complete the matching questionnaire.
             </DialogPrimitive.Description>
 
             <DialogPrimitive.Close
@@ -284,8 +330,9 @@ const EarlyAccess = () => {
                   🎉
                 </p>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto">
-                  Thanks again — we&apos;ll follow up to learn more about your store and share how TryVerse can
-                  support your goals.
+                  {submissionKind === "individual"
+                    ? "Thanks — we’ll be in touch about personal virtual try-on access when spots open up."
+                    : "Thanks again — we’ll follow up to learn more about your store and share how TryVerse can support your goals."}
                 </p>
                 <Button className="mt-4 gradient-primary text-primary-foreground" onClick={() => handleOpenChange(false)}>
                   Back to home
@@ -308,67 +355,162 @@ const EarlyAccess = () => {
               </div>
             ) : (
               <div className="space-y-6 pr-1">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-2">
-                    TryVerse — Early access
-                  </p>
-                  <p className="text-xs text-muted-foreground mb-3">For fashion brands & retailers</p>
-                  <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground leading-tight">
-                    Early access for fashion brands
-                  </h2>
-                  <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-                    Help us understand your needs so we can prioritize early access.
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Who is this for?
-                  </p>
-                  <div className="flex gap-2 items-start">
-                    <User className="h-4 w-4 text-foreground shrink-0 mt-0.5" aria-hidden />
-                    <div className="text-sm leading-snug">
-                      <span className="font-medium text-foreground">Individual — sign up</span>
-                      <span className="text-muted-foreground">
-                        {" "}
-                        Try virtual try-on for yourself (no waitlist).
-                      </span>
-                      {b2cSignupEnabled ? (
-                        <div className="mt-2">
-                          <Link
-                            to="/auth?signup=individual"
-                            className="text-sm font-medium text-foreground underline underline-offset-2 hover:no-underline"
-                          >
-                            Create a personal account →
+                {flow === "pick" && (
+                  <div className="space-y-5">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-2">
+                        TryVerse — Early access
+                      </p>
+                      <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground leading-tight">
+                        How are you joining?
+                      </h2>
+                      <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
+                        Choose one to continue — you&apos;ll get the right form.
+                      </p>
+                    </div>
+                    <Field label="Registering as *" htmlFor="ea-register-as">
+                      <Select value={pickSelection} onValueChange={setPickSelection}>
+                        <SelectTrigger id="ea-register-as">
+                          <SelectValue placeholder="As a business or as an individual" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="business">As a business (brand or store)</SelectItem>
+                          <SelectItem value="individual">As an individual (personal try-on)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button
+                        type="button"
+                        className="flex-1 gradient-primary text-primary-foreground h-11"
+                        onClick={handlePickContinue}
+                      >
+                        Next
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Already have an account?{" "}
+                      <Link to="/auth" className="underline hover:text-foreground">
+                        Log in
+                      </Link>
+                      {b2cSignupEnabled && (
+                        <>
+                          {" · "}
+                          <Link to="/auth?signup=individual" className="underline hover:text-foreground">
+                            Sign up as individual
                           </Link>
-                          <span className="text-muted-foreground text-xs block mt-1">
-                            Already registered?{" "}
-                            <Link to="/auth" className="underline hover:text-foreground">
-                              Sign in
-                            </Link>
-                          </span>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Personal sign-up is paused right now. You can still{" "}
-                          <Link to="/auth" className="underline hover:text-foreground">
-                            sign in
-                          </Link>{" "}
-                          if you already have an account.
-                        </p>
+                        </>
                       )}
-                    </div>
+                    </p>
                   </div>
-                  <div className="flex gap-2 items-start">
-                    <Building2 className="h-4 w-4 text-foreground shrink-0 mt-0.5" aria-hidden />
-                    <div className="text-sm text-foreground leading-snug">
-                      <span className="font-medium">Business (form below)</span>
-                      <span className="text-muted-foreground"> — brands &amp; stores joining the waitlist.</span>
-                    </div>
-                  </div>
-                </div>
+                )}
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                {flow === "individual" && (
+                  <form onSubmit={handleSubmitIndividual} className="space-y-6">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-2">
+                        TryVerse — Interest list
+                      </p>
+                      <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground leading-tight">
+                        Personal virtual try-on
+                      </h2>
+                      <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
+                        Tell us a bit about you — we&apos;ll reach out when we open more personal spots.
+                      </p>
+                    </div>
+                    <Field label="First name *" htmlFor="ind-first">
+                      <Input
+                        id="ind-first"
+                        required
+                        value={indFirstName}
+                        onChange={(e) => setIndFirstName(e.target.value)}
+                        autoComplete="given-name"
+                      />
+                    </Field>
+                    <Field label="Email *" htmlFor="ind-email">
+                      <Input
+                        id="ind-email"
+                        type="email"
+                        required
+                        value={indEmail}
+                        onChange={(e) => setIndEmail(e.target.value)}
+                        autoComplete="email"
+                      />
+                    </Field>
+                    <Field label="What are you interested in? *" htmlFor="ind-interests">
+                      <Textarea
+                        id="ind-interests"
+                        required
+                        rows={4}
+                        placeholder="e.g. Trying outfits before I buy, special events, experimenting with looks…"
+                        value={indInterests}
+                        onChange={(e) => setIndInterests(e.target.value)}
+                      />
+                    </Field>
+                    <Field label="When are you hoping to try TryVerse? *">
+                      <Select value={indTimeline} onValueChange={setIndTimeline}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select timeline" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIMELINES.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="How did you hear about us? (optional)">
+                      <Select
+                        value={indHeardAbout || "none"}
+                        onValueChange={(v) => setIndHeardAbout(v === "none" ? "" : v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Prefer not to say</SelectItem>
+                          {HEARD_ABOUT.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <Button
+                        type="submit"
+                        disabled={submitting}
+                        className="flex-1 gradient-primary text-primary-foreground h-11"
+                      >
+                        {submitting ? "Sending…" : "Submit interest"}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => setFlow("pick")}>
+                        Back
+                      </Button>
+                    </div>
+                  </form>
+                )}
+
+                {flow === "business" && (
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-2">
+                      TryVerse — Early access
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-3">For fashion brands & retailers</p>
+                    <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground leading-tight">
+                      Early access for fashion brands
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
+                      Help us understand your needs so we can prioritize early access.
+                    </p>
+                  </div>
                   <div className="space-y-4">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border pb-1">
                       About your business
@@ -655,7 +797,13 @@ const EarlyAccess = () => {
                       Already have an account? Log in
                     </Link>
                   </p>
+                  <div className="flex justify-center pt-1">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setFlow("pick")}>
+                      ← Change registration type
+                    </Button>
+                  </div>
                 </form>
+                )}
               </div>
             )}
           </DialogPrimitive.Content>

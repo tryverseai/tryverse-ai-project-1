@@ -31,7 +31,13 @@ router.post(
   '/person-path',
   optionalApiKey,
   optionalAuth,
-  [body('modelId').isUUID().withMessage('modelId must be a UUID')],
+  [
+    body('modelId')
+      .isString()
+      .trim()
+      .isLength({ min: 1, max: 200 })
+      .withMessage('modelId must be a model id (UUID) or slug from GET /api/models'),
+  ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {

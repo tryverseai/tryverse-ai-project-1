@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ComplianceOnboardingModal } from "./ComplianceOnboardingModal";
+import type { PolicyAudience } from "@/content/policyContent";
 
 /**
  * Shows compliance onboarding modal for logged-in users who haven't
@@ -11,6 +12,7 @@ export function ComplianceOnboardingGate({ children }: { children: React.ReactNo
   const { user } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [policyAudience, setPolicyAudience] = useState<PolicyAudience>("business");
 
   useEffect(() => {
     if (!user) {
@@ -23,17 +25,23 @@ export function ComplianceOnboardingGate({ children }: { children: React.ReactNo
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("compliance_onboarding_completed_at")
+          .select("compliance_onboarding_completed_at, account_type")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
 
-        if (error) {
-          // Profile might not exist yet (e.g. handle_new_user hasn't run)
+        const row = data;
+        if (row?.account_type === "individual" || user.user_metadata?.account_type === "individual") {
+          setPolicyAudience("individual");
+        } else {
+          setPolicyAudience("business");
+        }
+
+        if (error || !row) {
           setShowModal(true);
           return;
         }
 
-        setShowModal(!data?.compliance_onboarding_completed_at);
+        setShowModal(!row.compliance_onboarding_completed_at);
       } catch {
         setShowModal(false);
       } finally {
@@ -42,7 +50,7 @@ export function ComplianceOnboardingGate({ children }: { children: React.ReactNo
     };
 
     checkCompliance();
-  }, [user?.id]);
+  }, [user?.id, user?.user_metadata]);
 
   if (loading || !user) {
     return <>{children}</>;
@@ -54,6 +62,7 @@ export function ComplianceOnboardingGate({ children }: { children: React.ReactNo
       <ComplianceOnboardingModal
         open={showModal}
         userId={user.id}
+        accountType={policyAudience}
         onComplete={() => setShowModal(false)}
         onExit={() => setShowModal(false)}
       />

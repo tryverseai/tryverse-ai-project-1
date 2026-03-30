@@ -364,6 +364,7 @@ CREATE POLICY "Authenticated users can read support requests" ON public.support_
 CREATE TABLE IF NOT EXISTS public.early_access_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  applicant_type TEXT NOT NULL DEFAULT 'business' CHECK (applicant_type IN ('business', 'individual')),
   first_name TEXT NOT NULL,
   email TEXT NOT NULL,
   brand_name TEXT NOT NULL,

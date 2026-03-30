@@ -206,11 +206,17 @@ router.get(
     query('limit').optional().isInt({ min: 1, max: 200 }).toInt(),
     query('page').optional().isInt({ min: 1 }).toInt(),
     query('search').optional().isString().trim().isLength({ max: 80 }),
+    query('accountType').optional().isIn(['business', 'individual', 'all']),
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const q = matchedData(req) as { limit?: number; page?: number; search?: string };
+      const q = matchedData(req) as {
+        limit?: number;
+        page?: number;
+        search?: string;
+        accountType?: 'business' | 'individual' | 'all';
+      };
       const limit = Math.min(q.limit ?? 50, 200);
       const page = Math.max(q.page ?? 1, 1);
       const offset = (page - 1) * limit;
@@ -224,11 +230,16 @@ router.get(
       let profilesQuery = supabaseAdmin
         .from('profiles')
         .select(
-          'id, brand_name, full_name, contact_email, plan_id, free_credits_remaining, monthly_credits_remaining, monthly_credits_total, widget_activated, created_at, is_blocked',
+          'id, brand_name, full_name, contact_email, account_type, plan_id, free_credits_remaining, monthly_credits_remaining, monthly_credits_total, widget_activated, created_at, is_blocked',
           { count: 'exact' }
         )
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
+
+      const at = q.accountType || 'all';
+      if (at === 'business' || at === 'individual') {
+        profilesQuery = profilesQuery.eq('account_type', at);
+      }
 
       if (search) {
         const term = `%${search}%`;
@@ -503,6 +514,59 @@ router.patch(
 
       logger.info('Admin: Credits adjusted', { userId, updates });
       res.json({ success: true, profile: data });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * PATCH /api/admin/users/:userId/profile — account_type (and JWT metadata sync for dashboard routing).
+ */
+router.patch(
+  '/users/:userId/profile',
+  [
+    param('userId').isUUID(),
+    body('account_type').isIn(['business', 'individual']).withMessage('account_type required'),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.params.userId as string;
+      const account_type = req.body.account_type as 'business' | 'individual';
+
+      const { error: pe } = await supabaseAdmin.from('profiles').update({ account_type }).eq('id', userId);
+      if (pe) {
+        res.status(400).json({ error: pe.message });
+        return;
+      }
+
+      const { data: authData, error: ge } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (ge || !authData?.user) {
+        logger.warn('Admin: profile account_type updated but auth user fetch failed', { userId, ge });
+        res.json({ success: true, account_type, authMetadataSynced: false });
+        return;
+      }
+
+      const meta = { ...(authData.user.user_metadata as Record<string, unknown>), account_type };
+      const { error: ue } = await supabaseAdmin.auth.admin.updateUserById(userId, { user_metadata: meta });
+      if (ue) {
+        logger.warn('Admin: auth metadata sync failed after account_type change', { userId, ue });
+        res.json({ success: true, account_type, authMetadataSynced: false });
+        return;
+      }
+
+      await logAudit({
+        event_type: 'admin_action',
+        actor: 'admin',
+        action: 'user_account_type_changed',
+        target_id: userId,
+        details: { account_type },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+
+      res.json({ success: true, account_type, authMetadataSynced: true });
     } catch (err) {
       next(err);
     }

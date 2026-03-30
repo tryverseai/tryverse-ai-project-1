@@ -75,6 +75,7 @@ export type Database = {
       }
       early_access_requests: {
         Row: {
+          applicant_type: string
           biggest_challenge: string
           brand_name: string
           created_at: string
@@ -117,6 +118,7 @@ export type Database = {
           website_url: string
         }
         Update: {
+          applicant_type?: string
           biggest_challenge?: string
           brand_name?: string
           created_at?: string

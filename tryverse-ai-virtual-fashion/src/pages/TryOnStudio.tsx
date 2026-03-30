@@ -63,10 +63,23 @@ interface TryOnStudioProps {
   variant?: TryOnStudioVariant;
   /** Where “add credits” links (B2B billing vs B2C profile). */
   creditsHelpPath?: string;
+  /** Open in a specific mode (e.g. individual dashboard “Models” tab). */
+  initialMode?: Mode;
+  /**
+   * `embedded` defaults to individual-oriented copy (preset models).
+   * Set `business` if this embed is ever shown in a merchant context.
+   */
+  audience?: "business" | "individual";
 }
 
-const TryOnStudio = ({ variant = "full", creditsHelpPath }: TryOnStudioProps) => {
-  const [mode, setMode] = useState<Mode>("upload");
+const TryOnStudio = ({
+  variant = "full",
+  creditsHelpPath,
+  initialMode,
+  audience: audienceProp,
+}: TryOnStudioProps) => {
+  const audience = audienceProp ?? (variant === "embedded" ? "individual" : "business");
+  const [mode, setMode] = useState<Mode>(initialMode ?? "upload");
   const [phase, setPhase] = useState<Phase>("select");
   const [selectedCategory, setSelectedCategory] = useState<TryOnCategory>("clothing");
   const [genderFilter, setGenderFilter] = useState<"Female" | "Male">("Female");
@@ -95,6 +108,12 @@ const TryOnStudio = ({ variant = "full", creditsHelpPath }: TryOnStudioProps) =>
   const libraryProductInputRef = useRef<HTMLInputElement>(null);
 
   const [processElapsedSec, setProcessElapsedSec] = useState(0);
+
+  useEffect(() => {
+    if (initialMode) {
+      setMode(initialMode);
+    }
+  }, [initialMode]);
 
   useEffect(() => {
     if (phase !== "processing") {
@@ -496,16 +515,28 @@ const TryOnStudio = ({ variant = "full", creditsHelpPath }: TryOnStudioProps) =>
               {phase === "select" && mode === "ai-model" && (
                 <motion.div key="demo-select" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                   <div className="bg-muted/50 border border-border rounded-xl p-4 mb-6 text-center">
-                    <p className="text-sm text-foreground/90">
-                      <span className="font-medium">Shared model library</span> — same presets shoppers can see in your{" "}
-                      <strong>embedded widget</strong> when <strong>Show AI Model Selection</strong> is enabled in Settings.
-                    </p>
+                    {audience === "individual" ? (
+                      <p className="text-sm text-foreground/90">
+                        <span className="font-medium">Preset models</span> — pick a look, then upload a product image. Great
+                        when you don&apos;t want to use your own photo; same quality AI try-on as{" "}
+                        <strong>Upload Photo</strong>.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-foreground/90">
+                        <span className="font-medium">Shared model library</span> — same presets shoppers can see in your{" "}
+                        <strong>embedded widget</strong> when <strong>Show AI Model Selection</strong> is enabled in
+                        Settings.
+                      </p>
+                    )}
                   </div>
                   <div className="grid lg:grid-cols-2 gap-8">
                     <div className="bg-card rounded-2xl border border-border/50 p-6 space-y-4">
                       <div>
                         <h3 className="font-display text-lg font-semibold text-foreground mb-1">1. Choose a model</h3>
-                        <p className="text-sm text-muted-foreground">Different looks and body types — run the migration if the list is empty.</p>
+                        <p className="text-sm text-muted-foreground">
+                          Different looks and body types.
+                          {audience === "business" && " Run the migration if the list is empty."}
+                        </p>
                       </div>
                       <div className="flex gap-2">
                         {(["Female", "Male"] as const).map((g) => (

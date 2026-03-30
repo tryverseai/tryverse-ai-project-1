@@ -15,7 +15,7 @@ interface AuthContextType {
     fullName?: string,
     role?: string,
     accountType?: AccountType
-  ) => Promise<{ error: Error | null }>;
+  ) => Promise<{ error: Error | null; session: Session | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -56,14 +56,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: new Error(
           "New accounts are not open yet. Join the waitlist — we’ll email you a link when your brand is approved."
         ),
+        session: null,
       };
     }
     if (accountType === "individual" && !b2cSignupEnabled) {
       return {
         error: new Error("Personal sign-up is not available right now. Please try again later."),
+        session: null,
       };
     }
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -76,7 +78,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       },
     });
-    return { error: error as Error | null };
+    if (error) {
+      return { error: error as Error, session: null };
+    }
+    let session = data.session ?? null;
+    // If "Confirm email" is off, Supabase usually returns a session on signUp. If not, try one sign-in
+    // so the client has a session and can load the dashboard without a confirmation round-trip.
+    if (!session) {
+      const signInRes = await supabase.auth.signInWithPassword({ email, password });
+      if (!signInRes.error) {
+        session = signInRes.data.session;
+      }
+    }
+    return { error: null, session };
   };
 
   const signIn = async (email: string, password: string) => {

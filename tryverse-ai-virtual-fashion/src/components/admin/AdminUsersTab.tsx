@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { getAdminUsers, banAdminUser, adjustUserCredits } from "@/lib/backendApi";
+import { getAdminUsers, banAdminUser, adjustUserCredits, patchAdminUserAccountType } from "@/lib/backendApi";
 import { toast } from "sonner";
 
 interface AdminUsersTabProps {
@@ -31,12 +31,14 @@ interface AdminUser {
   created_at: string;
   is_banned?: boolean;
   banned_until?: string | null;
+  account_type?: string;
 }
 
 export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 1 });
   const [search, setSearch] = useState("");
+  const [accountFilter, setAccountFilter] = useState<"all" | "business" | "individual">("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creditsDialog, setCreditsDialog] = useState<AdminUser | null>(null);
@@ -48,7 +50,13 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
     setLoading(true);
     setError(null);
     try {
-      const res = await getAdminUsers(adminKey, pagination.page, pagination.limit, search || undefined);
+      const res = await getAdminUsers(
+        adminKey,
+        pagination.page,
+        pagination.limit,
+        search || undefined,
+        accountFilter
+      );
       setUsers(res.users || []);
       setPagination((p) => ({ ...p, ...res.pagination }));
     } catch (err) {
@@ -61,7 +69,25 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
 
   useEffect(() => {
     fetchUsers();
-  }, [adminKey, pagination.page, search]);
+  }, [adminKey, pagination.page, search, accountFilter]);
+
+  const handleAccountTypeChange = async (u: AdminUser, next: "business" | "individual") => {
+    const cur = u.account_type === "individual" ? "individual" : "business";
+    if (cur === next) return;
+    if (
+      !confirm(
+        `Set this account to ${next}? The user’s dashboard routing updates after they refresh or sign in again.`
+      )
+    )
+      return;
+    try {
+      await patchAdminUserAccountType(adminKey, u.id, next);
+      toast.success("Account type updated");
+      await fetchUsers();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to update account type");
+    }
+  };
 
   const handleBlock = async (u: AdminUser) => {
     if (!confirm(`Block ${u.brand_name || u.contact_email || "this user"}? They will not be able to use the API.`)) return;
@@ -111,18 +137,44 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by brand or email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && fetchUsers()}
-            className="pl-10"
-          />
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              { id: "all" as const, label: "All accounts" },
+              { id: "business" as const, label: "Business" },
+              { id: "individual" as const, label: "Individual" },
+            ]
+          ).map((t) => (
+            <Button
+              key={t.id}
+              type="button"
+              size="sm"
+              variant={accountFilter === t.id ? "default" : "outline"}
+              onClick={() => {
+                setAccountFilter(t.id);
+                setPagination((p) => ({ ...p, page: 1 }));
+              }}
+            >
+              {t.label}
+            </Button>
+          ))}
         </div>
-        <Button variant="outline" onClick={fetchUsers}>Refresh</Button>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by brand or email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && fetchUsers()}
+              className="pl-10"
+            />
+          </div>
+          <Button variant="outline" onClick={fetchUsers}>
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -140,7 +192,8 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Brand</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Brand / name</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Type</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Plan</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Credits</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Widget</th>
@@ -157,6 +210,19 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
                         <p className="font-medium text-foreground">{u.brand_name || "—"}</p>
                         <p className="text-xs text-muted-foreground">{u.contact_email || u.full_name || u.id.slice(0, 8)}</p>
                       </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <select
+                        className="text-xs border border-border rounded-md bg-background px-2 py-1.5 max-w-[140px]"
+                        value={u.account_type === "individual" ? "individual" : "business"}
+                        onChange={(e) =>
+                          void handleAccountTypeChange(u, e.target.value as "business" | "individual")
+                        }
+                        aria-label="Account type"
+                      >
+                        <option value="business">Business</option>
+                        <option value="individual">Individual</option>
+                      </select>
                     </td>
                     <td className="px-5 py-4 text-sm capitalize">{u.plan_id || u.current_plan_id || "free"}</td>
                     <td className="px-5 py-4 text-sm">

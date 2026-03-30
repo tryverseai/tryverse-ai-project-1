@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,10 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { TermsContent, PrivacyContent, DataProcessingContent } from "@/content/policyContent";
+import {
+  TermsContent,
+  PrivacyContent,
+  DataProcessingContent,
+  PersonalDataNoticeContent,
+  type PolicyAudience,
+} from "@/content/policyContent";
 import { toast } from "sonner";
+import type { LucideIcon } from "lucide-react";
+import { dashboardPathForAccountType } from "@/lib/accountType";
 
-const GOALS_OPTIONS = [
+const GOALS_OPTIONS_BUSINESS = [
   "Make my brand look more premium",
   "Create professional model photos instantly",
   "Increase conversions on my product pages",
@@ -18,49 +26,87 @@ const GOALS_OPTIONS = [
   "Create high-fashion content for ads and social media",
 ];
 
-const STEPS = [
-  {
-    id: "terms",
-    title: "Terms of Service",
-    subtitle: "Last updated: March 9, 2026",
-    icon: FileText,
-    content: TermsContent,
-    isLegal: true,
-  },
-  {
-    id: "privacy",
-    title: "Privacy Policy",
-    subtitle: "Last updated: March 9, 2026",
-    icon: Shield,
-    content: PrivacyContent,
-    isLegal: true,
-  },
-  {
-    id: "data",
-    title: "Data Processing Agreement",
-    subtitle: "Last updated: March 9, 2026",
-    icon: Database,
-    content: DataProcessingContent,
-    isLegal: true,
-  },
-  {
-    id: "goals",
-    title: "What are your goals?",
-    subtitle: "Help us personalize your experience",
-    icon: Target,
-    content: null,
-    isLegal: false,
-  },
-] as const;
+const GOALS_OPTIONS_INDIVIDUAL = [
+  "Try clothes online before I buy",
+  "See how different styles look on someone like me",
+  "Make fun or shareable try-on images",
+  "Save time versus in-store fitting rooms",
+  "Experiment with fashion looks for myself",
+];
+
+type StepDef = {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: LucideIcon;
+  content: React.ComponentType<{ audience?: PolicyAudience }> | null;
+  isLegal: boolean;
+};
+
+function buildSteps(accountType: PolicyAudience): StepDef[] {
+  const dataStep: StepDef =
+    accountType === "individual"
+      ? {
+          id: "data",
+          title: "Your photos & data",
+          subtitle: "Last updated: March 9, 2026",
+          icon: Database,
+          content: PersonalDataNoticeContent,
+          isLegal: true,
+        }
+      : {
+          id: "data",
+          title: "Data Processing Agreement",
+          subtitle: "Last updated: March 9, 2026",
+          icon: Database,
+          content: DataProcessingContent,
+          isLegal: true,
+        };
+
+  return [
+    {
+      id: "terms",
+      title: "Terms of Service",
+      subtitle: "Last updated: March 9, 2026",
+      icon: FileText,
+      content: TermsContent,
+      isLegal: true,
+    },
+    {
+      id: "privacy",
+      title: "Privacy Policy",
+      subtitle: "Last updated: March 9, 2026",
+      icon: Shield,
+      content: PrivacyContent,
+      isLegal: true,
+    },
+    dataStep,
+    {
+      id: "goals",
+      title: "What are your goals?",
+      subtitle: "Help us personalize your experience",
+      icon: Target,
+      content: null,
+      isLegal: false,
+    },
+  ];
+}
 
 interface ComplianceOnboardingModalProps {
   open: boolean;
   userId: string;
+  accountType: PolicyAudience;
   onComplete: () => void;
   onExit?: () => void;
 }
 
-export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: ComplianceOnboardingModalProps) {
+export function ComplianceOnboardingModal({
+  open,
+  userId,
+  accountType,
+  onComplete,
+  onExit,
+}: ComplianceOnboardingModalProps) {
   const navigate = useNavigate();
   const contentRef = useRef<HTMLDivElement>(null);
   const [stepIndex, setStepIndex] = useState(0);
@@ -68,10 +114,21 @@ export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: 
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
-  // Scroll content to top when step changes
+  const STEPS = useMemo(() => buildSteps(accountType), [accountType]);
+  const goalOptions =
+    accountType === "individual" ? GOALS_OPTIONS_INDIVIDUAL : GOALS_OPTIONS_BUSINESS;
+
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0, behavior: "instant" });
   }, [stepIndex]);
+
+  useEffect(() => {
+    if (open) {
+      setStepIndex(0);
+      setAcknowledged(false);
+      setSelectedGoals([]);
+    }
+  }, [open, accountType]);
 
   const step = STEPS[stepIndex];
   const isLastStep = stepIndex === STEPS.length - 1;
@@ -100,7 +157,7 @@ export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: 
 
         if (error) throw error;
         onComplete();
-        navigate("/dashboard");
+        navigate(dashboardPathForAccountType(accountType), { replace: true });
         toast.success("Welcome to TryVerse! Your dashboard is ready.");
       } catch (err) {
         console.error("Compliance save failed:", err);
@@ -140,7 +197,6 @@ export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: 
           onEscapeKeyDown={(e) => e.preventDefault()}
           className="fixed left-[50%] top-[50%] z-50 w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] gap-0 border border-border bg-background shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-xl overflow-hidden flex flex-col max-h-[90vh]"
         >
-          {/* Header */}
           <div className="px-6 py-4 border-b border-border shrink-0 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
@@ -158,6 +214,7 @@ export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: 
                 {stepIndex + 1} of {STEPS.length}
               </span>
               <button
+                type="button"
                 onClick={handleExit}
                 className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 aria-label="Exit"
@@ -167,7 +224,6 @@ export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: 
             </div>
           </div>
 
-          {/* Progress dots */}
           <div className="px-6 py-2 flex gap-2 shrink-0">
             {STEPS.map((_, i) => (
               <div
@@ -180,7 +236,6 @@ export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: 
             ))}
           </div>
 
-          {/* Scrollable content */}
           <div ref={contentRef} className="flex-1 overflow-y-auto px-6 py-4 min-h-0 max-h-[45vh]">
             <AnimatePresence mode="wait">
               <motion.div
@@ -193,10 +248,11 @@ export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: 
                 {isGoalsStep ? (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      Select all that apply. This helps us tailor TryVerse for your needs.
+                      Select all that apply. This helps us tailor TryVerse for{" "}
+                      {accountType === "individual" ? "your personal try-ons" : "your brand"}.
                     </p>
                     <div className="space-y-2">
-                      {GOALS_OPTIONS.map((goal) => (
+                      {goalOptions.map((goal) => (
                         <label
                           key={goal}
                           className={cn(
@@ -217,13 +273,12 @@ export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: 
                     </div>
                   </div>
                 ) : (
-                  ContentComponent && <ContentComponent />
+                  ContentComponent && <ContentComponent audience={accountType} />
                 )}
               </motion.div>
             </AnimatePresence>
           </div>
 
-          {/* Footer: checkbox (legal only) + Next */}
           <div className="px-6 py-4 border-t border-border shrink-0 space-y-4">
             {!isGoalsStep && (
               <label className="flex items-start gap-3 cursor-pointer group">
@@ -237,11 +292,7 @@ export function ComplianceOnboardingModal({ open, userId, onComplete, onExit }: 
                 </span>
               </label>
             )}
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed || saving}
-              className="w-full gap-2"
-            >
+            <Button type="button" onClick={handleNext} disabled={!canProceed || saving} className="w-full gap-2">
               {saving ? "Saving..." : isLastStep ? "Finish & Open Dashboard" : "Next"}
               {!isLastStep && <ChevronRight className="h-4 w-4" />}
             </Button>
