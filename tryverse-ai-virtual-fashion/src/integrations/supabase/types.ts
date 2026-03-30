@@ -346,6 +346,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_type: string
           brand_name: string
           compliance_onboarding_completed_at: string | null
           contact_email: string | null
@@ -369,6 +370,7 @@ export type Database = {
           widget_show_models: boolean | null
         }
         Insert: {
+          account_type?: string
           brand_name?: string
           compliance_onboarding_completed_at?: string | null
           contact_email?: string | null
@@ -392,6 +394,7 @@ export type Database = {
           widget_show_models?: boolean | null
         }
         Update: {
+          account_type?: string
           brand_name?: string
           compliance_onboarding_completed_at?: string | null
           contact_email?: string | null

@@ -56,7 +56,16 @@ const categories: { id: TryOnCategory; label: string; icon: typeof Shirt }[] = [
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
-const TryOnStudio = () => {
+export type TryOnStudioVariant = "full" | "embedded";
+
+interface TryOnStudioProps {
+  /** full = marketing layout + navbar; embedded = consumer dashboard (no global chrome). */
+  variant?: TryOnStudioVariant;
+  /** Where “add credits” links (B2B billing vs B2C profile). */
+  creditsHelpPath?: string;
+}
+
+const TryOnStudio = ({ variant = "full", creditsHelpPath }: TryOnStudioProps) => {
   const [mode, setMode] = useState<Mode>("upload");
   const [phase, setPhase] = useState<Phase>("select");
   const [selectedCategory, setSelectedCategory] = useState<TryOnCategory>("clothing");
@@ -300,18 +309,25 @@ const TryOnStudio = () => {
     (m) => m.gender === (genderFilter === "Female" ? "female" : "male")
   );
 
+  const embedded = variant === "embedded";
+  const resolvedCreditsPath = creditsHelpPath ?? (embedded ? "/dashboard/individual?tab=profile" : "/dashboard/business?tab=Billing");
+
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="pt-[var(--navbar-height)] pb-20">
-        <div className="max-w-7xl mx-auto px-6">
+      {!embedded && <Navbar />}
+      <main className={embedded ? "pb-8 px-3 sm:px-4 md:px-6" : "pt-[var(--navbar-height)] pb-20"}>
+        <div className={embedded ? "max-w-7xl mx-auto" : "max-w-7xl mx-auto px-6"}>
 
           {/* Header */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-            <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-3">
-              Virtual Try-On Studio
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`text-center ${embedded ? "mb-8" : "mb-12"}`}
+          >
+            <h1 className={`font-display font-bold text-foreground mb-3 ${embedded ? "text-2xl md:text-3xl" : "text-3xl md:text-4xl"}`}>
+              {embedded ? "Try it on" : "Virtual Try-On Studio"}
             </h1>
-            <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+            <p className={`text-muted-foreground max-w-xl mx-auto ${embedded ? "text-sm md:text-base" : "text-lg"}`}>
               Upload your photo and a product image — our AI will show you exactly how it looks.
             </p>
           </motion.div>
@@ -733,11 +749,23 @@ const TryOnStudio = () => {
                     </Button>
                     {errorKind === "credits" && (
                       <p className="text-xs text-muted-foreground max-w-sm">
-                        Store team: add try-on credits under{" "}
-                        <Link to="/dashboard?tab=Billing" className="underline font-medium text-foreground/80 hover:text-foreground">
-                          Dashboard → Billing
-                        </Link>
-                        .
+                        {embedded ? (
+                          <>
+                            Add try-on credits under{" "}
+                            <Link to={resolvedCreditsPath} className="underline font-medium text-foreground/80 hover:text-foreground">
+                              Profile &amp; plan
+                            </Link>
+                            .
+                          </>
+                        ) : (
+                          <>
+                            Store team: add try-on credits under{" "}
+                            <Link to={resolvedCreditsPath} className="underline font-medium text-foreground/80 hover:text-foreground">
+                              Dashboard → Billing
+                            </Link>
+                            .
+                          </>
+                        )}
                       </p>
                     )}
                   </div>
@@ -748,7 +776,7 @@ const TryOnStudio = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      {!embedded && <Footer />}
     </div>
   );
 };

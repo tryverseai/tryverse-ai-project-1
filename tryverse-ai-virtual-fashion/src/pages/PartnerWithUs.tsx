@@ -72,13 +72,20 @@ const PartnerWithUs = () => (
           </div>
 
           <div className="text-center space-y-4">
-            <Link to="/early-access">
-              <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12">
-                Get Early Access <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+              <Link to="/auth">
+                <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12">
+                  Sign up <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+              <Link to="/early-access">
+                <Button size="lg" variant="outline" className="text-base px-8 h-12">
+                  Join waitlist
+                </Button>
+              </Link>
+            </div>
             <p className="text-sm text-muted-foreground">
-              Request early access — we&apos;ll reach out with demo options when it fits your brand.
+              Try the product with a free account, or request waitlist access — we&apos;ll reach out with demo options when it fits your brand.
             </p>
           </div>
         </div>
@@ -122,11 +129,18 @@ const PartnerWithUs = () => (
                 ))}
               </div>
 
-              <Link to="/early-access">
-                <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft">
-                  Get Early Access <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link to="/auth">
+                  <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft">
+                    Sign up <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link to="/early-access">
+                  <Button size="lg" variant="outline">
+                    Join waitlist
+                  </Button>
+                </Link>
+              </div>
             </motion.div>
 
             <motion.div

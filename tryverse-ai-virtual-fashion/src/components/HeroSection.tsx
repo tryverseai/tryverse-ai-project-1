@@ -44,15 +44,20 @@ export function HeroSection() {
             AI-powered virtual try-on and fit prediction infrastructure for modern fashion brands. Increase conversions. Reduce returns. Scale globally.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/early-access">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
+            <Link to="/auth">
               <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12 w-full sm:w-auto">
-                Get Early Access
+                Sign up
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
-            <Link to="/about">
+            <Link to="/early-access">
               <Button size="lg" variant="outline" className="text-base h-12 border-border w-full sm:w-auto">
+                Join waitlist
+              </Button>
+            </Link>
+            <Link to="/about">
+              <Button size="lg" variant="ghost" className="text-base h-12 w-full sm:w-auto">
                 Learn More
               </Button>
             </Link>

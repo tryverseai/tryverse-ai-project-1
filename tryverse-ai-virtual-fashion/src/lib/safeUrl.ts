@@ -51,6 +51,8 @@ export function safeInAppRedirectPath(raw: string | null | undefined, fallback =
 /** Paths allowed after sign-in (matches ProtectedRoute redirect targets + /admin). */
 const POST_LOGIN_REDIRECT_PREFIXES = [
   "/dashboard",
+  "/dashboard/business",
+  "/dashboard/individual",
   "/pricing",
   "/widget-preview",
   "/api-docs",

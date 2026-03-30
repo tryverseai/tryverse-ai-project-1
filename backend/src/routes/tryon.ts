@@ -245,6 +245,38 @@ router.get(
 );
 
 /**
+ * DELETE /api/tryon/:tryonId
+ * Removes a try-on record owned by the authenticated user (B2C gallery / cleanup).
+ */
+router.delete(
+  '/:tryonId',
+  requireAuth,
+  [param('tryonId').isUUID().withMessage('Invalid tryonId')],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const tryonId = req.params.tryonId as string;
+      const { data, error } = await supabaseAdmin
+        .from('tryons')
+        .delete()
+        .eq('id', tryonId)
+        .eq('user_id', req.user!.id)
+        .select('id')
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        res.status(404).json({ error: 'Try-on not found' });
+        return;
+      }
+      res.json({ success: true });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
  * GET /api/tryon/job/:jobId
  * Gets Bull queue job status. Verifies ownership before returning.
  */

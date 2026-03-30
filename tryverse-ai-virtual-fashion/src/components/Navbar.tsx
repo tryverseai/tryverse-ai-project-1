@@ -174,8 +174,13 @@ export function Navbar() {
                 </Button>
               </Link>
               <Link to="/early-access">
+                <Button variant="outline" size="sm" className="text-sm">
+                  Join waitlist
+                </Button>
+              </Link>
+              <Link to="/auth">
                 <Button size="sm" className="gradient-primary text-primary-foreground text-sm shadow-soft">
-                  Get Early Access
+                  Sign up
                 </Button>
               </Link>
             </>
@@ -253,8 +258,13 @@ export function Navbar() {
                 </Button>
               </Link>
               <Link to="/early-access" onClick={() => setOpen(false)}>
+                <Button variant="outline" className="w-full">
+                  Join waitlist
+                </Button>
+              </Link>
+              <Link to="/auth" onClick={() => setOpen(false)}>
                 <Button className="gradient-primary text-primary-foreground w-full">
-                  Get Early Access
+                  Sign up
                 </Button>
               </Link>
             </>

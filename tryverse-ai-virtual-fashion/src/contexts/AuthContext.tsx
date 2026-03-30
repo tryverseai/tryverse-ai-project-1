@@ -1,13 +1,21 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
-import { inviteSignupEnabled } from "@/lib/featureFlags";
+import { inviteSignupEnabled, b2cSignupEnabled } from "@/lib/featureFlags";
+import type { AccountType } from "@/lib/accountType";
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, brandName: string, fullName?: string, role?: string) => Promise<{ error: Error | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    brandName: string,
+    fullName?: string,
+    role?: string,
+    accountType?: AccountType
+  ) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -35,20 +43,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, brandName: string, fullName?: string, role?: string) => {
-    if (!inviteSignupEnabled) {
+  const signUp = async (
+    email: string,
+    password: string,
+    brandName: string,
+    fullName?: string,
+    role?: string,
+    accountType: AccountType = "business"
+  ) => {
+    if (accountType === "business" && !inviteSignupEnabled) {
       return {
         error: new Error(
           "New accounts are not open yet. Join the waitlist — we’ll email you a link when your brand is approved."
         ),
       };
     }
+    if (accountType === "individual" && !b2cSignupEnabled) {
+      return {
+        error: new Error("Personal sign-up is not available right now. Please try again later."),
+      };
+    }
     const { error } = await supabase.auth.signUp({
       email,
       password,
-        options: {
+      options: {
         emailRedirectTo: `${window.location.origin}/auth/confirm`,
-        data: { brand_name: brandName, full_name: fullName || '', role: role || '' },
+        data: {
+          brand_name: brandName,
+          full_name: fullName || "",
+          role: role || "",
+          account_type: accountType,
+        },
       },
     });
     return { error: error as Error | null };

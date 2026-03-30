@@ -16,8 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { posthogCapture } from "@/lib/posthog";
-import { inviteSignupEnabled } from "@/lib/featureFlags";
-import { postLoginRedirectPath } from "@/lib/safeUrl";
+import { inviteSignupEnabled, b2cSignupEnabled } from "@/lib/featureFlags";
+import { postLoginRedirectPath, safeInAppRedirectPath } from "@/lib/safeUrl";
 
 const roles = [
   "Founder",
@@ -28,8 +28,11 @@ const roles = [
   "Other",
 ];
 
-/** Supabase often surfaces raw SMTP/confirmation failures — steer users to Early Access / waitlist. */
-function signUpErrorToast(error: Error): {
+/** Supabase often surfaces raw SMTP/confirmation failures — copy varies by signup flow. */
+function signUpErrorToast(
+  error: Error,
+  flow: "individual" | "business"
+): {
   title: string;
   description: string;
   variant: "default" | "destructive";
@@ -45,7 +48,9 @@ function signUpErrorToast(error: Error): {
     return {
       title: "Check your email settings",
       description:
-        "We couldn’t send the confirmation email. If you were invited, try again or contact us. New brands can request access via Get Early Access.",
+        flow === "individual"
+          ? "We couldn’t send the confirmation email. Check spam, wait a moment and try again, or sign in if you already verified. If it keeps failing, your project’s Supabase Auth email (SMTP) needs to be configured."
+          : "We couldn’t send the confirmation email. If you were invited, try again or contact us. You can also request access via Join waitlist on the site.",
       variant: "default",
     };
   }
@@ -57,18 +62,24 @@ function signUpErrorToast(error: Error): {
   };
 }
 
-/** Invite-only signup: show registration only when opened with ?signup=true (link you send to invited brands). */
-function hasInviteSignupParam(searchParams: URLSearchParams) {
-  return searchParams.get("signup") === "true" || searchParams.get("invite") === "true";
+/** Brand / B2B invite signup: ?signup=true | business | invite */
+function hasBusinessInviteSignupParam(searchParams: URLSearchParams) {
+  const s = searchParams.get("signup");
+  return s === "true" || s === "invite" || s === "business";
 }
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
-  const wantsInviteSignup = hasInviteSignupParam(searchParams);
-  /** Invite link signup form — only when VITE_ENABLE_INVITE_SIGNUP=true */
-  const showSignupForm = wantsInviteSignup && inviteSignupEnabled;
-  /** User opened /auth?signup=true while signups are paused — show waitlist message only */
-  const signupPaused = wantsInviteSignup && !inviteSignupEnabled;
+  const wantsBusinessInvite = hasBusinessInviteSignupParam(searchParams);
+  /** Brand signup form — hidden when VITE_ENABLE_INVITE_SIGNUP=false */
+  const showBusinessSignupForm = wantsBusinessInvite && inviteSignupEnabled;
+  /** User opened business invite link while brand signups are paused — show waitlist message only */
+  const businessSignupPaused = wantsBusinessInvite && !inviteSignupEnabled;
+
+  const wantsIndividualSignup = searchParams.get("signup") === "individual";
+  const showIndividualSignupForm = wantsIndividualSignup && b2cSignupEnabled;
+  const individualSignupPaused = wantsIndividualSignup && !b2cSignupEnabled;
+
   const signupPausedToastSent = useRef(false);
 
   const redirectParam = searchParams.get("redirect");
@@ -90,9 +101,9 @@ const Auth = () => {
     }
   }, [redirectParam]);
 
-  /** Same notification users saw when sign-up wasn’t available: waitlist + no account creation */
+  /** Brand invite: same notification when business sign-up isn’t available */
   useEffect(() => {
-    if (!signupPaused || signupPausedToastSent.current) return;
+    if (!businessSignupPaused || signupPausedToastSent.current) return;
     signupPausedToastSent.current = true;
     toast({
       title: "Sign up isn’t open yet",
@@ -100,21 +111,41 @@ const Auth = () => {
         "Join the waitlist first. When we approve your brand, we’ll email you a link to create your TryVerse account.",
       duration: 11000,
     });
-  }, [signupPaused, toast]);
+  }, [businessSignupPaused, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    if (showSignupForm) {
-      const finalRole = role === "Other" ? customRole : role;
-      const { error } = await signUp(email, password, brandName, fullName, finalRole);
+    if (showIndividualSignupForm) {
+      const { error } = await signUp(
+        email,
+        password,
+        fullName.trim() || "My Try-Ons",
+        fullName,
+        undefined,
+        "individual"
+      );
       if (error) {
         console.error("Signup error:", error);
         const t = signUpErrorToast(error);
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
       } else {
-        posthogCapture("user_signed_up", { email });
+        posthogCapture("user_signed_up", { email, account_type: "individual" });
+        toast({
+          title: "Account created",
+          description: "Check your email to confirm your account, then sign in.",
+        });
+      }
+    } else if (showBusinessSignupForm) {
+      const finalRole = role === "Other" ? customRole : role;
+      const { error } = await signUp(email, password, brandName, fullName, finalRole, "business");
+      if (error) {
+        console.error("Signup error:", error);
+        const t = signUpErrorToast(error, "business");
+        toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
+      } else {
+        posthogCapture("user_signed_up", { email, account_type: "business" });
         toast({
           title: "Account created",
           description: "Check your email to confirm your account, then sign in.",
@@ -193,7 +224,7 @@ const Auth = () => {
             </Link>
           </div>
 
-          {signupPaused ? (
+          {businessSignupPaused ? (
             <>
               <h1 className="font-display text-2xl font-bold text-foreground mb-2">Sign up isn&apos;t open yet</h1>
               <p className="text-muted-foreground mb-4">
@@ -219,53 +250,102 @@ const Auth = () => {
                 </p>
               </div>
             </>
+          ) : individualSignupPaused ? (
+            <>
+              <h1 className="font-display text-2xl font-bold text-foreground mb-2">Personal sign-up is paused</h1>
+              <p className="text-muted-foreground mb-6">
+                We&apos;re not creating new individual accounts right now. Please check back later or{" "}
+                <Link to="/auth" className="text-foreground font-medium underline underline-offset-2">
+                  sign in
+                </Link>{" "}
+                if you already have one.
+              </p>
+            </>
           ) : (
             <>
           <h1 className="font-display text-2xl font-bold text-foreground mb-2">
-            {showSignupForm ? "Create your TryVerse account" : "Welcome back"}
+            {showIndividualSignupForm
+              ? "Create a personal account"
+              : showBusinessSignupForm
+                ? "Create your TryVerse account"
+                : "Welcome back"}
           </h1>
           <p className="text-muted-foreground mb-4">
-            {showSignupForm
-              ? "For invited brands only — use the email we approved for your workspace."
-              : "Sign in to your brand dashboard"}
+            {showIndividualSignupForm
+              ? "Upload your photo, try on clothes with AI, and download your favorites."
+              : showBusinessSignupForm
+                ? "For invited brands only — use the email we approved for your workspace."
+                : "Sign in to continue — we&apos;ll take you to the right place."}
           </p>
 
-          {showSignupForm && (
+          {showBusinessSignupForm && (
             <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
               <span className="font-medium text-foreground">Not invited yet?</span> Anyone can request to join via{" "}
               <Link to="/early-access" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
-                Get Early Access
+                Join waitlist
               </Link>
               . We only enable sign-up for brands we&apos;ve invited.
             </p>
           )}
 
-          {!showSignupForm && (
-            <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 leading-relaxed">
-              <span className="font-medium text-foreground">New to TryVerse?</span>{" "}
-              <Link to="/early-access" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
-                Request early access (waitlist)
+          {showIndividualSignupForm && (
+            <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
+              <span className="font-medium text-foreground">Just for you.</span> This account is for personal try-ons — no store or
+              API setup. Running a brand?{" "}
+              <Link to="/auth?signup=business" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
+                Continue as a business
               </Link>
               .
-              {inviteSignupEnabled ? (
-                <>
-                  {" "}
-                  If we already sent you an invite, use{" "}
-                  <Link to="/auth?signup=true" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
-                    create account
-                  </Link>
-                  .
-                </>
-              ) : (
-                <span className="block mt-2 text-muted-foreground">
-                  Account creation is paused — we&apos;ll email you a signup link after waitlist approval.
-                </span>
-              )}
             </p>
           )}
 
+          {!showBusinessSignupForm && !showIndividualSignupForm && (
+            <>
+              <p className="text-sm text-muted-foreground mb-4 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 leading-relaxed">
+                <span className="font-medium text-foreground">New to TryVerse?</span> Choose how you&apos;ll use it:
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 mb-6">
+                <Button asChild variant="default" className="flex-1 h-11 gap-2 gradient-primary text-primary-foreground shadow-soft">
+                  <Link to="/auth?signup=individual">
+                    <User className="h-4 w-4" />
+                    Sign up — Individual
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="flex-1 h-11 gap-2">
+                  <Link to="/auth?signup=business">
+                    <Building2 className="h-4 w-4" />
+                    Continue as Business
+                  </Link>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mb-6">
+                Brands on the waitlist: after you&apos;re approved, use the{" "}
+                <Link to="/auth?signup=business" className="text-foreground font-medium underline underline-offset-2">
+                  business
+                </Link>{" "}
+                link with your work email.
+                {!inviteSignupEnabled && (
+                  <span className="block mt-2">Business self-serve signup may be paused until your invite is enabled.</span>
+                )}
+              </p>
+            </>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            {showSignupForm && (
+            {showIndividualSignupForm && (
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Your name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="pl-10 h-12"
+                  required
+                  autoComplete="name"
+                />
+              </div>
+            )}
+            {showBusinessSignupForm && (
               <>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -318,11 +398,12 @@ const Auth = () => {
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="email"
-                placeholder="Work email"
+                placeholder={showIndividualSignupForm ? "Email" : "Work email"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="pl-10 h-12"
                 required
+                autoComplete="email"
               />
             </div>
             <div className="relative">
@@ -346,12 +427,16 @@ const Auth = () => {
             </div>
 
             <Button type="submit" className="w-full gradient-primary text-primary-foreground h-12 shadow-soft" disabled={loading}>
-              {loading ? "Please wait..." : showSignupForm ? "Create account" : "Sign In"}
+              {loading
+                ? "Please wait..."
+                : showBusinessSignupForm || showIndividualSignupForm
+                  ? "Create account"
+                  : "Sign In"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </form>
 
-          {!showSignupForm && (
+          {!showBusinessSignupForm && !showIndividualSignupForm && (
             <p className="text-sm text-muted-foreground text-center mt-4">
               <Link to="/forgot-password" className="text-foreground font-medium hover:underline">
                 Forgot your password?
@@ -359,14 +444,14 @@ const Auth = () => {
             </p>
           )}
 
-          {showSignupForm ? (
+          {(showBusinessSignupForm || showIndividualSignupForm) && (
             <p className="text-sm text-muted-foreground text-center mt-4">
               Already have an account?{" "}
               <Link to="/auth" className="text-foreground font-medium hover:underline">
                 Sign in
               </Link>
             </p>
-          ) : null}
+          )}
             </>
           )}
         </motion.div>

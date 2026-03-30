@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { submitEarlyAccessRequest } from "@/lib/backendApi";
+import { b2cSignupEnabled } from "@/lib/featureFlags";
+import { Building2, User } from "lucide-react";
 import { X } from "lucide-react";
 
 const ROLES = [
@@ -263,7 +265,7 @@ const EarlyAccess = () => {
               TryVerse — Get early access for fashion brands
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">
-              Request early access for your brand. Short questionnaire for retailers and fashion brands.
+              Business waitlist for retailers and fashion brands. Personal accounts use a separate sign-up flow, not this form.
             </DialogPrimitive.Description>
 
             <DialogPrimitive.Close
@@ -288,11 +290,21 @@ const EarlyAccess = () => {
                 <Button className="mt-4 gradient-primary text-primary-foreground" onClick={() => handleOpenChange(false)}>
                   Back to home
                 </Button>
-                <p className="text-xs text-muted-foreground pt-2">
-                  <Link to="/auth" className="underline hover:text-foreground">
-                    Already have an account? Log in
-                  </Link>
-                </p>
+                <div className="text-xs text-muted-foreground pt-2 space-y-1">
+                  <p>
+                    <Link to="/auth" className="underline hover:text-foreground">
+                      Already have an account? Log in
+                    </Link>
+                  </p>
+                  {b2cSignupEnabled && (
+                    <p>
+                      Looking for a personal account instead?{" "}
+                      <Link to="/auth?signup=individual" className="underline hover:text-foreground">
+                        Sign up as Individual
+                      </Link>
+                    </p>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="space-y-6 pr-1">
@@ -307,6 +319,53 @@ const EarlyAccess = () => {
                   <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
                     Help us understand your needs so we can prioritize early access.
                   </p>
+                </div>
+
+                <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Who is this for?
+                  </p>
+                  <div className="flex gap-2 items-start">
+                    <User className="h-4 w-4 text-foreground shrink-0 mt-0.5" aria-hidden />
+                    <div className="text-sm leading-snug">
+                      <span className="font-medium text-foreground">Individual — sign up</span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        Try virtual try-on for yourself (no waitlist).
+                      </span>
+                      {b2cSignupEnabled ? (
+                        <div className="mt-2">
+                          <Link
+                            to="/auth?signup=individual"
+                            className="text-sm font-medium text-foreground underline underline-offset-2 hover:no-underline"
+                          >
+                            Create a personal account →
+                          </Link>
+                          <span className="text-muted-foreground text-xs block mt-1">
+                            Already registered?{" "}
+                            <Link to="/auth" className="underline hover:text-foreground">
+                              Sign in
+                            </Link>
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Personal sign-up is paused right now. You can still{" "}
+                          <Link to="/auth" className="underline hover:text-foreground">
+                            sign in
+                          </Link>{" "}
+                          if you already have an account.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    <Building2 className="h-4 w-4 text-foreground shrink-0 mt-0.5" aria-hidden />
+                    <div className="text-sm text-foreground leading-snug">
+                      <span className="font-medium">Business (form below)</span>
+                      <span className="text-muted-foreground"> — brands &amp; stores joining the waitlist.</span>
+                    </div>
+                  </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">

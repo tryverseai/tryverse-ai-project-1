@@ -193,9 +193,18 @@ export async function getTryOnHistory(page = 1, category?: TryOnCategory) {
   if (category) params.append('category', category);
   const res = await fetch(`${BACKEND_URL}/api/tryon?${params}`, { headers });
   return handleResponse<{
-    tryons: TryOnResponse[];
+    tryons: (TryOnResponse & { id?: string; tryonId?: string; createdAt?: string })[];
     pagination: { page: number; limit: number; total: number; pages: number };
   }>(res);
+}
+
+export async function deleteTryOn(tryonId: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/tryon/${encodeURIComponent(tryonId)}`, {
+    method: 'DELETE',
+    headers,
+  });
+  await handleResponse(res, { feature: 'try_on' });
 }
 
 // ─── Credits ─────────────────────────────────────────────────────────────────

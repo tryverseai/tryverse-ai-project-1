@@ -199,7 +199,7 @@ export function WidgetTab() {
       }
       if (creditsOut) {
         toast.error("No try-on credits left. Opening Billing…");
-        navigate("/dashboard?tab=Billing");
+        navigate("/dashboard/business?tab=Billing");
       } else {
         toast.error(err.message);
       }

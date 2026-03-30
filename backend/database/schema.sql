@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   website                    TEXT,
   plan_id                    TEXT REFERENCES plans(id) DEFAULT 'free',
   role                       TEXT DEFAULT 'brand',          -- 'brand' | 'admin'
+  account_type               TEXT NOT NULL DEFAULT 'business' CHECK (account_type IN ('business', 'individual')),
   free_credits_remaining     INTEGER DEFAULT 3,
   free_credits_total         INTEGER DEFAULT 3,
   monthly_credits_remaining  INTEGER DEFAULT 0,
@@ -49,6 +50,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at                         TIMESTAMPTZ DEFAULT NOW(),
   updated_at                         TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'business';
 
 -- ─── API KEYS ────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS api_keys (
@@ -171,7 +174,14 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_type TEXT;
 BEGIN
+  v_type := COALESCE(NULLIF(TRIM(NEW.raw_user_meta_data->>'account_type'), ''), 'business');
+  IF v_type NOT IN ('business', 'individual') THEN
+    v_type := 'business';
+  END IF;
+
   INSERT INTO public.profiles (
     id,
     brand_name,
@@ -182,18 +192,20 @@ BEGIN
     monthly_credits_remaining,
     monthly_credits_total,
     widget_activated,
-    role
+    role,
+    account_type
   ) VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'brand_name', 'My Brand'),
     COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
     NEW.email,
-    3,     -- 3 free try-ons on signup
+    3,
     3,
     0,
     0,
     false,
-    COALESCE(NEW.raw_user_meta_data->>'role', 'brand')
+    COALESCE(NEW.raw_user_meta_data->>'role', 'brand'),
+    v_type
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
