@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, FileText, Shield, Database, Target, X } from "lucide-react";
@@ -16,7 +16,8 @@ import {
 } from "@/content/policyContent";
 import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
-import { dashboardPathForAccountType } from "@/lib/accountType";
+import { dashboardPathForAccountType, type AccountType } from "@/lib/accountType";
+import { complianceDoneSessionKey } from "@/lib/complianceStorage";
 
 const GOALS_OPTIONS_BUSINESS = [
   "Make my brand look more premium",
@@ -108,6 +109,7 @@ export function ComplianceOnboardingModal({
   onExit,
 }: ComplianceOnboardingModalProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const contentRef = useRef<HTMLDivElement>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -143,24 +145,30 @@ export function ComplianceOnboardingModal({
 
     if (isLastStep) {
       setSaving(true);
+      const goals = selectedGoals.length > 0 ? selectedGoals : [];
+      const completedAt = new Date().toISOString();
       try {
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from("profiles")
-          .upsert(
-            {
-              id: userId,
-              compliance_onboarding_completed_at: new Date().toISOString(),
-              onboarding_goals: selectedGoals.length > 0 ? selectedGoals : [],
-            },
-            { onConflict: "id" }
-          );
+          .update({
+            compliance_onboarding_completed_at: completedAt,
+            onboarding_goals: goals,
+          })
+          .eq("id", userId);
 
-        if (error) throw error;
+        if (updateError) throw updateError;
+
+        sessionStorage.setItem(complianceDoneSessionKey(userId), "1");
         onComplete();
-        navigate(dashboardPathForAccountType(accountType), { replace: true });
         toast.success("Welcome to TryVerse! Your dashboard is ready.");
+
+        const dash = dashboardPathForAccountType(accountType as AccountType);
+        if (!location.pathname.startsWith("/admin") && location.pathname !== dash) {
+          navigate(dash, { replace: true });
+        }
       } catch (err) {
         console.error("Compliance save failed:", err);
+        sessionStorage.removeItem(complianceDoneSessionKey(userId));
         toast.error("Failed to save. Please try again.");
       } finally {
         setSaving(false);

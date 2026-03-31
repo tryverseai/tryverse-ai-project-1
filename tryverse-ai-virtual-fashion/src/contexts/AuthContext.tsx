@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import { inviteSignupEnabled, b2cSignupEnabled } from "@/lib/featureFlags";
 import type { AccountType } from "@/lib/accountType";
+import { complianceDoneSessionKey } from "@/lib/complianceStorage";
 
 interface AuthContextType {
   user: User | null;
@@ -99,7 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user?.id;
     await supabase.auth.signOut();
+    if (uid) sessionStorage.removeItem(complianceDoneSessionKey(uid));
   };
 
   return (

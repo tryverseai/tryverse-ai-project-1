@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { submitEarlyAccessRequest, submitIndividualEarlyAccessRequest } from "@/lib/backendApi";
-import { b2cSignupEnabled } from "@/lib/featureFlags";
+import { b2cSignupEnabled, inviteSignupEnabled } from "@/lib/featureFlags";
 import { X } from "lucide-react";
 
 const ROLES = [
@@ -343,12 +343,35 @@ const EarlyAccess = () => {
                       Already have an account? Log in
                     </Link>
                   </p>
-                  {b2cSignupEnabled && (
+                  {(b2cSignupEnabled || inviteSignupEnabled) && (
                     <p>
-                      Looking for a personal account instead?{" "}
-                      <Link to="/auth?signup=individual" className="underline hover:text-foreground">
-                        Sign up as Individual
-                      </Link>
+                      {b2cSignupEnabled && inviteSignupEnabled ? (
+                        <>
+                          Looking to create an account? Sign up as{" "}
+                          <Link to="/auth?signup=individual" className="underline hover:text-foreground">
+                            Individual
+                          </Link>{" "}
+                          or{" "}
+                          <Link to="/auth?signup=business" className="underline hover:text-foreground">
+                            Business
+                          </Link>
+                          .
+                        </>
+                      ) : b2cSignupEnabled ? (
+                        <>
+                          Looking for a personal account instead?{" "}
+                          <Link to="/auth?signup=individual" className="underline hover:text-foreground">
+                            Sign up as Individual
+                          </Link>
+                        </>
+                      ) : (
+                        <>
+                          Brand or store sign-up:{" "}
+                          <Link to="/auth?signup=business" className="underline hover:text-foreground">
+                            Sign up as Business
+                          </Link>
+                        </>
+                      )}
                     </p>
                   )}
                 </div>
@@ -396,12 +419,29 @@ const EarlyAccess = () => {
                       <Link to="/auth" className="underline hover:text-foreground">
                         Log in
                       </Link>
-                      {b2cSignupEnabled && (
+                      {(b2cSignupEnabled || inviteSignupEnabled) && (
                         <>
                           {" · "}
-                          <Link to="/auth?signup=individual" className="underline hover:text-foreground">
-                            Sign up as individual
-                          </Link>
+                          {b2cSignupEnabled && inviteSignupEnabled ? (
+                            <>
+                              Sign up as{" "}
+                              <Link to="/auth?signup=individual" className="underline hover:text-foreground">
+                                Individual
+                              </Link>{" "}
+                              or{" "}
+                              <Link to="/auth?signup=business" className="underline hover:text-foreground">
+                                Business
+                              </Link>
+                            </>
+                          ) : b2cSignupEnabled ? (
+                            <Link to="/auth?signup=individual" className="underline hover:text-foreground">
+                              Sign up as Individual
+                            </Link>
+                          ) : (
+                            <Link to="/auth?signup=business" className="underline hover:text-foreground">
+                              Sign up as Business
+                            </Link>
+                          )}
                         </>
                       )}
                     </p>

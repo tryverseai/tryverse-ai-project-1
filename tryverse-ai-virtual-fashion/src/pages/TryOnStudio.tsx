@@ -49,10 +49,10 @@ interface UploadedImage {
 }
 
 // ─── Active categories (V1) ───────────────────────────────────────────────────
-const categories: { id: TryOnCategory; label: string; icon: typeof Shirt }[] = [
-  { id: "clothing", label: "Clothing",  icon: Shirt        },
-  { id: "bags",     label: "Bags",      icon: ShoppingBag  },
-  { id: "glasses",  label: "Eyewear",   icon: Glasses      },
+const ALL_CATEGORIES: { id: TryOnCategory; label: string; icon: typeof Shirt }[] = [
+  { id: "clothing", label: "Clothing", icon: Shirt },
+  { id: "bags", label: "Bags", icon: ShoppingBag },
+  { id: "glasses", label: "Eyewear", icon: Glasses },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -114,6 +114,15 @@ const TryOnStudio = ({
       setMode(initialMode);
     }
   }, [initialMode]);
+
+  useEffect(() => {
+    if (clothingOnly) {
+      setSelectedCategory("clothing");
+      setProductImage(null);
+      setLibraryProductImage(null);
+      setProductDescription("");
+    }
+  }, [clothingOnly]);
 
   useEffect(() => {
     if (phase !== "processing") {
@@ -371,7 +380,7 @@ const TryOnStudio = ({
           </div>
 
           {/* Category selector */}
-          <div className="flex justify-center gap-2 mb-10">
+          <div className={`flex justify-center gap-2 mb-10 ${categories.length <= 1 ? "hidden" : ""}`}>
             {categories.map((cat) => (
               <button
                 key={cat.id}
@@ -655,9 +664,6 @@ const TryOnStudio = ({
                           className="resize-y min-h-[80px] text-sm"
                           onChange={(e) => setProductDescription(e.target.value.slice(0, 400))}
                         />
-                        <p className="text-xs text-muted-foreground">
-                          Same hints as upload mode — especially useful for long dresses and gowns.
-                        </p>
                       </div>
                       <Button
                         onClick={handleTryOnWithLibraryModel}

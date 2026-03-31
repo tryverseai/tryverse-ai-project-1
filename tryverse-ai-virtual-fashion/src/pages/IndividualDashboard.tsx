@@ -111,7 +111,9 @@ const IndividualDashboard = () => {
         <div className="max-w-5xl mx-auto px-4 md:px-6 pt-6 md:pt-8">
           <div className="mb-6 md:mb-8">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Personal</p>
-            <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">Hi, {displayName}</h1>
+            <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
+              Hi {displayName}, Welcome to your Try On Studio
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">
               Try outfits on your photos — quick, private, and yours to download.
             </p>
@@ -154,25 +156,27 @@ const IndividualDashboard = () => {
             </div>
           </div>
 
-          {activeTab === "studio" && <TryOnStudio variant="embedded" audience="individual" />}
+          {activeTab === "studio" && (
+            <TryOnStudio variant="embedded" audience="individual" clothingOnly />
+          )}
 
           {activeTab === "models" && (
             <div className="space-y-4">
               <div>
                 <h2 className="font-display text-xl font-semibold text-foreground">Model library</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Pick a preset model and a product photo — uses the same try-on pipeline as{" "}
+                  Pick a preset model, then upload a clothing photo to try it on — same quality as{" "}
                   <button type="button" className="text-foreground font-medium underline" onClick={() => selectTab("studio")}>
                     Try on
                   </button>
-                  . If you see “model not found”, ensure your backend can reach the preset image URLs (see{" "}
-                  <code className="text-xs bg-muted px-1 rounded">FRONTEND_URL</code> in the API env) and that models are active in Supabase.
+                  , without using your own picture. If a model doesn&apos;t load, try another or switch back to Try on with your photo.
                 </p>
               </div>
               <TryOnStudio
                 variant="embedded"
                 audience="individual"
                 initialMode="ai-model"
+                clothingOnly
                 creditsHelpPath="/dashboard/individual?tab=profile"
               />
             </div>
