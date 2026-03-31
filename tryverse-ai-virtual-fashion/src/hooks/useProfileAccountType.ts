@@ -7,14 +7,18 @@ import type { AccountType } from "@/lib/accountType";
 /** Sign-up stores account_type on the JWT before profiles row may exist. */
 function accountTypeFromMetadata(user: User | null): AccountType | null {
   const raw = user?.user_metadata?.account_type;
-  if (raw === "individual") return "individual";
-  if (raw === "business") return "business";
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase();
+  if (s === "individual") return "individual";
+  if (s === "business" || s === "brand") return "business";
   return null;
 }
 
 function normalizeProfileType(value: string | null | undefined): AccountType | null {
-  if (value === "individual") return "individual";
-  if (value === "business") return "business";
+  if (value == null) return null;
+  const s = String(value).trim().toLowerCase();
+  if (s === "individual") return "individual";
+  if (s === "business" || s === "brand") return "business";
   return null;
 }
 
@@ -72,7 +76,7 @@ export function useProfileAccountType(): {
         const resolved: AccountType =
           meta === "individual" && fromRow === "business" ? "individual" : fromRow;
         setAccountType(resolved);
-        if (!meta) setLoading(false);
+        setLoading(false);
         return;
       }
 

@@ -70,6 +70,8 @@ interface TryOnStudioProps {
    * Set `business` if this embed is ever shown in a merchant context.
    */
   audience?: "business" | "individual";
+  /** When true, only clothing try-on is offered (e.g. consumer dashboard). */
+  clothingOnly?: boolean;
 }
 
 const TryOnStudio = ({
@@ -77,8 +79,12 @@ const TryOnStudio = ({
   creditsHelpPath,
   initialMode,
   audience: audienceProp,
+  clothingOnly = false,
 }: TryOnStudioProps) => {
   const audience = audienceProp ?? (variant === "embedded" ? "individual" : "business");
+  const categories = clothingOnly
+    ? ALL_CATEGORIES.filter((c) => c.id === "clothing")
+    : ALL_CATEGORIES;
   const [mode, setMode] = useState<Mode>(initialMode ?? "upload");
   const [phase, setPhase] = useState<Phase>("select");
   const [selectedCategory, setSelectedCategory] = useState<TryOnCategory>("clothing");

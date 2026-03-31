@@ -293,28 +293,50 @@ const Auth = () => {
               ? "Upload your photo, try on clothes with AI, and download your favorites."
               : showBusinessSignupForm
                 ? "For invited brands only — use the email we approved for your workspace."
-                : "Sign in to continue — we&apos;ll take you to the right place."}
+                : "Sign in to continue."}
           </p>
 
           {showBusinessSignupForm && (
-            <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
-              <span className="font-medium text-foreground">Not invited yet?</span> Anyone can request to join via{" "}
-              <Link to="/early-access" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
-                Join waitlist
-              </Link>
-              . We only enable sign-up for brands we&apos;ve invited.
-            </p>
+            <>
+              <p className="text-sm mb-4">
+                <Link
+                  to="/auth"
+                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium"
+                >
+                  <ChevronLeft className="h-4 w-4 shrink-0" />
+                  Choose individual or business instead
+                </Link>
+              </p>
+              <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
+                <span className="font-medium text-foreground">Not invited yet?</span> Anyone can request to join via{" "}
+                <Link to="/early-access" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
+                  Join waitlist
+                </Link>
+                . We only enable sign-up for brands we&apos;ve invited.
+              </p>
+            </>
           )}
 
           {showIndividualSignupForm && (
-            <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
-              <span className="font-medium text-foreground">Just for you.</span> This account is for personal try-ons — no store or
-              API setup. Running a brand?{" "}
-              <Link to="/auth?signup=business" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
-                Continue as a business
-              </Link>
-              .
-            </p>
+            <>
+              <p className="text-sm mb-4">
+                <Link
+                  to="/auth"
+                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium"
+                >
+                  <ChevronLeft className="h-4 w-4 shrink-0" />
+                  Choose individual or business instead
+                </Link>
+              </p>
+              <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
+                <span className="font-medium text-foreground">Just for you.</span> This account is for personal try-ons — no store or
+                API setup. Running a brand?{" "}
+                <Link to="/auth?signup=business" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
+                  Continue as a business
+                </Link>
+                .
+              </p>
+            </>
           )}
 
           {!showBusinessSignupForm && !showIndividualSignupForm && (

@@ -95,7 +95,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error && data.session) {
+      // Ensure JWT + user_metadata (e.g. account_type) are available to hooks immediately after sign-in.
+      await supabase.auth.getUser();
+    }
     return { error: error as Error | null };
   };
 
