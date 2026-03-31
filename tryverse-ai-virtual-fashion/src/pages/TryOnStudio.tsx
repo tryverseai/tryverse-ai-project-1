@@ -510,9 +510,6 @@ const TryOnStudio = ({
                         className="resize-y min-h-[80px] text-sm"
                         onChange={(e) => setProductDescription(e.target.value.slice(0, 400))}
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Helps the AI match length, cut, and materials. For dresses and gowns, mention <strong>full-length</strong> or <strong>floor-length</strong> when the photo is cropped tight.
-                      </p>
                     </div>
 
                     <Button

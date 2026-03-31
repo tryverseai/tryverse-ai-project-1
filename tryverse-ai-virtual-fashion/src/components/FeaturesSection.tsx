@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Eye, Ruler, Camera, BarChart3, Code2, Video } from "lucide-react";
+import { Eye, Ruler, Camera, BarChart3, Code2, Video, ShoppingBag, Glasses } from "lucide-react";
 import { AutoPlayVideo } from "@/components/AutoPlayVideo";
 import featuresModelVideo from "@/assets/features-model-video.mp4";
 import featuresSofaPoster from "@/assets/features-model-sofa.jpg";
@@ -11,37 +11,49 @@ const features = [
     icon: Eye,
     title: "Virtual Try-On",
     description:
-      "Photorealistic AI previews of customers wearing any product from your catalog — clothing, accessories, and jewelry.",
+      "Photorealistic previews on your storefront — clothing and more — so shoppers see how items look before they buy.",
+  },
+  {
+    icon: ShoppingBag,
+    title: "Bags & accessories",
+    description:
+      "Handbags, totes, and accessories on your models or customers' photos — same pipeline as apparel, via widget or API.",
+  },
+  {
+    icon: Glasses,
+    title: "Eyewear",
+    description:
+      "Sunglasses and optical frames with realistic scale on the face — higher confidence on PDPs and in your embed.",
   },
   {
     icon: Ruler,
     title: "Fit Prediction Engine",
     description:
-      "AI analyzes body proportions and garment measurements to predict the best size and fit for each customer.",
+      "AI analyzes body proportions and garment context to suggest size and fit for shoppers directly on your site.",
   },
   {
     icon: Camera,
     title: "AI Marketing Assets",
     description:
-      "Automatically generate model shots, product visuals, and promotional images — no photoshoot required.",
+      "Auto-generate model shots, catalog visuals, and campaign stills — less reliance on full studio shoots.",
   },
   {
     icon: Video,
     title: "AI Product Videos",
     description:
-      "Turn try-on images into short, realistic product videos for ads and social media — no extra shoots required.",
+      "Turn try-on stills into short, realistic clips for ads, PDPs, and social — built for brand and growth teams.",
   },
   {
     icon: Code2,
     title: "API & Widget SDK",
     description:
-      "Embed virtual try-on into any e-commerce platform with a single script tag or integrate via REST API.",
+      "Drop-in widget or REST API for Shopify, custom stacks, and headless storefronts — ship try-on without rebuilding your stack.",
   },
   {
     icon: BarChart3,
-    title: "Brand Dashboard",
+    title: "Dashboards & analytics",
     description:
-      "Manage catalogs, view try-on analytics, track conversion lifts, and monitor fit prediction performance.",
+      "Manage catalogs, API keys, domains, and try-on performance from one place — credits, usage, and rollouts under control.",
   },
 ];
 
@@ -61,10 +73,10 @@ export function FeaturesSection() {
             Platform
           </p>
           <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4 leading-tight px-1">
-            Everything Brands Need to Sell Fashion Online
+            Built for Brands — Loved by Shoppers
           </h2>
-          <p className="text-muted-foreground text-base sm:text-lg leading-relaxed px-1">
-            From virtual try-on to AI content generation — a complete infrastructure for modern fashion commerce.
+          <p className="text-center text-xs font-medium text-muted-foreground uppercase tracking-[0.2em] px-1">
+            Works with the stacks brands use
           </p>
         </motion.div>
 

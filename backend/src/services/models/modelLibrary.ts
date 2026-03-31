@@ -13,7 +13,8 @@ const SSRF_BLOCKED_HOSTS =
 export function resolveModelImageUrl(stored: string): string {
   const trimmed = stored.trim();
   if (trimmed.startsWith('/')) {
-    const base = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+    // Use centralized env (includes default for local dev) — not raw process.env, which may be unset.
+    const base = env.FRONTEND_URL.replace(/\/$/, '');
     if (!base) {
       throw new Error('FRONTEND_URL must be set when model library uses path-only image_url values');
     }
@@ -112,10 +113,20 @@ export async function listActiveModels(): Promise<PublicModelRow[]> {
     logger.error('listActiveModels failed', { message: error.message });
     throw new Error('Could not load model library');
   }
-  return (data || []).map((row) => ({
-    ...row,
-    image_url: resolveModelImageUrl(row.image_url),
-  })) as PublicModelRow[];
+  return (data || []).flatMap((row) => {
+    try {
+      return [
+        {
+          ...row,
+          image_url: resolveModelImageUrl(row.image_url),
+        } as PublicModelRow,
+      ];
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logger.warn('listActiveModels: skipped row (invalid image_url)', { slug: row.slug, message: msg });
+      return [];
+    }
+  });
 }
 
 export async function listAllModelsForAdmin(): Promise<

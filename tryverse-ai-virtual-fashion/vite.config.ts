@@ -8,6 +8,11 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      // Dev: browser calls same origin (see BACKEND_URL in backendApi); Vite forwards to the API.
+      "/api": { target: "http://localhost:3001", changeOrigin: true },
+      "/health": { target: "http://localhost:3001", changeOrigin: true },
+    },
     hmr: {
       overlay: false,
     },

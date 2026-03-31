@@ -78,7 +78,7 @@ export function TrustedBy() {
           viewport={{ once: true }}
         >
           <p className="text-center text-xs font-medium text-muted-foreground uppercase tracking-[0.2em] mb-10">
-            Works with your favorite platforms
+            Works with the stacks brands use
           </p>
 
           {/* Extra vertical padding so translateZ doesn’t clip against overflow */}

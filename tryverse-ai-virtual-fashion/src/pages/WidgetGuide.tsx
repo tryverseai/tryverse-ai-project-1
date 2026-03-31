@@ -2,11 +2,12 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { motion } from "framer-motion";
 import { FileText, Code, CheckCircle, AlertCircle } from "lucide-react";
+import { widgetBackendPublicUrl } from "@/lib/backendApi";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 const APP_URL = import.meta.env.VITE_APP_URL || (typeof window !== "undefined" ? window.location.origin : "");
 
 const WidgetGuide = () => {
+  const docBackend = widgetBackendPublicUrl();
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -76,7 +77,7 @@ const WidgetGuide = () => {
   apiKey: 'YOUR_API_KEY',
   productImage: 'https://yoursite.com/product-image.jpg',
   category: 'clothing',
-  backendUrl: '${BACKEND_URL}'
+  backendUrl: '${docBackend}'
 })">
   Try It On
 </button>`}
@@ -97,7 +98,7 @@ const WidgetGuide = () => {
     productImage: 'https://yoursite.com/product-image.jpg',
     category: 'clothing',
     container: 'tryverse-embed',
-    backendUrl: '${BACKEND_URL}'
+    backendUrl: '${docBackend}'
   });
 </script>`}
                   </pre>
@@ -143,7 +144,7 @@ const WidgetGuide = () => {
   apiKey: 'YOUR_API_KEY',
   productImage: document.querySelector('[data-product-image]').src,
   category: 'clothing',
-  backendUrl: '${BACKEND_URL}'
+  backendUrl: '${docBackend}'
 })">
   Try It On
 </button>`}
@@ -159,7 +160,7 @@ const WidgetGuide = () => {
               <pre className="p-4 rounded-lg bg-muted/50 overflow-x-auto text-xs font-mono text-foreground">
 {`TryVerse.config({
   apiKey: 'YOUR_API_KEY',
-  backendUrl: '${BACKEND_URL}',
+  backendUrl: '${docBackend}',
   category: 'clothing'
 });
 

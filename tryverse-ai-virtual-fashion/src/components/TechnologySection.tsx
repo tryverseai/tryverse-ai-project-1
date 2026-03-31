@@ -54,7 +54,7 @@ export function TechnologySection() {
             Built on Advanced AI Infrastructure
           </h2>
           <p className="text-muted-foreground text-base sm:text-lg leading-relaxed px-1">
-            Designed for speed, realism, and reliability at scale.
+            Designed for speed, realism, and reliability — whether traffic hits your embedded widget or your customers open their own studio.
           </p>
         </motion.div>
 

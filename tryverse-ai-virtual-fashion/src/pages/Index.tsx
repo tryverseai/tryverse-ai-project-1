@@ -13,8 +13,11 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <Helmet>
-        <title>TryVerse AI — Virtual Try-On for Fashion & Jewelry</title>
-        <meta name="description" content="AI-powered virtual try-on platform for fashion and jewelry brands. Let shoppers see how clothes and accessories look on them before buying. Boost conversions by 3x." />
+        <title>TryVerse AI — Virtual Try-On for Brands & Shoppers</title>
+        <meta
+          name="description"
+          content="AI virtual try-on and fit intelligence for fashion brands (widget, API, dashboard) and for people who want a personal try-on studio. Reduce returns, lift conversions, try outfits at home."
+        />
         <link rel="canonical" href="https://tryverse.ai/" />
       </Helmet>
       <Navbar />

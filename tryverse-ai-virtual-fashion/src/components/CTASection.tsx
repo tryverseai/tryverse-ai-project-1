@@ -15,10 +15,10 @@ export function CTASection() {
         >
           <div className="relative z-10">
             <h2 className="font-display text-3xl md:text-5xl font-bold text-primary-foreground mb-5">
-              Ready to Transform Fashion Commerce?
+              Ready for Your Brand — or for You?
             </h2>
-            <p className="text-primary-foreground/70 text-lg max-w-xl mx-auto mb-8">
-              Start with 3 free AI try-ons. No credit card required. Experience TryVerse before committing to a plan.
+            <p className="text-primary-foreground/70 text-lg max-w-2xl mx-auto mb-8">
+              Start with 20 free AI try-ons on a personal account — no credit card. Running a store? Join the waitlist or sign up when your workspace is approved — same core AI for shoppers and for commerce teams.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
               <Link to="/auth">

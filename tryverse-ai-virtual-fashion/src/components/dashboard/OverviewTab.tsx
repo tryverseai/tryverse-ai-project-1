@@ -72,8 +72,8 @@ export function OverviewTab() {
     );
   }
 
-  const creditsRemaining = profile?.free_credits_remaining ?? 3;
-  const creditsTotal = profile?.free_credits_total ?? 3;
+  const creditsRemaining = profile?.free_credits_remaining ?? 20;
+  const creditsTotal = profile?.free_credits_total ?? 20;
   const widgetActivated = profile?.widget_activated ?? false;
 
   const statCards = [

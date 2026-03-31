@@ -32,7 +32,7 @@ export function HeroSection() {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border text-foreground text-xs font-medium mb-8">
             <span className="w-1.5 h-1.5 rounded-full bg-foreground animate-pulse" />
-            AI-Powered Virtual Try-On Infrastructure
+            Virtual try-on for brands &amp; shoppers
           </div>
 
           <h1 className="font-display text-4xl md:text-5xl lg:text-[3.5rem] font-bold leading-[1.1] tracking-tight text-foreground mb-6">
@@ -40,8 +40,10 @@ export function HeroSection() {
             <span className="text-muted-foreground">First</span>
           </h1>
 
-          <p className="text-lg text-muted-foreground leading-relaxed mb-10 max-w-lg mx-auto">
-            AI-powered virtual try-on and fit prediction infrastructure for modern fashion brands. Increase conversions. Reduce returns. Scale globally.
+          <p className="text-lg text-muted-foreground leading-relaxed mb-10 max-w-2xl mx-auto">
+            AI-powered virtual try-on and fit intelligence for <span className="text-foreground font-medium">fashion brands</span> and for{" "}
+            <span className="text-foreground font-medium">everyday shoppers</span>. Embed it on your store, or try outfits on yourself in a personal
+            studio — boost confidence and conversions, cut returns, scale globally.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
@@ -65,7 +67,7 @@ export function HeroSection() {
 
           <div className="mt-12 grid grid-cols-3 gap-8 max-w-md mx-auto">
             {[
-              { value: "AI", label: "Powered Try-On" },
+              { value: "B2B", label: "+ B2C studio" },
               { value: "<1s", label: "Processing" },
               { value: "99%", label: "Uptime" },
             ].map((stat) => (

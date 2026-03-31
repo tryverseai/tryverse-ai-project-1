@@ -11,9 +11,12 @@ const LOW_CREDITS_THRESHOLD = 5;
 export const SHOPPER_TRYON_UNAVAILABLE_MESSAGE =
   "Virtual try-on isn't available right now. Please try again later or contact the store.";
 
-/** Plan limits: Free=3/month, Pro/starter=100, Enterprise=unlimited (-1) */
+/** Default free try-on pool for new profiles and free-plan monthly reset (`free_credits_*` columns). */
+export const DEFAULT_FREE_CREDITS = 20;
+
+/** Plan limits: Free tier uses {@link DEFAULT_FREE_CREDITS}; paid tiers = monthly allocation. -1 = unlimited */
 const PLAN_LIMITS: Record<string, number> = {
-  free: 3,
+  free: DEFAULT_FREE_CREDITS,
   starter: 100,
   growth: 1000,
   enterprise: -1,
@@ -54,8 +57,8 @@ async function ensureMonthlyCreditReset(
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (planId === 'free') {
-    updates.free_credits_remaining = 3;
-    updates.free_credits_total = 3;
+    updates.free_credits_remaining = DEFAULT_FREE_CREDITS;
+    updates.free_credits_total = DEFAULT_FREE_CREDITS;
   } else if (!isUnlimited) {
     updates.monthly_credits_remaining = limit;
     updates.monthly_credits_total = limit;
@@ -98,8 +101,8 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
       .from('profiles')
       .insert({
         id: userId,
-        free_credits_remaining: 3,
-        free_credits_total: 3,
+        free_credits_remaining: DEFAULT_FREE_CREDITS,
+        free_credits_total: DEFAULT_FREE_CREDITS,
         monthly_credits_remaining: 0,
         monthly_credits_total: 0,
         plan_id: 'free',
@@ -323,8 +326,8 @@ export async function getCreditSummary(userId: string) {
       .from('profiles')
       .insert({
         id: userId,
-        free_credits_remaining: 3,
-        free_credits_total: 3,
+        free_credits_remaining: DEFAULT_FREE_CREDITS,
+        free_credits_total: DEFAULT_FREE_CREDITS,
         monthly_credits_remaining: 0,
         monthly_credits_total: 0,
         plan_id: 'free',

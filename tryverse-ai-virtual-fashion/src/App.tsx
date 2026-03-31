@@ -104,9 +104,9 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route path="/studio" element={<ProtectedRoute><TryOnStudio /></ProtectedRoute>} />
+            <Route path="/studio" element={<ProtectedRoute><TryOnStudio clothingOnly /></ProtectedRoute>} />
             <Route path="/admin" element={<Admin />} />
-            <Route path="/try-on-studio" element={<ProtectedRoute><TryOnStudio /></ProtectedRoute>} />
+            <Route path="/try-on-studio" element={<ProtectedRoute><TryOnStudio clothingOnly /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </ComplianceOnboardingGate>

@@ -1,6 +1,51 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+/**
+ * True when VITE_BACKEND_URL is the usual local API — browser calls to :3001 often fail (offline URL,
+ * firewall, mixed context); in dev we route via Vite proxy instead.
+ */
+function isLocalDefaultApiUrl(value: string): boolean {
+  const v = value.trim().replace(/\/$/, '');
+  return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]):3001$/i.test(v);
+}
+
+/**
+ * Base URL for API calls from the web app.
+ * - In **development**, use same-origin `/api` and `/health` (Vite → :3001) when URL is unset **or**
+ *   still `http://localhost:3001` in .env — avoids `Failed to fetch (localhost:3001)` from direct cross-port calls.
+ * - In **production**, set `VITE_BACKEND_URL` to your API origin when UI and API differ.
+ */
+function resolveBackendBaseUrl(): string {
+  const raw = typeof import.meta.env.VITE_BACKEND_URL === 'string' ? import.meta.env.VITE_BACKEND_URL : '';
+  const trimmed = raw.trim();
+
+  if (import.meta.env.DEV) {
+    if (!trimmed || isLocalDefaultApiUrl(trimmed)) {
+      return '';
+    }
+    return trimmed.replace(/\/$/, '');
+  }
+
+  if (trimmed) {
+    return trimmed.replace(/\/$/, '');
+  }
+  return 'http://localhost:3001';
+}
+
+/** Same-origin in dev (empty) or explicit API base in prod. */
+export const BACKEND_URL = resolveBackendBaseUrl();
+
+/** Absolute API origin for widget snippets / external embeds (never empty). */
+export function widgetBackendPublicUrl(): string {
+  const raw = import.meta.env.VITE_BACKEND_URL;
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    return raw.trim().replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  return 'http://localhost:3001';
+}
 
 export type TryOnCategory = 'clothing' | 'bags' | 'glasses';
 
@@ -216,6 +261,7 @@ export async function getCredits() {
     plan: string;
     isUnlimited: boolean;
     freeCreditsRemaining: number;
+    freeCreditsTotal: number;
     monthlyCreditsRemaining: number;
     monthlyCreditsTotal: number;
     usagePercent: number;
@@ -577,9 +623,21 @@ async function adminFetch(path: string, adminKey: string, options?: RequestInit)
   } catch (e) {
     const hint =
       e instanceof TypeError
-        ? `Cannot reach backend at ${BACKEND_URL}. Start the API (npm run dev in backend), confirm VITE_BACKEND_URL in the frontend .env, and try http://localhost:8080 (not an offline Network tab URL if the API is only on this machine).`
+        ? BACKEND_URL
+          ? `Cannot reach backend at ${BACKEND_URL}. Start the API (npm run dev in backend) or fix VITE_BACKEND_URL.`
+          : `Cannot reach API. Start the backend on port 3001 (npm run dev in backend) so Vite can proxy /api, or set VITE_BACKEND_URL.`
         : String(e);
-    throw new Error(`Failed to fetch (${new URL(BACKEND_URL).host}): ${hint}`);
+    let target = 'API';
+    if (BACKEND_URL) {
+      try {
+        target = new URL(BACKEND_URL).host;
+      } catch {
+        target = BACKEND_URL;
+      }
+    } else if (typeof window !== 'undefined') {
+      target = `${window.location.host} (proxied /api)`;
+    }
+    throw new Error(`Failed to fetch (${target}): ${hint}`);
   }
   if (res.status === 403) throw new Error('Invalid admin key');
   if (!res.ok) {

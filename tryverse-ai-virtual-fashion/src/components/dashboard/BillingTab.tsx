@@ -129,7 +129,7 @@ export function BillingTab() {
           ) : (
             <div>
               <p className="font-display text-xl font-bold text-foreground mb-1">Free Trial</p>
-              <p className="text-sm text-muted-foreground mb-4">{profile?.free_credits_remaining ?? 0} / {profile?.free_credits_total ?? 3} free try-ons remaining</p>
+              <p className="text-sm text-muted-foreground mb-4">{profile?.free_credits_remaining ?? 0} / {profile?.free_credits_total ?? 20} free try-ons remaining</p>
               <Button onClick={() => navigate("/pricing")} className="gradient-primary text-primary-foreground shadow-soft gap-2">
                 <ArrowUpRight className="h-4 w-4" /> Upgrade Plan
               </Button>

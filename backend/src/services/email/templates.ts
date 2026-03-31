@@ -37,7 +37,7 @@ export function welcomeEmail(params: { name: string; brandName: string; appUrl?:
   <div style="padding: 32px 24px;">
     <h1 style="font-size: 24px; margin-bottom: 16px;">Welcome to TryVerse</h1>
     <p>Hi ${escapeHtml(displayName)},</p>
-    <p>Your TryVerse account is ready. Start with <strong>3 free AI try-ons</strong> to experience virtual try-on on your products.</p>
+    <p>Your TryVerse account is ready. Start with <strong>20 free AI try-ons</strong> to experience virtual try-on on your products.</p>
     <ul style="margin: 20px 0;">
       <li>Add products to your catalog</li>
       <li>Embed the widget on your store</li>

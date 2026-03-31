@@ -162,16 +162,7 @@ const IndividualDashboard = () => {
 
           {activeTab === "models" && (
             <div className="space-y-4">
-              <div>
-                <h2 className="font-display text-xl font-semibold text-foreground">Model library</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Pick a preset model, then upload a clothing photo to try it on — same quality as{" "}
-                  <button type="button" className="text-foreground font-medium underline" onClick={() => selectTab("studio")}>
-                    Try on
-                  </button>
-                  , without using your own picture. If a model doesn&apos;t load, try another or switch back to Try on with your photo.
-                </p>
-              </div>
+              <h2 className="font-display text-xl font-semibold text-foreground">Model library</h2>
               <TryOnStudio
                 variant="embedded"
                 audience="individual"

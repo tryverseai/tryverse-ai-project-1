@@ -84,9 +84,6 @@ const PartnerWithUs = () => (
                 </Button>
               </Link>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Try the product with a free account, or request waitlist access — we&apos;ll reach out with demo options when it fits your brand.
-            </p>
           </div>
         </div>
       </section>

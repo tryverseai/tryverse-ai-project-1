@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS plans (
 
 INSERT INTO plans (id, name, price_ngn, price_usd, tryons_per_month, max_products, features, is_active)
 VALUES
-  ('free',       'Free Trial',  0,      0,   3,    5,    '["3 free try-ons","Basic quality","Email support"]',                                                                                    true),
+  ('free',       'Free Trial',  0,      0,   20,   5,    '["20 free try-ons","Basic quality","Email support"]',                                                                                   true),
   ('starter',    'Starter',     150000, 100, 100,  100,  '["100 try-ons/month","Basic fit prediction","Widget embed","Email support"]',                                                           true),
   ('growth',     'Growth',      500000, 350, 1000, 1000, '["1,000 try-ons/month","Advanced fit prediction","AI marketing content","Analytics dashboard","Priority support"]',                     true),
   ('enterprise', 'Enterprise',  0,      0,   -1,   -1,   '["Unlimited try-ons","AI video generation","Custom model training","Dedicated API access","SLA guarantee","Account manager"]',         true)
@@ -41,8 +41,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   plan_id                    TEXT REFERENCES plans(id) DEFAULT 'free',
   role                       TEXT DEFAULT 'brand',          -- 'brand' | 'admin'
   account_type               TEXT NOT NULL DEFAULT 'business' CHECK (account_type IN ('business', 'individual')),
-  free_credits_remaining     INTEGER DEFAULT 3,
-  free_credits_total         INTEGER DEFAULT 3,
+  free_credits_remaining     INTEGER DEFAULT 20,
+  free_credits_total         INTEGER DEFAULT 20,
   monthly_credits_remaining  INTEGER DEFAULT 0,
   monthly_credits_total      INTEGER DEFAULT 0,
   widget_activated                   BOOLEAN DEFAULT false,
@@ -199,8 +199,8 @@ BEGIN
     COALESCE(NEW.raw_user_meta_data->>'brand_name', 'My Brand'),
     COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
     NEW.email,
-    3,
-    3,
+    20,
+    20,
     0,
     0,
     false,
@@ -215,7 +215,7 @@ $$;
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- ─── API KEY GENERATION FUNCTION ─────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.generate_api_key(p_name TEXT DEFAULT 'Default')

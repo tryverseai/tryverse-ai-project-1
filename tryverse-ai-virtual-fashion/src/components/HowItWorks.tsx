@@ -8,7 +8,7 @@ const steps = [
     step: "01",
     title: "Pick Your Style",
     description:
-      "Shoppers select the item they love directly from your product page — no extra steps, no friction.",
+      "Shoppers select what they love on the product page — no extra steps, no friction. Trying on at home? Pick or upload a product image in your personal TryVerse studio.",
   },
   {
     icon: Upload,
@@ -44,7 +44,7 @@ export function HowItWorks() {
             Try Before You Buy — In Three Simple Steps
           </h2>
           <p className="text-muted-foreground text-base sm:text-lg leading-relaxed px-1">
-            From browsing to trying on, it all happens right on your product page.
+            From browsing on a store&apos;s site to opening your own studio — it all happens in one smooth flow, powered by the same AI.
           </p>
         </motion.div>
 

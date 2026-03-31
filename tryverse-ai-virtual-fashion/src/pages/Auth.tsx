@@ -212,7 +212,7 @@ const Auth = () => {
           </p>
           <div className="mt-12 grid grid-cols-3 gap-6">
             {[
-              { value: "3", label: "Free Try-Ons" },
+              { value: "20", label: "Free Try-Ons" },
               { value: "<1s", label: "Try-On Speed" },
               { value: "99%", label: "Uptime" },
             ].map((stat) => (

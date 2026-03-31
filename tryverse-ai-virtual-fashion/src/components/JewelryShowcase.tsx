@@ -20,20 +20,20 @@ export function JewelryShowcase() {
   return (
     <section className="py-20 md:py-28">
       <div className="max-w-7xl mx-auto px-6">
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 max-w-2xl mx-auto">
           <motion.p
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             className="text-xs font-medium text-muted-foreground uppercase tracking-[0.2em]"
           >
-            Accessories & Jewelry Try-On
+            Accessories &amp; jewelry try-on
           </motion.p>
           <motion.p
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            transition={{ delay: 0.05 }}
+            transition={{ delay: 0.04 }}
             className="mt-2 text-sm italic text-muted-foreground"
           >
             Coming Soon

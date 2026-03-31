@@ -12,6 +12,7 @@ import {
   startTryOn,
   getCredits,
   isCreditsExhaustedApiError,
+  widgetBackendPublicUrl,
   type TryOnCategory,
 } from "@/lib/backendApi";
 import { posthogCapture } from "@/lib/posthog";
@@ -23,11 +24,8 @@ const getScriptBase = () =>
   (typeof window !== 'undefined' ? window.location.origin : '') ||
   import.meta.env.VITE_APP_URL ||
   'https://app.tryverse.ai';
-const getBackendUrl = () =>
-  (import.meta.env.VITE_BACKEND_URL as string) || 'http://localhost:3001';
-
 const getPopupSnippet = (apiKey: string) => {
-  const backend = getBackendUrl();
+  const backend = widgetBackendPublicUrl();
   const scriptBase = getScriptBase();
   return `<!-- Add to your product page -->
 <script src="${scriptBase}/tryverse-widget.js"></script>
@@ -42,7 +40,7 @@ const getPopupSnippet = (apiKey: string) => {
 };
 
 const getEmbedSnippet = (apiKey: string) => {
-  const backend = getBackendUrl();
+  const backend = widgetBackendPublicUrl();
   const scriptBase = getScriptBase();
   return `<!-- Add where you want the try-on to appear -->
 <div id="tryverse-embed"></div>
@@ -74,7 +72,8 @@ export function WidgetTab() {
   const [selected, setSelected] = useState<"popup" | "embed">("popup");
   const [copied, setCopied] = useState(false);
   const [activeView, setActiveView] = useState<"preview" | "install">("preview");
-  const [creditsRemaining, setCreditsRemaining] = useState(3);
+  const [creditsRemaining, setCreditsRemaining] = useState(20);
+  const [creditsPoolTotal, setCreditsPoolTotal] = useState(20);
   const [widgetActivated, setWidgetActivated] = useState(false);
   const [productImage, setProductImage] = useState<string | null>(null);
   const [personImage, setPersonImage] = useState<string | null>(null);
@@ -98,9 +97,11 @@ export function WidgetTab() {
         setCreditsRemaining(
           credits.isUnlimited ? 999 : credits.monthlyCreditsRemaining + credits.freeCreditsRemaining
         );
+        setCreditsPoolTotal(credits.freeCreditsTotal + credits.monthlyCreditsTotal);
         setWidgetActivated(credits.isUnlimited || credits.plan !== "free");
       } catch {
-        setCreditsRemaining(3);
+        setCreditsRemaining(20);
+        setCreditsPoolTotal(20);
       }
 
       const { data: keys } = await supabase
@@ -259,7 +260,7 @@ export function WidgetTab() {
                 {widgetActivated ? "Widget Activated" : "Free AI Try-On Credits"}
               </p>
               <p className="text-xs text-muted-foreground">
-                {widgetActivated ? "Unlimited generations" : `${creditsRemaining} / 3 Remaining`}
+                {widgetActivated ? "Unlimited generations" : `${creditsRemaining} / ${creditsPoolTotal} Remaining`}
               </p>
             </div>
           </div>
