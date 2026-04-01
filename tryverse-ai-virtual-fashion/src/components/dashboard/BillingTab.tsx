@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { getCredits } from "@/lib/backendApi";
 
 interface Subscription {
   plan_id: string;
@@ -53,15 +54,25 @@ export function BillingTab() {
   useEffect(() => {
     if (!user) return;
     const fetchData = async () => {
-      const [{ data: sub }, { data: pays }, { data: prof }, { data: plansData }] = await Promise.all([
+      const [{ data: sub }, { data: pays }, { data: prof }, { data: plansData }, creditsApi] = await Promise.all([
         supabase.from("subscriptions").select("plan_id, status, provider, current_period_start, current_period_end").eq("user_id", user.id).single(),
         supabase.from("payments").select("id, amount, currency, status, provider, reference, created_at").order("created_at", { ascending: false }).limit(10),
         supabase.from("profiles").select("widget_activated, free_credits_remaining, free_credits_total, monthly_credits_remaining, monthly_credits_total, current_plan_id").eq("id", user.id).single(),
         supabase.from("plans").select("id, name, price_ngn, tryons_per_month").eq("is_active", true),
+        getCredits().catch(() => null),
       ]);
       setSubscription(sub as Subscription | null);
       setPayments((pays as Payment[]) || []);
-      setProfile(prof as unknown as Profile | null);
+      const base = prof as unknown as Profile | null;
+      setProfile(
+        base && creditsApi && !creditsApi.isUnlimited
+          ? {
+              ...base,
+              free_credits_remaining: creditsApi.freeCreditsRemaining,
+              free_credits_total: creditsApi.freeCreditsTotal,
+            }
+          : base
+      );
       setPlans((plansData as Plan[]) || []);
       setLoading(false);
     };

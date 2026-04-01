@@ -8,10 +8,9 @@ export function initSentry(): boolean {
     Sentry.init({
       dsn,
       environment: import.meta.env.MODE || "development",
-      integrations: [
-        Sentry.browserTracingIntegration(),
-      ],
-      tracesSampleRate: 0.2,
+      // Tracing can throw or misbehave in some dev environments; keep prod-only.
+      integrations: import.meta.env.PROD ? [Sentry.browserTracingIntegration()] : [],
+      tracesSampleRate: import.meta.env.PROD ? 0.2 : 0,
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 0,
 

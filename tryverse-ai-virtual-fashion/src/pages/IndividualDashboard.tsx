@@ -3,7 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import TryOnStudio from "@/pages/TryOnStudio";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Images, Compass, UserRound, Trash2, Download, Loader2, Users } from "lucide-react";
+import { Sparkles, Images, Compass, UserRound, Trash2, Download, Loader2, Users, BookOpen } from "lucide-react";
+import { TryOnGuideContent } from "@/components/dashboard/TryOnGuideContent";
 import { useAuth } from "@/contexts/AuthContext";
 import { getTryOnHistory, getCredits, deleteTryOn } from "@/lib/backendApi";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ import { safeImageSrcForDom, openExternalHttpUrlInNewTab } from "@/lib/safeUrl";
 import { Link } from "react-router-dom";
 
 const tabs = [
+  { id: "guide", label: "Tips & guide", icon: BookOpen },
   { id: "studio", label: "Try on", icon: Sparkles },
   { id: "models", label: "Models", icon: Users },
   { id: "creations", label: "My creations", icon: Images },
@@ -31,7 +33,7 @@ interface HistoryItem {
 const IndividualDashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab") as TabId | null;
-  const [activeTab, setActiveTab] = useState<TabId>("studio");
+  const [activeTab, setActiveTab] = useState<TabId>("guide");
   const { user, signOut } = useAuth();
   const [credits, setCredits] = useState<{ free: number; monthly: number } | null>(null);
   const [creations, setCreations] = useState<HistoryItem[]>([]);
@@ -41,8 +43,11 @@ const IndividualDashboard = () => {
   useEffect(() => {
     if (tabParam && tabs.some((t) => t.id === tabParam)) {
       setActiveTab(tabParam);
+      return;
     }
-  }, [tabParam]);
+    setActiveTab("guide");
+    setSearchParams({ tab: "guide" }, { replace: true });
+  }, [tabParam, setSearchParams]);
 
   const selectTab = (id: TabId) => {
     setActiveTab(id);
@@ -155,6 +160,12 @@ const IndividualDashboard = () => {
               ))}
             </div>
           </div>
+
+          {activeTab === "guide" && (
+            <div className="max-w-3xl mx-auto">
+              <TryOnGuideContent />
+            </div>
+          )}
 
           {activeTab === "studio" && (
             <TryOnStudio variant="embedded" audience="individual" clothingOnly />

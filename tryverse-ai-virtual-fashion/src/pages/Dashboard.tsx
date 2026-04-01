@@ -3,8 +3,9 @@ import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Package, BarChart3, Settings, Key, Code, LayoutDashboard, CreditCard
+  Package, BarChart3, Settings, Key, Code, LayoutDashboard, CreditCard, BookOpen,
 } from "lucide-react";
+import { TryOnGuideTab } from "@/components/dashboard/TryOnGuideTab";
 import { OverviewTab } from "@/components/dashboard/OverviewTab";
 import { ApiKeysTab } from "@/components/dashboard/ApiKeysTab";
 import { WidgetTab } from "@/components/dashboard/WidgetTab";
@@ -24,6 +25,7 @@ const sidebarItems = [
 ];
 
 const tabComponents: Record<string, React.FC> = {
+  [DEFAULT_TAB]: TryOnGuideTab,
   Overview: OverviewTab,
   Analytics: AnalyticsTab,
   Products: ProductsTab,
@@ -35,7 +37,7 @@ const tabComponents: Record<string, React.FC> = {
 
 const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState("Overview");
+  const [activeTab, setActiveTab] = useState(DEFAULT_TAB);
   const { user } = useAuth();
   const brandName = user?.user_metadata?.brand_name || "Your Brand";
 
@@ -43,8 +45,11 @@ const Dashboard = () => {
     const tab = searchParams.get("tab");
     if (tab && tabComponents[tab]) {
       setActiveTab(tab);
+      return;
     }
-  }, [searchParams]);
+    setActiveTab(DEFAULT_TAB);
+    setSearchParams({ tab: DEFAULT_TAB }, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const selectTab = (label: string) => {
     setActiveTab(label);
@@ -52,7 +57,7 @@ const Dashboard = () => {
   };
 
   const renderContent = () => {
-    const ActiveComponent = tabComponents[activeTab] || OverviewTab;
+    const ActiveComponent = tabComponents[activeTab] || TryOnGuideTab;
     return (
       <ErrorBoundary>
         <ActiveComponent />

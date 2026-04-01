@@ -7,3 +7,8 @@ export function dashboardPathForAccountType(type: AccountType | null | undefined
   if (type === "individual") return DASHBOARD_INDIVIDUAL;
   return DASHBOARD_BUSINESS;
 }
+
+/** First dashboard tab id/label after sign-in when URL has no `tab` param. */
+export function defaultDashboardTabValue(type: AccountType): string {
+  return type === "individual" ? "guide" : "Try-On guide";
+}

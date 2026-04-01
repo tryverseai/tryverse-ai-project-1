@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useProfileAccountType } from "@/hooks/useProfileAccountType";
-import { dashboardPathForAccountType } from "@/lib/accountType";
+import { dashboardPathForAccountType, defaultDashboardTabValue } from "@/lib/accountType";
 
 /**
  * /dashboard → canonical home for the user’s account type.
@@ -18,5 +18,10 @@ export function DashboardHomeRedirect() {
   }
 
   const target = dashboardPathForAccountType(accountType);
-  return <Navigate to={{ pathname: target, search: location.search }} replace />;
+  const params = new URLSearchParams(location.search);
+  if (!params.has("tab")) {
+    params.set("tab", defaultDashboardTabValue(accountType));
+  }
+  const search = `?${params.toString()}`;
+  return <Navigate to={{ pathname: target, search }} replace />;
 }

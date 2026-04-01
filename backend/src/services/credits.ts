@@ -14,6 +14,66 @@ export const SHOPPER_TRYON_UNAVAILABLE_MESSAGE =
 /** Default free try-on pool for new profiles and free-plan monthly reset (`free_credits_*` columns). */
 export const DEFAULT_FREE_CREDITS = 20;
 
+/** Older signups used a 3-try free pool; migrate to {@link DEFAULT_FREE_CREDITS} on read. */
+const LEGACY_FREE_CREDITS_TOTAL = 3;
+
+/**
+ * One-time style migration: free-plan rows still at the old 3-cap get +17 pool (remaining capped at 20).
+ */
+async function migrateLegacyFreeCreditsIfNeeded(
+  userId: string,
+  profile: {
+    plan_id: string | null;
+    free_credits_remaining: number;
+    free_credits_total: number;
+  }
+): Promise<{ free_credits_remaining: number; free_credits_total: number }> {
+  const planId = profile.plan_id || 'free';
+  if (planId !== 'free') {
+    return {
+      free_credits_remaining: profile.free_credits_remaining,
+      free_credits_total: profile.free_credits_total,
+    };
+  }
+  if (profile.free_credits_total !== LEGACY_FREE_CREDITS_TOTAL) {
+    return {
+      free_credits_remaining: profile.free_credits_remaining,
+      free_credits_total: profile.free_credits_total,
+    };
+  }
+
+  const bonus = DEFAULT_FREE_CREDITS - LEGACY_FREE_CREDITS_TOTAL;
+  const newRemaining = Math.min(
+    DEFAULT_FREE_CREDITS,
+    profile.free_credits_remaining + bonus
+  );
+  const newTotal = DEFAULT_FREE_CREDITS;
+
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .update({
+      free_credits_remaining: newRemaining,
+      free_credits_total: newTotal,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    logger.warn('Legacy free credits migration failed', { userId, message: error.message });
+    return {
+      free_credits_remaining: profile.free_credits_remaining,
+      free_credits_total: profile.free_credits_total,
+    };
+  }
+
+  logger.info('Migrated legacy free credits pool (3 → 20 cap)', {
+    userId,
+    newRemaining,
+    newTotal,
+  });
+  return { free_credits_remaining: newRemaining, free_credits_total: newTotal };
+}
+
 /** Plan limits: Free tier uses {@link DEFAULT_FREE_CREDITS}; paid tiers = monthly allocation. -1 = unlimited */
 const PLAN_LIMITS: Record<string, number> = {
   free: DEFAULT_FREE_CREDITS,
@@ -119,6 +179,9 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
   if (!profile) {
     return { allowed: false, creditsRemaining: 0, creditType: 'free', reason: 'Profile not found' };
   }
+
+  const migratedFree = await migrateLegacyFreeCreditsIfNeeded(userId, profile);
+  profile = { ...profile, ...migratedFree };
 
   await ensureMonthlyCreditReset(userId, profile);
 
@@ -338,6 +401,9 @@ export async function getCreditSummary(userId: string) {
   }
 
   if (!profile) return null;
+
+  const migratedFree = await migrateLegacyFreeCreditsIfNeeded(userId, profile);
+  profile = { ...profile, ...migratedFree };
 
   const isUnlimited = profile.monthly_credits_total === -1;
   const used = isUnlimited

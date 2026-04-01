@@ -4,6 +4,7 @@ import { Eye, TrendingUp, Users, Zap, Loader2, Sparkles } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { getCredits } from "@/lib/backendApi";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
@@ -58,7 +59,17 @@ export function OverviewTab() {
       }
 
       setStats({ totalTryOns, totalGenerations, totalActivations, todayTryOns, weeklyData });
-      setProfile(profileData as unknown as Profile);
+      const row = profileData as unknown as Profile | null;
+      setProfile(
+        row
+          ? {
+              widget_activated: row.widget_activated,
+              free_credits_remaining:
+                creditsApi?.freeCreditsRemaining ?? row.free_credits_remaining ?? 20,
+              free_credits_total: creditsApi?.freeCreditsTotal ?? row.free_credits_total ?? 20,
+            }
+          : null
+      );
       setLoading(false);
     };
     fetchData();

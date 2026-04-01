@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Camera, User, Scan, Check, RotateCcw, ArrowRight, Glasses, ShoppingBag, Shirt, AlertCircle, X } from "lucide-react";
+import { Upload, Camera, User, Scan, Check, RotateCcw, ArrowRight, Glasses, ShoppingBag, Shirt, AlertCircle, X, BookOpen, Sparkles } from "lucide-react";
+import { TryOnGuideContent } from "@/components/dashboard/TryOnGuideContent";
 import { toast } from "sonner";
 import {
   uploadImage,
@@ -25,6 +26,7 @@ import { captureSentryException } from "@/lib/sentry";
 type Mode = "upload" | "ai-model";
 type Phase = "select" | "uploading" | "processing" | "result" | "error";
 type TryOnErrorKind = "credits" | "person_photo" | "generic";
+type StudioSection = "guide" | "tryon";
 
 function classifyTryOnError(message: string, creditsOut: boolean): TryOnErrorKind {
   if (creditsOut) return "credits";
@@ -81,7 +83,9 @@ const TryOnStudio = ({
   audience: audienceProp,
   clothingOnly = false,
 }: TryOnStudioProps) => {
-  const audience = audienceProp ?? (variant === "embedded" ? "individual" : "business");
+  const embedded = variant === "embedded";
+  const [studioSection, setStudioSection] = useState<StudioSection>(() => (embedded ? "tryon" : "guide"));
+  const audience = audienceProp ?? (embedded ? "individual" : "business");
   const categories = clothingOnly
     ? ALL_CATEGORIES.filter((c) => c.id === "clothing")
     : ALL_CATEGORIES;
@@ -343,7 +347,6 @@ const TryOnStudio = ({
     (m) => m.gender === (genderFilter === "Female" ? "female" : "male")
   );
 
-  const embedded = variant === "embedded";
   const resolvedCreditsPath = creditsHelpPath ?? (embedded ? "/dashboard/individual?tab=profile" : "/dashboard/business?tab=Billing");
 
   return (
@@ -366,6 +369,37 @@ const TryOnStudio = ({
             </p>
           </motion.div>
 
+          {!embedded && (
+            <div className="flex justify-center gap-2 mb-8">
+              {([
+                { id: "guide" as const, label: "Tips & guide", icon: BookOpen },
+                { id: "tryon" as const, label: "Start try-on", icon: Sparkles },
+              ] as const).map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setStudioSection(s.id)}
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    studioSection === s.id
+                      ? "bg-foreground text-background"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  <s.icon className="h-4 w-4" />
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!embedded && studioSection === "guide" && (
+            <div className="max-w-3xl mx-auto pb-16">
+              <TryOnGuideContent />
+            </div>
+          )}
+
+          {(embedded || studioSection === "tryon") && (
+            <>
           {/* Mode selector */}
           <div className="flex justify-center gap-2 mb-6">
             {([
@@ -814,6 +848,8 @@ const TryOnStudio = ({
 
             </AnimatePresence>
           </div>
+            </>
+          )}
         </div>
       </main>
       {!embedded && <Footer />}
