@@ -14,7 +14,11 @@ import { ProductsTab } from "@/components/dashboard/ProductsTab";
 import { SettingsTab } from "@/components/dashboard/SettingsTab";
 import { BillingTab } from "@/components/dashboard/BillingTab";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+const DEFAULT_TAB = "Try-On guide";
+
 const sidebarItems = [
+  { icon: BookOpen, label: DEFAULT_TAB },
   { icon: LayoutDashboard, label: "Overview" },
   { icon: BarChart3, label: "Analytics" },
   { icon: Package, label: "Products" },

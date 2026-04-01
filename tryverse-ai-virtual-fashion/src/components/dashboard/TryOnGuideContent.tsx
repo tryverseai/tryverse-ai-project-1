@@ -1,85 +1,99 @@
 /**
  * Shared tips & best-practices copy for Virtual Try-On (dashboard tabs + studio).
  */
+function SectionDivider() {
+  return <hr className="border-0 border-t border-border/60 my-8" aria-hidden="true" />;
+}
+
 export function TryOnGuideContent() {
   return (
-    <div className="rounded-2xl border border-border/60 bg-card/40 p-6 md:p-10 text-left space-y-10">
-      <header className="space-y-2">
+    <div className="rounded-2xl border border-border/60 bg-card/40 p-6 md:p-10 text-left space-y-0">
+      <header className="space-y-2 mb-8">
         <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground">
-          Virtual Try-On tips &amp; guide
+          Virtual try-on: tips &amp; guide
         </h2>
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Get clearer results and fewer surprises by following these suggestions for photos, fits, and product images.
+          How to get reliable results in TryVerse—model photos, product shots, and what to expect from the output.
         </p>
       </header>
 
       <section className="space-y-4">
-        <h3 className="font-display text-lg font-semibold text-foreground">Tips for tops try-on</h3>
+        <h3 className="font-display text-lg font-semibold text-foreground">Tips for Tops Try-On</h3>
         <ul className="space-y-4 text-sm text-foreground/90 leading-relaxed list-none pl-0">
           <li>
-            <span className="font-medium text-foreground">Tip 1:</span> When uploading an image of a top, using a
-            half-body photo can enhance the clarity of the try-on result and improve the retention of logo details.
+            <span className="font-medium text-foreground">Tip 1:</span> When uploading a top, using a half-body image
+            helps produce clearer results and preserves finer details like logos.
           </li>
           <li>
-            <span className="font-medium text-foreground">Tip 2:</span> To ensure the best try-on effect, the type of
-            clothing being tried on should closely match what the model is wearing. For example, if trying on a
-            short-sleeve top, the model should also wear a short-sleeve item. Similarly, if trying on a top, the model
-            should not be dressed in long garments like dresses or trench coats. This helps avoid mismatches, such as
-            switching from short sleeves to long sleeves or vice versa.
+            <span className="font-medium text-foreground">Tip 2:</span> For the best outcome, make sure the clothing
+            on the model is similar to the item being tried on. For example, if you&apos;re trying on a short-sleeve
+            top, the model should also be wearing short sleeves. Avoid using images where the model is wearing long or
+            covering garments like coats or dresses, as this can lead to incorrect sleeve or garment mismatches.
           </li>
           <li>
-            <span className="font-medium text-foreground">Tip 3:</span> The fit of the clothing being tried on should
-            closely match the fit of what the model is originally wearing. For example, if trying on a fitted item like
-            a tank top, the model should ideally not be wearing loose clothing, such as a cardigan or jacket, as this
-            may prevent the fitted item from being showcased effectively.
+            <span className="font-medium text-foreground">Tip 3:</span> Try to match the fit of the model&apos;s outfit
+            with the item being tested. If the new piece is fitted (like a tank top), it works best when the model is
+            already wearing something fitted. Loose outerwear like jackets or cardigans can reduce accuracy and affect how
+            the garment is displayed.
           </li>
           <li>
-            <span className="font-medium text-foreground">Tip 4 (dress / long clothing):</span> When trying on long
-            clothing, it is best to have the model maintain a standing posture to avoid poses that involve folding or
-            overlapping of the body.
+            <span className="font-medium text-foreground">Tip 4 (Dresses / Long Clothing):</span> When working with
+            long garments, it&apos;s best for the model to be standing in a neutral pose. Poses with bent limbs or
+            overlapping body parts may interfere with how the clothing is rendered.
           </li>
         </ul>
       </section>
 
+      <SectionDivider />
+
       <section className="space-y-3">
-        <h3 className="font-display text-lg font-semibold text-foreground">Bottoms try-on tips</h3>
+        <h3 className="font-display text-lg font-semibold text-foreground">Bottoms Try-On Tips</h3>
         <p className="text-sm text-foreground/90 leading-relaxed">
-          When trying on bottoms, opt for models displaying full body or at least the lower half. Models should wear long
-          top garments, preferably avoiding boots or dresses, as these may prevent bottoms from being put on. Suitable
-          for platform display.
+          For bottoms, use images where the model shows a full body or at least the lower half. The model should
+          preferably be wearing a long top and avoid items like dresses or boots, as these can block or interfere with how
+          the bottoms are applied.
         </p>
       </section>
 
+      <SectionDivider />
+
       <section className="space-y-3">
-        <h3 className="font-display text-lg font-semibold text-foreground">III. Notes</h3>
+        <h3 className="font-display text-lg font-semibold text-foreground">Notes</h3>
         <p className="text-sm text-foreground/90 leading-relaxed">
-          Discrepancies may occur in the try-on clothing details, especially when the clothing occupies a small portion
-          of the image or contains fine text. This can result in inaccuracies with small text and logo details, a common
-          challenge in virtual try-on technology. We will continue to optimize this aspect and welcome user feedback.
+          Some variations in clothing details may occur, especially when the item is small in the image or includes
+          intricate elements like text or logos. These finer details may not always render perfectly, which is a common
+          limitation in virtual try-on systems. We&apos;re continuously improving this and welcome feedback to enhance
+          accuracy.
         </p>
       </section>
 
+      <SectionDivider />
+
       <section className="space-y-3">
-        <h3 className="font-display text-lg font-semibold text-foreground">Single clothing item (product photo)</h3>
+        <h3 className="font-display text-lg font-semibold text-foreground">Image Guidelines for Best Results</h3>
         <ul className="list-disc pl-5 text-sm text-foreground/90 space-y-1.5">
-          <li>White background flat lay</li>
-          <li>Simple and clear clothing details</li>
-          <li>Focus on the garment as the main subject</li>
+          <li>Use clear product images of a single clothing item</li>
+          <li>Prefer flat lays with a clean, white background</li>
+          <li>Ensure the garment is the main focus of the image</li>
         </ul>
       </section>
 
+      <SectionDivider />
+
       <section className="space-y-3">
-        <h3 className="font-display text-lg font-semibold text-foreground">Generated results</h3>
+        <h3 className="font-display text-lg font-semibold text-foreground">Results</h3>
         <p className="text-sm text-foreground/90 leading-relaxed">
-          After uploading compliant product and model images, wait <strong>10–13 seconds</strong> to receive the virtual
-          try-on result.
+          Once you upload compatible product and model images, your virtual try-on result should appear within
+          approximately <strong>10–13 seconds</strong>.
         </p>
       </section>
 
-      <footer className="pt-4 border-t border-border/50">
+      <SectionDivider />
+
+      <footer>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          That&apos;s the end of this guide! We&apos;ve covered how to use the Virtual Try-On feature in TryVerse, along
-          with tips to make the most of it. We hope this helps support your creative projects!
+          That&apos;s it for the guide! You now know how to get the best results using TryVerse&apos;s Virtual Try-On
+          feature. Enjoy creating and experimenting!
         </p>
       </footer>
     </div>

@@ -28,7 +28,7 @@ function Stop-ListenersOnPorts {
   Start-Sleep -Seconds 2
 }
 
-Stop-ListenersOnPorts @(3001, 8080)
+Stop-ListenersOnPorts @(3001, 8080, 3000)
 
 $backend = Start-Process -FilePath "npm" -ArgumentList "run", "dev" -WorkingDirectory (Join-Path $root "backend") -PassThru -WindowStyle Normal
 $frontend = Start-Process -FilePath "npm" -ArgumentList "run", "dev" -WorkingDirectory (Join-Path $root "tryverse-ai-virtual-fashion") -PassThru -WindowStyle Normal

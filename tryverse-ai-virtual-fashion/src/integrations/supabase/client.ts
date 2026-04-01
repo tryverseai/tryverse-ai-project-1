@@ -2,8 +2,21 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const rawUrl = import.meta.env.VITE_SUPABASE_URL;
+const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_URL =
+  typeof rawUrl === "string" && rawUrl.trim() !== "" ? rawUrl.trim() : "https://missing-env.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY =
+  typeof rawKey === "string" && rawKey.trim() !== "" ? rawKey.trim() : "missing-publishable-key";
+
+if (
+  import.meta.env.DEV &&
+  (typeof rawUrl !== "string" || !rawUrl.trim() || typeof rawKey !== "string" || !rawKey.trim())
+) {
+  console.warn(
+    "[TryVerse] Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in tryverse-ai-virtual-fashion/.env — see .env.example. Auth will not work until they are set."
+  );
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

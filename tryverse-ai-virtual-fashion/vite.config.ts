@@ -5,7 +5,7 @@ import path from "path";
 // https://vitejs.dev/config/
 export default defineConfig(() => ({
   server: {
-    // Listen on all local addresses so http://localhost:8080 and http://127.0.0.1:8080 both work.
+    // Canonical local UI port for this repo (matches FRONTEND_URL / CORS defaults).
     host: true,
     port: 8080,
     strictPort: true,
