@@ -6,13 +6,30 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Camera, User, Scan, Check, RotateCcw, ArrowRight, Glasses, ShoppingBag, Shirt, AlertCircle, X, BookOpen, Sparkles } from "lucide-react";
+import {
+  Upload,
+  Camera,
+  User,
+  Scan,
+  Check,
+  RotateCcw,
+  ArrowRight,
+  Glasses,
+  ShoppingBag,
+  Shirt,
+  AlertCircle,
+  X,
+  BookOpen,
+  Sparkles,
+  Lock,
+} from "lucide-react";
 import { TryOnGuideContent } from "@/components/dashboard/TryOnGuideContent";
 import { toast } from "sonner";
 import {
   uploadImage,
   startTryOn,
   getTryverseModels,
+  getCredits,
   createPersonPathFromModel,
   isCreditsExhaustedApiError,
   SHOPPER_TRYON_UNAVAILABLE_MESSAGE,
@@ -21,6 +38,12 @@ import {
 } from "@/lib/backendApi";
 import { posthogCapture } from "@/lib/posthog";
 import { captureSentryException } from "@/lib/sentry";
+import { useAuth } from "@/contexts/AuthContext";
+
+function isFreePlanIdForModels(planId: string): boolean {
+  const p = planId.trim().toLowerCase();
+  return p === "free" || p === "free_trial" || p === "trial";
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Mode = "upload" | "ai-model";
@@ -86,6 +109,10 @@ const TryOnStudio = ({
   const embedded = variant === "embedded";
   const [studioSection, setStudioSection] = useState<StudioSection>(() => (embedded ? "tryon" : "guide"));
   const audience = audienceProp ?? (embedded ? "individual" : "business");
+  const { user } = useAuth();
+  /** When false, user is logged out or on free/trial — only free_tier_eligible presets are usable. */
+  const [libraryPaysFullCatalog, setLibraryPaysFullCatalog] = useState(false);
+
   const categories = clothingOnly
     ? ALL_CATEGORIES.filter((c) => c.id === "clothing")
     : ALL_CATEGORIES;
@@ -169,6 +196,25 @@ const TryOnStudio = ({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setLibraryPaysFullCatalog(false);
+      return;
+    }
+    let cancelled = false;
+    void getCredits()
+      .then((c) => {
+        if (cancelled) return;
+        setLibraryPaysFullCatalog(!isFreePlanIdForModels(c.plan));
+      })
+      .catch(() => {
+        if (!cancelled) setLibraryPaysFullCatalog(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // ── Image selection helpers ──────────────────────────────────────────────
   const handleFileSelect = useCallback((
@@ -255,6 +301,16 @@ const TryOnStudio = ({
   const handleTryOnWithLibraryModel = async () => {
     if (!selectedModel || !libraryProductImage) {
       toast.error("Select a model and upload a product image");
+      return;
+    }
+
+    const picked = libraryModels.find((m) => m.id === selectedModel);
+    if (
+      picked &&
+      !libraryPaysFullCatalog &&
+      !(picked.free_tier_eligible ?? (picked.slug === "diane" || picked.slug === "andrew"))
+    ) {
+      toast.error("This model is for paid plans. Use Diane or Andrew on the free tier, or upgrade.");
       return;
     }
 
@@ -346,6 +402,16 @@ const TryOnStudio = ({
   const filteredModels = libraryModels.filter(
     (m) => m.gender === (genderFilter === "Female" ? "female" : "male")
   );
+
+  const isModelLockedForUser = (m: TryverseModel) =>
+    !libraryPaysFullCatalog && !(m.free_tier_eligible ?? (m.slug === "diane" || m.slug === "andrew"));
+
+  const selectedPresetLocked =
+    !!selectedModel &&
+    (() => {
+      const m = libraryModels.find((x) => x.id === selectedModel);
+      return m ? isModelLockedForUser(m) : false;
+    })();
 
   const resolvedCreditsPath = creditsHelpPath ?? (embedded ? "/dashboard/individual?tab=profile" : "/dashboard/business?tab=Billing");
 
@@ -579,11 +645,18 @@ const TryOnStudio = ({
                     <div className="bg-card rounded-2xl border border-border/50 p-6 space-y-4">
                       <div>
                         <h3 className="font-display text-lg font-semibold text-foreground mb-1">1. Choose a model</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Different looks and body types.
-                          {audience === "business" && " Run the migration if the list is empty."}
-                        </p>
-                      </div>
+                    <p className="text-sm text-muted-foreground">
+                      Different looks and body types.
+                      {audience === "business" && " Run the migration if the list is empty."}
+                    </p>
+                    {!libraryPaysFullCatalog && (
+                      <p className="text-xs text-muted-foreground rounded-lg border border-border/60 bg-muted/40 px-3 py-2 mt-2">
+                        <span className="font-medium text-foreground">Free plan:</span> Diane and Andrew are included. Other
+                        models are visible — subscribe to use them, or an admin can mark more presets as free-tier in Admin →
+                        Model library.
+                      </p>
+                    )}
+                  </div>
                       <div className="flex gap-2">
                         {(["Female", "Male"] as const).map((g) => (
                           <button
@@ -611,30 +684,47 @@ const TryOnStudio = ({
                         <p className="text-sm text-muted-foreground py-8 text-center">No models for this filter.</p>
                       ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[min(52vh,520px)] overflow-y-auto pr-1">
-                          {filteredModels.map((model) => (
-                            <button
-                              key={model.id}
-                              type="button"
-                              onClick={() => setSelectedModel(model.id)}
-                              className={`rounded-xl overflow-hidden border-2 text-left transition-all ${
-                                selectedModel === model.id
-                                  ? "border-foreground shadow-soft"
-                                  : "border-border/50 hover:border-foreground/20"
-                              }`}
-                            >
-                              <div className="aspect-[3/4] relative bg-muted">
-                                <img
-                                  src={`${model.image_url}${model.image_url.includes("?") ? "&" : "?"}tryverse_slug=${encodeURIComponent(model.slug)}`}
-                                  alt={model.display_name}
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                />
-                                <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
-                                  <p className="text-white text-xs font-semibold">{model.display_name}</p>
+                          {filteredModels.map((model) => {
+                            const locked = isModelLockedForUser(model);
+                            return (
+                              <button
+                                key={model.id}
+                                type="button"
+                                onClick={() => {
+                                  if (locked) {
+                                    toast.message("Paid plan", {
+                                      description:
+                                        "Subscribe to use this model, or pick Diane / Andrew on the free tier.",
+                                    });
+                                    return;
+                                  }
+                                  setSelectedModel(model.id);
+                                }}
+                                className={`rounded-xl overflow-hidden border-2 text-left transition-all relative ${
+                                  selectedModel === model.id && !locked
+                                    ? "border-foreground shadow-soft"
+                                    : "border-border/50 hover:border-foreground/20"
+                                } ${locked ? "opacity-75 cursor-not-allowed" : ""}`}
+                              >
+                                <div className="aspect-[3/4] relative bg-muted">
+                                  <img
+                                    src={`${model.image_url}${model.image_url.includes("?") ? "&" : "?"}tryverse_slug=${encodeURIComponent(model.slug)}`}
+                                    alt={model.display_name}
+                                    className={`w-full h-full object-cover ${locked ? "grayscale-[0.35]" : ""}`}
+                                    loading="lazy"
+                                  />
+                                  {locked && (
+                                    <div className="absolute top-2 right-2 rounded-full bg-background/90 p-1.5 shadow-sm">
+                                      <Lock className="h-3.5 w-3.5 text-foreground" aria-hidden />
+                                    </div>
+                                  )}
+                                  <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
+                                    <p className="text-white text-xs font-semibold">{model.display_name}</p>
+                                  </div>
                                 </div>
-                              </div>
-                            </button>
-                          ))}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -704,7 +794,13 @@ const TryOnStudio = ({
                       </div>
                       <Button
                         onClick={handleTryOnWithLibraryModel}
-                        disabled={!selectedModel || !libraryProductImage || modelsLoading || !!modelsError}
+                        disabled={
+                          !selectedModel ||
+                          selectedPresetLocked ||
+                          !libraryProductImage ||
+                          modelsLoading ||
+                          !!modelsError
+                        }
                         className="w-full gradient-primary text-primary-foreground shadow-soft"
                       >
                         Try it on <ArrowRight className="ml-2 h-4 w-4" />

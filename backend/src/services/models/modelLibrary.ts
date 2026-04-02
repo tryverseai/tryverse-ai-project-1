@@ -2,6 +2,8 @@ import { supabaseAdmin } from '../../config/supabase';
 import { env } from '../../config/env';
 import { uploadImageBuffer } from '../storage/images';
 import { logger } from '../../config/logger';
+import { isFreeTierPlanId } from '../../lib/planTier';
+import { AppError } from '../../middleware/errorHandler';
 
 const SSRF_BLOCKED_HOSTS =
   /^(localhost|127\.|0\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1|\[::\]|0\.0\.0\.0)/i;
@@ -32,6 +34,35 @@ export interface PublicModelRow {
   appearance_tag: string | null;
   image_url: string;
   sort_order: number;
+  /** When true, users on the free plan may select this preset; paid plans may use any active model. */
+  free_tier_eligible: boolean;
+}
+
+const SELECT_ACTIVE_BASE =
+  'id, slug, display_name, gender, body_type, appearance_tag, image_url, sort_order';
+const SELECT_ACTIVE_WITH_FREE = `${SELECT_ACTIVE_BASE}, free_tier_eligible`;
+const SELECT_ADMIN_BASE = `${SELECT_ACTIVE_BASE}, is_active, created_at`;
+const SELECT_ADMIN_WITH_FREE = `${SELECT_ADMIN_BASE}, free_tier_eligible`;
+
+/** When DB column `free_tier_eligible` is absent, fall back to default free presets. */
+export function freeTierEligibleFromRow(row: {
+  slug: string;
+  free_tier_eligible?: boolean | null;
+}): boolean {
+  if (typeof row.free_tier_eligible === 'boolean') return row.free_tier_eligible;
+  const s = String(row.slug).trim().toLowerCase();
+  return s === 'diane' || s === 'andrew';
+}
+
+function shouldRetryModelQueryWithoutFreeTier(err: { message?: string; details?: string; hint?: string }): boolean {
+  const blob = `${err.message || ''} ${err.details || ''} ${err.hint || ''}`.toLowerCase();
+  return (
+    blob.includes('free_tier_eligible') ||
+    (blob.includes('column') && (blob.includes('does not exist') || blob.includes('not find'))) ||
+    blob.includes('schema cache') ||
+    blob.includes('could not find') ||
+    blob.includes('unknown field')
+  );
 }
 
 function hostnameAllowedForModelImageFetch(hostname: string): boolean {
@@ -103,21 +134,37 @@ function assertSafeImageUrl(url: string): void {
 }
 
 export async function listActiveModels(): Promise<PublicModelRow[]> {
-  const { data, error } = await supabaseAdmin
+  const first = await supabaseAdmin
     .from('tryverse_model_library')
-    .select('id, slug, display_name, gender, body_type, appearance_tag, image_url, sort_order')
+    .select(SELECT_ACTIVE_WITH_FREE)
     .eq('is_active', true)
     .order('sort_order', { ascending: true });
+
+  let data: unknown[] | null = first.data as unknown[] | null;
+  let error = first.error;
+
+  if (error && shouldRetryModelQueryWithoutFreeTier(error)) {
+    logger.warn('listActiveModels: retrying without free_tier_eligible', { message: error.message });
+    const r2 = await supabaseAdmin
+      .from('tryverse_model_library')
+      .select(SELECT_ACTIVE_BASE)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    data = r2.data as unknown[] | null;
+    error = r2.error;
+  }
 
   if (error) {
     logger.error('listActiveModels failed', { message: error.message });
     throw new Error('Could not load model library');
   }
-  return (data || []).flatMap((row) => {
+  return (data || []).flatMap((rowRaw) => {
+    const row = rowRaw as PublicModelRow & { free_tier_eligible?: boolean | null };
     try {
       return [
         {
           ...row,
+          free_tier_eligible: freeTierEligibleFromRow(row),
           image_url: resolveModelImageUrl(row.image_url),
         } as PublicModelRow,
       ];
@@ -132,19 +179,39 @@ export async function listActiveModels(): Promise<PublicModelRow[]> {
 export async function listAllModelsForAdmin(): Promise<
   (PublicModelRow & { is_active: boolean; created_at: string })[]
 > {
-  const { data, error } = await supabaseAdmin
+  const first = await supabaseAdmin
     .from('tryverse_model_library')
-    .select('id, slug, display_name, gender, body_type, appearance_tag, image_url, sort_order, is_active, created_at')
+    .select(SELECT_ADMIN_WITH_FREE)
     .order('sort_order', { ascending: true });
+
+  let data: unknown[] | null = first.data as unknown[] | null;
+  let error = first.error;
+
+  if (error && shouldRetryModelQueryWithoutFreeTier(error)) {
+    logger.warn('listAllModelsForAdmin: retrying without free_tier_eligible', { message: error.message });
+    const r2 = await supabaseAdmin.from('tryverse_model_library').select(SELECT_ADMIN_BASE).order('sort_order', {
+      ascending: true,
+    });
+    data = r2.data as unknown[] | null;
+    error = r2.error;
+  }
 
   if (error) {
     logger.error('listAllModelsForAdmin failed', { message: error.message });
     throw new Error('Could not load model library');
   }
-  return (data || []).map((row) => ({
-    ...row,
-    image_url: resolveModelImageUrl(row.image_url),
-  })) as (PublicModelRow & { is_active: boolean; created_at: string })[];
+  return (data || []).map((rowRaw) => {
+    const row = rowRaw as PublicModelRow & {
+      is_active: boolean;
+      created_at: string;
+      free_tier_eligible?: boolean | null;
+    };
+    return {
+      ...row,
+      free_tier_eligible: freeTierEligibleFromRow(row),
+      image_url: resolveModelImageUrl(row.image_url),
+    } as PublicModelRow & { is_active: boolean; created_at: string };
+  });
 }
 
 export const UUID_RE =
@@ -156,12 +223,34 @@ export const UUID_RE =
  */
 export async function resolveModelToPersonPath(modelIdOrSlug: string, userId: string): Promise<string> {
   const raw = modelIdOrSlug.trim();
-  let qb = supabaseAdmin.from('tryverse_model_library').select('id, image_url, is_active');
+  const base = supabaseAdmin.from('tryverse_model_library');
+  let qb = base.select('id, slug, image_url, is_active, free_tier_eligible');
   qb = UUID_RE.test(raw) ? qb.eq('id', raw) : qb.eq('slug', raw);
-  const { data: row, error } = await qb.maybeSingle();
+  let { data: row, error } = await qb.maybeSingle();
+
+  if (error && shouldRetryModelQueryWithoutFreeTier(error)) {
+    logger.warn('resolveModelToPersonPath: retrying without free_tier_eligible', { message: error.message });
+    let qb2 = base.select('id, slug, image_url, is_active');
+    qb2 = UUID_RE.test(raw) ? qb2.eq('id', raw) : qb2.eq('slug', raw);
+    const r2 = await qb2.maybeSingle();
+    row = r2.data as typeof row;
+    error = r2.error;
+  }
 
   if (error || !row || !row.is_active) {
     throw new Error('Model not found or inactive');
+  }
+
+  const { data: profile } = await supabaseAdmin.from('profiles').select('plan_id').eq('id', userId).maybeSingle();
+  const planId = profile?.plan_id ?? 'free';
+  const freeTier = isFreeTierPlanId(planId);
+  const eligible = freeTierEligibleFromRow(row as { slug: string; free_tier_eligible?: boolean | null });
+  if (freeTier && !eligible) {
+    throw new AppError(
+      'This model is available on paid plans. Upgrade or use a free-tier model (e.g. Diane or Andrew).',
+      403,
+      'MODEL_PAID_ONLY'
+    );
   }
 
   const absoluteUrl = resolveModelImageUrl(row.image_url);

@@ -318,6 +318,7 @@ export type Database = {
           image_url: string
           sort_order: number
           is_active: boolean
+          free_tier_eligible: boolean
           created_at: string
         }
         Insert: {
@@ -330,6 +331,7 @@ export type Database = {
           image_url: string
           sort_order?: number
           is_active?: boolean
+          free_tier_eligible?: boolean
           created_at?: string
         }
         Update: {
@@ -342,6 +344,7 @@ export type Database = {
           image_url?: string
           sort_order?: number
           is_active?: boolean
+          free_tier_eligible?: boolean
           created_at?: string
         }
         Relationships: []

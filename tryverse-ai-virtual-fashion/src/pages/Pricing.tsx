@@ -16,62 +16,127 @@ import { captureSentryException } from "@/lib/sentry";
 import { assignTrustedPaymentCheckoutUrl } from "@/lib/safeUrl";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
+import { cn } from "@/lib/utils";
+
+type PricingAudience = "individual" | "business";
+
+type PlanRow = {
+  id: string;
+  name: string;
+  price_ngn: number;
+  price_usd: number;
+  tryons_per_month: number;
+  features: Json;
+};
+
+/** Shown when Supabase has no `pro` / `creator` row yet (checkout still requires plan in DB for paid tiers). */
+const FALLBACK_PRO: PlanRow = {
+  id: "pro",
+  name: "Pro",
+  price_ngn: 15000,
+  price_usd: 10,
+  tryons_per_month: 75,
+  features: [
+    "50–100 try-ons / month",
+    "HD images",
+    "No watermark",
+    "Download images",
+  ] as unknown as Json,
+};
+
+const FALLBACK_CREATOR: PlanRow = {
+  id: "creator",
+  name: "Creator",
+  price_ngn: 30000,
+  price_usd: 20,
+  tryons_per_month: 250,
+  features: [
+    "200–300 try-ons / month",
+    "HD + better realism",
+    "Generate marketing images",
+    "Priority processing",
+  ] as unknown as Json,
+};
+
+const FREE_IDS = new Set(["free", "free_trial", "trial"]);
+
+type PlanUiEntry = {
+  description: string;
+  goodFor: string;
+  featured: boolean;
+  cta: string;
+  /** Headline when “NGN” pricing is selected (matches checkout when paying in NGN). */
+  displayPriceNgn?: string;
+  /** Headline when “USD” pricing is selected (matches checkout when paying in USD). */
+  displayPriceUsd?: string;
+};
 
 /** Enriches DB plans with on-page marketing copy (not stored in DB). */
-const PLAN_UI: Record<
-  string,
-  { description: string; goodFor: string; featured: boolean; cta: string }
-> = {
+const PLAN_UI: Record<string, PlanUiEntry> = {
   free: {
-    description: "Try the platform at no cost.",
-    goodFor: "Teams",
+    description: "Start with the free try-on pool for your account type.",
+    goodFor: "Exploring TryVerse",
     featured: false,
-    cta: "Get Started",
+    cta: "Get started",
   },
   free_trial: {
-    description: "Try the platform at no cost.",
-    goodFor: "Teams",
+    description: "Start with the free try-on pool for your account type.",
+    goodFor: "Exploring TryVerse",
     featured: false,
-    cta: "Get Started",
+    cta: "Get started",
   },
   trial: {
-    description: "Try the platform at no cost.",
-    goodFor: "Teams",
+    description: "Start with the free try-on pool for your account type.",
+    goodFor: "Exploring TryVerse",
     featured: false,
-    cta: "Get Started",
+    cta: "Get started",
+  },
+  pro: {
+    description: "50–100 try-ons, HD images, no watermark, downloads — for everyday creators.",
+    goodFor: "Creators · Fashion lovers",
+    featured: false,
+    cta: "Upgrade to Pro",
+    displayPriceNgn: "₦15,000",
+    displayPriceUsd: "$10",
+  },
+  creator: {
+    description: "200–300 try-ons with stronger realism, marketing images, and priority processing.",
+    goodFor: "Influencers · Content creators",
+    featured: true,
+    cta: "Go Creator",
+    displayPriceNgn: "₦30,000",
+    displayPriceUsd: "~$20",
   },
   starter: {
-    description: "For testing and small-scale use.",
-    goodFor: "Individuals · Small brands testing",
+    description: "100–200 try-ons and room for 50–100 products — entry for small brands.",
+    goodFor: "Small brands · Pilot programmes",
     featured: false,
-    cta: "Get Started",
+    cta: "Get Starter",
+    displayPriceNgn: "₦80,000",
+    displayPriceUsd: "~$60",
   },
   growth: {
-    description: "For brands creating content.",
-    goodFor: "Growing brands · Social media teams",
+    description: "500–1000 try-ons, 100–500 products, analytics, API/widget, and marketing content at scale.",
+    goodFor: "Growing brands · Performance teams",
     featured: true,
-    cta: "Get Started",
+    cta: "Get Growth",
+    displayPriceNgn: "₦180,000",
+    displayPriceUsd: "~$150",
   },
   enterprise: {
-    description: "For brands at scale.",
-    goodFor: "Large brands · E-commerce",
+    description:
+      "AI video generation, custom models, SLA, and dedicated infrastructure — negotiated to fit your stack.",
+    goodFor: "Retail · Marketplaces · Agencies",
     featured: false,
-    cta: "Contact Sales",
+    cta: "Let's talk",
   },
 };
 
-/** Visual order: Free → Starter → Growth → Enterprise (single row on large screens). */
-const PLAN_DISPLAY_ORDER = ["free", "free_trial", "trial", "starter", "growth", "enterprise"] as const;
+const B2C_ORDER = ["free", "pro", "creator"] as const;
+const B2B_ORDER = ["free", "starter", "growth", "enterprise"] as const;
 
-function sortPlansForDisplay<
-  T extends { id: string },
->(plans: T[]): T[] {
-  const order = [...PLAN_DISPLAY_ORDER];
-  const rank = (id: string) => {
-    const i = order.indexOf(id as (typeof PLAN_DISPLAY_ORDER)[number]);
-    return i === -1 ? 100 : i;
-  };
-  return [...plans].sort((a, b) => rank(a.id) - rank(b.id));
+function firstFreePlan(all: PlanRow[]): PlanRow | undefined {
+  return all.find((p) => FREE_IDS.has(p.id));
 }
 
 function parseFeatures(features: Json): string[] {
@@ -81,6 +146,46 @@ function parseFeatures(features: Json): string[] {
   return [];
 }
 
+function withWidgetEmbed(plan: PlanRow): PlanRow {
+  if (plan.id !== "growth" && plan.id !== "enterprise") return plan;
+  const list = parseFeatures(plan.features);
+  if (list.some((f) => /widget embed/i.test(f))) return plan;
+  return { ...plan, features: ["Widget embed", ...list] as unknown as Json };
+}
+
+/**
+ * Resolves slot ids to rows. `free` slot accepts free | free_trial | trial from DB.
+ * Pro/Creator use DB row or static fallback so Individuals always shows three tiers.
+ */
+function resolvePlansForAudience(all: PlanRow[], audience: PricingAudience): PlanRow[] {
+  const order = audience === "individual" ? B2C_ORDER : B2B_ORDER;
+  return order
+    .map((slotId): PlanRow | null => {
+      if (slotId === "free") {
+        const row = firstFreePlan(all);
+        if (row) return withWidgetEmbed({ ...row, name: "Free" });
+        return {
+          id: "free",
+          name: "Free",
+          price_ngn: 0,
+          price_usd: 0,
+          tryons_per_month: 5,
+          features: [
+            "5 try-ons/month on free pool (individual) · 20 on signup (brands)",
+            "Watermark",
+            "Basic quality",
+          ] as unknown as Json,
+        };
+      }
+      const row = all.find((p) => p.id === slotId);
+      if (row) return withWidgetEmbed(row);
+      if (slotId === "pro") return FALLBACK_PRO;
+      if (slotId === "creator") return FALLBACK_CREATOR;
+      return null;
+    })
+    .filter((p): p is PlanRow => p != null);
+}
+
 function isFreePlanId(id: string): boolean {
   return id === "free" || id === "free_trial" || id === "trial";
 }
@@ -88,23 +193,14 @@ function isFreePlanId(id: string): boolean {
 const Pricing = () => {
   const { user, session } = useAuth();
   const navigate = useNavigate();
+  const [audience, setAudience] = useState<PricingAudience>("individual");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [plansLoading, setPlansLoading] = useState(true);
-  const [dbPlans, setDbPlans] = useState<
-    Array<{
-      id: string;
-      name: string;
-      price_ngn: number;
-      price_usd: number;
-      tryons_per_month: number;
-      features: Json;
-    }>
-  >([]);
+  const [dbPlans, setDbPlans] = useState<PlanRow[]>([]);
   const [providers, setProviders] = useState({
     paystack: false,
     flutterwave: false,
   });
-  /** Bill in USD (Flutterwave) or NGN (Paystack when available, else Flutterwave). */
   const [checkoutCurrency, setCheckoutCurrency] = useState<"USD" | "NGN">("USD");
 
   useEffect(() => {
@@ -118,7 +214,7 @@ const Pricing = () => {
           getPaymentProviders(),
         ]);
         if (error) throw error;
-        setDbPlans(sortPlansForDisplay(planRows || []));
+        setDbPlans(planRows || []);
         setProviders(p);
         if (p.flutterwave) setCheckoutCurrency("USD");
         else if (p.paystack) setCheckoutCurrency("NGN");
@@ -131,9 +227,15 @@ const Pricing = () => {
     })();
   }, []);
 
-  const handleSubscribe = async (plan: (typeof dbPlans)[0]) => {
+  const handleSubscribe = async (plan: PlanRow) => {
     if (plan.id === "enterprise") {
-      window.open("mailto:sales@tryverse.ai?subject=Enterprise Plan Inquiry", "_blank");
+      window.open("mailto:sales@tryverse.ai?subject=TryVerse%20Enterprise%20%2F%20custom%20plan", "_blank");
+      return;
+    }
+
+    const paidNeedsDb = ["pro", "creator", "starter", "growth"].includes(plan.id);
+    if (paidNeedsDb && !dbPlans.some((p) => p.id === plan.id)) {
+      toast.error("This paid plan isn’t in your Supabase yet. Run the latest migrations or add the plan, then try again.");
       return;
     }
 
@@ -144,7 +246,7 @@ const Pricing = () => {
         return;
       }
       navigate("/dashboard");
-      toast.success("You're on the free trial — head to the dashboard to try it out.");
+      toast.success("You're on the free tier — opening your dashboard.");
       return;
     }
 
@@ -214,36 +316,68 @@ const Pricing = () => {
       ? "NGN"
       : checkoutCurrency;
 
-  const renderPlanCard = (plan: (typeof dbPlans)[number], i: number) => {
-    const ui = PLAN_UI[plan.id] || {
+  const visiblePlans = resolvePlansForAudience(dbPlans, audience);
+
+  const renderPlanCard = (plan: PlanRow, i: number) => {
+    const baseUi = PLAN_UI[plan.id] || {
       description: "",
       goodFor: "Teams",
       featured: false,
       cta: "Get Started",
     };
-    const features = parseFeatures(plan.features);
+
+    const freeOverride =
+      isFreePlanId(plan.id)
+        ? audience === "individual"
+          ? {
+              description: "5 try-ons on the free pool, watermark, basic quality — built for sharing.",
+              goodFor: "Virality · Fashion discovery",
+            }
+          : {
+              description: "20 try-ons on signup for your brand, watermark, basic quality — perfect for a pilot.",
+              goodFor: "Small brands testing fit AI",
+            }
+        : {};
+
+    const ui: PlanUiEntry = { ...baseUi, ...freeOverride };
+
+    const features = isFreePlanId(plan.id)
+      ? audience === "individual"
+        ? ["5 try-ons", "Watermark", "Basic quality"]
+        : ["20 try-ons", "Watermark", "Basic quality"]
+      : parseFeatures(plan.features);
     const showUsd = displayCurrency === "USD";
     const free = isFreePlanId(plan.id);
+    const hasDualCurrencyHeadline =
+      Boolean(ui.displayPriceNgn && ui.displayPriceUsd) && plan.id !== "enterprise";
+
     const priceDisplay =
       plan.id === "enterprise"
-        ? "Lets Talk"
+        ? "Let's talk"
         : free
-          ? "$0"
-          : showUsd
-            ? formatUsd(plan.price_usd)
-            : formatNgn(plan.price_ngn);
+          ? showUsd
+            ? "$0"
+            : "₦0"
+          : hasDualCurrencyHeadline
+            ? showUsd
+              ? ui.displayPriceUsd!
+              : ui.displayPriceNgn!
+            : showUsd
+              ? formatUsd(plan.price_usd)
+              : formatNgn(plan.price_ngn);
 
     return (
       <motion.div
-        key={plan.id}
+        key={`${audience}-${plan.id}`}
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: i * 0.1 }}
-        className={`rounded-2xl p-6 sm:p-7 border flex flex-col h-full min-h-0 min-w-0 ${
+        className={cn(
+          "rounded-2xl p-6 sm:p-7 border flex flex-col h-full min-h-0 min-w-0",
           ui.featured
             ? "border-foreground bg-foreground text-background shadow-elevated relative"
             : "border-border/50 bg-card"
-        }`}
+        )}
       >
         {ui.featured && (
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-background text-foreground text-xs font-semibold">
@@ -251,33 +385,24 @@ const Pricing = () => {
           </div>
         )}
         <div className="mb-6">
-          <h3 className="font-display text-lg font-semibold mb-1">{plan.name}</h3>
-          <p className={`text-sm mb-1 ${ui.featured ? "text-background/70" : "text-muted-foreground"}`}>
-            {ui.description}
-          </p>
-          <p className={`text-xs mb-4 ${ui.featured ? "text-background/60" : "text-muted-foreground/80"}`}>
+          <h3 className="font-display text-lg font-semibold mb-1">{free ? "Free" : plan.name}</h3>
+          <p className={cn("text-sm mb-1", ui.featured ? "text-background/70" : "text-muted-foreground")}>{ui.description}</p>
+          <p className={cn("text-xs mb-4", ui.featured ? "text-background/60" : "text-muted-foreground/80")}>
             Good for: {ui.goodFor}
           </p>
-          <div className="flex items-baseline gap-1">
-            <span className="font-display text-4xl font-bold">{priceDisplay}</span>
-            <span className={`text-sm ${ui.featured ? "text-background/60" : "text-muted-foreground"}`}>
+          <div className="flex flex-wrap items-baseline gap-1">
+            <span className="font-display text-3xl sm:text-4xl font-bold leading-tight">{priceDisplay}</span>
+            <span className={cn("text-sm", ui.featured ? "text-background/60" : "text-muted-foreground")}>
               {plan.id === "enterprise" || free ? "" : "/month"}
             </span>
           </div>
-          {plan.id !== "enterprise" && (
-            <p className={`text-[10px] mt-1 ${ui.featured ? "text-background/50" : "text-muted-foreground"}`}>
-              {plan.tryons_per_month >= 0
-                ? `${plan.tryons_per_month.toLocaleString()} try-ons / month`
-                : "Unlimited try-ons"}
-            </p>
-          )}
         </div>
 
         <ul className="space-y-3 flex-1 mb-8">
           {features.map((feature) => (
             <li key={feature} className="flex items-start gap-2.5 text-sm">
               <Check
-                className={`h-4 w-4 mt-0.5 flex-shrink-0 ${ui.featured ? "text-background/70" : "text-foreground"}`}
+                className={cn("h-4 w-4 mt-0.5 flex-shrink-0", ui.featured ? "text-background/70" : "text-foreground")}
               />
               <span className={ui.featured ? "text-background/90" : "text-foreground"}>{feature}</span>
             </li>
@@ -285,11 +410,10 @@ const Pricing = () => {
         </ul>
 
         <Button
-          className={`w-full mt-auto shrink-0 ${
-            ui.featured
-              ? "bg-background text-foreground hover:bg-background/90"
-              : "gradient-primary text-primary-foreground shadow-soft"
-          }`}
+          className={cn(
+            "w-full mt-auto shrink-0",
+            ui.featured ? "bg-background text-foreground hover:bg-background/90" : "gradient-primary text-primary-foreground shadow-soft"
+          )}
           onClick={() => handleSubscribe(plan)}
           disabled={loadingPlan === plan.id}
         >
@@ -316,26 +440,66 @@ const Pricing = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-16"
+            className="text-center mb-12 md:mb-14"
           >
             <p className="text-xs font-medium text-muted-foreground mb-3 tracking-[0.2em] uppercase">Pricing</p>
             <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">
-              Simple, Transparent Pricing
+              Plans for people and for brands
             </h1>
-            <p className="text-muted-foreground text-lg max-w-xl mx-auto mb-6">
-              Choose the plan that fits your brand. Pay securely by card or bank when you&apos;re ready.
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
+              Whether you&apos;re trying outfits for yourself (B2C) or scaling virtual try-on for shoppers (B2B), pick the
+              lane that fits — then pay securely by card or bank when you&apos;re ready.
             </p>
 
-            {providers.flutterwave && (
-              <div className="flex flex-col items-center gap-3 max-w-md mx-auto mb-2">
+            <div
+              className="inline-flex rounded-full border border-border/80 bg-muted/40 p-1.5 gap-1 mx-auto mb-8"
+              role="tablist"
+              aria-label="Pricing audience"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={audience === "individual"}
+                className={cn(
+                  "px-5 py-2.5 rounded-full text-sm font-semibold transition-colors",
+                  audience === "individual" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setAudience("individual")}
+              >
+                For individuals
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={audience === "business"}
+                className={cn(
+                  "px-5 py-2.5 rounded-full text-sm font-semibold transition-colors",
+                  audience === "business" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setAudience("business")}
+              >
+                For brands
+              </button>
+            </div>
+
+            {(providers.flutterwave || providers.paystack) && (
+              <div className="flex flex-col items-center gap-2 max-w-md mx-auto mb-2">
+                <label htmlFor="pricing-currency" className="text-xs text-muted-foreground">
+                  Show prices &amp; pay in
+                </label>
                 <select
+                  id="pricing-currency"
                   value={checkoutCurrency}
                   onChange={(e) => setCheckoutCurrency(e.target.value as "USD" | "NGN")}
-                  className="text-xs border border-border rounded-md bg-background px-3 py-2 min-w-[200px]"
-                  aria-label="Checkout currency"
+                  className="text-xs border border-border rounded-md bg-background px-3 py-2 min-w-[220px]"
+                  aria-label="Pricing and checkout currency"
                 >
-                  <option value="USD">USD (from plan)</option>
-                  <option value="NGN">NGN (from plan)</option>
+                  <option value="USD" disabled={!providers.flutterwave}>
+                    USD
+                  </option>
+                  <option value="NGN" disabled={!providers.paystack && !providers.flutterwave}>
+                    NGN
+                  </option>
                 </select>
               </div>
             )}
@@ -345,13 +509,18 @@ const Pricing = () => {
             <div className="flex justify-center py-24">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : dbPlans.length === 0 ? (
+          ) : visiblePlans.length === 0 ? (
             <p className="text-center text-muted-foreground py-12">
               Plans aren’t available at the moment. Please check back soon.
             </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6 items-stretch max-w-7xl mx-auto w-full">
-              {dbPlans.map((plan, i) => renderPlanCard(plan, i))}
+            <div
+              className={cn(
+                "grid grid-cols-1 gap-5 lg:gap-6 items-stretch max-w-7xl mx-auto w-full",
+                audience === "individual" ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-4"
+              )}
+            >
+              {visiblePlans.map((plan, i) => renderPlanCard(plan, i))}
             </div>
           )}
 

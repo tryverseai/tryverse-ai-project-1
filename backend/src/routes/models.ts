@@ -5,6 +5,7 @@ import { optionalApiKey } from '../middleware/apiKey';
 import { handleValidationErrors } from '../middleware/validate';
 import { listActiveModels, resolveModelToPersonPath } from '../services/models/modelLibrary';
 import { logger } from '../config/logger';
+import { AppError } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -51,6 +52,10 @@ router.post(
       const filePath = await resolveModelToPersonPath(modelId, userId);
       res.status(201).json({ success: true, filePath });
     } catch (err) {
+      if (err instanceof AppError) {
+        res.status(err.statusCode).json({ error: err.message, code: err.code });
+        return;
+      }
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('not found') || msg.includes('inactive')) {
         res.status(404).json({ error: msg });

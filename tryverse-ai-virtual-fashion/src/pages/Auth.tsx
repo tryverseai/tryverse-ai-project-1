@@ -121,12 +121,25 @@ const Auth = () => {
     const resolved = new URL(nextPath, window.location.origin);
     if (resolved.origin !== window.location.origin) {
       navigate("/dashboard", { replace: true });
-    } else {
+      return;
+    }
+    const pathOnly = resolved.pathname;
+    // Always enter through /dashboard so DashboardHomeRedirect + AccountTypeGate use DB account_type.
+    if (
+      pathOnly === "/dashboard" ||
+      pathOnly.startsWith("/dashboard/business") ||
+      pathOnly.startsWith("/dashboard/individual")
+    ) {
       navigate(
-        { pathname: resolved.pathname, search: resolved.search, hash: resolved.hash },
+        { pathname: "/dashboard", search: resolved.search, hash: resolved.hash },
         { replace: true }
       );
+      return;
     }
+    navigate(
+      { pathname: resolved.pathname, search: resolved.search, hash: resolved.hash },
+      { replace: true }
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -191,6 +191,8 @@ export interface TryverseModel {
   appearance_tag: string | null;
   image_url: string;
   sort_order: number;
+  /** Free-plan users may only use models where this is true (enforced on API). */
+  free_tier_eligible?: boolean;
 }
 
 export async function getTryverseModels(): Promise<TryverseModel[]> {
@@ -259,11 +261,13 @@ export async function getCredits() {
   const res = await fetch(`${BACKEND_URL}/api/credits`, { headers });
   return handleResponse<{
     plan: string;
+    accountType: 'individual' | 'business';
     isUnlimited: boolean;
     freeCreditsRemaining: number;
     freeCreditsTotal: number;
     monthlyCreditsRemaining: number;
     monthlyCreditsTotal: number;
+    monthlyCreditsUsed: number;
     usagePercent: number;
   }>(res);
 }
@@ -663,8 +667,19 @@ export async function getAdminMetrics(adminKey: string) {
 
 export async function getAdminModelLibrary(adminKey: string) {
   return adminFetch<{
-    models: (TryverseModel & { is_active: boolean; created_at: string })[];
+    models: (TryverseModel & { is_active: boolean; free_tier_eligible: boolean; created_at: string })[];
   }>('/api/admin/model-library', adminKey, { cache: 'no-store' });
+}
+
+export async function patchAdminModelLibrary(
+  adminKey: string,
+  modelId: string,
+  patch: { is_active?: boolean; free_tier_eligible?: boolean }
+) {
+  return adminFetch<{ ok: boolean; id: string }>(`/api/admin/model-library/${modelId}`, adminKey, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
 }
 
 export async function getAdminUsers(

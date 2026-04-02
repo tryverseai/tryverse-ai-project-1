@@ -11,6 +11,18 @@ import { toast } from "sonner";
 import { safeImageSrcForDom, openExternalHttpUrlInNewTab } from "@/lib/safeUrl";
 import { Link } from "react-router-dom";
 
+function planLabel(planId: string): string {
+  const map: Record<string, string> = {
+    free: "Free",
+    pro: "Pro",
+    creator: "Creator",
+    starter: "Starter",
+    growth: "Growth",
+    enterprise: "Enterprise",
+  };
+  return map[planId] || planId.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 const tabs = [
   { id: "guide", label: "Tips & guide", icon: BookOpen },
   { id: "studio", label: "Try on", icon: Sparkles },
@@ -35,7 +47,14 @@ const IndividualDashboard = () => {
   const tabParam = searchParams.get("tab") as TabId | null;
   const [activeTab, setActiveTab] = useState<TabId>("guide");
   const { user, signOut } = useAuth();
-  const [credits, setCredits] = useState<{ free: number; monthly: number } | null>(null);
+  const [credits, setCredits] = useState<{
+    plan: string;
+    free: number;
+    freeTotal: number;
+    monthly: number;
+    monthlyTotal: number;
+    unlimited: boolean;
+  } | null>(null);
   const [creations, setCreations] = useState<HistoryItem[]>([]);
   const [creationsLoading, setCreationsLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -58,8 +77,12 @@ const IndividualDashboard = () => {
     try {
       const c = await getCredits();
       setCredits({
+        plan: c.plan,
         free: c.freeCreditsRemaining,
+        freeTotal: c.freeCreditsTotal,
         monthly: c.monthlyCreditsRemaining,
+        monthlyTotal: c.monthlyCreditsTotal,
+        unlimited: c.isUnlimited,
       });
     } catch {
       setCredits(null);
@@ -122,6 +145,45 @@ const IndividualDashboard = () => {
             <p className="text-sm text-muted-foreground mt-1">
               Try outfits on your photos — quick, private, and yours to download.
             </p>
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-card/80 p-4 md:p-5 mb-8">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Your plan &amp; credits</p>
+            {credits ? (
+              <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-3">
+                <div>
+                  <p className="font-display text-lg font-semibold text-foreground">{planLabel(credits.plan)}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Free try-ons:{" "}
+                    <span className="text-foreground font-medium">
+                      {credits.free} / {credits.freeTotal}
+                    </span>{" "}
+                    left
+                  </p>
+                  {!["free", "free_trial", "trial"].includes(credits.plan) &&
+                  !credits.unlimited &&
+                  credits.monthlyTotal > 0 ? (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Plan try-ons this cycle:{" "}
+                      <span className="text-foreground font-medium">
+                        {credits.monthly} / {credits.monthlyTotal}
+                      </span>
+                    </p>
+                  ) : null}
+                  {credits.unlimited ? (
+                    <p className="text-sm text-muted-foreground mt-1">Included try-ons: unlimited on your plan</p>
+                  ) : null}
+                </div>
+                <Link
+                  to="/pricing"
+                  className="text-sm font-medium text-foreground underline underline-offset-4 self-start sm:self-center"
+                >
+                  Change plan
+                </Link>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Loading credits…</p>
+            )}
           </div>
 
           {/* Desktop tabs */}
@@ -274,13 +336,23 @@ const IndividualDashboard = () => {
                   <p className="text-muted-foreground">Plan &amp; try-ons</p>
                   {credits ? (
                     <p className="text-foreground">
-                      Free try-ons left: <strong>{credits.free}</strong>
-                      {credits.monthly > 0 && (
+                      Plan: <strong>{planLabel(credits.plan)}</strong>
+                      <br />
+                      Free pool: <strong>{credits.free}</strong> / {credits.freeTotal}
+                      {!["free", "free_trial", "trial"].includes(credits.plan) &&
+                      !credits.unlimited &&
+                      credits.monthlyTotal > 0 ? (
                         <>
-                          {" "}
-                          · Monthly balance: <strong>{credits.monthly}</strong>
+                          <br />
+                          This cycle: <strong>{credits.monthly}</strong> / {credits.monthlyTotal}
                         </>
-                      )}
+                      ) : null}
+                      {credits.unlimited ? (
+                        <>
+                          <br />
+                          Included try-ons: <strong>unlimited</strong>
+                        </>
+                      ) : null}
                     </p>
                   ) : (
                     <p className="text-muted-foreground">Could not load credits.</p>

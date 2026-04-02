@@ -17,16 +17,31 @@ interface Stats {
 }
 
 interface Profile {
-  free_credits_remaining: number;
-  free_credits_total: number;
   widget_activated: boolean;
 }
+
+function planLabel(planId: string): string {
+  const map: Record<string, string> = {
+    free: "Free",
+    pro: "Pro",
+    creator: "Creator",
+    starter: "Starter",
+    growth: "Growth",
+    enterprise: "Enterprise",
+    free_trial: "Free trial",
+    trial: "Trial",
+  };
+  return map[planId] || planId.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+type CreditSummary = Awaited<ReturnType<typeof getCredits>>;
 
 export function OverviewTab() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<Stats | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [credits, setCredits] = useState<CreditSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,9 +50,10 @@ export function OverviewTab() {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-      const [{ data: events }, { data: profileData }] = await Promise.all([
+      const [{ data: events }, { data: profileData }, creditSummary] = await Promise.all([
         supabase.from("usage_events").select("event_type, created_at").order("created_at", { ascending: true }),
-        supabase.from("profiles").select("free_credits_remaining, free_credits_total, widget_activated").eq("id", user.id).single(),
+        supabase.from("profiles").select("widget_activated").eq("id", user.id).single(),
+        getCredits().catch(() => null),
       ]);
 
       const allEvents = events || [];
@@ -64,12 +80,10 @@ export function OverviewTab() {
         row
           ? {
               widget_activated: row.widget_activated,
-              free_credits_remaining:
-                creditsApi?.freeCreditsRemaining ?? row.free_credits_remaining ?? 20,
-              free_credits_total: creditsApi?.freeCreditsTotal ?? row.free_credits_total ?? 20,
             }
           : null
       );
+      setCredits(creditSummary);
       setLoading(false);
     };
     fetchData();
@@ -83,9 +97,21 @@ export function OverviewTab() {
     );
   }
 
-  const creditsRemaining = profile?.free_credits_remaining ?? 20;
-  const creditsTotal = profile?.free_credits_total ?? 20;
+  const freeRemaining = credits?.freeCreditsRemaining ?? 0;
+  const freeTotal = credits?.freeCreditsTotal ?? 0;
+  const monthlyRemaining = credits?.monthlyCreditsRemaining ?? 0;
+  const monthlyTotal = credits?.monthlyCreditsTotal ?? 0;
+  const showMonthly =
+    Boolean(credits?.plan && credits.plan !== "free" && credits.plan !== "free_trial" && credits.plan !== "trial") &&
+    !credits?.isUnlimited &&
+    monthlyTotal > 0;
+  const tryOnBudgetLow =
+    Boolean(credits) &&
+    !credits!.isUnlimited &&
+    freeRemaining <= 0 &&
+    (!showMonthly || monthlyRemaining <= 0);
   const widgetActivated = profile?.widget_activated ?? false;
+  const planName = credits ? planLabel(credits.plan) : "—";
 
   const statCards = [
     { label: "Total Try-Ons", value: stats?.totalTryOns.toLocaleString() || "0", icon: Eye },
@@ -101,27 +127,63 @@ export function OverviewTab() {
         <p className="text-sm text-muted-foreground mt-1">Your virtual try-on performance at a glance</p>
       </div>
 
-      {/* Credits Banner */}
-      <div className={`rounded-xl border p-5 mb-8 ${creditsRemaining > 0 ? "border-border/50 bg-card" : "border-destructive/30 bg-destructive/5"}`}>
+      {/* Credits & plan */}
+      <div
+        className={`rounded-xl border p-5 mb-8 ${
+          !credits ? "border-border/50 bg-card" : !tryOnBudgetLow ? "border-border/50 bg-card" : "border-destructive/30 bg-destructive/5"
+        }`}
+      >
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${creditsRemaining > 0 ? "gradient-primary shadow-soft" : "bg-destructive/10"}`}>
-              <Sparkles className={`h-5 w-5 ${creditsRemaining > 0 ? "text-primary-foreground" : "text-destructive"}`} />
+          <div className="flex items-start gap-3">
+            <div
+              className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                !credits || !tryOnBudgetLow ? "gradient-primary shadow-soft" : "bg-destructive/10"
+              }`}
+            >
+              <Sparkles
+                className={`h-5 w-5 ${!credits || !tryOnBudgetLow ? "text-primary-foreground" : "text-destructive"}`}
+              />
             </div>
-            <div>
-              <p className="font-display text-sm font-semibold text-foreground">Free AI Try-On Credits</p>
-              <p className="text-lg font-bold text-foreground">{creditsRemaining} / {creditsTotal} <span className="text-sm font-normal text-muted-foreground">Remaining</span></p>
+            <div className="space-y-1 min-w-0">
+              <p className="font-display text-sm font-semibold text-foreground">Plan &amp; try-ons</p>
+              {credits ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Current plan: <span className="text-foreground font-medium">{planName}</span>
+                    {credits.isUnlimited ? (
+                      <span className="text-foreground font-medium"> · Unlimited included try-ons</span>
+                    ) : null}
+                  </p>
+                  <p className="text-lg font-bold text-foreground">
+                    Free pool: {freeRemaining} / {freeTotal}
+                    <span className="text-sm font-normal text-muted-foreground"> remaining</span>
+                  </p>
+                  {showMonthly && (
+                    <p className="text-sm font-medium text-foreground">
+                      Plan try-ons this cycle: {monthlyRemaining.toLocaleString()} / {monthlyTotal.toLocaleString()}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Credit details will appear here once loaded.</p>
+              )}
             </div>
           </div>
-          {creditsRemaining === 0 && !widgetActivated && (
+          {tryOnBudgetLow && (
             <Button onClick={() => navigate("/pricing")} className="gradient-primary text-primary-foreground shadow-soft">
-              Activate Widget
+              {!widgetActivated ? "Activate widget" : "View plans"}
             </Button>
           )}
         </div>
-        {creditsRemaining === 0 && !widgetActivated && (
+        {tryOnBudgetLow && (
           <p className="text-sm text-muted-foreground mt-3">
-            You've used your free TryVerse tests. Activate your widget to continue using AI try-ons.
+            You&apos;ve used the try-ons included on your current plan.{" "}
+            {!widgetActivated ? "Activate your widget or upgrade to continue." : "Upgrade for more capacity."}
+          </p>
+        )}
+        {!credits && (
+          <p className="text-sm text-amber-700 dark:text-amber-400 mt-3">
+            Couldn&apos;t load credit balance from the server. Check your connection or refresh the page.
           </p>
         )}
       </div>

@@ -95,6 +95,62 @@ router.get('/model-library', async (_req: Request, res: Response, next: NextFunc
 });
 
 /**
+ * PATCH /api/admin/model-library/:id
+ * Toggle catalog visibility (is_active) and free-tier preset access (free_tier_eligible).
+ */
+router.patch(
+  '/model-library/:id',
+  [
+    param('id').isUUID().withMessage('id must be a model UUID'),
+    body('is_active').optional().isBoolean(),
+    body('free_tier_eligible').optional().isBoolean(),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = matchedData(req) as { id: string };
+      const b = matchedData(req) as { is_active?: boolean; free_tier_eligible?: boolean };
+      const patch: Record<string, boolean> = {};
+      if (typeof b.is_active === 'boolean') patch.is_active = b.is_active;
+      if (typeof b.free_tier_eligible === 'boolean') patch.free_tier_eligible = b.free_tier_eligible;
+      if (Object.keys(patch).length === 0) {
+        res.status(400).json({ error: 'Provide is_active and/or free_tier_eligible (boolean).' });
+        return;
+      }
+      const { data: row, error: fetchErr } = await supabaseAdmin
+        .from('tryverse_model_library')
+        .select('id, slug, display_name')
+        .eq('id', id)
+        .maybeSingle();
+      if (fetchErr) throw fetchErr;
+      if (!row) {
+        res.status(404).json({ error: 'Model not found' });
+        return;
+      }
+      const { error } = await supabaseAdmin.from('tryverse_model_library').update(patch).eq('id', id);
+      if (error) throw error;
+      await logAudit({
+        event_type: 'admin_action',
+        actor: 'admin',
+        action: 'model_library_update',
+        target_id: id,
+        details: {
+          summary: `Updated model ${row.display_name} (${row.slug}): ${JSON.stringify(patch)}`,
+          model_id: id,
+          slug: row.slug,
+          patch,
+        },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+      res.json({ ok: true, id, ...patch });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
  * GET /api/admin/metrics
  * High-level platform metrics dashboard.
  */
