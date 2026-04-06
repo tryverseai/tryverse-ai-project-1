@@ -2,8 +2,8 @@ import { supabaseAdmin } from '../../config/supabase';
 import { env } from '../../config/env';
 import { uploadImageBuffer } from '../storage/images';
 import { logger } from '../../config/logger';
-import { isFreeTierPlanId } from '../../lib/planTier';
 import { AppError } from '../../middleware/errorHandler';
+import { checkCredits, SHOPPER_TRYON_UNAVAILABLE_MESSAGE } from '../credits';
 
 const SSRF_BLOCKED_HOSTS =
   /^(localhost|127\.|0\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1|\[::\]|0\.0\.0\.0)/i;
@@ -241,16 +241,9 @@ export async function resolveModelToPersonPath(modelIdOrSlug: string, userId: st
     throw new Error('Model not found or inactive');
   }
 
-  const { data: profile } = await supabaseAdmin.from('profiles').select('plan_id').eq('id', userId).maybeSingle();
-  const planId = profile?.plan_id ?? 'free';
-  const freeTier = isFreeTierPlanId(planId);
-  const eligible = freeTierEligibleFromRow(row as { slug: string; free_tier_eligible?: boolean | null });
-  if (freeTier && !eligible) {
-    throw new AppError(
-      'This model is available on paid plans. Upgrade or use a free-tier model (e.g. Diane or Andrew).',
-      403,
-      'MODEL_PAID_ONLY'
-    );
+  const creditCheck = await checkCredits(userId);
+  if (!creditCheck.allowed) {
+    throw new AppError(SHOPPER_TRYON_UNAVAILABLE_MESSAGE, 402, 'CREDITS_EXHAUSTED');
   }
 
   const absoluteUrl = resolveModelImageUrl(row.image_url);

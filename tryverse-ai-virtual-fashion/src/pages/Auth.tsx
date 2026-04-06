@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,19 +159,18 @@ const Auth = () => {
         console.error("Signup error:", error);
         const t = signUpErrorToast(error, "individual");
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
-      } else if (session) {
-        posthogCapture("user_signed_up", { email, account_type: "individual", immediate_session: true });
-        toast({
-          title: "Welcome",
-          description: "You're signed in — taking you to your dashboard.",
-        });
-        goToDashboardAfterAuth();
       } else {
+        if (session) {
+          await signOut();
+        }
         posthogCapture("user_signed_up", { email, account_type: "individual", immediate_session: false });
+        navigate("/auth", { replace: true, state: { postSignupEmail: email } });
         toast({
           title: "Account created",
-          description: "Confirm your email from the link we sent, then sign in here.",
+          description: "Sign in with your email and password to continue.",
+          duration: 9000,
         });
+        setPassword("");
       }
     } else if (showBusinessSignupForm) {
       const finalRole = role === "Other" ? customRole : role;
@@ -180,19 +179,18 @@ const Auth = () => {
         console.error("Signup error:", error);
         const t = signUpErrorToast(error, "business");
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
-      } else if (session) {
-        posthogCapture("user_signed_up", { email, account_type: "business", immediate_session: true });
-        toast({
-          title: "Welcome",
-          description: "You're signed in — taking you to your dashboard.",
-        });
-        goToDashboardAfterAuth();
       } else {
+        if (session) {
+          await signOut();
+        }
         posthogCapture("user_signed_up", { email, account_type: "business", immediate_session: false });
+        navigate("/auth", { replace: true, state: { postSignupEmail: email } });
         toast({
           title: "Account created",
-          description: "Confirm your email from the link we sent, then sign in here.",
+          description: "Sign in with your email and password to continue.",
+          duration: 9000,
         });
+        setPassword("");
       }
     } else {
       const { error } = await signIn(email, password);

@@ -9,11 +9,11 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import {
   TermsContent,
-  PrivacyContent,
   DataProcessingContent,
   PersonalDataNoticeContent,
   type PolicyAudience,
 } from "@/content/policyContent";
+import { TermlyPrivacyPolicyContent } from "@/content/TermlyPrivacyPolicyContent";
 import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
 import { dashboardPathForAccountType, type AccountType } from "@/lib/accountType";
@@ -76,9 +76,9 @@ function buildSteps(accountType: PolicyAudience): StepDef[] {
     {
       id: "privacy",
       title: "Privacy Policy",
-      subtitle: "Last updated: March 9, 2026",
+      subtitle: "Last updated: April 6, 2026",
       icon: Shield,
-      content: PrivacyContent,
+      content: TermlyPrivacyPolicyContent,
       isLegal: true,
     },
     dataStep,

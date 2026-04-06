@@ -40,9 +40,20 @@ import { posthogCapture } from "@/lib/posthog";
 import { captureSentryException } from "@/lib/sentry";
 import { useAuth } from "@/contexts/AuthContext";
 
-function isFreePlanIdForModels(planId: string): boolean {
-  const p = planId.trim().toLowerCase();
-  return p === "free" || p === "free_trial" || p === "trial";
+/** Diane / Andrew pinned first in Studio lists so order stays correct even when DB sort_order differs (e.g. Zoe lower than Diane). */
+function sortTryverseModelsForDisplay(models: TryverseModel[]): TryverseModel[] {
+  const rank = (slug: string) => {
+    const s = slug.trim().toLowerCase();
+    if (s === "diane" || s === "andrew") return 0;
+    return 1;
+  };
+  return [...models].sort((a, b) => {
+    const ra = rank(a.slug);
+    const rb = rank(b.slug);
+    if (ra !== rb) return ra - rb;
+    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+    return a.display_name.localeCompare(b.display_name);
+  });
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -110,8 +121,8 @@ const TryOnStudio = ({
   const [studioSection, setStudioSection] = useState<StudioSection>(() => (embedded ? "tryon" : "guide"));
   const audience = audienceProp ?? (embedded ? "individual" : "business");
   const { user } = useAuth();
-  /** When false, user is logged out or on free/trial — only free_tier_eligible presets are usable. */
-  const [libraryPaysFullCatalog, setLibraryPaysFullCatalog] = useState(false);
+  /** When true, preset models are usable (logged-in user still has try-on credits). */
+  const [studioModelsUnlocked, setStudioModelsUnlocked] = useState(false);
 
   const categories = clothingOnly
     ? ALL_CATEGORIES.filter((c) => c.id === "clothing")
@@ -180,7 +191,7 @@ const TryOnStudio = ({
       try {
         const models = await getTryverseModels();
         if (!cancelled) {
-          setLibraryModels(models);
+          setLibraryModels(sortTryverseModelsForDisplay(models));
           setModelsError(null);
         }
       } catch (e) {
@@ -199,17 +210,19 @@ const TryOnStudio = ({
 
   useEffect(() => {
     if (!user) {
-      setLibraryPaysFullCatalog(false);
+      setStudioModelsUnlocked(false);
       return;
     }
     let cancelled = false;
     void getCredits()
       .then((c) => {
         if (cancelled) return;
-        setLibraryPaysFullCatalog(!isFreePlanIdForModels(c.plan));
+        const hasCredits =
+          c.isUnlimited || c.freeCreditsRemaining + c.monthlyCreditsRemaining > 0;
+        setStudioModelsUnlocked(hasCredits);
       })
       .catch(() => {
-        if (!cancelled) setLibraryPaysFullCatalog(false);
+        if (!cancelled) setStudioModelsUnlocked(false);
       });
     return () => {
       cancelled = true;
@@ -304,13 +317,10 @@ const TryOnStudio = ({
       return;
     }
 
-    const picked = libraryModels.find((m) => m.id === selectedModel);
-    if (
-      picked &&
-      !libraryPaysFullCatalog &&
-      !(picked.free_tier_eligible ?? (picked.slug === "diane" || picked.slug === "andrew"))
-    ) {
-      toast.error("This model is for paid plans. Use Diane or Andrew on the free tier, or upgrade.");
+    if (!studioModelsUnlocked) {
+      toast.error("You're out of try-on credits.", {
+        description: "Add credits to use preset models, or try again later.",
+      });
       return;
     }
 
@@ -403,8 +413,7 @@ const TryOnStudio = ({
     (m) => m.gender === (genderFilter === "Female" ? "female" : "male")
   );
 
-  const isModelLockedForUser = (m: TryverseModel) =>
-    !libraryPaysFullCatalog && !(m.free_tier_eligible ?? (m.slug === "diane" || m.slug === "andrew"));
+  const isModelLockedForUser = (_m: TryverseModel) => !studioModelsUnlocked;
 
   const selectedPresetLocked =
     !!selectedModel &&
@@ -649,11 +658,16 @@ const TryOnStudio = ({
                       Different looks and body types.
                       {audience === "business" && " Run the migration if the list is empty."}
                     </p>
-                    {!libraryPaysFullCatalog && (
+                    {user && !studioModelsUnlocked && (
                       <p className="text-xs text-muted-foreground rounded-lg border border-border/60 bg-muted/40 px-3 py-2 mt-2">
-                        <span className="font-medium text-foreground">Free plan:</span> Diane and Andrew are included. Other
-                        models are visible — subscribe to use them, or an admin can mark more presets as free-tier in Admin →
-                        Model library.
+                        <span className="font-medium text-foreground">Out of try-on credits:</span> preset models are locked
+                        until you add credits.{" "}
+                        <Link
+                          to={resolvedCreditsPath}
+                          className="text-foreground font-medium underline underline-offset-2 hover:no-underline"
+                        >
+                          Add credits
+                        </Link>
                       </p>
                     )}
                   </div>
@@ -692,9 +706,9 @@ const TryOnStudio = ({
                                 type="button"
                                 onClick={() => {
                                   if (locked) {
-                                    toast.message("Paid plan", {
+                                    toast.message("Try-on credits needed", {
                                       description:
-                                        "Subscribe to use this model, or pick Diane / Andrew on the free tier.",
+                                        "Add credits to unlock preset models, or sign in if you haven't yet.",
                                     });
                                     return;
                                   }

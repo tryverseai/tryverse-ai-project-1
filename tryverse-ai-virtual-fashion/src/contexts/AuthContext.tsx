@@ -102,15 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) {
       return { error: error as Error, session: null };
     }
-    let session = data.session ?? null;
-    // If "Confirm email" is off, Supabase usually returns a session on signUp. If not, try one sign-in
-    // so the client has a session and can load the dashboard without a confirmation round-trip.
-    if (!session) {
-      const signInRes = await supabase.auth.signInWithPassword({ email, password });
-      if (!signInRes.error) {
-        session = signInRes.data.session;
-      }
-    }
+    const session = data.session ?? null;
     return { error: null, session };
   };
 
