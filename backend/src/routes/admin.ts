@@ -2,8 +2,10 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { body, param, query, matchedData } from 'express-validator';
 import { requireAdmin } from '../middleware/auth';
 import { handleValidationErrors } from '../middleware/validate';
-import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
+import { anyApi, convexQueryTrusted, convexMutationTrusted } from '../config/convexHttp';
+import { cxGetProfile, cxPatchProfile } from '../services/creditsConvexBridge';
+import { cxPatchTryon } from '../services/tryonConvexBridge';
 import { getTryOnQueue } from '../services/queue/producer';
 import { enqueueTryOnJob } from '../services/queue/producer';
 import { executeTryOnPipeline } from '../services/ai/pipeline';
@@ -16,46 +18,34 @@ import { listAllModelsForAdmin } from '../services/models/modelLibrary';
 const router = Router();
 
 /**
- * Block/unblock: always updates profiles.is_blocked (enforced in requireAuth) and
- * sets Supabase auth ban_duration when the hosted Auth API supports it.
+ * Block/unblock: updates profiles.is_blocked (enforced in requireAuth).
  */
 async function setUserBlockedState(userId: string, blocked: boolean, req: Request): Promise<void> {
-  const { data: profileRow, error: exErr } = await supabaseAdmin
-    .from('profiles')
-    .select('id, brand_name, contact_email, full_name')
-    .eq('id', userId)
-    .maybeSingle();
-  if (exErr) throw exErr;
+  const profileRow = await convexQueryTrusted<{
+    id: string;
+    brand_name: string | null;
+    contact_email: string | null;
+    full_name: string | null;
+  } | null>(anyApi.adminTrusted.getProfileForAdminBlock, {
+    secret: env.BACKEND_SHARED_SECRET,
+    userId,
+  });
   if (!profileRow) {
     throw new AppError('User not found', 404);
   }
 
-  const { error: pe } = await supabaseAdmin.from('profiles').update({ is_blocked: blocked }).eq('id', userId);
-  if (pe) throw pe;
-
-  const { error: ae } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-    ban_duration: blocked ? '876000h' : 'none',
+  await cxPatchProfile(userId, {
+    is_blocked: blocked,
+    updated_at: new Date().toISOString(),
   });
-  if (ae) {
-    await supabaseAdmin.from('profiles').update({ is_blocked: !blocked }).eq('id', userId);
-    logger.error('Admin: auth ban failed after profile update; reverted is_blocked', {
-      userId,
-      blocked,
-      authError: ae.message,
-    });
-    throw new AppError(
-      ae.message || 'Auth could not apply ban (profile was reverted). Try again or check Supabase Auth.',
-      400
-    );
-  }
 
   const brand = profileRow.brand_name?.trim() || null;
   const email = profileRow.contact_email?.trim() || null;
   const fullName = profileRow.full_name?.trim() || null;
   const displayLabel = [brand, email || fullName].filter(Boolean).join(' · ') || userId;
   const summary = blocked
-    ? `Blocked user ${displayLabel}: API access denied (profiles.is_blocked) and Supabase auth ban applied (~100y).`
-    : `Unblocked user ${displayLabel}: profiles.is_blocked cleared and Supabase auth ban removed.`;
+    ? `Blocked user ${displayLabel}: API access denied (profiles.is_blocked).`
+    : `Unblocked user ${displayLabel}: profiles.is_blocked cleared.`;
 
   await logAudit({
     event_type: 'admin_action',
@@ -69,7 +59,6 @@ async function setUserBlockedState(userId: string, blocked: boolean, req: Reques
       target_email: email,
       target_full_name: fullName,
       blocked,
-      ban_duration: blocked ? '876000h' : 'none',
     },
     ip_address: req.ip,
     user_agent: req.headers['user-agent'],
@@ -117,18 +106,19 @@ router.patch(
         res.status(400).json({ error: 'Provide is_active and/or free_tier_eligible (boolean).' });
         return;
       }
-      const { data: row, error: fetchErr } = await supabaseAdmin
-        .from('tryverse_model_library')
-        .select('id, slug, display_name')
-        .eq('id', id)
-        .maybeSingle();
-      if (fetchErr) throw fetchErr;
+      const row = await convexQueryTrusted<{ id: string; slug: string; display_name: string } | null>(
+        anyApi.backendTrusted.getModelLibraryRowByLegacyId,
+        { secret: env.BACKEND_SHARED_SECRET, legacyId: id }
+      );
       if (!row) {
         res.status(404).json({ error: 'Model not found' });
         return;
       }
-      const { error } = await supabaseAdmin.from('tryverse_model_library').update(patch).eq('id', id);
-      if (error) throw error;
+      await convexMutationTrusted(anyApi.backendTrusted.patchModelLibraryByLegacyId, {
+        secret: env.BACKEND_SHARED_SECRET,
+        legacyId: id,
+        patch,
+      });
       await logAudit({
         event_type: 'admin_action',
         actor: 'admin',
@@ -156,96 +146,40 @@ router.patch(
  */
 router.get('/metrics', async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
-    const [
-      { count: totalUsers },
-      { count: totalTryons },
-      { count: activeSubscriptions },
-      { count: tryonsToday },
-      { count: tryonsThisMonth },
-      { count: completedTryons },
-      { data: revenueData },
-    ] = await Promise.all([
-      supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }),
-      supabaseAdmin.from('tryons').select('id', { count: 'exact', head: true }),
-      supabaseAdmin
-        .from('subscriptions')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'active'),
-      supabaseAdmin
-        .from('tryons')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', todayStart),
-      supabaseAdmin
-        .from('tryons')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', monthStart),
-      supabaseAdmin
-        .from('tryons')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'completed'),
-      supabaseAdmin
-        .from('payments')
-        .select('amount, currency')
-        .eq('status', 'success'),
-    ]);
+    const bundle = await convexQueryTrusted<{
+      totalUsers: number;
+      totalTryons: number;
+      activeSubscriptions: number;
+      tryonsToday: number;
+      tryonsThisMonth: number;
+      completedTryons: number;
+      revenueData: Array<{ amount: number; currency: string }>;
+      usageOverTime: Array<{ date: string; tryons: number; newUsers: number }>;
+    }>(anyApi.adminTrusted.adminMetricsBundle, { secret: env.BACKEND_SHARED_SECRET });
 
     const successRate =
-      totalTryons && totalTryons > 0
-        ? Math.round(((completedTryons || 0) / (totalTryons || 1)) * 100)
+      bundle.totalTryons > 0
+        ? Math.round((bundle.completedTryons / bundle.totalTryons) * 100)
         : 0;
 
-    const revenueNGN = (revenueData || [])
+    const revenueNGN = bundle.revenueData
       .filter((p) => p.currency === 'NGN')
       .reduce((sum, p) => sum + p.amount, 0);
-
-    const revenueUSD = (revenueData || [])
+    const revenueUSD = bundle.revenueData
       .filter((p) => p.currency === 'USD')
       .reduce((sum, p) => sum + p.amount, 0);
 
-    // Daily usage for charts (last 30 days)
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: dailyTryons } = await supabaseAdmin
-      .from('tryons')
-      .select('created_at')
-      .gte('created_at', thirtyDaysAgo);
-    const { data: newUsersData } = await supabaseAdmin
-      .from('profiles')
-      .select('created_at')
-      .gte('created_at', thirtyDaysAgo);
-
-    const dailyMap: Record<string, { tryons: number; users: number }> = {};
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-      const day = d.toISOString().slice(0, 10);
-      dailyMap[day] = { tryons: 0, users: 0 };
-    }
-    for (const t of dailyTryons || []) {
-      const day = t.created_at?.slice(0, 10);
-      if (day && dailyMap[day]) dailyMap[day].tryons++;
-    }
-    for (const u of newUsersData || []) {
-      const day = u.created_at?.slice(0, 10);
-      if (day && dailyMap[day]) dailyMap[day].users++;
-    }
-    const usageOverTime = Object.entries(dailyMap)
-      .map(([date, v]) => ({ date, tryons: v.tryons, newUsers: v.users }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-
     res.json({
-      users: { total: totalUsers || 0 },
+      users: { total: bundle.totalUsers },
       tryons: {
-        total: totalTryons || 0,
-        today: tryonsToday || 0,
-        thisMonth: tryonsThisMonth || 0,
+        total: bundle.totalTryons,
+        today: bundle.tryonsToday,
+        thisMonth: bundle.tryonsThisMonth,
         successRate,
       },
-      subscriptions: { active: activeSubscriptions || 0 },
-      revenue: { ngn: revenueNGN, usd: revenueUSD, totalPayments: (revenueData || []).length },
-      usageOverTime,
+      subscriptions: { active: bundle.activeSubscriptions },
+      revenue: { ngn: revenueNGN, usd: revenueUSD, totalPayments: bundle.revenueData.length },
+      usageOverTime: bundle.usageOverTime,
     });
   } catch (err) {
     next(err);
@@ -282,41 +216,26 @@ router.get(
         ? String(searchRaw).slice(0, 80).replace(/[^a-zA-Z0-9@.\s-]/g, '').trim() || undefined
         : undefined;
 
-      // Use plan_id only - current_plan_id may not exist in all schemas
-      let profilesQuery = supabaseAdmin
-        .from('profiles')
-        .select(
-          'id, brand_name, full_name, contact_email, account_type, plan_id, free_credits_remaining, monthly_credits_remaining, monthly_credits_total, widget_activated, created_at, is_blocked',
-          { count: 'exact' }
-        )
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
-
       const at = q.accountType || 'all';
-      if (at === 'business' || at === 'individual') {
-        profilesQuery = profilesQuery.eq('account_type', at);
-      }
+      const { profiles, total } = await convexQueryTrusted<{
+        profiles: Array<Record<string, unknown>>;
+        total: number;
+      }>(anyApi.adminTrusted.adminListProfiles, {
+        secret: env.BACKEND_SHARED_SECRET,
+        limit,
+        offset,
+        search,
+        accountType: at === 'all' ? undefined : at,
+      });
 
-      if (search) {
-        const term = `%${search}%`;
-        profilesQuery = profilesQuery.or(`brand_name.ilike.${term},contact_email.ilike.${term}`);
-      }
-
-      const { data, error, count } = await profilesQuery;
-      if (error) {
-        logger.error('Admin users query failed', { error });
-        throw error;
-      }
-
-      const profiles = data || [];
-      const usersWithBan = profiles.map((profile: { id: string; is_blocked?: boolean } & Record<string, unknown>) => ({
+      const usersWithBan = profiles.map((profile) => ({
         ...profile,
         is_banned: Boolean(profile.is_blocked),
       }));
 
       res.json({
         users: usersWithBan,
-        pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
       });
     } catch (err) {
       next(err);
@@ -335,49 +254,19 @@ router.get('/tryons', async (req: Request, res: Response, next: NextFunction): P
     const offset = (page - 1) * limit;
     const status = req.query.status as string | undefined;
 
-    let query = supabaseAdmin
-      .from('tryons')
-      .select('id, user_id, status, category, created_at, completed_at', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (status) {
-      query = query.eq('status', status);
-    }
-
-    const { data, error, count } = await query;
-    if (error) throw error;
-
-    const rows = data || [];
-    const userIds = [...new Set(rows.map((r: { user_id: string | null }) => r.user_id).filter(Boolean))] as string[];
-
-    let profileMap: Record<string, { brand_name: string | null; contact_email: string | null }> = {};
-    if (userIds.length > 0) {
-      const { data: profilesData } = await supabaseAdmin
-        .from('profiles')
-        .select('id, brand_name, contact_email')
-        .in('id', userIds);
-      profileMap = (profilesData || []).reduce(
-        (acc, p) => {
-          acc[p.id] = { brand_name: p.brand_name ?? null, contact_email: p.contact_email ?? null };
-          return acc;
-        },
-        {} as Record<string, { brand_name: string | null; contact_email: string | null }>
-      );
-    }
-
-    const tryonsWithBrand = rows.map((t: { user_id: string | null } & Record<string, unknown>) => {
-      const p = t.user_id ? profileMap[t.user_id] : null;
-      return {
-        ...t,
-        brand_name: p?.brand_name ?? null,
-        contact_email: p?.contact_email ?? null,
-      };
+    const { tryons: rows, total } = await convexQueryTrusted<{
+      tryons: Array<Record<string, unknown>>;
+      total: number;
+    }>(anyApi.adminTrusted.adminListTryons, {
+      secret: env.BACKEND_SHARED_SECRET,
+      limit,
+      offset,
+      status,
     });
 
     res.json({
-      tryons: tryonsWithBrand,
-      pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) },
+      tryons: rows,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (err) {
     next(err);
@@ -393,15 +282,12 @@ router.get('/revenue', async (req: Request, res: Response, next: NextFunction): 
     const days = Math.min(parseInt(String(req.query.days || '30'), 10), 365);
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data, error } = await supabaseAdmin
-      .from('payments')
-      .select('amount, currency, provider, status, created_at')
-      .gte('created_at', since)
-      .order('created_at', { ascending: true });
-
-    if (error) throw error;
-
-    const payments = data || [];
+    const payments = await convexQueryTrusted<
+      Array<{ amount: number; currency: string; provider: string; status: string; created_at: string }>
+    >(anyApi.adminTrusted.adminPaymentsSince, {
+      secret: env.BACKEND_SHARED_SECRET,
+      sinceIso: since,
+    });
     const successful = payments.filter((p) => p.status === 'success');
 
     const byProvider: Record<string, { count: number; amountNGN: number; amountUSD: number }> = {};
@@ -423,11 +309,10 @@ router.get('/revenue', async (req: Request, res: Response, next: NextFunction): 
       .map(([date, totalNGN]) => ({ date, totalNGN }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    const { data: recentPayments } = await supabaseAdmin
-      .from('payments')
-      .select('id, user_id, amount, currency, provider, status, reference, created_at')
-      .order('created_at', { ascending: false })
-      .limit(20);
+    const recentPayments = await convexQueryTrusted<unknown[]>(anyApi.adminTrusted.adminRecentPayments, {
+      secret: env.BACKEND_SHARED_SECRET,
+      limit: 20,
+    });
 
     res.json({
       period: { days },
@@ -492,11 +377,11 @@ router.get('/queue', async (_req: Request, res: Response, next: NextFunction): P
 
 /**
  * POST /api/admin/users/:userId/block
- * Body: { "blocked": true | false } — updates profiles.is_blocked + Supabase auth ban.
+ * Body: { "blocked": true | false } — updates profiles.is_blocked.
  */
 router.post(
   '/users/:userId/block',
-  [param('userId').isUUID(), body('blocked').isBoolean()],
+  [param('userId').isString().trim().isLength({ min: 1, max: 256 }), body('blocked').isBoolean()],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -538,7 +423,7 @@ router.delete(
 router.patch(
   '/users/:userId/credits',
   [
-    param('userId').isUUID(),
+    param('userId').isString().trim().isLength({ min: 1, max: 256 }),
     body('freeCredits').optional().isInt({ min: 0 }),
     body('monthlyCredits').optional().isInt({ min: 0 }),
   ],
@@ -556,20 +441,24 @@ router.patch(
         return;
       }
 
-      const { data, error } = await supabaseAdmin
-        .from('profiles')
-        .update(updates)
-        .eq('id', userId)
-        .select('id, free_credits_remaining, monthly_credits_remaining')
-        .single();
-
-      if (error || !data) {
+      const existing = await cxGetProfile(userId);
+      if (!existing) {
         res.status(404).json({ error: 'User not found' });
         return;
       }
 
+      await cxPatchProfile(userId, updates);
+      const data = await cxGetProfile(userId);
+
       logger.info('Admin: Credits adjusted', { userId, updates });
-      res.json({ success: true, profile: data });
+      res.json({
+        success: true,
+        profile: {
+          id: userId,
+          free_credits_remaining: data?.free_credits_remaining,
+          monthly_credits_remaining: data?.monthly_credits_remaining,
+        },
+      });
     } catch (err) {
       next(err);
     }
@@ -582,7 +471,7 @@ router.patch(
 router.patch(
   '/users/:userId/profile',
   [
-    param('userId').isUUID(),
+    param('userId').isString().trim().isLength({ min: 1, max: 256 }),
     body('account_type').isIn(['business', 'individual']).withMessage('account_type required'),
   ],
   handleValidationErrors,
@@ -591,25 +480,19 @@ router.patch(
       const userId = req.params.userId as string;
       const account_type = req.body.account_type as 'business' | 'individual';
 
-      const { error: pe } = await supabaseAdmin.from('profiles').update({ account_type }).eq('id', userId);
-      if (pe) {
-        res.status(400).json({ error: pe.message });
-        return;
-      }
-
-      const { data: authData, error: ge } = await supabaseAdmin.auth.admin.getUserById(userId);
-      if (ge || !authData?.user) {
-        logger.warn('Admin: profile account_type updated but auth user fetch failed', { userId, ge });
-        res.json({ success: true, account_type, authMetadataSynced: false });
-        return;
-      }
-
-      const meta = { ...(authData.user.user_metadata as Record<string, unknown>), account_type };
-      const { error: ue } = await supabaseAdmin.auth.admin.updateUserById(userId, { user_metadata: meta });
-      if (ue) {
-        logger.warn('Admin: auth metadata sync failed after account_type change', { userId, ue });
-        res.json({ success: true, account_type, authMetadataSynced: false });
-        return;
+      try {
+        await convexMutationTrusted(anyApi.adminTrusted.patchUserAccountType, {
+          secret: env.BACKEND_SHARED_SECRET,
+          userId,
+          account_type,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('User not found') || msg.includes('not_found')) {
+          res.status(404).json({ error: 'User not found' });
+          return;
+        }
+        throw e;
       }
 
       await logAudit({
@@ -640,13 +523,19 @@ router.post(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const tryonId = req.params.tryonId as string;
-      const { data: tryon, error: fetchError } = await supabaseAdmin
-        .from('tryons')
-        .select('id, user_id, person_image, product_image, garment_image, category, status')
-        .eq('id', tryonId)
-        .single();
+      const tryon = await convexQueryTrusted<{
+        id: string;
+        user_id?: string | null;
+        person_image: string;
+        product_image: string;
+        category?: string | null;
+        status: string;
+      } | null>(anyApi.adminTrusted.adminGetTryonForRetry, {
+        secret: env.BACKEND_SHARED_SECRET,
+        legacyId: tryonId,
+      });
 
-      if (fetchError || !tryon) {
+      if (!tryon) {
         res.status(404).json({ error: 'Try-on not found' });
         return;
       }
@@ -657,16 +546,18 @@ router.post(
       }
 
       const personImage = tryon.person_image;
-      const productImage = tryon.product_image || tryon.garment_image;
+      const productImage = tryon.product_image;
       if (!personImage || !productImage) {
         res.status(400).json({ error: 'Try-on missing image paths' });
         return;
       }
 
-      await supabaseAdmin
-        .from('tryons')
-        .update({ status: 'queued', completed_at: null })
-        .eq('id', tryonId);
+      if (!tryon.user_id) {
+        res.status(400).json({ error: 'Try-on missing user' });
+        return;
+      }
+
+      await cxPatchTryon(tryonId, { status: 'queued', completed_at: null });
 
       const queue = getTryOnQueue();
       const jobData = {
@@ -738,7 +629,16 @@ router.post('/queue/resume', async (_req: Request, res: Response, next: NextFunc
  */
 router.get('/settings', async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { data: plans } = await supabaseAdmin.from('plans').select('id, name, tryons_per_month, max_products, price_ngn, price_usd').eq('is_active', true).order('tryons_per_month');
+    const plans = await convexQueryTrusted<
+      Array<{
+        id: string;
+        name: string;
+        tryons_per_month: number;
+        max_products: number;
+        price_ngn: number;
+        price_usd: number;
+      }>
+    >(anyApi.adminTrusted.listPlansActiveTrusted, { secret: env.BACKEND_SHARED_SECRET });
 
     res.json({
       featureFlags: {
@@ -805,26 +705,24 @@ router.get('/health', async (_req: Request, res: Response, next: NextFunction): 
 router.get('/activity', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const limit = Math.min(parseInt(String(req.query.limit || '20'), 10), 50);
-    const { data: tryons } = await supabaseAdmin
-      .from('tryons')
-      .select('id, user_id, status, category, created_at')
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    const tryons = await convexQueryTrusted<
+      Array<{
+        id: string;
+        user_id?: string | null;
+        status: string;
+        category: string;
+        created_at: string;
+        brand_name?: string | null;
+      }>
+    >(anyApi.adminTrusted.recentTryonsActivity, {
+      secret: env.BACKEND_SHARED_SECRET,
+      limit,
+    });
 
-    const userIds = [...new Set((tryons || []).map((t) => t.user_id).filter(Boolean))];
-    let profileMap: Record<string, string> = {};
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabaseAdmin.from('profiles').select('id, brand_name').in('id', userIds);
-      profileMap = (profiles || []).reduce((acc, p) => {
-        acc[p.id] = p.brand_name || 'Unknown';
-        return acc;
-      }, {} as Record<string, string>);
-    }
-
-    const items = (tryons || []).map((t) => ({
+    const items = tryons.map((t) => ({
       id: t.id,
       type: 'tryon' as const,
-      brand: t.user_id ? profileMap[t.user_id] : 'Unknown',
+      brand: t.brand_name?.trim() || (t.user_id ? 'Unknown' : 'Unknown'),
       status: t.status,
       category: t.category,
       createdAt: t.created_at,
@@ -843,26 +741,44 @@ router.get('/activity', async (req: Request, res: Response, next: NextFunction):
 router.get('/api-keys', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const limit = Math.min(parseInt(String(req.query.limit || '50'), 10), 200);
-    const { data: keys, error } = await supabaseAdmin
-      .from('api_keys')
-      .select('id, user_id, key_value, name, status, last_used, created_at')
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    const keys = await convexQueryTrusted<
+      Array<{
+        id: string;
+        user_id: string;
+        key_value: string;
+        name: string;
+        status: string;
+        last_used: string | null;
+        created_at: string;
+      }>
+    >(anyApi.adminTrusted.listApiKeysAdmin, {
+      secret: env.BACKEND_SHARED_SECRET,
+      limit,
+    });
 
-    if (error) throw error;
+    const userIds = [...new Set(keys.map((k) => k.user_id))];
+    const profiles =
+      userIds.length > 0
+        ? await convexQueryTrusted<
+            Array<{ id: string; brand_name: string | null; contact_email: string | null; full_name: string | null }>
+          >(anyApi.adminTrusted.getProfilesByIdsAdmin, {
+            secret: env.BACKEND_SHARED_SECRET,
+            ids: userIds,
+          })
+        : [];
+    const profileMap = profiles.reduce((acc, p) => {
+      acc[p.id] = p.brand_name?.trim() || p.contact_email?.trim() || p.full_name?.trim() || 'Unknown';
+      return acc;
+    }, {} as Record<string, string>);
 
-    const userIds = [...new Set((keys || []).map((k) => k.user_id))];
-    let profileMap: Record<string, string> = {};
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabaseAdmin.from('profiles').select('id, brand_name').in('id', userIds);
-      profileMap = (profiles || []).reduce((acc, p) => {
-        acc[p.id] = p.brand_name || 'Unknown';
-        return acc;
-      }, {} as Record<string, string>);
-    }
-
-    const keysWithBrand = (keys || []).map((k) => ({
-      ...k,
+    const keysWithBrand = keys.map((k) => ({
+      id: k.id,
+      user_id: k.user_id,
+      key_value: k.key_value,
+      name: k.name,
+      status: k.status,
+      last_used: k.last_used,
+      created_at: k.created_at,
       brand_name: profileMap[k.user_id] || '—',
       key_preview: k.key_value ? `${k.key_value.slice(0, 8)}…` : '—',
     }));
@@ -879,14 +795,24 @@ router.get('/api-keys', async (req: Request, res: Response, next: NextFunction):
  */
 router.post(
   '/api-keys/:id/revoke',
-  [param('id').isUUID()],
+  [param('id').isString().trim().isLength({ min: 1, max: 256 })],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const { error } = await supabaseAdmin.from('api_keys').update({ status: 'revoked' }).eq('id', id);
-
-      if (error) throw error;
+      try {
+        await convexMutationTrusted(anyApi.adminTrusted.revokeApiKeyAdmin, {
+          secret: env.BACKEND_SHARED_SECRET,
+          legacyId: id,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('not_found')) {
+          res.status(404).json({ error: 'API key not found' });
+          return;
+        }
+        throw e;
+      }
       await logAudit({
         event_type: 'admin_action',
         actor: 'admin',
@@ -909,32 +835,16 @@ router.post(
  */
 router.get('/domains', async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('allowed_domains')
-      .select('id, api_key_id, domain, verified, created_at')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    const apiKeyIds = [...new Set((data || []).map((d) => d.api_key_id))];
-    let keyToBrand: Record<string, string> = {};
-    if (apiKeyIds.length > 0) {
-      const { data: keys } = await supabaseAdmin.from('api_keys').select('id, user_id').in('id', apiKeyIds);
-      const userIds = [...new Set((keys || []).map((k) => k.user_id))];
-      const { data: profiles } = await supabaseAdmin.from('profiles').select('id, brand_name').in('id', userIds);
-      const profileMap = (profiles || []).reduce((acc, p) => {
-        acc[p.id] = p.brand_name || '—';
-        return acc;
-      }, {} as Record<string, string>);
-      (keys || []).forEach((k) => {
-        keyToBrand[k.id] = profileMap[k.user_id] || '—';
-      });
-    }
-
-    const domainsWithBrand = (data || []).map((d) => ({
-      ...d,
-      brand_name: keyToBrand[d.api_key_id] || '—',
-    }));
+    const domainsWithBrand = await convexQueryTrusted<
+      Array<{
+        id: string;
+        api_key_id: string;
+        domain: string;
+        verified: boolean;
+        created_at: string;
+        brand_name: string;
+      }>
+    >(anyApi.adminTrusted.listAllowedDomainsAdmin, { secret: env.BACKEND_SHARED_SECRET });
 
     res.json({ domains: domainsWithBrand });
   } catch (err) {
@@ -990,39 +900,49 @@ router.get('/audit', async (req: Request, res: Response, next: NextFunction): Pr
       info: ['admin_action'],
     };
 
-    let query = supabaseAdmin
-      .from('admin_audit_log')
-      .select('id, event_type, actor, action, target_id, details, ip_address, created_at', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
+    let eventTypes: string[] | undefined;
     if (eventType) {
-      query = query.eq('event_type', eventType);
+      eventTypes = [eventType];
     } else if (severity && severityGroups[severity]) {
-      query = query.in('event_type', severityGroups[severity]);
+      eventTypes = severityGroups[severity];
     }
 
-    const { data, error, count } = await query;
-    if (error) throw error;
+    const { entries, total } = await convexQueryTrusted<{
+      entries: Array<{
+        id: string;
+        event_type: string;
+        actor: string;
+        action: string;
+        target_id?: string | null;
+        details?: unknown;
+        ip_address?: string | null;
+        created_at: string;
+      }>;
+      total: number;
+    }>(anyApi.adminTrusted.listAuditLogAdmin, {
+      secret: env.BACKEND_SHARED_SECRET,
+      limit,
+      offset,
+      eventTypes,
+    });
 
-    const entries = data || [];
-    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const profileActions = new Set(['user_banned', 'user_unbanned']);
-    const targetIds = [
-      ...new Set(
-        entries
-          .filter((e) => e.target_id && uuidRe.test(String(e.target_id)))
-          .map((e) => String(e.target_id))
-      ),
-    ];
+    const targetIds = [...new Set(entries.map((e) => (e.target_id ? String(e.target_id) : '')).filter(Boolean))];
     let profileMap: Record<string, { brand_name: string | null; contact_email: string | null; full_name: string | null }> =
       {};
     if (targetIds.length > 0) {
-      const { data: profiles } = await supabaseAdmin
-        .from('profiles')
-        .select('id, brand_name, contact_email, full_name')
-        .in('id', targetIds);
-      profileMap = (profiles || []).reduce(
+      const profiles = await convexQueryTrusted<
+        Array<{
+          id: string;
+          brand_name: string | null;
+          contact_email: string | null;
+          full_name: string | null;
+        }>
+      >(anyApi.adminTrusted.getProfilesByIdsAdmin, {
+        secret: env.BACKEND_SHARED_SECRET,
+        ids: targetIds,
+      });
+      profileMap = profiles.reduce(
         (acc, p) => {
           acc[p.id] = {
             brand_name: p.brand_name ?? null,
@@ -1058,7 +978,7 @@ router.get('/audit', async (req: Request, res: Response, next: NextFunction): Pr
 
     res.json({
       entries: enriched,
-      total: count ?? (data?.length ?? 0),
+      total,
       pagination: { offset, limit },
     });
   } catch (err) {
@@ -1072,11 +992,9 @@ router.get('/audit', async (req: Request, res: Response, next: NextFunction): Pr
  */
 router.post('/audit/clear', async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { error } = await supabaseAdmin
-      .from('admin_audit_log')
-      .delete()
-      .gte('created_at', '1970-01-01T00:00:00.000Z');
-    if (error) throw error;
+    await convexMutationTrusted(anyApi.adminTrusted.clearAuditLogAdmin, {
+      secret: env.BACKEND_SHARED_SECRET,
+    });
     res.json({ ok: true, message: 'Audit log cleared' });
   } catch (err) {
     next(err);

@@ -1,13 +1,32 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { User, Session } from "@supabase/supabase-js";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useConvexAuth } from "convex/react";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { inviteSignupEnabled, b2cSignupEnabled } from "@/lib/featureFlags";
 import type { AccountType } from "@/lib/accountType";
 import { complianceDoneSessionKey } from "@/lib/complianceStorage";
+import { readConvexAuthJwt } from "@/lib/convexAuthStorage";
+
+export type LegacyUserMetadata = {
+  account_type?: AccountType;
+  brand_name?: string;
+  full_name?: string;
+  role?: string;
+  plan?: string;
+};
+
+/** Drop-in shape for code that expected Supabase `User`. */
+export type AppUser = {
+  id: string;
+  email?: string;
+  user_metadata: LegacyUserMetadata;
+};
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: AppUser | null;
+  /** Convex Auth JWT for API calls; `access_token` is read from the same storage the Convex client uses. */
+  session: { access_token: string } | null;
   loading: boolean;
   signUp: (
     email: string,
@@ -16,7 +35,7 @@ interface AuthContextType {
     fullName?: string,
     role?: string,
     accountType?: AccountType
-  ) => Promise<{ error: Error | null; session: Session | null }>;
+  ) => Promise<{ error: Error | null; session: null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -24,45 +43,67 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { isLoading: convexAuthLoading, isAuthenticated } = useConvexAuth();
+  const { signIn: convexSignIn, signOut: convexSignOut } = useAuthActions();
+  const sessionUser = useQuery(api.authSession.sessionUser, isAuthenticated ? {} : "skip");
+  const userRow = useQuery(api.userBootstrap.myUserRow, isAuthenticated ? {} : "skip");
+  const profile = useQuery(api.profiles.getMyProfile, isAuthenticated ? {} : "skip");
+  const upsertProfile = useMutation(api.profiles.upsertProfileForUser);
+  const [tokenTick, setTokenTick] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
-    const safetyTimer = window.setTimeout(() => {
-      if (!cancelled) setLoading(false);
-    }, 15000);
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (cancelled) return;
-      window.clearTimeout(safetyTimer);
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    void supabase.auth
-      .getSession()
-      .then(({ data: { session } }) => {
-        if (cancelled) return;
-        window.clearTimeout(safetyTimer);
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        window.clearTimeout(safetyTimer);
-        setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(safetyTimer);
-      subscription.unsubscribe();
+    if (typeof window === "undefined") return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key?.includes("__convexAuthJWT")) setTokenTick((n) => n + 1);
     };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
+
+  const user = useMemo((): AppUser | null => {
+    if (!isAuthenticated || !sessionUser) return null;
+    const rawType = String(userRow?.account_type ?? "business").toLowerCase();
+    const account_type: AccountType = rawType === "individual" ? "individual" : "business";
+    return {
+      id: sessionUser.id,
+      email: sessionUser.email ?? undefined,
+      user_metadata: {
+        account_type,
+        brand_name: userRow?.brand_name ?? undefined,
+        full_name: userRow?.full_name ?? undefined,
+        role: userRow?.role ?? undefined,
+      },
+    };
+  }, [isAuthenticated, sessionUser, userRow]);
+
+  useEffect(() => {
+    if (!user || profile === undefined) return;
+    if (profile !== null) return;
+    const acct = user.user_metadata.account_type ?? "business";
+    const cap = acct === "individual" ? 5 : 20;
+    void upsertProfile({
+      userId: user.id,
+      patch: {
+        account_type: acct,
+        brand_name: user.user_metadata.brand_name,
+        full_name: user.user_metadata.full_name,
+        role: user.user_metadata.role,
+        free_credits_remaining: cap,
+        free_credits_total: cap,
+      },
+    });
+  }, [user, profile, upsertProfile]);
+
+  const loading =
+    convexAuthLoading || (isAuthenticated && (sessionUser === undefined || userRow === undefined));
+
+  const session = useMemo(() => {
+    if (!user) return null;
+    const t = readConvexAuthJwt();
+    if (!t) return null;
+    void tokenTick;
+    return { access_token: t };
+  }, [user, tokenTick, isAuthenticated, loading]);
 
   const signUp = async (
     email: string,
@@ -86,40 +127,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session: null,
       };
     }
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/confirm`,
-        data: {
-          brand_name: brandName,
-          full_name: fullName || "",
-          role: role || "",
-          account_type: accountType,
-        },
-      },
-    });
-    if (error) {
-      return { error: error as Error, session: null };
+    try {
+      await convexSignIn("password", {
+        flow: "signUp",
+        email,
+        password,
+        brandName,
+        fullName,
+        role,
+        accountType,
+      } as Record<string, unknown>);
+      return { error: null, session: null };
+    } catch (e) {
+      return { error: e as Error, session: null };
     }
-    const session = data.session ?? null;
-    return { error: null, session };
   };
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (!error && data.session) {
-      // Ensure JWT + user_metadata (e.g. account_type) are available to hooks immediately after sign-in.
-      await supabase.auth.getUser();
+    try {
+      await convexSignIn("password", { flow: "signIn", email, password } as Record<string, unknown>);
+      return { error: null };
+    } catch (e) {
+      return { error: e as Error };
     }
-    return { error: error as Error | null };
   };
 
   const signOut = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const uid = session?.user?.id;
-    await supabase.auth.signOut();
+    const uid = user?.id;
+    await convexSignOut();
     if (uid) sessionStorage.removeItem(complianceDoneSessionKey(uid));
+    setTokenTick((n) => n + 1);
   };
 
   return (

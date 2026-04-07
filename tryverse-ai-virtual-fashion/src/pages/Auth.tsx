@@ -147,7 +147,7 @@ const Auth = () => {
     setLoading(true);
 
     if (showIndividualSignupForm) {
-      const { error, session } = await signUp(
+      const { error } = await signUp(
         email,
         password,
         fullName.trim() || "My Try-Ons",
@@ -160,37 +160,23 @@ const Auth = () => {
         const t = signUpErrorToast(error, "individual");
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
       } else {
-        if (session) {
-          await signOut();
-        }
-        posthogCapture("user_signed_up", { email, account_type: "individual", immediate_session: false });
-        navigate("/auth", { replace: true, state: { postSignupEmail: email } });
-        toast({
-          title: "Account created",
-          description: "Sign in with your email and password to continue.",
-          duration: 9000,
-        });
+        posthogCapture("user_signed_up", { email, account_type: "individual", immediate_session: true });
+        toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
         setPassword("");
+        goToDashboardAfterAuth();
       }
     } else if (showBusinessSignupForm) {
       const finalRole = role === "Other" ? customRole : role;
-      const { error, session } = await signUp(email, password, brandName, fullName, finalRole, "business");
+      const { error } = await signUp(email, password, brandName, fullName, finalRole, "business");
       if (error) {
         console.error("Signup error:", error);
         const t = signUpErrorToast(error, "business");
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
       } else {
-        if (session) {
-          await signOut();
-        }
-        posthogCapture("user_signed_up", { email, account_type: "business", immediate_session: false });
-        navigate("/auth", { replace: true, state: { postSignupEmail: email } });
-        toast({
-          title: "Account created",
-          description: "Sign in with your email and password to continue.",
-          duration: 9000,
-        });
+        posthogCapture("user_signed_up", { email, account_type: "business", immediate_session: true });
+        toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
         setPassword("");
+        goToDashboardAfterAuth();
       }
     } else {
       const { error } = await signIn(email, password);

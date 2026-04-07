@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { CreditCard, ArrowUpRight, Clock, CheckCircle, XCircle, Loader2, Sparkles } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { getCredits } from "@/lib/backendApi";
+import { isConvexDataEnabled } from "@/lib/convexData";
 
 interface Subscription {
   plan_id: string;
@@ -45,6 +47,8 @@ interface Plan {
 export function BillingTab() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const convexOn = isConvexDataEnabled();
+  const billingSnap = useQuery(api.billing.getMyBillingSnapshot, convexOn && user ? {} : "skip");
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -53,31 +57,101 @@ export function BillingTab() {
 
   useEffect(() => {
     if (!user) return;
-    const fetchData = async () => {
-      const [{ data: sub }, { data: pays }, { data: prof }, { data: plansData }, creditsApi] = await Promise.all([
-        supabase.from("subscriptions").select("plan_id, status, provider, current_period_start, current_period_end").eq("user_id", user.id).single(),
-        supabase.from("payments").select("id, amount, currency, status, provider, reference, created_at").order("created_at", { ascending: false }).limit(10),
-        supabase.from("profiles").select("widget_activated, free_credits_remaining, free_credits_total, monthly_credits_remaining, monthly_credits_total, current_plan_id").eq("id", user.id).single(),
-        supabase.from("plans").select("id, name, price_ngn, tryons_per_month").eq("is_active", true),
-        getCredits().catch(() => null),
-      ]);
-      setSubscription(sub as Subscription | null);
-      setPayments((pays as Payment[]) || []);
-      const base = prof as unknown as Profile | null;
-      setProfile(
-        base && creditsApi && !creditsApi.isUnlimited
-          ? {
-              ...base,
-              free_credits_remaining: creditsApi.freeCreditsRemaining,
-              free_credits_total: creditsApi.freeCreditsTotal,
-            }
-          : base
-      );
-      setPlans((plansData as Plan[]) || []);
+    if (!convexOn) {
       setLoading(false);
-    };
-    fetchData();
-  }, [user]);
+      return;
+    }
+
+    if (billingSnap === undefined) {
+      setLoading(true);
+      return;
+    }
+    if (!billingSnap) {
+      setSubscription(null);
+      setPayments([]);
+      setProfile(null);
+      setPlans([]);
+      setLoading(false);
+      return;
+    }
+
+    const sub = billingSnap.subscription;
+    setSubscription(
+      sub
+        ? {
+            plan_id: sub.plan_id,
+            status: sub.status,
+            provider: sub.provider,
+            current_period_start: sub.current_period_start ?? null,
+            current_period_end: sub.current_period_end ?? null,
+          }
+        : null
+    );
+    setPayments(
+      billingSnap.payments.map((p) => ({
+        id: String((p as { legacy_id?: string }).legacy_id ?? p._id),
+        amount: p.amount,
+        currency: p.currency,
+        status: p.status,
+        provider: p.provider,
+        reference: p.reference,
+        created_at: p.created_at ?? "",
+      }))
+    );
+    const prof = billingSnap.profile;
+    void getCredits()
+      .then((creditsApi) => {
+        const base =
+          prof &&
+          ({
+            widget_activated: prof.widget_activated,
+            free_credits_remaining: prof.free_credits_remaining,
+            free_credits_total: prof.free_credits_total,
+            monthly_credits_remaining: prof.monthly_credits_remaining,
+            monthly_credits_total: prof.monthly_credits_total,
+            current_plan_id: prof.current_plan_id ?? null,
+          } as Profile);
+        setProfile(
+          base && creditsApi && !creditsApi.isUnlimited
+            ? {
+                ...base,
+                free_credits_remaining: creditsApi.freeCreditsRemaining,
+                free_credits_total: creditsApi.freeCreditsTotal,
+              }
+            : base
+        );
+      })
+      .catch(() => {
+        if (prof) {
+          setProfile({
+            widget_activated: prof.widget_activated,
+            free_credits_remaining: prof.free_credits_remaining,
+            free_credits_total: prof.free_credits_total,
+            monthly_credits_remaining: prof.monthly_credits_remaining,
+            monthly_credits_total: prof.monthly_credits_total,
+            current_plan_id: prof.current_plan_id ?? null,
+          });
+        }
+      })
+      .finally(() => setLoading(false));
+
+    setPlans(
+      billingSnap.plans.map((p) => ({
+        id: p.id,
+        name: p.name,
+        price_ngn: p.price_ngn,
+        tryons_per_month: p.tryons_per_month,
+      }))
+    );
+  }, [user, convexOn, billingSnap]);
+
+  if (!convexOn) {
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        Set <code className="rounded bg-muted px-1">VITE_CONVEX_URL</code> to load billing data.
+      </div>
+    );
+  }
 
   if (loading) {
     return (

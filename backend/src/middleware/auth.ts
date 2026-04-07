@@ -1,14 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabaseAdmin } from '../config/supabase';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { logAudit } from '../services/audit';
 import { captureAuthError, Sentry } from '../config/sentry';
+import { createConvexClient, anyApi } from '../config/convexHttp';
 
 /**
- * Verifies a Supabase JWT from the Authorization header.
+ * Verifies Convex Auth JWT from the Authorization header (`Bearer`).
  * Sets req.user = { id, email } on success.
- * Logs failed auth attempts for security monitoring.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
@@ -32,46 +31,26 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const token = authHeader.slice(7);
   try {
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !user) {
+    const client = createConvexClient();
+    client.setAuth(token);
+    const session = await client.query(anyApi.authSession.verifyBearerSession, {});
+    if (!session) {
       logAudit({
         event_type: 'failed_login',
         actor: req.ip ? `ip:${req.ip}` : undefined,
         action: 'invalid_token',
-        details: { path: req.path, error: error?.message },
+        details: { path: req.path },
         ip_address: req.ip,
         user_agent: req.headers['user-agent'],
       });
-      captureAuthError('Invalid or expired token', { path: req.path, ip: req.ip, error: error?.message });
-      logger.warn('Auth failed: invalid or expired token', {
-        path: req.path,
-        ip: req.ip,
-        error: error?.message,
-      });
+      captureAuthError('Invalid or expired token', { path: req.path, ip: req.ip });
       res.status(401).json({ error: 'Invalid or expired token' });
       return;
     }
-    req.user = { id: user.id, email: user.email || '' };
-
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('is_blocked')
-      .eq('id', user.id)
-      .maybeSingle();
-    if (profileError) {
-      logger.warn('Auth: profile lookup failed (is_blocked)', {
-        userId: user.id,
-        error: profileError.message,
-      });
-      // If column missing until migration, continue; otherwise surface error
-      if (!profileError.message?.includes('column') && !profileError.message?.includes('schema cache')) {
-        res.status(500).json({ error: 'Profile check failed' });
-        return;
-      }
-    } else if (profile?.is_blocked) {
+    if (session.is_blocked) {
       logAudit({
         event_type: 'failed_login',
-        actor: user.id,
+        actor: session.id,
         action: 'account_suspended',
         details: { path: req.path },
         ip_address: req.ip,
@@ -80,7 +59,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       res.status(403).json({ error: 'Account suspended', code: 'ACCOUNT_SUSPENDED' });
       return;
     }
-
+    req.user = { id: session.id, email: session.email || '' };
     next();
   } catch (err) {
     const errObj = err instanceof Error ? err : new Error(String(err));
@@ -106,21 +85,17 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
   }
   const token = authHeader.slice(7);
   try {
-    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
-    if (user) {
-      const { data: profile, error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .select('is_blocked')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (!profileError && profile?.is_blocked) {
-        res.status(403).json({ error: 'Account suspended', code: 'ACCOUNT_SUSPENDED' });
-        return;
-      }
-      req.user = { id: user.id, email: user.email || '' };
+    const client = createConvexClient();
+    client.setAuth(token);
+    const session = await client.query(anyApi.authSession.verifyBearerSession, {});
+    if (session && !session.is_blocked) {
+      req.user = { id: session.id, email: session.email || '' };
+    } else if (session?.is_blocked) {
+      res.status(403).json({ error: 'Account suspended', code: 'ACCOUNT_SUSPENDED' });
+      return;
     }
   } catch {
-    // silently continue without user
+    // continue without user
   }
   next();
 }

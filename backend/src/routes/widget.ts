@@ -7,7 +7,12 @@ import { listActiveModels } from '../services/models/modelLibrary';
 import { widgetRateLimit } from '../middleware/rateLimiter';
 import { handleValidationErrors } from '../middleware/validate';
 import { checkCredits, SHOPPER_TRYON_UNAVAILABLE_MESSAGE } from '../services/credits';
-import { supabaseAdmin } from '../config/supabase';
+import { env } from '../config/env';
+import { anyApi, convexMutationTrusted, convexQueryTrusted } from '../config/convexHttp';
+import {
+  cxInsertTryon,
+  cxGetTryonForUser,
+} from '../services/tryonConvexBridge';
 import { enqueueTryOnJob, getTryOnQueue } from '../services/queue/producer';
 import { executeTryOnPipeline } from '../services/ai/pipeline';
 import { getSignedUrl, RESULT_BUCKET } from '../services/storage/images';
@@ -81,21 +86,18 @@ router.post(
         return;
       }
 
-      // Create tryon record
-      const { data: tryon, error: dbError } = await supabaseAdmin
-        .from('tryons')
-        .insert({
-          user_id: userId,
-          person_image: personImagePath,
-          product_image: productImagePath,
+      const tryonLegacyId = uuidv4();
+      try {
+        await cxInsertTryon({
+          legacyId: tryonLegacyId,
+          userId,
+          personImage: personImagePath,
+          productImage: productImagePath,
           category,
           status: 'queued',
-        })
-        .select('id')
-        .single();
-
-      if (dbError || !tryon) {
-        logger.error('Widget: Failed to create tryon record', { error: dbError?.message });
+        });
+      } catch (dbError) {
+        logger.error('Widget: Failed to create tryon record', { error: String(dbError) });
         res.status(500).json({ error: 'Failed to initiate try-on' });
         return;
       }
@@ -109,7 +111,7 @@ router.post(
         productImageUrl: productImagePath,
         category: category as ProductCategory,
         productDescription: productDescription || undefined,
-        tryonDbId: tryon.id,
+        tryonDbId: tryonLegacyId,
         widgetMode: true,
       };
 
@@ -119,10 +121,10 @@ router.post(
         await enqueueTryOnJob(jobData);
         res.status(202).json({
           success: true,
-          tryonId: tryon.id,
+          tryonId: tryonLegacyId,
           jobId,
           status: 'queued',
-          pollUrl: `/api/tryon/${tryon.id}`,
+          pollUrl: `/api/tryon/${tryonLegacyId}`,
           estimatedWaitSeconds: 30,
         });
       } else {
@@ -130,7 +132,7 @@ router.post(
         const result = await executeTryOnPipeline(jobData);
         res.status(200).json({
           success: result.status === 'completed',
-          tryonId: tryon.id,
+          tryonId: tryonLegacyId,
           status: result.status,
           resultUrl: result.resultUrl,
           error: result.error,
@@ -151,16 +153,15 @@ router.get(
   requireApiKey,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { tryonId } = req.params;
-
-      const { data: tryon, error } = await supabaseAdmin
-        .from('tryons')
-        .select('id, status, result_image, created_at, completed_at, category')
-        .eq('id', tryonId)
-        .eq('user_id', req.widgetUserId!)
-        .single();
-
-      if (error || !tryon) {
+      const rawId = req.params.tryonId;
+      const tryonId = (Array.isArray(rawId) ? rawId[0] : rawId) ?? '';
+      if (!tryonId) {
+        res.status(400).json({ error: 'tryonId required' });
+        return;
+      }
+      const widgetUid = req.widgetUserId!;
+      const tryon = await cxGetTryonForUser(tryonId, widgetUid);
+      if (!tryon) {
         res.status(404).json({ error: 'Try-on not found' });
         return;
       }
@@ -192,11 +193,14 @@ router.get(
   validateDomain,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('brand_name, widget_activated, widget_show_models')
-        .eq('id', req.widgetUserId!)
-        .single();
+      const profile = await convexQueryTrusted<{
+        brand_name: string | null;
+        widget_activated: boolean;
+        widget_show_models: boolean | undefined;
+      } | null>(anyApi.backendTrusted.getWidgetProfileRow, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId: req.widgetUserId!,
+      });
 
       if (!profile) {
         res.status(404).json({ error: 'Profile not found' });
@@ -250,31 +254,23 @@ router.post(
       }
       const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
 
-      const { data: apiKey } = await supabaseAdmin
-        .from('api_keys')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .limit(1)
-        .single();
-
-      if (!apiKey) {
-        res.status(400).json({ error: 'Create an API key first in Dashboard → API Keys' });
-        return;
-      }
-
-      const { error } = await supabaseAdmin.from('allowed_domains').insert({
-        api_key_id: apiKey.id,
-        domain: cleanDomain,
-      });
-
-      if (error) {
-        if (error.code === '23505') {
+      try {
+        await convexMutationTrusted(anyApi.backendTrusted.insertAllowedDomainForUser, {
+          secret: env.BACKEND_SHARED_SECRET,
+          userId,
+          domain: cleanDomain,
+        });
+      } catch (e) {
+        const msg = String(e instanceof Error ? e.message : e);
+        if (msg.includes('DUPLICATE_DOMAIN')) {
           res.status(409).json({ error: 'Domain already added' });
-        } else {
-          throw error;
+          return;
         }
-        return;
+        if (msg.includes('NO_ACTIVE_API_KEY')) {
+          res.status(400).json({ error: 'Create an API key first in Dashboard → API Keys' });
+          return;
+        }
+        throw e;
       }
 
       res.status(201).json({ success: true, domain: cleanDomain });

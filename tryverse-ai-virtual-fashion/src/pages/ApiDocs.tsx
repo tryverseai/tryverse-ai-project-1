@@ -4,68 +4,81 @@ import { motion } from "framer-motion";
 import { Code, Copy, Check, Terminal, Key, Image, Zap } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { widgetBackendPublicUrl } from "@/lib/backendApi";
 
 const endpoints = [
   {
     method: "POST",
-    path: "/functions/v1/generate-tryon",
-    description: "Generate a virtual try-on image by combining a product image with a person image.",
+    path: "/api/widget/request",
+    description:
+      "Generate a virtual try-on from storage paths. Upload images first with POST /api/upload (multipart, same x-api-key) or POST /api/upload/from-url for remote product images.",
     headers: [
       { name: "x-api-key", type: "string", required: true, description: "Your TryVerse API key (tv_live_...)" },
       { name: "Content-Type", type: "string", required: true, description: "application/json" },
     ],
     body: [
-      { name: "productImage", type: "string", required: true, description: "URL of the product image (clothing/jewelry/glasses)" },
-      { name: "personImage", type: "string", required: true, description: "URL of the person/model image" },
-      { name: "category", type: "string", required: true, description: "Product category: 'clothing', 'jewelry', or 'glasses'" },
+      { name: "personImagePath", type: "string", required: true, description: "Path returned from POST /api/upload (type=person)" },
+      { name: "productImagePath", type: "string", required: true, description: "Path returned from POST /api/upload (type=product)" },
+      { name: "category", type: "string", required: true, description: "clothing, bags, or glasses" },
+      { name: "productDescription", type: "string", required: false, description: "Optional caption for routing quality" },
     ],
     response: `{
   "success": true,
-  "resultImage": "https://replicate.delivery/...",
-  "tryonId": "uuid",
-  "creditsRemaining": 95
+  "tryonId": "…",
+  "status": "completed",
+  "resultUrl": "https://…"
+}
+
+// Or when jobs are queued:
+{
+  "success": true,
+  "tryonId": "…",
+  "status": "queued",
+  "pollUrl": "/api/tryon/…",
+  "estimatedWaitSeconds": 30
 }`,
     errors: [
       { code: "401", description: "Invalid or missing API key" },
       { code: "402", description: "No credits remaining" },
-      { code: "403", description: "Domain not authorized" },
+      { code: "403", description: "Domain not authorized or paths do not belong to key owner" },
       { code: "429", description: "Rate limit exceeded (60 req/min)" },
     ],
   },
   {
     method: "GET",
-    path: "/functions/v1/check-credits",
-    description: "Check remaining credits and widget activation status for an API key.",
+    path: "/api/widget/status/:tryonId",
+    description: "Poll try-on status when the request returned queued/processing.",
     headers: [
       { name: "x-api-key", type: "string", required: true, description: "Your TryVerse API key" },
     ],
     body: [],
     response: `{
-  "creditsRemaining": 95,
-  "widgetActivated": true,
-  "brandName": "Acme Fashion"
+  "tryonId": "…",
+  "status": "completed",
+  "resultUrl": "https://…",
+  "category": "clothing"
 }`,
     errors: [
       { code: "401", description: "Invalid API key" },
+      { code: "404", description: "Try-on not found" },
     ],
   },
 ];
 
-const getApiBaseUrl = () =>
-  (import.meta.env.VITE_SUPABASE_URL || "https://YOUR_PROJECT.supabase.co").replace(/\/$/, "");
+const getApiBaseUrl = () => widgetBackendPublicUrl().replace(/\/$/, "");
 
 const curlExample = () => `curl -X POST \\
-  '${getApiBaseUrl()}/functions/v1/generate-tryon' \\
+  '${getApiBaseUrl()}/api/widget/request' \\
   -H 'x-api-key: tv_live_your_api_key_here' \\
   -H 'Content-Type: application/json' \\
   -d '{
-    "productImage": "https://example.com/shirt.jpg",
-    "personImage": "https://example.com/model.jpg",
+    "personImagePath": "userId/person/photo.jpg",
+    "productImagePath": "userId/garment/product.jpg",
     "category": "clothing"
   }'`;
 
 const jsExample = () => `const response = await fetch(
-  '${getApiBaseUrl()}/functions/v1/generate-tryon',
+  '${getApiBaseUrl()}/api/widget/request',
   {
     method: 'POST',
     headers: {
@@ -73,15 +86,15 @@ const jsExample = () => `const response = await fetch(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      productImage: 'https://example.com/shirt.jpg',
-      personImage: 'https://example.com/model.jpg',
+      personImagePath: 'userId/person/photo.jpg',
+      productImagePath: 'userId/garment/product.jpg',
       category: 'clothing',
     }),
   }
 );
 
 const data = await response.json();
-console.log(data.resultImage);`;
+console.log(data.resultUrl);`;
 
 const ApiDocs = () => {
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
@@ -130,7 +143,9 @@ const ApiDocs = () => {
                 <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</div>
                 <div>
                   <p className="text-sm font-medium text-foreground">Make your first request</p>
-                  <p className="text-xs text-muted-foreground">Send a POST to the generate-tryon endpoint with product and person images</p>
+                  <p className="text-xs text-muted-foreground">
+                    Upload images (POST /api/upload), then POST /api/widget/request with the returned storage paths
+                  </p>
                 </div>
               </div>
             </div>

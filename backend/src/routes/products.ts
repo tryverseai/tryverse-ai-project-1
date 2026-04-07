@@ -2,11 +2,24 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { body, param, query } from 'express-validator';
 import { requireAuth } from '../middleware/auth';
 import { handleValidationErrors } from '../middleware/validate';
-import { supabaseAdmin } from '../config/supabase';
 import { getSignedUrl, INPUT_BUCKET } from '../services/storage/images';
 import { logger } from '../config/logger';
+import { createConvexClient, anyApi } from '../config/convexHttp';
 
 const router = Router();
+
+function bearer(req: Request): string | null {
+  const h = req.headers.authorization;
+  if (!h?.startsWith('Bearer ')) return null;
+  return h.slice(7);
+}
+
+function convexForRequest(req: Request) {
+  const c = createConvexClient();
+  const t = bearer(req);
+  if (t) c.setAuth(t);
+  return c;
+}
 
 async function resolveImageUrl(pathOrUrl: string | null): Promise<string | null> {
   if (!pathOrUrl) return null;
@@ -17,12 +30,9 @@ async function resolveImageUrl(pathOrUrl: string | null): Promise<string | null>
     return pathOrUrl;
   }
 }
+
 const VALID_CATEGORIES = ['clothing', 'bags', 'glasses'];
 
-/**
- * GET /api/products
- * List products for the authenticated user.
- */
 router.get(
   '/',
   requireAuth,
@@ -39,51 +49,36 @@ router.get(
       const limit = Math.min(100, Number(req.query.limit) || 20);
       const category = req.query.category as string | undefined;
 
-      let queryBuilder = supabaseAdmin
-        .from('products')
-        .select('id, name, image_url, category, product_url, tryons_count, created_at', { count: 'exact' })
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+      const client = convexForRequest(req);
+      const result = await client.query(anyApi.products.listMyProducts, {
+        page,
+        limit,
+        category,
+      });
 
-      if (category && VALID_CATEGORIES.includes(category)) {
-        queryBuilder = queryBuilder.eq('category', category);
-      }
-
-      const from = (page - 1) * limit;
-      const { data: rows, error, count } = await queryBuilder.range(from, from + limit - 1);
-
-      if (error) {
-        logger.error('Products list error', { userId, error: error.message });
-        res.status(500).json({ error: 'Failed to fetch products' });
+      if (!result) {
+        res.status(401).json({ error: 'Unauthorized' });
         return;
       }
 
       const products = await Promise.all(
-        (rows || []).map(async (p) => ({
+        (result.products || []).map(async (p: Record<string, unknown>) => ({
           ...p,
-          image_display_url: await resolveImageUrl(p.image_url),
+          image_display_url: await resolveImageUrl((p.image_url as string) || null),
         }))
       );
 
       res.json({
         products,
-        pagination: {
-          page,
-          limit,
-          total: count ?? 0,
-          pages: Math.ceil((count ?? 0) / limit) || 1,
-        },
+        pagination: result.pagination,
       });
     } catch (err) {
+      logger.error('Products list error', { userId: req.user?.id, error: String(err) });
       next(err);
     }
   }
 );
 
-/**
- * POST /api/products
- * Create a new product.
- */
 router.post(
   '/',
   requireAuth,
@@ -96,27 +91,14 @@ router.post(
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = req.user!.id;
       const { name, image_url, category, product_url } = req.body;
-
-      const { data: product, error } = await supabaseAdmin
-        .from('products')
-        .insert({
-          user_id: userId,
-          name,
-          image_url: image_url || null,
-          category,
-          product_url: product_url || null,
-        })
-        .select('id, name, image_url, category, product_url, tryons_count, created_at')
-        .single();
-
-      if (error) {
-        logger.error('Product create error', { userId, error: error.message });
-        res.status(500).json({ error: 'Failed to create product' });
-        return;
-      }
-
+      const client = convexForRequest(req);
+      const product = await client.mutation(anyApi.products.createProduct, {
+        name,
+        image_url,
+        category,
+        product_url,
+      });
       res.status(201).json(product);
     } catch (err) {
       next(err);
@@ -124,32 +106,20 @@ router.post(
   }
 );
 
-/**
- * GET /api/products/:id
- * Get a single product.
- */
 router.get(
   '/:id',
   requireAuth,
-  [param('id').isUUID()],
+  [param('id').isString().trim().notEmpty()],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = req.user!.id;
       const { id } = req.params;
-
-      const { data: product, error } = await supabaseAdmin
-        .from('products')
-        .select('id, name, image_url, category, product_url, tryons_count, created_at, updated_at')
-        .eq('id', id)
-        .eq('user_id', userId)
-        .single();
-
-      if (error || !product) {
+      const client = convexForRequest(req);
+      const product = await client.query(anyApi.products.getMyProduct, { id });
+      if (!product) {
         res.status(404).json({ error: 'Product not found' });
         return;
       }
-
       res.json(product);
     } catch (err) {
       next(err);
@@ -157,15 +127,11 @@ router.get(
   }
 );
 
-/**
- * PUT /api/products/:id
- * Update a product.
- */
 router.put(
   '/:id',
   requireAuth,
   [
-    param('id').isUUID(),
+    param('id').isString().trim().notEmpty(),
     body('name').optional().isString().trim().notEmpty().isLength({ max: 200 }),
     body('image_url').optional().isString().isLength({ max: 2048 }),
     body('category').optional().isIn(VALID_CATEGORIES),
@@ -174,61 +140,44 @@ router.put(
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = req.user!.id;
       const { id } = req.params;
-      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      if (req.body.name !== undefined) updates.name = req.body.name;
-      if (req.body.image_url !== undefined) updates.image_url = req.body.image_url;
-      if (req.body.category !== undefined) updates.category = req.body.category;
-      if (req.body.product_url !== undefined) updates.product_url = req.body.product_url;
-
-      const { data: product, error } = await supabaseAdmin
-        .from('products')
-        .update(updates)
-        .eq('id', id)
-        .eq('user_id', userId)
-        .select('id, name, image_url, category, product_url, tryons_count, created_at, updated_at')
-        .single();
-
-      if (error || !product) {
-        res.status(error?.code === 'PGRST116' ? 404 : 500).json({ error: 'Product not found' });
-        return;
-      }
-
+      const client = convexForRequest(req);
+      const product = await client.mutation(anyApi.products.updateProduct, {
+        id,
+        name: req.body.name,
+        image_url: req.body.image_url,
+        category: req.body.category,
+        product_url: req.body.product_url,
+      });
       res.json(product);
     } catch (err) {
+      const msg = String(err);
+      if (msg.includes('Not found')) {
+        res.status(404).json({ error: 'Product not found' });
+        return;
+      }
       next(err);
     }
   }
 );
 
-/**
- * DELETE /api/products/:id
- * Delete a product.
- */
 router.delete(
   '/:id',
   requireAuth,
-  [param('id').isUUID()],
+  [param('id').isString().trim().notEmpty()],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = req.user!.id;
       const { id } = req.params;
-
-      const { error } = await supabaseAdmin
-        .from('products')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', userId);
-
-      if (error) {
-        res.status(500).json({ error: 'Failed to delete product' });
-        return;
-      }
-
+      const client = convexForRequest(req);
+      await client.mutation(anyApi.products.deleteProduct, { id });
       res.status(204).send();
     } catch (err) {
+      const msg = String(err);
+      if (msg.includes('Not found')) {
+        res.status(404).json({ error: 'Product not found' });
+        return;
+      }
       next(err);
     }
   }

@@ -3,7 +3,8 @@ import { requireAuth } from '../middleware/auth';
 import { requireAdmin } from '../middleware/auth';
 import { getBrandAnalytics } from '../services/analytics/analytics';
 import { getCacheStats } from '../services/cache/tryonCache';
-import { supabaseAdmin } from '../config/supabase';
+import { env } from '../config/env';
+import { anyApi, convexQueryTrusted } from '../config/convexHttp';
 
 const router = Router();
 
@@ -38,19 +39,20 @@ router.get(
       const days = Math.min(parseInt(String(req.query.days || '30'), 10), 365);
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-      const [
-        { count: totalTryons },
-        { count: totalUsers },
-        { data: categoryBreakdown },
-        { data: dailyTryons },
-        cacheStats,
-      ] = await Promise.all([
-        supabaseAdmin.from('tryons').select('id', { count: 'exact', head: true }).gte('created_at', since),
-        supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }).gte('created_at', since),
-        supabaseAdmin.from('tryons').select('category').gte('created_at', since),
-        supabaseAdmin.from('tryons').select('created_at, status').gte('created_at', since).order('created_at'),
+      const [platform, cacheStats] = await Promise.all([
+        convexQueryTrusted<{
+          tryons: Array<{ category: string; created_at: string; status: string }>;
+          newUsers: number;
+        }>(anyApi.adminTrusted.platformAnalyticsSince, {
+          secret: env.BACKEND_SHARED_SECRET,
+          sinceIso: since,
+        }),
         getCacheStats(),
       ]);
+      const totalTryons = platform.tryons.length;
+      const totalUsers = platform.newUsers;
+      const categoryBreakdown = platform.tryons.map((t) => ({ category: t.category }));
+      const dailyTryons = platform.tryons;
 
       // Category breakdown
       const catMap: Record<string, number> = {};

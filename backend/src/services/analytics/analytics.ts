@@ -1,5 +1,7 @@
-import { supabaseAdmin } from '../../config/supabase';
 import { logger } from '../../config/logger';
+import { cxGetProfile } from '../creditsConvexBridge';
+import { userAnalyticsSince } from '../userAnalyticsConvexBridge';
+import { cxInsertUsageEvent } from '../tryonConvexBridge';
 
 /**
  * BRAND ANALYTICS SERVICE
@@ -40,30 +42,20 @@ export async function getBrandAnalytics(
 ): Promise<BrandAnalytics> {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-  const [
-    { data: tryons },
-    { data: profile },
-    { data: events },
-  ] = await Promise.all([
-    supabaseAdmin
-      .from('tryons')
-      .select('id, status, category, product_image, created_at, completed_at')
-      .eq('user_id', userId)
-      .gte('created_at', since),
-    supabaseAdmin
-      .from('profiles')
-      .select('monthly_credits_remaining, monthly_credits_total, free_credits_remaining')
-      .eq('id', userId)
-      .single(),
-    supabaseAdmin
-      .from('usage_events')
-      .select('event_type, metadata, created_at')
-      .eq('user_id', userId)
-      .gte('created_at', since),
+  const [{ tryons: tryonRows, events: eventRows }, profile] = await Promise.all([
+    userAnalyticsSince(userId, since),
+    cxGetProfile(userId),
   ]);
 
-  const allTryons = tryons || [];
-  const allEvents = events || [];
+  const allTryons = tryonRows.map((t) => ({
+    id: t.id,
+    status: t.status,
+    category: t.category,
+    product_image: t.product_image,
+    created_at: t.created_at,
+    completed_at: t.completed_at,
+  }));
+  const allEvents = eventRows;
 
   // Overview
   const completed = allTryons.filter((t) => t.status === 'completed');
@@ -80,8 +72,13 @@ export async function getBrandAnalytics(
     ? Math.round(processingTimes.reduce((a, b) => a + b, 0) / processingTimes.length)
     : 0;
 
-  const creditsUsed = (profile?.monthly_credits_total || 0) - (profile?.monthly_credits_remaining || 0);
-  const creditsRemaining = (profile?.monthly_credits_remaining || 0) + (profile?.free_credits_remaining || 0);
+  const prof = profile as {
+    monthly_credits_total?: number;
+    monthly_credits_remaining?: number;
+    free_credits_remaining?: number;
+  } | null;
+  const creditsUsed = (prof?.monthly_credits_total || 0) - (prof?.monthly_credits_remaining || 0);
+  const creditsRemaining = (prof?.monthly_credits_remaining || 0) + (prof?.free_credits_remaining || 0);
 
   // By category
   const categoryMap = new Map<string, { total: number; completed: number }>();
@@ -161,11 +158,7 @@ export async function trackEvent(
   metadata?: Record<string, unknown>
 ): Promise<void> {
   try {
-    await supabaseAdmin.from('usage_events').insert({
-      user_id: userId,
-      event_type: eventType,
-      metadata: metadata || null,
-    });
+    await cxInsertUsageEvent(userId, eventType, metadata);
   } catch (err) {
     logger.error('Failed to track event', { eventType, error: String(err) });
   }

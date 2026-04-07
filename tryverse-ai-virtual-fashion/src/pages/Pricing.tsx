@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Check, ArrowRight, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -14,9 +16,8 @@ import {
 } from "@/lib/backendApi";
 import { captureSentryException } from "@/lib/sentry";
 import { assignTrustedPaymentCheckoutUrl } from "@/lib/safeUrl";
-import { supabase } from "@/integrations/supabase/client";
-import type { Json } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
+import { isConvexDataEnabled } from "@/lib/convexData";
 
 type PricingAudience = "individual" | "business";
 
@@ -26,10 +27,10 @@ type PlanRow = {
   price_ngn: number;
   price_usd: number;
   tryons_per_month: number;
-  features: Json;
+  features: unknown;
 };
 
-/** Shown when Supabase has no `pro` / `creator` row yet (checkout still requires plan in DB for paid tiers). */
+/** Fallback catalog row when Convex has no matching plan document yet. */
 const FALLBACK_PRO: PlanRow = {
   id: "pro",
   name: "Pro",
@@ -41,7 +42,7 @@ const FALLBACK_PRO: PlanRow = {
     "HD images",
     "No watermark",
     "Download images",
-  ] as unknown as Json,
+  ],
 };
 
 const FALLBACK_CREATOR: PlanRow = {
@@ -55,7 +56,7 @@ const FALLBACK_CREATOR: PlanRow = {
     "HD + better realism",
     "Generate marketing images",
     "Priority processing",
-  ] as unknown as Json,
+  ],
 };
 
 const FREE_IDS = new Set(["free", "free_trial", "trial"]);
@@ -139,7 +140,7 @@ function firstFreePlan(all: PlanRow[]): PlanRow | undefined {
   return all.find((p) => FREE_IDS.has(p.id));
 }
 
-function parseFeatures(features: Json): string[] {
+function parseFeatures(features: unknown): string[] {
   if (Array.isArray(features)) {
     return features.filter((x): x is string => typeof x === "string");
   }
@@ -150,7 +151,7 @@ function withWidgetEmbed(plan: PlanRow): PlanRow {
   if (plan.id !== "growth" && plan.id !== "enterprise") return plan;
   const list = parseFeatures(plan.features);
   if (list.some((f) => /widget embed/i.test(f))) return plan;
-  return { ...plan, features: ["Widget embed", ...list] as unknown as Json };
+  return { ...plan, features: ["Widget embed", ...list] };
 }
 
 /**
@@ -174,7 +175,7 @@ function resolvePlansForAudience(all: PlanRow[], audience: PricingAudience): Pla
             "5 try-ons/month on free pool (individual) · 20 on signup (brands)",
             "Watermark",
             "Basic quality",
-          ] as unknown as Json,
+          ],
         };
       }
       const row = all.find((p) => p.id === slotId);
@@ -191,8 +192,11 @@ function isFreePlanId(id: string): boolean {
 }
 
 const Pricing = () => {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const convexOn = isConvexDataEnabled();
+  const convexPlans = useQuery(api.plans.listActivePlans, convexOn ? {} : "skip");
+  const seedPlansIfEmpty = useMutation(api.seed.seedPlansIfEmpty);
   const [audience, setAudience] = useState<PricingAudience>("individual");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [plansLoading, setPlansLoading] = useState(true);
@@ -204,28 +208,57 @@ const Pricing = () => {
   const [checkoutCurrency, setCheckoutCurrency] = useState<"USD" | "NGN">("USD");
 
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
       try {
-        const [{ data: planRows, error }, p] = await Promise.all([
-          supabase
-            .from("plans")
-            .select("id, name, price_ngn, price_usd, tryons_per_month, features")
-            .eq("is_active", true),
-          getPaymentProviders(),
-        ]);
-        if (error) throw error;
-        setDbPlans(planRows || []);
+        const p = await getPaymentProviders();
+        if (cancelled) return;
         setProviders(p);
         if (p.flutterwave) setCheckoutCurrency("USD");
         else if (p.paystack) setCheckoutCurrency("NGN");
+
+        if (convexOn) {
+          if (convexPlans === undefined) {
+            setPlansLoading(true);
+            return;
+          }
+          if (convexPlans.length === 0) {
+            await seedPlansIfEmpty({});
+            if (!cancelled) setPlansLoading(false);
+            return;
+          }
+          if (!cancelled) {
+            setDbPlans(
+              convexPlans.map((r) => ({
+                id: r.id,
+                name: r.name,
+                price_ngn: r.price_ngn,
+                price_usd: r.price_usd,
+                tryons_per_month: r.tryons_per_month,
+                features: r.features,
+              }))
+            );
+            setPlansLoading(false);
+          }
+        } else {
+          if (!cancelled) {
+            setDbPlans([]);
+            setPlansLoading(false);
+            toast.error("Set VITE_CONVEX_URL to load plans.");
+          }
+        }
       } catch {
-        toast.error("Could not load plans");
-        setDbPlans([]);
-      } finally {
-        setPlansLoading(false);
+        if (!cancelled) {
+          toast.error("Could not load plans");
+          setDbPlans([]);
+          setPlansLoading(false);
+        }
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [convexOn, convexPlans, seedPlansIfEmpty]);
 
   const handleSubscribe = async (plan: PlanRow) => {
     if (plan.id === "enterprise") {
@@ -235,12 +268,12 @@ const Pricing = () => {
 
     const paidNeedsDb = ["pro", "creator", "starter", "growth"].includes(plan.id);
     if (paidNeedsDb && !dbPlans.some((p) => p.id === plan.id)) {
-      toast.error("This paid plan isn’t in your Supabase yet. Run the latest migrations or add the plan, then try again.");
+      toast.error("This paid plan isn’t available yet. Run seed plans in Convex or contact support.");
       return;
     }
 
     if (plan.id === "free" || plan.id === "free_trial" || plan.id === "trial") {
-      if (!user || !session) {
+      if (!user) {
         toast.error("Please sign in to get started");
         navigate("/auth");
         return;
@@ -263,7 +296,7 @@ const Pricing = () => {
       return;
     }
 
-    if (!user || !session) {
+    if (!user) {
       toast.error("Please sign in to subscribe");
       navigate("/auth");
       return;

@@ -50,7 +50,7 @@ if (!rootEl) {
       const stack = e instanceof Error ? e.stack ?? "" : "";
       rootEl.innerHTML = `<div style="font-family:system-ui;padding:1.5rem;max-width:44rem;color:#111;background:#fff">
         <p style="font-weight:600;margin-bottom:0.5rem;font-size:18px">TryVerse could not load</p>
-        <p style="font-size:14px;line-height:1.5;margin-bottom:1rem;opacity:0.9">Copy <code style="background:#f4f4f5;padding:2px 6px;border-radius:4px">tryverse-ai-virtual-fashion/.env.example</code> to <code style="background:#f4f4f5;padding:2px 6px;border-radius:4px">.env</code> and set Supabase keys. Open the app at <strong>http://localhost:8080</strong> (API on port 3001).</p>
+        <p style="font-size:14px;line-height:1.5;margin-bottom:1rem;opacity:0.9">Copy <code style="background:#f4f4f5;padding:2px 6px;border-radius:4px">tryverse-ai-virtual-fashion/.env.example</code> to <code style="background:#f4f4f5;padding:2px 6px;border-radius:4px">.env</code> and set <strong>VITE_CONVEX_URL</strong> (and API URL as needed). Open the app at <strong>http://localhost:8080</strong> (API on port 3001).</p>
         <pre style="font-size:12px;white-space:pre-wrap;background:#f4f4f5;padding:12px;border-radius:8px;margin:0;overflow:auto;border:1px solid #e5e5e5">${escapeHtml(msg)}
 ${escapeHtml(stack)}</pre>
       </div>`;

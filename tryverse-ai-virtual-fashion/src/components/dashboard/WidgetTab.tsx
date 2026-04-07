@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import {
   uploadImage,
   startTryOn,
@@ -19,6 +20,7 @@ import { posthogCapture } from "@/lib/posthog";
 import { captureSentryException } from "@/lib/sentry";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { isConvexDataEnabled } from "@/lib/convexData";
 
 const getScriptBase = () =>
   (typeof window !== 'undefined' ? window.location.origin : '') ||
@@ -68,6 +70,8 @@ const sampleModels = [
 
 export function WidgetTab() {
   const { user, session } = useAuth();
+  const convexOn = isConvexDataEnabled();
+  const cxKeys = useQuery(api.apiKeys.listMyApiKeys, convexOn && user ? {} : "skip");
   const navigate = useNavigate();
   const [selected, setSelected] = useState<"popup" | "embed">("popup");
   const [copied, setCopied] = useState(false);
@@ -104,16 +108,16 @@ export function WidgetTab() {
         setCreditsPoolTotal(20);
       }
 
-      const { data: keys } = await supabase
-        .from("api_keys")
-        .select("key_value")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .limit(1);
-      if (keys?.length) setApiKey(keys[0].key_value);
+      if (!convexOn) {
+        setApiKey(null);
+        return;
+      }
+      if (cxKeys === undefined) return;
+      const active = cxKeys.find((k) => k.status === "active");
+      setApiKey(active?.key_value ?? null);
     };
-    fetchUserData();
-  }, [user]);
+    void fetchUserData();
+  }, [user, convexOn, cxKeys]);
 
   const copy = () => {
     const code =

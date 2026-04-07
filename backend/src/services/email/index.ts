@@ -1,6 +1,6 @@
-import { supabaseAdmin } from '../../config/supabase';
 import { env } from '../../config/env';
 import { sendEmail } from './resend';
+import { anyApi, convexQueryTrusted } from '../../config/convexHttp';
 import {
   welcomeEmail,
   apiKeyDeliveryEmail,
@@ -15,19 +15,24 @@ import {
 const appUrl = env.FRONTEND_URL || 'https://app.tryverse.ai';
 
 async function getUserEmailAndName(userId: string): Promise<{ email: string | null; name: string }> {
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('contact_email, full_name, brand_name')
-    .eq('id', userId)
-    .single();
+  const profile = await convexQueryTrusted<Record<string, unknown> | null>(anyApi.backendTrusted.getProfileRow, {
+    secret: env.BACKEND_SHARED_SECRET,
+    userId,
+  });
+  const urow = await convexQueryTrusted<Record<string, unknown> | null>(anyApi.backendTrusted.getUserRowById, {
+    secret: env.BACKEND_SHARED_SECRET,
+    userId,
+  });
 
-  let email: string | null = profile?.contact_email || null;
-  if (!email) {
-    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
-    email = authUser?.user?.email || null;
-  }
-
-  const name = profile?.full_name || profile?.brand_name || '';
+  let email: string | null =
+    (typeof profile?.contact_email === 'string' && profile.contact_email) ||
+    (typeof urow?.email === 'string' && urow.email) ||
+    null;
+  const name =
+    (typeof profile?.full_name === 'string' && profile.full_name) ||
+    (typeof profile?.brand_name === 'string' && profile.brand_name) ||
+    (typeof urow?.name === 'string' && urow.name) ||
+    '';
   return { email, name };
 }
 

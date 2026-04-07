@@ -5,11 +5,18 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Upload, User, ShoppingBag, Star, Heart, ChevronRight, Scan, Check, RotateCcw, AlertCircle, Loader2 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { posthogCapture } from "@/lib/posthog";
 import { toast } from "sonner";
 import { safeImageSrcForDom } from "@/lib/safeUrl";
 import type { CSSProperties } from "react";
+import { captureSentryException } from "@/lib/sentry";
+import {
+  uploadImageWithApiKey,
+  uploadImageFromUrlWithApiKey,
+  widgetRequestTryOnWithApiKey,
+  pollWidgetTryOnUntilResult,
+  type TryOnCategory,
+} from "@/lib/backendApi";
 
 import modelFemaleBefore from "@/assets/model-female-before.jpg";
 import modelMaleBefore from "@/assets/model-male-before.jpg";
@@ -28,6 +35,13 @@ type WidgetPhase = "idle" | "open" | "uploading" | "processing" | "result" | "er
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+function normalizeTryOnCategory(raw: string): TryOnCategory {
+  const s = raw.toLowerCase();
+  if (s === "bags" || s === "glasses" || s === "clothing") return s;
+  if (s === "jewelry") return "bags";
+  return "clothing";
+}
+
 const WidgetPreview = () => {
   const [searchParams] = useSearchParams();
   const isWidgetMode = searchParams.get('mode') === 'widget';
@@ -43,6 +57,7 @@ const WidgetPreview = () => {
   const [phase, setPhase] = useState<WidgetPhase>(isWidgetMode ? "open" : "idle");
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [uploadedPersonImage, setUploadedPersonImage] = useState<string | null>(null);
+  const [personUploadFile, setPersonUploadFile] = useState<File | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -66,36 +81,30 @@ const WidgetPreview = () => {
     setPhase("uploading");
 
     try {
-      const fileName = `widget/${Date.now()}_${Math.random().toString(36).substring(7)}.${file.type === 'image/png' ? 'png' : 'jpg'}`;
-      
-      const { data, error } = await supabase.storage
-        .from('tryverse_images')
-        .upload(fileName, file, { contentType: file.type });
-
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage
-        .from('tryverse_images')
-        .getPublicUrl(data.path);
-
-      setUploadedPersonImage(urlData.publicUrl);
-      setSelectedModel(null);
-      setPhase("open");
-      toast.success("Photo uploaded successfully!");
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      toast.error("Failed to upload photo. Please try again.");
+      const reader = new FileReader();
+      reader.onload = () => {
+        setUploadedPersonImage(reader.result as string);
+        setPersonUploadFile(file);
+        setSelectedModel(null);
+        setPhase("open");
+        toast.success("Photo ready!");
+      };
+      reader.readAsDataURL(file);
+    } catch (error: unknown) {
+      console.error("Upload error:", error);
+      toast.error("Failed to read photo. Please try again.");
       setPhase("open");
     }
   };
 
   const handleTryOn = async () => {
     const personImg = uploadedPersonImage || (selectedModel ? models.find(m => m.id === selectedModel)?.image : null);
-    if (!personImg) return;
+    if (!personImg && !personUploadFile) return;
 
     const productImg =
       (productImageParam && safeImageSrcForDom(productImageParam)) || String(shirtProduct);
     const apiKey = apiKeyParam;
+    const category = normalizeTryOnCategory(productTypeParam);
 
     setPhase("processing");
     setErrorMessage(null);
@@ -103,33 +112,40 @@ const WidgetPreview = () => {
 
     try {
       if (apiKey) {
-        // Real API call
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-tryon`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-          },
-          body: JSON.stringify({
-            productImage: productImg,
-            personImage: personImg,
-            category: productTypeParam,
-          })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Generation failed');
+        let personFile = personUploadFile;
+        if (!personFile && personImg) {
+          const url = typeof personImg === "string" ? (safeImageSrcForDom(personImg) || personImg) : "";
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("Could not load person image");
+          const blob = await res.blob();
+          personFile = new File([blob], "person.jpg", { type: blob.type || "image/jpeg" });
         }
+        if (!personFile) throw new Error("Missing person image");
 
-        if (data.resultImage) {
-          setResultImage(data.resultImage);
-          setPhase("result");
-          posthogCapture("try_on_completed", { source: "widget_preview", category: productTypeParam });
+        const personPath = (await uploadImageWithApiKey(personFile, "person", apiKey)).filePath;
+
+        let productUrl = productImg;
+        if (productUrl.startsWith("/")) {
+          productUrl = `${window.location.origin}${productUrl}`;
+        }
+        const productPath = (await uploadImageFromUrlWithApiKey(productUrl, apiKey)).filePath;
+
+        const started = await widgetRequestTryOnWithApiKey(
+          { personImagePath: personPath, productImagePath: productPath, category },
+          apiKey
+        );
+
+        let outUrl: string | undefined;
+        if ("status" in started && started.status === "queued") {
+          outUrl = await pollWidgetTryOnUntilResult(started.tryonId, apiKey);
         } else {
-          throw new Error('No result image received');
+          outUrl = started.resultUrl;
+          if (!outUrl) throw new Error(started.error || "No result image received");
         }
+
+        setResultImage(outUrl);
+        setPhase("result");
+        posthogCapture("try_on_completed", { source: "widget_preview", category: productTypeParam });
       } else {
         // Demo mode - simulate
         await new Promise(r => setTimeout(r, 2000));
@@ -151,13 +167,14 @@ const WidgetPreview = () => {
     setPhase(isWidgetMode ? "open" : "idle");
     setSelectedModel(null);
     setUploadedPersonImage(null);
+    setPersonUploadFile(null);
     setResultImage(null);
     setErrorMessage(null);
   };
 
   const models = [
-    { id: "f1", name: "Sarah", image: widgetPreviewDemoModelFemale },
-    { id: "m1", name: "James", image: widgetPreviewDemoModelMale },
+    { id: "f1", name: "Sarah", image: modelFemaleBefore },
+    { id: "m1", name: "James", image: modelMaleBefore },
   ];
 
   const WidgetContent = ({ onClose }: { onClose?: () => void }) => (
@@ -210,7 +227,11 @@ const WidgetPreview = () => {
               {models.map((m) => (
                 <button
                   key={m.id}
-                  onClick={() => { setSelectedModel(m.id); setUploadedPersonImage(null); }}
+                  onClick={() => {
+                    setSelectedModel(m.id);
+                    setUploadedPersonImage(null);
+                    setPersonUploadFile(null);
+                  }}
                   className={`rounded-xl overflow-hidden border-2 transition-all ${
                     selectedModel === m.id ? "border-foreground" : "border-border/50 hover:border-foreground/20"
                   }`}
@@ -230,7 +251,11 @@ const WidgetPreview = () => {
               ))}
             </div>
 
-            <Button onClick={handleTryOn} disabled={!selectedModel && !uploadedPersonImage} className="w-full gradient-primary text-primary-foreground text-xs h-9">
+            <Button
+              onClick={handleTryOn}
+              disabled={!selectedModel && !uploadedPersonImage && !personUploadFile}
+              className="w-full gradient-primary text-primary-foreground text-xs h-9"
+            >
               Generate Try-On <ChevronRight className="ml-1 h-3 w-3" />
             </Button>
           </motion.div>

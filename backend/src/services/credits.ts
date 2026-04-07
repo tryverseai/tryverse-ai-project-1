@@ -1,11 +1,36 @@
-import { supabaseAdmin } from '../config/supabase';
 import { getRedisClient } from '../config/redis';
 import { logger } from '../config/logger';
 import { env } from '../config/env';
 import { sendLowCreditsWarningEmail } from './email';
 import type { CreditCheckResult } from '../types';
+import {
+  cxGetProfile,
+  cxPatchProfile,
+  cxInsertProfile,
+  cxGetUserRow,
+  cxGetPlan,
+  type ConvexProfileRow,
+} from './creditsConvexBridge';
 
 const LOW_CREDITS_THRESHOLD = 5;
+
+function narrowCreditFields(p: ConvexProfileRow): {
+  plan_id: string | null;
+  account_type?: string | null;
+  free_credits_remaining: number;
+  free_credits_total: number;
+  monthly_credits_remaining: number;
+  monthly_credits_total: number;
+} {
+  return {
+    plan_id: typeof p.plan_id === 'string' ? p.plan_id : null,
+    account_type: p.account_type,
+    free_credits_remaining: Number(p.free_credits_remaining ?? 0),
+    free_credits_total: Number(p.free_credits_total ?? 0),
+    monthly_credits_remaining: Number(p.monthly_credits_remaining ?? 0),
+    monthly_credits_total: Number(p.monthly_credits_total ?? 0),
+  };
+}
 
 /** Shown to end customers (widget, studio) — not billing/Replicate instructions for the store owner. */
 export const SHOPPER_TRYON_UNAVAILABLE_MESSAGE =
@@ -30,10 +55,9 @@ export function freePoolCapForAccountType(accountType: string | null | undefined
 /** Older signups used a 3-try free pool; migrate cap depends on account_type. */
 const LEGACY_FREE_CREDITS_TOTAL = 3;
 
-async function accountTypeFromAuthUser(userId: string): Promise<'individual' | 'business'> {
-  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
-  if (error || !data?.user) return 'business';
-  const s = String(data.user.user_metadata?.account_type ?? '')
+async function accountTypeFromConvexUser(userId: string): Promise<'individual' | 'business'> {
+  const row = await cxGetUserRow(userId);
+  const s = String(row?.account_type ?? '')
     .trim()
     .toLowerCase();
   return s === 'individual' ? 'individual' : 'business';
@@ -70,17 +94,14 @@ async function migrateLegacyFreeCreditsIfNeeded(
   const newRemaining = Math.min(cap, profile.free_credits_remaining + bonus);
   const newTotal = cap;
 
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({
+  try {
+    await cxPatchProfile(userId, {
       free_credits_remaining: newRemaining,
       free_credits_total: newTotal,
       updated_at: new Date().toISOString(),
-    })
-    .eq('id', userId);
-
-  if (error) {
-    logger.warn('Legacy free credits migration failed', { userId, message: error.message });
+    });
+  } catch (e) {
+    logger.warn('Legacy free credits migration failed', { userId, message: String(e) });
     return {
       free_credits_remaining: profile.free_credits_remaining,
       free_credits_total: profile.free_credits_total,
@@ -126,17 +147,14 @@ async function reconcileIndividualFreePoolCap(
   const newTotal = cap;
   const newRem = Math.min(profile.free_credits_remaining, cap);
 
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({
+  try {
+    await cxPatchProfile(userId, {
       free_credits_remaining: newRem,
       free_credits_total: newTotal,
       updated_at: new Date().toISOString(),
-    })
-    .eq('id', userId);
-
-  if (error) {
-    logger.warn('Individual free pool cap reconcile failed', { userId, message: error.message });
+    });
+  } catch (e) {
+    logger.warn('Individual free pool cap reconcile failed', { userId, message: String(e) });
     return {
       free_credits_remaining: profile.free_credits_remaining,
       free_credits_total: profile.free_credits_total,
@@ -202,7 +220,7 @@ async function ensureMonthlyCreditReset(
   }
 
   if (Object.keys(updates).length > 1) {
-    await supabaseAdmin.from('profiles').update(updates).eq('id', userId);
+    await cxPatchProfile(userId, updates);
     try {
       const redis = getRedisClient();
       if (redis.status === 'ready') {
@@ -221,8 +239,12 @@ async function hydrateProfileWithAccountType<T extends { account_type?: string |
   if (profile.account_type === 'individual' || profile.account_type === 'business') {
     return profile;
   }
-  const { data } = await supabaseAdmin.from('profiles').select('account_type').eq('id', userId).single();
-  return { ...profile, account_type: data?.account_type ?? (await accountTypeFromAuthUser(userId)) };
+  const row = await cxGetProfile(userId);
+  const at = row?.account_type;
+  if (typeof at === 'string' && (at === 'individual' || at === 'business')) {
+    return { ...profile, account_type: at };
+  }
+  return { ...profile, account_type: await accountTypeFromConvexUser(userId) };
 }
 
 /**
@@ -236,36 +258,18 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
     return { allowed: true, creditsRemaining: 999999, creditType: 'monthly' };
   }
 
-  let { data: profile, error } = await supabaseAdmin
-    .from('profiles')
-    .select(
-      'id, account_type, free_credits_remaining, free_credits_total, monthly_credits_remaining, monthly_credits_total, plan_id'
-    )
-    .eq('id', userId)
-    .single();
+  let profile = await cxGetProfile(userId);
 
-  // Auto-create profile if missing (user signed up before schema was applied)
-  if (error?.code === 'PGRST116' || !profile) {
-    const acct = await accountTypeFromAuthUser(userId);
+  if (!profile) {
+    const acct = await accountTypeFromConvexUser(userId);
     const cap = freePoolCapForAccountType(acct);
-    const { data: newProfile, error: insertErr } = await supabaseAdmin
-      .from('profiles')
-      .insert({
-        id: userId,
-        account_type: acct,
-        free_credits_remaining: cap,
-        free_credits_total: cap,
-        monthly_credits_remaining: 0,
-        monthly_credits_total: 0,
-        plan_id: 'free',
-      })
-      .select()
-      .single();
-    if (insertErr) {
-      logger.error('Failed to create profile', { userId, error: insertErr.message });
+    try {
+      await cxInsertProfile(userId, acct, cap, cap);
+    } catch (insertErr) {
+      logger.error('Failed to create profile', { userId, error: String(insertErr) });
       return { allowed: false, creditsRemaining: 0, creditType: 'free', reason: 'Profile not found' };
     }
-    profile = newProfile;
+    profile = await cxGetProfile(userId);
   }
 
   if (!profile) {
@@ -277,40 +281,35 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
     return { allowed: false, creditsRemaining: 0, creditType: 'free', reason: 'Profile not found' };
   }
 
-  const migratedFree = await migrateLegacyFreeCreditsIfNeeded(userId, profile);
+  const migratedFree = await migrateLegacyFreeCreditsIfNeeded(userId, narrowCreditFields(profile));
   profile = { ...profile, ...migratedFree };
 
-  const reconciled = await reconcileIndividualFreePoolCap(userId, profile);
+  const reconciled = await reconcileIndividualFreePoolCap(userId, narrowCreditFields(profile));
   profile = { ...profile, ...reconciled };
 
-  await ensureMonthlyCreditReset(userId, profile);
+  await ensureMonthlyCreditReset(userId, narrowCreditFields(profile));
 
-  // Re-fetch after potential reset
-  const { data: refreshed } = await supabaseAdmin
-    .from('profiles')
-    .select(
-      'free_credits_remaining, monthly_credits_remaining, monthly_credits_total, plan_id, account_type'
-    )
-    .eq('id', userId)
-    .single();
+  const refreshed = await cxGetProfile(userId);
   if (refreshed) Object.assign(profile, refreshed);
 
+  const pf = narrowCreditFields(profile);
+
   // Enterprise/unlimited plan (-1 means unlimited)
-  if (profile.monthly_credits_total === -1) {
+  if (pf.monthly_credits_total === -1) {
     return { allowed: true, creditsRemaining: -1, creditType: 'monthly' };
   }
 
   // Paid plan with monthly credits
-  if (profile.plan_id && profile.plan_id !== 'free' && profile.monthly_credits_remaining > 0) {
+  if (pf.plan_id && pf.plan_id !== 'free' && pf.monthly_credits_remaining > 0) {
     return {
       allowed: true,
-      creditsRemaining: profile.monthly_credits_remaining,
+      creditsRemaining: pf.monthly_credits_remaining,
       creditType: 'monthly',
     };
   }
 
   // Paid plan but credits exhausted
-  if (profile.plan_id && profile.plan_id !== 'free' && profile.monthly_credits_remaining <= 0) {
+  if (pf.plan_id && pf.plan_id !== 'free' && pf.monthly_credits_remaining <= 0) {
     return {
       allowed: false,
       creditsRemaining: 0,
@@ -321,10 +320,10 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
   }
 
   // Free tier
-  if (profile.free_credits_remaining > 0) {
+  if (pf.free_credits_remaining > 0) {
     return {
       allowed: true,
-      creditsRemaining: profile.free_credits_remaining,
+      creditsRemaining: pf.free_credits_remaining,
       creditType: 'free',
     };
   }
@@ -347,11 +346,7 @@ export async function decrementCredits(userId: string): Promise<void> {
     return;
   }
 
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('monthly_credits_remaining, monthly_credits_total, free_credits_remaining, plan_id')
-    .eq('id', userId)
-    .single();
+  const profile = await cxGetProfile(userId);
 
   if (!profile) {
     logger.error('Profile not found during credit decrement', { userId });
@@ -363,20 +358,22 @@ export async function decrementCredits(userId: string): Promise<void> {
 
   let updatePayload: Record<string, number> = {};
 
-  if (profile.plan_id && profile.plan_id !== 'free' && profile.monthly_credits_remaining > 0) {
-    updatePayload = { monthly_credits_remaining: profile.monthly_credits_remaining - 1 };
-  } else if (profile.free_credits_remaining > 0) {
-    updatePayload = { free_credits_remaining: profile.free_credits_remaining - 1 };
+  const planId = String(profile.plan_id ?? 'free');
+  const monthlyRem = Number(profile.monthly_credits_remaining ?? 0);
+  const monthlyTot = Number(profile.monthly_credits_total ?? 0);
+  const freeRem = Number(profile.free_credits_remaining ?? 0);
+
+  if (planId && planId !== 'free' && monthlyRem > 0) {
+    updatePayload = { monthly_credits_remaining: monthlyRem - 1 };
+  } else if (freeRem > 0) {
+    updatePayload = { free_credits_remaining: freeRem - 1 };
   } else {
     logger.warn('Attempted credit decrement with 0 credits', { userId });
     return;
   }
 
-  const { error } = await supabaseAdmin.from('profiles').update(updatePayload).eq('id', userId);
-
-  if (error) {
-    logger.error('Failed to decrement credits', { userId, error: error.message });
-  } else {
+  try {
+    await cxPatchProfile(userId, updatePayload);
     const newRemaining = Object.values(updatePayload)[0];
     logger.info('Credit deducted', { userId, creditType: Object.keys(updatePayload)[0] });
     if (newRemaining > 0 && newRemaining <= LOW_CREDITS_THRESHOLD) {
@@ -384,6 +381,8 @@ export async function decrementCredits(userId: string): Promise<void> {
         logger.warn('Low credits email failed', { userId, error: String(e) })
       );
     }
+  } catch (err) {
+    logger.error('Failed to decrement credits', { userId, error: String(err) });
   }
 }
 
@@ -392,31 +391,28 @@ export async function decrementCredits(userId: string): Promise<void> {
  * Only call when a credit was incorrectly deducted or to undo a deduction.
  */
 export async function restoreCredits(userId: string): Promise<void> {
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select(
-      'monthly_credits_remaining, monthly_credits_total, free_credits_remaining, free_credits_total, plan_id'
-    )
-    .eq('id', userId)
-    .single();
+  const profile = await cxGetProfile(userId);
 
   if (!profile || profile.monthly_credits_total === -1) return;
 
   let updatePayload: Record<string, number> = {};
-  if (
-    profile.plan_id &&
-    profile.plan_id !== 'free' &&
-    profile.monthly_credits_remaining < profile.monthly_credits_total
-  ) {
-    updatePayload = { monthly_credits_remaining: profile.monthly_credits_remaining + 1 };
-  } else if (profile.free_credits_remaining < profile.free_credits_total) {
-    updatePayload = { free_credits_remaining: profile.free_credits_remaining + 1 };
+  const planId = String(profile.plan_id ?? '');
+  const monthlyRem = Number(profile.monthly_credits_remaining ?? 0);
+  const monthlyTot = Number(profile.monthly_credits_total ?? 0);
+  const freeRem = Number(profile.free_credits_remaining ?? 0);
+  const freeTot = Number(profile.free_credits_total ?? 0);
+  if (planId && planId !== 'free' && monthlyRem < monthlyTot) {
+    updatePayload = { monthly_credits_remaining: monthlyRem + 1 };
+  } else if (freeRem < freeTot) {
+    updatePayload = { free_credits_remaining: freeRem + 1 };
   }
 
   if (Object.keys(updatePayload).length > 0) {
-    const { error } = await supabaseAdmin.from('profiles').update(updatePayload).eq('id', userId);
-    if (!error) {
+    try {
+      await cxPatchProfile(userId, updatePayload);
       logger.info('Credit restored (AI failure)', { userId });
+    } catch {
+      /* ignore */
     }
   }
 }
@@ -430,36 +426,31 @@ export async function allocateCredits(
   planId: string,
   provider: string
 ): Promise<void> {
-  const { data: plan } = await supabaseAdmin
-    .from('plans')
-    .select('tryons_per_month, name')
-    .eq('id', planId)
-    .single();
+  const plan = await cxGetPlan(planId);
 
   if (!plan) {
     logger.error('Plan not found during credit allocation', { planId });
     return;
   }
 
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({
-      plan_id: planId,
-      monthly_credits_total: plan.tryons_per_month,
-      monthly_credits_remaining: plan.tryons_per_month,
-      widget_activated: true,
-    })
-    .eq('id', userId);
+  const tryons = Number(plan.tryons_per_month ?? 0);
 
-  if (error) {
-    logger.error('Failed to allocate credits', { userId, planId, error: error.message });
-    throw new Error(`Credit allocation failed: ${error.message}`);
+  try {
+    await cxPatchProfile(userId, {
+      plan_id: planId,
+      monthly_credits_total: tryons,
+      monthly_credits_remaining: tryons,
+      widget_activated: true,
+    });
+  } catch (error) {
+    logger.error('Failed to allocate credits', { userId, planId, error: String(error) });
+    throw new Error(`Credit allocation failed: ${String(error)}`);
   }
 
   logger.info('Credits allocated', {
     userId,
     planId,
-    credits: plan.tryons_per_month,
+    credits: tryons,
     provider,
   });
 }
@@ -468,40 +459,26 @@ export async function allocateCredits(
  * Returns the user's plan ID for rate limiting and feature checks.
  */
 export async function getPlanId(userId: string): Promise<string> {
-  const { data } = await supabaseAdmin.from('profiles').select('plan_id').eq('id', userId).single();
-  return data?.plan_id || 'free';
+  const row = await cxGetProfile(userId);
+  const pid = row && typeof row.plan_id === 'string' ? row.plan_id : null;
+  return pid || 'free';
 }
 
 /**
  * Returns credit usage summary for a user.
  */
 export async function getCreditSummary(userId: string) {
-  let { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select(
-      'account_type, free_credits_remaining, free_credits_total, monthly_credits_remaining, monthly_credits_total, plan_id'
-    )
-    .eq('id', userId)
-    .single();
+  let profile = await cxGetProfile(userId);
 
-  // Auto-create profile if missing
   if (!profile) {
-    const acct = await accountTypeFromAuthUser(userId);
+    const acct = await accountTypeFromConvexUser(userId);
     const cap = freePoolCapForAccountType(acct);
-    const { data: newProfile } = await supabaseAdmin
-      .from('profiles')
-      .insert({
-        id: userId,
-        account_type: acct,
-        free_credits_remaining: cap,
-        free_credits_total: cap,
-        monthly_credits_remaining: 0,
-        monthly_credits_total: 0,
-        plan_id: 'free',
-      })
-      .select()
-      .single();
-    profile = newProfile ?? undefined;
+    try {
+      await cxInsertProfile(userId, acct, cap, cap);
+    } catch {
+      /* ignore */
+    }
+    profile = await cxGetProfile(userId);
   }
 
   if (!profile) return null;
@@ -509,29 +486,27 @@ export async function getCreditSummary(userId: string) {
   profile = await hydrateProfileWithAccountType(userId, profile);
   if (!profile) return null;
 
-  const migratedFree = await migrateLegacyFreeCreditsIfNeeded(userId, profile);
+  const migratedFree = await migrateLegacyFreeCreditsIfNeeded(userId, narrowCreditFields(profile));
   profile = { ...profile, ...migratedFree };
 
-  const reconciled = await reconcileIndividualFreePoolCap(userId, profile);
+  const reconciled = await reconcileIndividualFreePoolCap(userId, narrowCreditFields(profile));
   profile = { ...profile, ...reconciled };
 
-  const isUnlimited = profile.monthly_credits_total === -1;
-  const used = isUnlimited
-    ? 0
-    : profile.monthly_credits_total - profile.monthly_credits_remaining;
+  const pf = narrowCreditFields(profile);
+
+  const isUnlimited = pf.monthly_credits_total === -1;
+  const used = isUnlimited ? 0 : pf.monthly_credits_total - pf.monthly_credits_remaining;
 
   return {
-    plan: profile.plan_id || 'free',
+    plan: pf.plan_id || 'free',
     accountType: profile.account_type === 'individual' ? 'individual' : 'business',
     isUnlimited,
-    freeCreditsRemaining: profile.free_credits_remaining,
-    freeCreditsTotal: profile.free_credits_total,
-    monthlyCreditsRemaining: profile.monthly_credits_remaining,
-    monthlyCreditsTotal: profile.monthly_credits_total,
+    freeCreditsRemaining: pf.free_credits_remaining,
+    freeCreditsTotal: pf.free_credits_total,
+    monthlyCreditsRemaining: pf.monthly_credits_remaining,
+    monthlyCreditsTotal: pf.monthly_credits_total,
     monthlyCreditsUsed: used,
     usagePercent:
-      isUnlimited || !profile.monthly_credits_total
-        ? 0
-        : Math.round((used / profile.monthly_credits_total) * 100),
+      isUnlimited || !pf.monthly_credits_total ? 0 : Math.round((used / pf.monthly_credits_total) * 100),
   };
 }

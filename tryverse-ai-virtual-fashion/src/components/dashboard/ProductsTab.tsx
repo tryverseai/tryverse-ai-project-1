@@ -28,15 +28,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import {
   getProducts,
   createProduct,
   updateProduct,
   deleteProduct,
   uploadImage,
+  resolveProductImageDisplayUrl,
   type Product,
   type TryOnCategory,
 } from "@/lib/backendApi";
+import { isConvexDataEnabled } from "@/lib/convexData";
 import { openExternalHttpUrlInNewTab, safeImageSrcForDom, safeHttpHrefForDom } from "@/lib/safeUrl";
 
 const CATEGORIES: { id: TryOnCategory; label: string }[] = [
@@ -53,6 +57,7 @@ function productImageBgStyle(raw: string | null | undefined): CSSProperties | un
 }
 
 export function ProductsTab() {
+  const convexOn = isConvexDataEnabled();
   const [products, setProducts] = useState<Product[]>([]);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -62,6 +67,19 @@ export function ProductsTab() {
   });
   const [nameQuery, setNameQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<TryOnCategory | "">("");
+  const cxProducts = useQuery(
+    api.products.listMyProducts,
+    convexOn
+      ? {
+          page: pagination.page,
+          limit: pagination.limit,
+          category: categoryFilter || undefined,
+        }
+      : "skip"
+  );
+  const createProductCv = useMutation(api.products.createProduct);
+  const updateProductCv = useMutation(api.products.updateProduct);
+  const deleteProductCv = useMutation(api.products.deleteProduct);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -77,6 +95,7 @@ export function ProductsTab() {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchProducts = async () => {
+    if (convexOn) return;
     setLoading(true);
     setFetchError(null);
     try {
@@ -100,8 +119,52 @@ export function ProductsTab() {
   };
 
   useEffect(() => {
-    fetchProducts();
-  }, [pagination.page, categoryFilter]);
+    if (!convexOn) {
+      void fetchProducts();
+    }
+  }, [convexOn, pagination.page, categoryFilter]);
+
+  useEffect(() => {
+    if (!convexOn) return;
+    let cancelled = false;
+    if (cxProducts === undefined) {
+      setLoading(true);
+      return;
+    }
+    void (async () => {
+      try {
+        setFetchError(null);
+        const raw = cxProducts?.products ?? [];
+        const enriched: Product[] = await Promise.all(
+          raw.map(async (p) => ({
+            ...p,
+            category: p.category as TryOnCategory,
+            image_display_url: await resolveProductImageDisplayUrl(p.image_url),
+          }))
+        );
+        if (cancelled) return;
+        setProducts(enriched);
+        if (cxProducts?.pagination) {
+          setPagination({
+            page: cxProducts.pagination.page,
+            limit: cxProducts.pagination.limit,
+            total: cxProducts.pagination.total,
+            pages: cxProducts.pagination.pages,
+          });
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setFetchError(e instanceof Error ? e.message : "Failed to load");
+          setProducts([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [convexOn, cxProducts]);
 
   const handleOpenCreate = () => {
     setEditingProduct(null);
@@ -155,7 +218,37 @@ export function ProductsTab() {
     }
     setSaving(true);
     try {
-      if (editingProduct) {
+      if (convexOn) {
+        if (editingProduct) {
+          const updated = await updateProductCv({
+            id: editingProduct.id,
+            name: form.name.trim(),
+            image_url: form.image_url || undefined,
+            category: form.category,
+            product_url: form.product_url || undefined,
+          });
+          const image_display_url = await resolveProductImageDisplayUrl(updated.image_url);
+          toast.success("Product updated");
+          setProducts((prev) =>
+            prev.map((x) =>
+              x.id === editingProduct.id ? { ...updated, image_display_url, category: updated.category as TryOnCategory } : x
+            )
+          );
+        } else {
+          const created = await createProductCv({
+            name: form.name.trim(),
+            image_url: form.image_url || undefined,
+            category: form.category,
+            product_url: form.product_url || undefined,
+          });
+          const image_display_url = await resolveProductImageDisplayUrl(created.image_url);
+          toast.success("Product created");
+          setProducts((prev) => [
+            { ...created, category: created.category as TryOnCategory, image_display_url },
+            ...prev,
+          ]);
+        }
+      } else if (editingProduct) {
         await updateProduct(editingProduct.id, {
           name: form.name.trim(),
           image_url: form.image_url || undefined,
@@ -173,7 +266,7 @@ export function ProductsTab() {
         toast.success("Product created");
       }
       setDialogOpen(false);
-      fetchProducts();
+      if (!convexOn) fetchProducts();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -184,9 +277,14 @@ export function ProductsTab() {
   const handleDelete = async (p: Product) => {
     if (!confirm(`Delete "${p.name}"?`)) return;
     try {
-      await deleteProduct(p.id);
+      if (convexOn) {
+        await deleteProductCv({ id: p.id });
+        setProducts((prev) => prev.filter((x) => x.id !== p.id));
+      } else {
+        await deleteProduct(p.id);
+        fetchProducts();
+      }
       toast.success("Product deleted");
-      fetchProducts();
     } catch (err) {
       toast.error("Failed to delete");
     }
@@ -261,7 +359,7 @@ export function ProductsTab() {
           </p>
           <p className="text-xs text-muted-foreground max-w-md mx-auto mb-4">
             {fetchError.includes("exist") || fetchError.includes("relation")
-              ? "Make sure the products table exists. Run the migration in Supabase Dashboard → SQL Editor."
+              ? "Make sure products exist in Convex (seed or create from the dashboard)."
               : "Check your connection and try again."}
           </p>
           <Button onClick={fetchProducts} variant="outline">

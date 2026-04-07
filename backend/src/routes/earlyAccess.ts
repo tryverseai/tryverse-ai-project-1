@@ -2,7 +2,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { body } from 'express-validator';
 import { earlyAccessRateLimit } from '../middleware/rateLimiter';
 import { handleValidationErrors } from '../middleware/validate';
-import { supabaseAdmin } from '../config/supabase';
+import { env } from '../config/env';
+import { anyApi, convexMutationTrusted } from '../config/convexHttp';
 import { sendEmail } from '../services/email/resend';
 import { logger } from '../config/logger';
 import { buildEarlyAccessConfirmationHtml, buildIndividualWaitlistConfirmationHtml } from './earlyAccessEmailHtml';
@@ -83,33 +84,32 @@ router.post(
         prior_solution_notes,
       } = req.body as Record<string, unknown>;
 
-      const { data, error } = await supabaseAdmin
-        .from('early_access_requests')
-        .insert({
-          applicant_type: 'business',
-          first_name,
-          email: String(email).toLowerCase(),
-          brand_name,
-          role,
-          website_url,
-          platform,
-          product_range,
-          monthly_revenue,
-          return_rate,
-          top_return_reason,
-          customer_confidence,
-          tried_solutions,
-          must_have_features,
-          biggest_challenge,
-          timeline,
-          heard_about: heard_about || null,
-          prior_solution_notes: prior_solution_notes || null,
-        })
-        .select('id')
-        .single();
-
-      if (error) {
-        logger.error('Early access insert failed', { error: error.message });
+      try {
+        await convexMutationTrusted(anyApi.backendTrusted.insertEarlyAccessRowTrusted, {
+          secret: env.BACKEND_SHARED_SECRET,
+          row: {
+            applicant_type: 'business',
+            first_name,
+            email: String(email).toLowerCase(),
+            brand_name,
+            role,
+            website_url,
+            platform,
+            product_range,
+            monthly_revenue,
+            return_rate,
+            top_return_reason,
+            customer_confidence,
+            tried_solutions,
+            must_have_features,
+            biggest_challenge,
+            timeline,
+            heard_about: heard_about || null,
+            prior_solution_notes: prior_solution_notes || null,
+          },
+        });
+      } catch (error) {
+        logger.error('Early access insert failed', { error: String(error) });
         res.status(500).json({ error: 'Could not save your application. Please try again later.' });
         return;
       }
@@ -132,14 +132,13 @@ router.post(
 
       if (!emailSent) {
         logger.warn('Early access saved but confirmation email was not sent', {
-          id: data?.id,
           to,
           hint:
             'Set RESEND_API_KEY in backend/.env. For Resend test mode, emails only go to your verified address; for production verify your domain at resend.com/domains and set EMAIL_FROM to an address on that domain.',
         });
       }
 
-      res.status(201).json({ success: true, id: data?.id, emailSent });
+      res.status(201).json({ success: true, emailSent });
     } catch (err) {
       next(err);
     }
@@ -164,33 +163,32 @@ router.post(
         unknown
       >;
 
-      const { data, error } = await supabaseAdmin
-        .from('early_access_requests')
-        .insert({
-          applicant_type: 'individual',
-          first_name,
-          email: String(email).toLowerCase(),
-          brand_name: `${String(first_name).trim()} ${INDIVIDUAL_EARLY_ACCESS_FILLERS.brand_name_suffix}`,
-          role: INDIVIDUAL_EARLY_ACCESS_FILLERS.role,
-          website_url: INDIVIDUAL_EARLY_ACCESS_FILLERS.website_url,
-          platform: INDIVIDUAL_EARLY_ACCESS_FILLERS.platform,
-          product_range: INDIVIDUAL_EARLY_ACCESS_FILLERS.product_range,
-          monthly_revenue: INDIVIDUAL_EARLY_ACCESS_FILLERS.monthly_revenue,
-          return_rate: INDIVIDUAL_EARLY_ACCESS_FILLERS.return_rate,
-          top_return_reason: INDIVIDUAL_EARLY_ACCESS_FILLERS.top_return_reason,
-          customer_confidence: INDIVIDUAL_EARLY_ACCESS_FILLERS.customer_confidence,
-          tried_solutions: [],
-          must_have_features: [],
-          biggest_challenge: what_interests_you,
-          timeline,
-          heard_about: heard_about || null,
-          prior_solution_notes: null,
-        })
-        .select('id')
-        .single();
-
-      if (error) {
-        logger.error('Individual early access insert failed', { error: error.message });
+      try {
+        await convexMutationTrusted(anyApi.backendTrusted.insertEarlyAccessRowTrusted, {
+          secret: env.BACKEND_SHARED_SECRET,
+          row: {
+            applicant_type: 'individual',
+            first_name,
+            email: String(email).toLowerCase(),
+            brand_name: `${String(first_name).trim()} ${INDIVIDUAL_EARLY_ACCESS_FILLERS.brand_name_suffix}`,
+            role: INDIVIDUAL_EARLY_ACCESS_FILLERS.role,
+            website_url: INDIVIDUAL_EARLY_ACCESS_FILLERS.website_url,
+            platform: INDIVIDUAL_EARLY_ACCESS_FILLERS.platform,
+            product_range: INDIVIDUAL_EARLY_ACCESS_FILLERS.product_range,
+            monthly_revenue: INDIVIDUAL_EARLY_ACCESS_FILLERS.monthly_revenue,
+            return_rate: INDIVIDUAL_EARLY_ACCESS_FILLERS.return_rate,
+            top_return_reason: INDIVIDUAL_EARLY_ACCESS_FILLERS.top_return_reason,
+            customer_confidence: INDIVIDUAL_EARLY_ACCESS_FILLERS.customer_confidence,
+            tried_solutions: [],
+            must_have_features: [],
+            biggest_challenge: what_interests_you,
+            timeline,
+            heard_about: heard_about || null,
+            prior_solution_notes: null,
+          },
+        });
+      } catch (error) {
+        logger.error('Individual early access insert failed', { error: String(error) });
         res.status(500).json({ error: 'Could not save your request. Please try again later.' });
         return;
       }
@@ -208,12 +206,11 @@ router.post(
 
       if (!emailSent) {
         logger.warn('Individual early access saved but confirmation email was not sent', {
-          id: data?.id,
           to,
         });
       }
 
-      res.status(201).json({ success: true, id: data?.id, emailSent });
+      res.status(201).json({ success: true, emailSent });
     } catch (err) {
       next(err);
     }

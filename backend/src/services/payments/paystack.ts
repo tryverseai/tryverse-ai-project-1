@@ -2,8 +2,15 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
-import { supabaseAdmin } from '../../config/supabase';
 import { allocateCredits } from '../credits';
+import {
+  paymentSuccessExists,
+  insertPaymentRow,
+  upsertSubscriptionRow,
+  cancelSubscriptionsForUserId,
+} from '../billingConvexBridge';
+import { cxGetPlan, cxGetProfile } from '../creditsConvexBridge';
+import { cxInsertUsageEvent } from '../tryonConvexBridge';
 import { sendPaymentConfirmationEmail, sendFailedPaymentEmail } from '../email';
 import type { PaystackWebhookEvent } from '../../types';
 
@@ -112,81 +119,65 @@ export async function handlePaystackWebhook(event: PaystackWebhookEvent): Promis
       return;
     }
 
-    // Deduplication: avoid processing the same payment twice
-    const { data: existing } = await supabaseAdmin
-      .from('payments')
-      .select('id')
-      .eq('reference', reference)
-      .eq('status', 'success')
-      .single();
-
-    if (existing) {
+    if (await paymentSuccessExists(reference)) {
       logger.warn('Duplicate Paystack webhook — already processed', { reference });
       return;
     }
 
-    // Record payment
-    const { error: paymentError } = await supabaseAdmin.from('payments').insert({
-      user_id: metadata.user_id,
-      reference,
-      amount: amount / 100,
-      currency,
-      status: 'success',
-      provider: 'paystack',
-    });
-
-    if (paymentError) {
-      logger.error('Failed to record payment', { error: paymentError.message });
+    try {
+      await insertPaymentRow({
+        user_id: metadata.user_id,
+        reference,
+        amount: amount / 100,
+        currency,
+        status: 'success',
+        provider: 'paystack',
+      });
+    } catch (paymentError) {
+      logger.error('Failed to record payment', { error: String(paymentError) });
     }
 
-    // Upsert subscription
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
 
-    await supabaseAdmin.from('subscriptions').upsert(
-      {
-        user_id: metadata.user_id,
-        plan_id: metadata.plan_id,
-        status: 'active',
-        provider: 'paystack',
-        current_period_start: now.toISOString(),
-        current_period_end: nextMonth.toISOString(),
-      },
-      { onConflict: 'user_id' }
-    );
+    await upsertSubscriptionRow({
+      user_id: metadata.user_id,
+      plan_id: metadata.plan_id,
+      status: 'active',
+      provider: 'paystack',
+      current_period_start: now.toISOString(),
+      current_period_end: nextMonth.toISOString(),
+    });
 
     // Allocate credits
     await allocateCredits(metadata.user_id, metadata.plan_id, 'paystack');
 
     // Send payment confirmation email
     try {
-      const { data: plan } = await supabaseAdmin.from('plans').select('name, tryons_per_month').eq('id', metadata.plan_id).single();
-      const { data: profile } = await supabaseAdmin.from('profiles').select('full_name, brand_name').eq('id', metadata.user_id).single();
-      const name = profile?.full_name || profile?.brand_name || '';
+      const plan = await cxGetPlan(metadata.plan_id);
+      const profile = await cxGetProfile(metadata.user_id);
+      const name =
+        String((profile as { full_name?: string } | null)?.full_name || '') ||
+        String((profile as { brand_name?: string } | null)?.brand_name || '');
       await sendPaymentConfirmationEmail({
         email: customer.email,
         name,
-        planName: plan?.name || metadata.plan_id,
+        planName: String((plan as { name?: string } | null)?.name || metadata.plan_id),
         amount: String(amount / 100),
         currency,
-        credits: plan?.tryons_per_month ?? 0,
+        credits: Number((plan as { tryons_per_month?: number } | null)?.tryons_per_month ?? 0),
       });
     } catch (e) {
       logger.warn('Failed to send payment confirmation email', { error: String(e) });
     }
 
-    // Log usage event
-    await supabaseAdmin.from('usage_events').insert({
-      user_id: metadata.user_id,
-      event_type: 'subscription_activated',
-      metadata: {
-        plan_id: metadata.plan_id,
-        provider: 'paystack',
-        reference,
-        amount: amount / 100,
-        currency,
-        customer_email: customer.email,
-      },
+    await cxInsertUsageEvent(metadata.user_id, 'subscription_activated', {
+      plan_id: metadata.plan_id,
+      provider: 'paystack',
+      reference,
+      amount: amount / 100,
+      currency,
+      customer_email: customer.email,
     });
 
     logger.info('Paystack subscription activated', {
@@ -199,8 +190,10 @@ export async function handlePaystackWebhook(event: PaystackWebhookEvent): Promis
     const { metadata, customer } = event.data;
     if (customer?.email && metadata?.user_id) {
       try {
-        const { data: profile } = await supabaseAdmin.from('profiles').select('full_name, brand_name').eq('id', metadata.user_id).single();
-        const name = profile?.full_name || profile?.brand_name || '';
+        const profile = await cxGetProfile(metadata.user_id);
+        const name =
+          String((profile as { full_name?: string } | null)?.full_name || '') ||
+          String((profile as { brand_name?: string } | null)?.brand_name || '');
         await sendFailedPaymentEmail({
           email: customer.email,
           name,
@@ -215,11 +208,7 @@ export async function handlePaystackWebhook(event: PaystackWebhookEvent): Promis
   if (event.event === 'subscription.disable') {
     const userId = event.data.metadata?.user_id;
     if (userId) {
-      await supabaseAdmin
-        .from('subscriptions')
-        .update({ status: 'cancelled' })
-        .eq('user_id', userId);
-
+      await cancelSubscriptionsForUserId(userId);
       logger.info('Paystack subscription cancelled', { userId });
     }
   }

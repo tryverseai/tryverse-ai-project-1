@@ -2,7 +2,13 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
-import { supabaseAdmin } from '../../config/supabase';
+import {
+  paymentSuccessExists,
+  insertPaymentRow,
+  upsertSubscriptionRow,
+} from '../billingConvexBridge';
+import { cxGetPlan, cxGetProfile } from '../creditsConvexBridge';
+import { cxInsertUsageEvent } from '../tryonConvexBridge';
 import { allocateCredits } from '../credits';
 import { sendPaymentConfirmationEmail, sendFailedPaymentEmail } from '../email';
 import type { FlutterwaveWebhookEvent } from '../../types';
@@ -117,21 +123,12 @@ export async function handleFlutterwaveWebhook(event: FlutterwaveWebhookEvent): 
       return;
     }
 
-    // Check for duplicate processing
-    const { data: existing } = await supabaseAdmin
-      .from('payments')
-      .select('id')
-      .eq('reference', tx_ref)
-      .eq('status', 'success')
-      .single();
-
-    if (existing) {
+    if (await paymentSuccessExists(tx_ref)) {
       logger.warn('Duplicate Flutterwave webhook — already processed', { tx_ref });
       return;
     }
 
-    // Record payment
-    await supabaseAdmin.from('payments').insert({
+    await insertPaymentRow({
       user_id: meta.user_id,
       reference: tx_ref,
       amount,
@@ -140,55 +137,48 @@ export async function handleFlutterwaveWebhook(event: FlutterwaveWebhookEvent): 
       provider: 'flutterwave',
     });
 
-    // Upsert subscription
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
 
-    await supabaseAdmin.from('subscriptions').upsert(
-      {
-        user_id: meta.user_id,
-        plan_id: meta.plan_id,
-        status: 'active',
-        provider: 'flutterwave',
-        provider_subscription_id: String(event.data.id),
-        current_period_start: now.toISOString(),
-        current_period_end: nextMonth.toISOString(),
-      },
-      { onConflict: 'user_id' }
-    );
+    await upsertSubscriptionRow({
+      user_id: meta.user_id,
+      plan_id: meta.plan_id,
+      status: 'active',
+      provider: 'flutterwave',
+      provider_subscription_id: String(event.data.id),
+      current_period_start: now.toISOString(),
+      current_period_end: nextMonth.toISOString(),
+    });
 
     // Allocate credits
     await allocateCredits(meta.user_id, meta.plan_id, 'flutterwave');
 
     // Send payment confirmation email
     try {
-      const { data: plan } = await supabaseAdmin.from('plans').select('name, tryons_per_month').eq('id', meta.plan_id).single();
-      const { data: profile } = await supabaseAdmin.from('profiles').select('full_name, brand_name').eq('id', meta.user_id).single();
-      const name = profile?.full_name || profile?.brand_name || '';
+      const plan = await cxGetPlan(meta.plan_id);
+      const profile = await cxGetProfile(meta.user_id);
+      const name =
+        String((profile as { full_name?: string } | null)?.full_name || '') ||
+        String((profile as { brand_name?: string } | null)?.brand_name || '');
       await sendPaymentConfirmationEmail({
         email: customer.email,
         name,
-        planName: plan?.name || meta.plan_id,
+        planName: String((plan as { name?: string } | null)?.name || meta.plan_id),
         amount: String(amount),
         currency,
-        credits: plan?.tryons_per_month ?? 0,
+        credits: Number((plan as { tryons_per_month?: number } | null)?.tryons_per_month ?? 0),
       });
     } catch (e) {
       logger.warn('Failed to send payment confirmation email', { error: String(e) });
     }
 
-    // Log usage event
-    await supabaseAdmin.from('usage_events').insert({
-      user_id: meta.user_id,
-      event_type: 'subscription_activated',
-      metadata: {
-        plan_id: meta.plan_id,
-        provider: 'flutterwave',
-        tx_ref,
-        amount,
-        currency,
-        customer_email: customer.email,
-      },
+    await cxInsertUsageEvent(meta.user_id, 'subscription_activated', {
+      plan_id: meta.plan_id,
+      provider: 'flutterwave',
+      tx_ref,
+      amount,
+      currency,
+      customer_email: customer.email,
     });
 
     logger.info('Flutterwave subscription activated', {
@@ -203,8 +193,10 @@ export async function handleFlutterwaveWebhook(event: FlutterwaveWebhookEvent): 
     const userId = meta?.user_id;
     if (email && userId) {
       try {
-        const { data: profile } = await supabaseAdmin.from('profiles').select('full_name, brand_name').eq('id', userId).single();
-        const name = profile?.full_name || profile?.brand_name || '';
+        const profile = await cxGetProfile(userId);
+        const name =
+          String((profile as { full_name?: string } | null)?.full_name || '') ||
+          String((profile as { brand_name?: string } | null)?.brand_name || '');
         await sendFailedPaymentEmail({
           email,
           name,

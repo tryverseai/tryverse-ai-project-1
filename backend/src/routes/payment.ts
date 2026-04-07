@@ -17,8 +17,8 @@ import {
   handleFlutterwaveWebhook,
   verifyFlutterwaveTransaction,
 } from '../services/payments/flutterwave';
-import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
+import { cxGetPlan, cxGetProfile } from '../services/creditsConvexBridge';
 import type { PaystackWebhookEvent, FlutterwaveWebhookEvent } from '../types';
 
 const router = Router();
@@ -76,19 +76,15 @@ router.post(
         return;
       }
       const { planId, callbackUrl } = req.body;
-      const { data: plan, error } = await supabaseAdmin
-        .from('plans')
-        .select('price_ngn, id')
-        .eq('id', planId)
-        .eq('is_active', true)
-        .maybeSingle();
-      if (error || !plan || plan.price_ngn <= 0) {
+      const plan = await cxGetPlan(planId);
+      const p = plan as { price_ngn?: number; is_active?: boolean } | null;
+      if (!p || !p.is_active || !p.price_ngn || p.price_ngn <= 0) {
         throw new AppError('Plan not available for Paystack checkout', 400);
       }
 
       const result = await initializePaystackPayment({
         email: req.user!.email,
-        amount: plan.price_ngn,
+        amount: p.price_ngn,
         planId,
         userId: req.user!.id,
         callbackUrl,
@@ -139,22 +135,18 @@ router.post(
       const { planId, currency, callbackUrl } = req.body;
       const cur = String(currency).toUpperCase();
 
-      const { data: plan, error } = await supabaseAdmin
-        .from('plans')
-        .select('price_usd, price_ngn, id')
-        .eq('id', planId)
-        .eq('is_active', true)
-        .maybeSingle();
-      if (error || !plan) {
+      const plan = await cxGetPlan(planId);
+      const p = plan as { price_usd?: number; price_ngn?: number; is_active?: boolean } | null;
+      if (!p || !p.is_active) {
         throw new AppError('Plan not found or inactive', 404);
       }
 
-      const amount = cur === 'USD' ? plan.price_usd : plan.price_ngn;
-      if (amount <= 0) {
+      const amount = cur === 'USD' ? p.price_usd : p.price_ngn;
+      if (amount === undefined || amount <= 0) {
         throw new AppError('This plan is not available for self-checkout in this currency', 400);
       }
 
-      const { data: profile } = await supabaseAdmin.from('profiles').select('full_name').eq('id', req.user!.id).single();
+      const profile = await cxGetProfile(req.user!.id);
 
       const result = await initializeFlutterwavePayment({
         email: req.user!.email,
@@ -163,7 +155,7 @@ router.post(
         planId,
         userId: req.user!.id,
         callbackUrl,
-        fullName: profile?.full_name || undefined,
+        fullName: (profile as { full_name?: string } | null)?.full_name || undefined,
       });
 
       res.json(result);

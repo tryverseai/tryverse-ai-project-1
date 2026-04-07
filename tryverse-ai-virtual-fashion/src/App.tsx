@@ -12,6 +12,7 @@ import { AccountTypeGate } from "@/components/AccountTypeGate";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { ComplianceOnboardingGate } from "@/components/ComplianceOnboardingGate";
 import { CookieConsent } from "@/components/CookieConsent";
+import { ConvexProviderGate } from "@/components/ConvexProviderGate";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import IndividualDashboard from "./pages/IndividualDashboard";
@@ -39,6 +40,7 @@ const queryClient = new QueryClient();
 const App = () => (
   <HelmetProvider>
   <QueryClientProvider client={queryClient}>
+    <ConvexProviderGate>
     <AuthProvider>
       <PostHogProvider>
       <TooltipProvider>
@@ -114,6 +116,7 @@ const App = () => (
       </TooltipProvider>
       </PostHogProvider>
     </AuthProvider>
+    </ConvexProviderGate>
   </QueryClientProvider>
   </HelmetProvider>
 );

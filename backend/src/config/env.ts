@@ -42,10 +42,15 @@ export const env = {
   NODE_ENV: optionalEnv('NODE_ENV', 'development'),
   PORT: parseInt(optionalEnv('PORT', '3001'), 10),
 
-  // ── Supabase ──────────────────────────────────────────────────────────────
-  SUPABASE_URL: requireEnv('SUPABASE_URL'),
-  SUPABASE_SERVICE_ROLE_KEY: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
-  SUPABASE_ANON_KEY: requireEnv('SUPABASE_ANON_KEY'),
+  // ── Convex (primary DB + auth validation) ─────────────────────────────────
+  CONVEX_URL: requireEnv('CONVEX_URL'),
+  /** Shared secret for Node → Convex `backendTrusted.*` (set same value in Convex env). */
+  BACKEND_SHARED_SECRET: requireEnv('BACKEND_SHARED_SECRET'),
+
+  // ── Legacy (optional — app data is on Convex) ──
+  SUPABASE_URL: optionalEnv('SUPABASE_URL', ''),
+  SUPABASE_SERVICE_ROLE_KEY: optionalEnv('SUPABASE_SERVICE_ROLE_KEY', ''),
+  SUPABASE_ANON_KEY: optionalEnv('SUPABASE_ANON_KEY', ''),
 
   // ── Redis ─────────────────────────────────────────────────────────────────
   REDIS_URL: optionalEnv('REDIS_URL', 'redis://localhost:6379'),

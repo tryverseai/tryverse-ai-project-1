@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
 import { env } from '../config/env';
+import { logAudit } from '../services/audit';
 import type { ApiKeyPayload } from '../types';
+import { convexMutationTrusted, convexQueryTrusted, anyApi } from '../config/convexHttp';
 
 function apiKeyFromQueryAllowed(): boolean {
   return env.NODE_ENV !== 'production' || env.ALLOW_API_KEY_IN_QUERY;
@@ -25,25 +26,35 @@ export async function optionalApiKey(req: Request, res: Response, next: NextFunc
   if (!keyValue) return next();
 
   try {
-    const { data: apiKey, error } = await supabaseAdmin
-      .from('api_keys')
-      .select('id, user_id, key_value, status')
-      .eq('key_value', keyValue)
-      .eq('status', 'active')
-      .single();
+    const apiKey = await convexQueryTrusted<{
+      id: string;
+      userId: string;
+      keyValue: string;
+      status: string;
+      name: string;
+    } | null>(anyApi.backendTrusted.lookupActiveApiKey, {
+      secret: env.BACKEND_SHARED_SECRET,
+      keyValue,
+    });
 
-    if (!error && apiKey) {
-      req.apiKey = { id: apiKey.id, userId: apiKey.user_id, keyValue: apiKey.key_value, status: apiKey.status } as ApiKeyPayload;
-      req.widgetUserId = apiKey.user_id;
+    if (apiKey) {
+      req.apiKey = {
+        id: apiKey.id,
+        userId: apiKey.userId,
+        keyValue: apiKey.keyValue,
+        status: apiKey.status,
+        name: apiKey.name,
+      } as ApiKeyPayload;
+      req.widgetUserId = apiKey.userId;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   next();
 }
 
 /**
  * Authenticates requests via API key (x-api-key header; query param only in dev or if ALLOW_API_KEY_IN_QUERY).
- * Used for widget and external brand integrations.
- * Sets req.apiKey and req.widgetUserId on success.
  */
 export async function requireApiKey(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!apiKeyFromQueryAllowed() && req.query.api_key) {
@@ -65,34 +76,39 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
   }
 
   try {
-    const { data: apiKey, error } = await supabaseAdmin
-      .from('api_keys')
-      .select('id, user_id, key_value, status, name')
-      .eq('key_value', keyValue)
-      .eq('status', 'active')
-      .single();
+    const apiKey = await convexQueryTrusted<{
+      id: string;
+      userId: string;
+      keyValue: string;
+      status: string;
+      name: string;
+    } | null>(anyApi.backendTrusted.lookupActiveApiKey, {
+      secret: env.BACKEND_SHARED_SECRET,
+      keyValue,
+    });
 
-    if (error || !apiKey) {
+    if (!apiKey) {
       res.status(401).json({ error: 'Invalid or revoked API key' });
       return;
     }
 
-    // Update last_used_at asynchronously (non-blocking)
-    void supabaseAdmin
-      .from('api_keys')
-      .update({ last_used_at: new Date().toISOString() })
-      .eq('id', apiKey.id)
-      .then(() => {}, (err: unknown) => logger.error('Failed to update last_used_at', { error: String(err) }));
+    void convexMutationTrusted(anyApi.backendTrusted.markApiKeyUsed, {
+      secret: env.BACKEND_SHARED_SECRET,
+      keyValue,
+    }).then(
+      () => {},
+      (err: unknown) => logger.error('Failed to update last_used_at', { error: String(err) })
+    );
 
     req.apiKey = {
       id: apiKey.id,
-      userId: apiKey.user_id,
-      keyValue: apiKey.key_value,
+      userId: apiKey.userId,
+      keyValue: apiKey.keyValue,
       status: apiKey.status,
       name: apiKey.name,
     } as ApiKeyPayload;
 
-    req.widgetUserId = apiKey.user_id;
+    req.widgetUserId = apiKey.userId;
     next();
   } catch (err) {
     logger.error('API key middleware error', { error: String(err) });
@@ -112,7 +128,6 @@ export async function validateDomain(req: Request, res: Response, next: NextFunc
 
   const origin = req.headers.origin || req.headers.referer || '';
   if (!origin) {
-    // Allow requests without origin header (server-to-server)
     return next();
   }
 
@@ -125,13 +140,15 @@ export async function validateDomain(req: Request, res: Response, next: NextFunc
       requestDomain = origin.replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '');
     }
 
-    const { data: allowedDomains } = await supabaseAdmin
-      .from('allowed_domains')
-      .select('domain')
-      .eq('api_key_id', req.apiKey.id);
+    const allowedDomains = await convexQueryTrusted<Array<{ domain: string }>>(
+      anyApi.backendTrusted.listAllowedDomainsForApiKey,
+      {
+        secret: env.BACKEND_SHARED_SECRET,
+        apiKeyId: req.apiKey.id,
+      }
+    );
 
     if (!allowedDomains || allowedDomains.length === 0) {
-      // No domain restrictions configured — allow all
       return next();
     }
 

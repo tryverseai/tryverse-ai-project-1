@@ -10,8 +10,13 @@ import { checkCredits, SHOPPER_TRYON_UNAVAILABLE_MESSAGE } from '../services/cre
 import { enqueueTryOnJob, getJobStatusForUser, getTryOnQueue } from '../services/queue/producer';
 import { executeTryOnPipeline } from '../services/ai/pipeline';
 import { getSupportedCategories } from '../services/ai/replicate';
-import { supabaseAdmin } from '../config/supabase';
 import { getSignedUrl, RESULT_BUCKET } from '../services/storage/images';
+import {
+  cxInsertTryon,
+  cxGetTryonForUser,
+  cxDeleteTryonForUser,
+  cxListTryons,
+} from '../services/tryonConvexBridge';
 import { logger } from '../config/logger';
 import type { TryOnJob, ProductCategory } from '../types';
 
@@ -50,13 +55,17 @@ router.post(
       .isString()
       .notEmpty()
       .isLength({ max: 200 })
-      .matches(/^[a-zA-Z0-9_-]+\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$|^anonymous\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$/i)
+      .matches(
+        /^[a-zA-Z0-9_-]+\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$|^anonymous\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$/i
+      )
       .withMessage('personImagePath must be a valid storage path from upload'),
     body('productImagePath')
       .isString()
       .notEmpty()
       .isLength({ max: 200 })
-      .matches(/^[a-zA-Z0-9_-]+\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$|^anonymous\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$/i)
+      .matches(
+        /^[a-zA-Z0-9_-]+\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$|^anonymous\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$/i
+      )
       .withMessage('productImagePath must be a valid storage path from upload'),
     body('category')
       .isIn(VALID_CATEGORIES)
@@ -109,21 +118,18 @@ router.post(
         return;
       }
 
-      // Create tryon record in DB
-      const { data: tryon, error: dbError } = await supabaseAdmin
-        .from('tryons')
-        .insert({
-          user_id: userId,
-          person_image: personImagePath,
-          product_image: productImagePath,
+      const tryonLegacyId = uuidv4();
+      try {
+        await cxInsertTryon({
+          legacyId: tryonLegacyId,
+          userId,
+          personImage: personImagePath,
+          productImage: productImagePath,
           category,
           status: 'queued',
-        })
-        .select('id')
-        .single();
-
-      if (dbError || !tryon) {
-        logger.error('Failed to create tryon record', { error: dbError?.message });
+        });
+      } catch (dbError) {
+        logger.error('Failed to create tryon record', { error: String(dbError) });
         res.status(500).json({ error: 'Failed to initiate try-on' });
         return;
       }
@@ -137,7 +143,7 @@ router.post(
         productImageUrl: productImagePath,
         category: category as ProductCategory,
         productDescription: productDescription || undefined,
-        tryonDbId: tryon.id,
+        tryonDbId: tryonLegacyId,
         widgetMode: !!req.apiKey,
       };
 
@@ -148,14 +154,14 @@ router.post(
 
         logger.info('Try-on job queued', {
           jobId,
-          tryonId: tryon.id,
+          tryonId: tryonLegacyId,
           userId,
           category,
         });
 
         res.status(202).json({
           success: true,
-          tryonId: tryon.id,
+          tryonId: tryonLegacyId,
           jobId,
           status: 'queued',
           category,
@@ -166,7 +172,7 @@ router.post(
         // Sync processing (no queue or explicitly requested)
         logger.info('Processing try-on synchronously', {
           jobId,
-          tryonId: tryon.id,
+          tryonId: tryonLegacyId,
           category,
         });
 
@@ -174,7 +180,7 @@ router.post(
 
         res.status(200).json({
           success: result.status === 'completed',
-          tryonId: tryon.id,
+          tryonId: tryonLegacyId,
           jobId,
           status: result.status,
           category,
@@ -204,23 +210,13 @@ router.get(
       const tryonId = req.params.tryonId as string;
       const userId = req.user?.id || req.widgetUserId;
 
-      // Always enforce ownership: user or widget (API key owner) must own the tryon
-      const query = supabaseAdmin
-        .from('tryons')
-        .select('id, status, result_image, created_at, completed_at, category, user_id')
-        .eq('id', tryonId);
-
-      if (userId) {
-        query.eq('user_id', userId);
-      } else {
-        // Anonymous/widget without resolved user: deny access
+      if (!userId) {
         res.status(401).json({ error: 'Authentication required to access try-on status' });
         return;
       }
 
-      const { data: tryon, error } = await query.single();
-
-      if (error || !tryon) {
+      const tryon = await cxGetTryonForUser(tryonId, userId);
+      if (!tryon) {
         res.status(404).json({ error: 'Try-on not found' });
         return;
       }
@@ -256,16 +252,8 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const tryonId = req.params.tryonId as string;
-      const { data, error } = await supabaseAdmin
-        .from('tryons')
-        .delete()
-        .eq('id', tryonId)
-        .eq('user_id', req.user!.id)
-        .select('id')
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!data) {
+      const deleted = await cxDeleteTryonForUser(tryonId, req.user!.id);
+      if (!deleted) {
         res.status(404).json({ error: 'Try-on not found' });
         return;
       }
@@ -314,24 +302,20 @@ router.get(
       const offset = (page - 1) * limit;
       const categoryFilter = req.query.category as ProductCategory | undefined;
 
-      let query = supabaseAdmin
-        .from('tryons')
-        .select('id, status, category, result_image, created_at, completed_at', { count: 'exact' })
-        .eq('user_id', req.user!.id)
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
-
-      if (categoryFilter && VALID_CATEGORIES.includes(categoryFilter)) {
-        query = query.eq('category', categoryFilter);
-      }
-
-      const { data: tryons, error, count } = await query;
-      if (error) throw error;
+      const { tryons, total } = await cxListTryons(
+        req.user!.id,
+        limit,
+        offset,
+        categoryFilter && VALID_CATEGORIES.includes(categoryFilter) ? categoryFilter : undefined
+      );
 
       const results = await Promise.all(
-        (tryons || []).map(async (t) => ({
-          ...t,
-          result_image: undefined,
+        tryons.map(async (t) => ({
+          id: t.id,
+          status: t.status,
+          category: t.category,
+          created_at: t.created_at,
+          completed_at: t.completed_at,
           resultUrl:
             t.status === 'completed' && t.result_image
               ? await getSignedUrl(RESULT_BUCKET, t.result_image, 3600).catch(() => null)
@@ -344,8 +328,8 @@ router.get(
         pagination: {
           page,
           limit,
-          total: count || 0,
-          pages: Math.ceil((count || 0) / limit),
+          total,
+          pages: Math.ceil(total / limit),
         },
       });
     } catch (err) {

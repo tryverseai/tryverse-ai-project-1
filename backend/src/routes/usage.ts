@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { requireAuth } from '../middleware/auth';
-import { supabaseAdmin } from '../config/supabase';
+import { userAnalyticsSince } from '../services/userAnalyticsConvexBridge';
 
 const router = Router();
 
@@ -19,28 +19,17 @@ router.get(
 
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-      const [
-        { data: tryons, error: tryonError },
-        { data: events, error: eventError },
-      ] = await Promise.all([
-        supabaseAdmin
-          .from('tryons')
-          .select('id, status, category, created_at, completed_at')
-          .eq('user_id', userId)
-          .gte('created_at', since)
-          .order('created_at', { ascending: true }),
-        supabaseAdmin
-          .from('usage_events')
-          .select('event_type, created_at, metadata')
-          .eq('user_id', userId)
-          .gte('created_at', since)
-          .order('created_at', { ascending: true }),
-      ]);
+      const { tryons: tryonRows, events: eventRows } = await userAnalyticsSince(userId, since);
 
-      if (tryonError) throw tryonError;
-      if (eventError) throw eventError;
+      const allTryons = tryonRows.map((t) => ({
+        id: t.id,
+        status: t.status,
+        category: t.category,
+        created_at: t.created_at,
+        completed_at: t.completed_at,
+      }));
 
-      const allTryons = tryons || [];
+      const events = eventRows.sort((a, b) => a.created_at.localeCompare(b.created_at));
 
       // Aggregations
       const totalTryons = allTryons.length;
@@ -87,7 +76,11 @@ router.get(
         },
         byCategory,
         dailyUsage,
-        recentEvents: (events || []).slice(-20),
+        recentEvents: events.slice(-20).map((e) => ({
+          event_type: e.event_type,
+          created_at: e.created_at,
+          metadata: e.metadata,
+        })),
       });
     } catch (err) {
       next(err);

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import type { User } from "@supabase/supabase-js";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import type { AppUser } from "@/contexts/AuthContext";
 import type { AccountType } from "@/lib/accountType";
+import { isConvexDataEnabled } from "@/lib/convexData";
+import { useSyncedConvexProfile } from "@/hooks/useSyncedConvexProfile";
 
-/** Sign-up stores account_type on the JWT before profiles row may exist. */
-function accountTypeFromMetadata(user: User | null): AccountType | null {
+function accountTypeFromMetadata(user: AppUser | null): AccountType | null {
   const raw = user?.user_metadata?.account_type;
   if (typeof raw !== "string") return null;
   const s = raw.trim().toLowerCase();
@@ -22,16 +22,14 @@ function normalizeProfileType(value: string | null | undefined): AccountType | n
   return null;
 }
 
-/**
- * Loads profiles.account_type for the signed-in user.
- * The profiles row is the source of truth for routing (dashboard individual vs business).
- * Metadata is only used while the row is missing (short window after sign-up).
- */
+/** Loads `profiles.account_type` from Convex (with JWT metadata fallback). */
 export function useProfileAccountType(): {
   accountType: AccountType;
   loading: boolean;
 } {
   const { user } = useAuth();
+  const convexOn = isConvexDataEnabled();
+  const { profile: cxProfile, loading: cxLoading } = useSyncedConvexProfile();
   const [accountType, setAccountType] = useState<AccountType>("business");
   const [loading, setLoading] = useState(true);
 
@@ -42,48 +40,21 @@ export function useProfileAccountType(): {
       return;
     }
 
-    const meta = accountTypeFromMetadata(user);
-    let cancelled = false;
-
-    const fetchProfile = async (attempt: number): Promise<void> => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("account_type")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      if (error) {
-        setAccountType(meta ?? "business");
-        setLoading(false);
-        return;
-      }
-
-      const fromRow = normalizeProfileType(data?.account_type ?? null);
-      if (fromRow) {
-        setAccountType(fromRow);
-        setLoading(false);
-        return;
-      }
-
-      if (attempt < 8) {
-        await new Promise((r) => setTimeout(r, 80 * (attempt + 1)));
-        if (!cancelled) return fetchProfile(attempt + 1);
-        return;
-      }
-
-      setAccountType(meta ?? "business");
+    if (!convexOn) {
+      setAccountType(accountTypeFromMetadata(user) ?? "business");
       setLoading(false);
-    };
+      return;
+    }
 
-    setLoading(true);
-    void fetchProfile(0);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id, user?.user_metadata?.account_type]);
+    if (cxLoading) {
+      setLoading(true);
+      return;
+    }
+    const meta = accountTypeFromMetadata(user);
+    const fromRow = normalizeProfileType(cxProfile?.account_type ?? null);
+    setAccountType(fromRow ?? meta ?? "business");
+    setLoading(false);
+  }, [user, convexOn, cxProfile, cxLoading]);
 
   return { accountType, loading };
 }

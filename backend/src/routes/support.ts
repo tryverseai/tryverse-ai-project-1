@@ -2,7 +2,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { body } from 'express-validator';
 import { supportContactRateLimit } from '../middleware/rateLimiter';
 import { handleValidationErrors } from '../middleware/validate';
-import { supabaseAdmin } from '../config/supabase';
+import { env } from '../config/env';
+import { anyApi, convexMutationTrusted } from '../config/convexHttp';
 import { logger } from '../config/logger';
 
 const router = Router();
@@ -37,24 +38,25 @@ router.post(
       const message = String(req.body.message).trim();
       const name = `${first_name} ${last_name}`.trim();
 
-      const { error } = await supabaseAdmin.from('support_requests').insert({
-        name,
-        first_name,
-        last_name,
-        company_name: company_name || null,
-        email,
-        phone_number: phone_number || null,
-        category,
-        subject,
-        message,
-        status: 'open',
-      });
-
-      if (error) {
-        logger.error('support_requests insert failed', { message: error.message, code: error.code });
+      try {
+        await convexMutationTrusted(anyApi.backendTrusted.insertSupportRequestTrusted, {
+          secret: env.BACKEND_SHARED_SECRET,
+          name,
+          first_name,
+          last_name,
+          company_name: company_name || null,
+          email,
+          phone_number: phone_number || null,
+          category,
+          subject,
+          message,
+        });
+      } catch (error) {
+        logger.error('support_requests insert failed', { message: String(error) });
         res.status(500).json({
           error: 'Could not save your message. Please try again or email us directly.',
-          details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+          details:
+            process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined,
         });
         return;
       }

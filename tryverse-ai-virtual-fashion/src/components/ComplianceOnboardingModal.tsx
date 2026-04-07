@@ -6,7 +6,9 @@ import { ChevronRight, FileText, Shield, Database, Target, X } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   TermsContent,
   DataProcessingContent,
@@ -108,8 +110,10 @@ export function ComplianceOnboardingModal({
   onComplete,
   onExit,
 }: ComplianceOnboardingModalProps) {
+  const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const completeComplianceCv = useMutation(api.profiles.completeCompliance);
   const contentRef = useRef<HTMLDivElement>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -148,15 +152,10 @@ export function ComplianceOnboardingModal({
       const goals = selectedGoals.length > 0 ? selectedGoals : [];
       const completedAt = new Date().toISOString();
       try {
-        const { error: updateError } = await supabase
-          .from("profiles")
-          .update({
-            compliance_onboarding_completed_at: completedAt,
-            onboarding_goals: goals,
-          })
-          .eq("id", userId);
-
-        if (updateError) throw updateError;
+        await completeComplianceCv({
+          onboarding_goals: goals,
+          completed_at: completedAt,
+        });
 
         sessionStorage.setItem(complianceDoneSessionKey(userId), "1");
         onComplete();
@@ -188,7 +187,7 @@ export function ComplianceOnboardingModal({
 
   const handleExit = async () => {
     onExit?.();
-    await supabase.auth.signOut();
+    await signOut();
     navigate("/auth");
   };
 

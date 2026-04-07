@@ -1,113 +1,89 @@
-import { supabaseAdmin } from '../../config/supabase';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
-import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
+import { convexUploadBuffer, convexDeleteStorageIds, storagePathToConvexId } from '../convexStorageBridge';
+import { anyApi, convexQueryTrusted } from '../../config/convexHttp';
 
 const INPUT_BUCKET = env.STORAGE_BUCKET_INPUTS;
 const RESULT_BUCKET = env.STORAGE_BUCKET_RESULTS;
 
-/** Maps Supabase "Bucket not found" to an actionable message. */
 const INFERENCE_SCRATCH_PREFIX = '_inference_scratch';
 
+export function storageFailureMessage(label: string, bucket: string, errorMessage: string): string {
+  void bucket;
+  return `${label}: ${errorMessage}`;
+}
+
 /**
- * Uploads a prepared JPEG buffer to the inputs bucket for Replicate (HTTPS signed URL).
- * Does not re-encode; use buffers already sized by the pipeline.
+ * Filename is always `{convexStorageId}.jpg`; folder encodes owner + type.
  */
 export async function uploadInferenceScratchJpeg(
   buffer: Buffer,
-  role: 'person' | 'product',
+  _role: 'person' | 'product',
   userId: string | null
 ): Promise<string> {
-  const base = userId ? `${userId}/${INFERENCE_SCRATCH_PREFIX}` : `anonymous/${INFERENCE_SCRATCH_PREFIX}`;
-  const filePath = `${base}/${uuidv4()}-${role}.jpg`;
-
-  const { error } = await supabaseAdmin.storage.from(INPUT_BUCKET).upload(filePath, buffer, {
-    contentType: 'image/jpeg',
-    cacheControl: '300',
-    upsert: false,
-  });
-
-  if (error) {
-    logger.error('Inference scratch upload failed', { error: error.message, filePath: filePath.slice(0, 80) });
-    throw new Error(storageFailureMessage('Inference scratch upload failed', INPUT_BUCKET, error.message));
-  }
-
-  return filePath;
+  const storageId = await convexUploadBuffer(buffer, 'image/jpeg');
+  const folder = userId
+    ? `${userId}/${INFERENCE_SCRATCH_PREFIX}`
+    : `anonymous/${INFERENCE_SCRATCH_PREFIX}`;
+  return `${folder}/${storageId}.jpg`;
 }
 
-/** Best-effort cleanup of temporary inference uploads. */
 export async function removeInferenceScratchPaths(paths: string[]): Promise<void> {
   if (!paths.length) return;
-  const { error } = await supabaseAdmin.storage.from(INPUT_BUCKET).remove(paths);
-  if (error) {
-    logger.warn('Inference scratch removal failed', { error: error.message, count: paths.length });
-  }
+  const ids = paths.map((p) => {
+    try {
+      return storagePathToConvexId(p);
+    } catch {
+      return null;
+    }
+  }).filter((x): x is string => x !== null);
+  await convexDeleteStorageIds(ids);
 }
 
-export function storageFailureMessage(
-  label: string,
-  bucket: string,
-  errorMessage: string
-): string {
-  let msg = `${label}: ${errorMessage}`;
-  if (/bucket not found/i.test(errorMessage)) {
-    msg += ` Create bucket "${bucket}" in Supabase Dashboard → Storage (name must match your STORAGE_BUCKET_* env var).`;
-  }
-  return msg;
-}
-
-/**
- * Processes, optimizes, and uploads an image buffer to Supabase Storage.
- * Returns the stored path (not a public URL).
- */
 export async function uploadImageBuffer(
   buffer: Buffer,
   mimeType: string,
   folder: 'person' | 'garment',
   userId?: string
 ): Promise<string> {
-  // Optimize image: convert to JPEG, resize to max 1024px, compress
+  void mimeType;
   const optimized = await sharp(buffer)
     .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality: 90, progressive: true })
     .toBuffer();
 
-  const fileName = `${uuidv4()}.jpg`;
-  const filePath = userId ? `${userId}/${folder}/${fileName}` : `anonymous/${folder}/${fileName}`;
-
-  const { error } = await supabaseAdmin.storage
-    .from(INPUT_BUCKET)
-    .upload(filePath, optimized, {
-      contentType: 'image/jpeg',
-      cacheControl: '3600',
-      upsert: false,
-    });
-
-  if (error) {
-    logger.error('Failed to upload image to storage', { error: error.message });
-    throw new Error(storageFailureMessage('Storage upload failed', INPUT_BUCKET, error.message));
-  }
-
-  return filePath;
+  const storageId = await convexUploadBuffer(optimized, 'image/jpeg');
+  const base = userId ? `${userId}/${folder}` : `anonymous/${folder}`;
+  return `${base}/${storageId}.jpg`;
 }
 
-/**
- * Uploads a result image (from URL) to Supabase Storage.
- * Downloads from the AI provider URL and re-uploads for permanence.
- */
+export async function uploadResultBuffer(buffer: Buffer, userId?: string): Promise<string> {
+  const optimized = await sharp(buffer)
+    .jpeg({
+      quality: 96,
+      progressive: true,
+      chromaSubsampling: '4:4:4',
+      mozjpeg: true,
+    })
+    .toBuffer();
+  const storageId = await convexUploadBuffer(optimized, 'image/jpeg');
+  const base = userId ? `${userId}/results` : `anonymous/results`;
+  return `${base}/${storageId}.jpg`;
+}
+
 export async function storeResultImage(
   imageUrl: string,
   tryonId: string,
   userId?: string
 ): Promise<string> {
+  void tryonId;
   const response = await fetch(imageUrl);
   if (!response.ok) throw new Error(`Failed to fetch result image: ${response.statusText}`);
 
   const arrayBuffer = await response.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  // Optimize result too
   const optimized = await sharp(buffer)
     .jpeg({
       quality: 96,
@@ -117,73 +93,36 @@ export async function storeResultImage(
     })
     .toBuffer();
 
-  const filePath = userId
-    ? `${userId}/results/${tryonId}.jpg`
-    : `anonymous/results/${tryonId}.jpg`;
-
-  const { error } = await supabaseAdmin.storage
-    .from(RESULT_BUCKET)
-    .upload(filePath, optimized, {
-      contentType: 'image/jpeg',
-      cacheControl: '86400',
-      upsert: true,
-    });
-
-  if (error) {
-    logger.error('Failed to store result image', { error: error.message });
-    throw new Error(storageFailureMessage('Result storage failed', RESULT_BUCKET, error.message));
-  }
-
-  return filePath;
+  const storageId = await convexUploadBuffer(optimized, 'image/jpeg');
+  const base = userId ? `${userId}/results` : `anonymous/results`;
+  return `${base}/${storageId}.jpg`;
 }
 
-/**
- * Generates a short-lived signed URL for a stored image.
- */
 export async function getSignedUrl(
-  bucket: string,
+  _bucket: string,
   filePath: string,
-  expiresInSeconds: number = env.IMAGE_EXPIRY_SECONDS
+  _expiresInSeconds: number = env.IMAGE_EXPIRY_SECONDS
 ): Promise<string> {
-  const { data, error } = await supabaseAdmin.storage
-    .from(bucket)
-    .createSignedUrl(filePath, expiresInSeconds);
-
-  if (error || !data?.signedUrl) {
-    throw new Error(`Failed to generate signed URL: ${error?.message}`);
+  void _expiresInSeconds;
+  try {
+    const storageId = storagePathToConvexId(filePath);
+    return await convexQueryTrusted<string>(anyApi.trustedStorage.storageGetUrl, {
+      secret: env.BACKEND_SHARED_SECRET,
+      storageId,
+    });
+  } catch (err) {
+    logger.error('getSignedUrl failed', { filePath: filePath.slice(0, 120), error: String(err) });
+    throw err instanceof Error ? err : new Error(String(err));
   }
-
-  return data.signedUrl;
 }
 
-/**
- * Returns a public CDN URL for result images.
- */
-export function getPublicUrl(bucket: string, filePath: string): string {
-  const { data } = supabaseAdmin.storage.from(bucket).getPublicUrl(filePath);
-  return data.publicUrl;
+export async function getPublicUrl(_bucket: string, filePath: string): Promise<string> {
+  return getSignedUrl(_bucket, filePath, env.IMAGE_EXPIRY_SECONDS);
 }
 
-/**
- * Deletes old/expired input images to save storage.
- */
-export async function cleanupExpiredInputs(olderThanHours: number = 24): Promise<void> {
-  const cutoff = new Date(Date.now() - olderThanHours * 60 * 60 * 1000).toISOString();
-
-  const { data: files } = await supabaseAdmin.storage
-    .from(INPUT_BUCKET)
-    .list('anonymous', { limit: 100 });
-
-  if (!files?.length) return;
-
-  const toDelete = files
-    .filter((f) => f.created_at && f.created_at < cutoff)
-    .map((f) => `anonymous/${f.name}`);
-
-  if (toDelete.length > 0) {
-    await supabaseAdmin.storage.from(INPUT_BUCKET).remove(toDelete);
-    logger.info(`Cleaned up ${toDelete.length} expired input images`);
-  }
+/** No global listing API for Convex scratch space — no-op. */
+export async function cleanupExpiredInputs(_olderThanHours: number = 24): Promise<void> {
+  void _olderThanHours;
 }
 
 export { INPUT_BUCKET, RESULT_BUCKET };

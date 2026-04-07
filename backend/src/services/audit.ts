@@ -1,5 +1,6 @@
-import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
+import { env } from '../config/env';
+import { anyApi, convexMutationTrusted } from '../config/convexHttp';
 
 export type AuditEventType =
   | 'admin_action'
@@ -20,16 +21,16 @@ export interface AuditEntry {
 
 export async function logAudit(entry: AuditEntry): Promise<void> {
   try {
-    const { error } = await supabaseAdmin.from('admin_audit_log').insert({
+    await convexMutationTrusted(anyApi.backendTrusted.insertAdminAuditLog, {
+      secret: env.BACKEND_SHARED_SECRET,
       event_type: entry.event_type,
-      actor: entry.actor ?? null,
       action: entry.action,
-      target_id: entry.target_id ?? null,
-      details: entry.details ?? {},
-      ip_address: entry.ip_address ?? null,
-      user_agent: entry.user_agent ?? null,
+      actor: entry.actor,
+      target_id: entry.target_id,
+      details: entry.details,
+      ip_address: entry.ip_address,
+      user_agent: entry.user_agent,
     });
-    if (error) logger.error('Audit log insert failed', { error: error.message });
   } catch (err) {
     logger.error('Audit log error', { error: String(err) });
   }

@@ -1,4 +1,3 @@
-import { supabaseAdmin } from '../../config/supabase';
 import { runVtonInference, type ClothingTryOnEngine } from './replicate';
 import { inferPoseType } from './promptBuilder';
 import { preprocessPersonImage, preprocessProductImage } from './preprocessing';
@@ -23,10 +22,11 @@ import {
   getSignedUrl,
   INPUT_BUCKET,
   RESULT_BUCKET,
-  storageFailureMessage,
   uploadInferenceScratchJpeg,
   removeInferenceScratchPaths,
+  uploadResultBuffer,
 } from '../storage/images';
+import { cxPatchTryon, cxInsertUsageEvent } from '../tryonConvexBridge';
 import { decrementCredits, restoreCredits } from '../credits';
 import { sendTryOnCompletedEmail } from '../email';
 import { captureAiError } from '../../config/sentry';
@@ -75,7 +75,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
 
   logger.info('Try-on request', { tryonDbId, userId, category });
 
-  await supabaseAdmin.from('tryons').update({ status: 'processing' }).eq('id', tryonDbId);
+  await cxPatchTryon(tryonDbId, { status: 'processing' });
 
   try {
     // ── STEP 1: Get signed URLs and optimize images ──────────────────────────
@@ -108,7 +108,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
     if (category === 'clothing') {
       const accept = await validatePersonForTryOn(personBuffer);
       if (!accept.ok) {
-        await supabaseAdmin.from('tryons').update({ status: 'failed' }).eq('id', tryonDbId);
+        await cxPatchTryon(tryonDbId, { status: 'failed' });
         return {
           jobId: job.jobId,
           status: 'failed',
@@ -157,11 +157,11 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       const cachedResultUrl = getCdnUrl(
         await getSignedUrl(RESULT_BUCKET, cachedResultPath, 86400 * 30)
       );
-      await supabaseAdmin.from('tryons').update({
+      await cxPatchTryon(tryonDbId, {
         status: 'completed',
         result_image: cachedResultPath,
         completed_at: new Date().toISOString(),
-      }).eq('id', tryonDbId);
+      });
 
       if (userId) {
         await decrementCredits(userId);
@@ -187,7 +187,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       const productDataUrl = bufferToDataUrl(productOptimized.buffer);
       const moderation = await moderateTryOnImages(personDataUrl, productDataUrl);
       if (!moderation.safe) {
-        await supabaseAdmin.from('tryons').update({ status: 'failed' }).eq('id', tryonDbId);
+        await cxPatchTryon(tryonDbId, { status: 'failed' });
         return {
           jobId: job.jobId,
           status: 'failed',
@@ -352,24 +352,8 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       throw new Error('Invalid output — model layout looks wrong; please try again.');
     }
 
-    // ── STEP 8: Store result in Supabase Storage ────────────────────────────
-    const resultPath = userId
-      ? `${userId}/results/${tryonDbId}.jpg`
-      : `anonymous/results/${tryonDbId}.jpg`;
-
-    const { error: storageError } = await supabaseAdmin.storage
-      .from(RESULT_BUCKET)
-      .upload(resultPath, finalBuffer, {
-        contentType: 'image/jpeg',
-        cacheControl: '86400',
-        upsert: true,
-      });
-
-    if (storageError) {
-      throw new Error(
-        storageFailureMessage('Result storage failed', RESULT_BUCKET, storageError.message)
-      );
-    }
+    // ── STEP 8: Store result (Convex file storage) ─────────────────────────
+    const resultPath = await uploadResultBuffer(finalBuffer, userId ?? undefined);
 
     // ── STEP 9: Cache the result (content-based) ──────────────────────────────
     await setCachedResultByHash(
@@ -386,11 +370,11 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
     const responsiveUrls = getResponsiveImageUrls(storedSignedUrl);
 
     // ── STEP 11: Update DB record ───────────────────────────────────────────
-    await supabaseAdmin.from('tryons').update({
+    await cxPatchTryon(tryonDbId, {
       status: 'completed',
       result_image: resultPath,
       completed_at: new Date().toISOString(),
-    }).eq('id', tryonDbId);
+    });
 
     // ── STEP 12: Decrement credits ──────────────────────────────────────────
     if (userId) await decrementCredits(userId);
@@ -404,23 +388,19 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
 
     // ── STEP 13: Log usage event ────────────────────────────────────────────
     if (userId) {
-      await supabaseAdmin.from('usage_events').insert({
-        user_id: userId,
-        event_type: 'tryon_completed',
-        metadata: {
-          tryon_id: tryonDbId,
-          category,
-          model_used: modelUsed,
-          processing_time_ms: processingTimeMs,
-          total_pipeline_ms: Date.now() - startTime,
-          widget_mode: job.widgetMode,
-          face_lock_applied: faceLockApplied,
-          post_processed: env.ENABLE_POST_PROCESSING,
-          body_detected: personPreprocessed.bodyDetected,
-          garment_topology: garmentTopology,
-          clothing_engine: clothingEngine ?? null,
-          human_parsing_skipped: parseStage.skipped,
-        },
+      await cxInsertUsageEvent(userId, 'tryon_completed', {
+        tryon_id: tryonDbId,
+        category,
+        model_used: modelUsed,
+        processing_time_ms: processingTimeMs,
+        total_pipeline_ms: Date.now() - startTime,
+        widget_mode: job.widgetMode,
+        face_lock_applied: faceLockApplied,
+        post_processed: env.ENABLE_POST_PROCESSING,
+        body_detected: personPreprocessed.bodyDetected,
+        garment_topology: garmentTopology,
+        clothing_engine: clothingEngine ?? null,
+        human_parsing_skipped: parseStage.skipped,
       });
     }
 
@@ -445,17 +425,17 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
 
     captureAiError(error, { tryonDbId, category, userId, jobId: job.jobId });
 
-    await supabaseAdmin.from('tryons').update({
+    await cxPatchTryon(tryonDbId, {
       status: 'failed',
       completed_at: new Date().toISOString(),
-    }).eq('id', tryonDbId);
+    });
 
     if (userId) {
       await restoreCredits(userId);
-      await supabaseAdmin.from('usage_events').insert({
-        user_id: userId,
-        event_type: 'tryon_failed',
-        metadata: { tryon_id: tryonDbId, category, error: error.message },
+      await cxInsertUsageEvent(userId, 'tryon_failed', {
+        tryon_id: tryonDbId,
+        category,
+        error: error.message,
       });
     }
 
