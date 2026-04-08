@@ -532,8 +532,12 @@ export const insertEarlyAccessRowTrusted = mutation({
   handler: async (ctx, { secret, row }) => {
     requireBackendSecret(secret);
     const r = row as Record<string, unknown>;
+    // Convex optional fields reject explicit `null`; omit null/undefined keys.
+    const cleaned = Object.fromEntries(
+      Object.entries(r).filter(([, val]) => val !== null && val !== undefined)
+    ) as Record<string, unknown>;
     await ctx.db.insert("early_access_requests", {
-      ...r,
+      ...cleaned,
       created_at: new Date().toISOString(),
     } as never);
   },

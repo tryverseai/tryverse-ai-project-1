@@ -2,16 +2,13 @@
 
 ## Authentication & Authorization
 
-### Supabase Auth (Frontend)
-- **Password hashing**: Handled by Supabase (bcrypt).
-- **Sessions**: Supabase JWT with configurable expiry. Configure in **Supabase Dashboard → Authentication → Settings**:
-  - **JWT expiry**: Recommended 3600 (1 hour) for access token.
-  - **Refresh token rotation**: Enable for better security.
-- **Email verification**: Enable **"Confirm email"** in Supabase → Authentication → Providers → Email.
-- **Password reset**: Supabase sends tokens with default 1-hour expiry. Configure in Auth → Email Templates if needed.
+### Convex Auth (Frontend + API)
+- **Password hashing**: Handled by Convex Auth (`@convex-dev/auth` Password provider).
+- **Sessions**: JWT issued by Convex Auth; the React app stores the token the Convex client uses.
+- **Password reset**: OTP email via Resend (`AUTH_RESEND_KEY` and related vars in the **Convex** deployment). See `tryverse-ai-virtual-fashion/convex/ResendOTPPasswordReset.ts`.
 
 ### Backend Auth
-- JWT verification via `supabaseAdmin.auth.getUser(token)`.
+- JWT verification via Convex (`authSession.verifyBearerSession` and shared Convex deployment URL).
 - Failed auth attempts are logged (path, IP) for monitoring.
 - Admin routes require `X-Admin-Key` header matching `ADMIN_SECRET_KEY`.
 
@@ -44,7 +41,7 @@ Rate limit hits are logged.
 
 - **Never** commit `.env` or any file containing secrets.
 - All secrets MUST be in environment variables. See `.env.example`.
-- **Frontend**: Only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (anon key) are public by design. The anon key is safe to expose.
+- **Frontend**: `VITE_CONVEX_URL` is public by design (Convex deployment URL). Do not put `BACKEND_SHARED_SECRET` or service keys in frontend env.
 - **API keys**: Stored hashed in DB. Never log full key values. Prefer `x-api-key` header over query params (query params may appear in logs).
 
 ---
@@ -59,7 +56,7 @@ Security rules apply whenever **`NODE_ENV=production`**, not only when you own a
 
 1. **HTTPS**: Enforce in production. The app redirects HTTP → HTTPS when `X-Forwarded-Proto` is `http`. Ensure your reverse proxy sets `X-Forwarded-Proto` and `X-Forwarded-For`.
 2. **Trust proxy**: Set `trust proxy` (already configured).
-3. **Database**: Restrict Supabase (or Postgres) to private network. Do not expose DB port to the internet.
+3. **Data**: Convex is managed; follow Convex access rules and keep `BACKEND_SHARED_SECRET` only on the Node backend and in Convex env.
 4. **Environment variables**: Use secrets manager or platform env (e.g. Vercel, Railway). Never bake secrets into images.
 5. **CORS**: Set `FRONTEND_URL` and `WIDGET_ALLOWED_ORIGINS` to your production domains. **`WIDGET_ALLOWED_ORIGINS=*` is rejected at startup when `NODE_ENV=production`.**
 6. **API hostname**: Set `PUBLIC_API_HOSTNAMES` to your API’s public hostname(s) so HTTP→HTTPS upgrade only applies to expected `Host` values.

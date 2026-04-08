@@ -67,9 +67,9 @@ Brand teams (e.g. Zara) log into the TryVerse platform to:
                     ┌─────────────────────┼─────────────────────┐
                     ▼                     ▼                     ▼
               ┌──────────┐         ┌──────────┐         ┌──────────────┐
-              │ Supabase │         │ Replicate│         │ Supabase     │
-              │ Storage  │         │ (IDM-VTON│         │ (auth, DB)   │
-              │ (images) │         │  FASHN)  │         │              │
+              │ Convex   │         │ Replicate│         │ Convex       │
+              │ (files,  │         │ (IDM-VTON│         │ Auth + DB    │
+              │  DB)     │         │  FASHN)  │         │              │
               └──────────┘         └──────────┘         └──────────────┘
 
 

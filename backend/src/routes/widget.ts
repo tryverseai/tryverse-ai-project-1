@@ -17,6 +17,7 @@ import { enqueueTryOnJob, getTryOnQueue } from '../services/queue/producer';
 import { executeTryOnPipeline } from '../services/ai/pipeline';
 import { getSignedUrl, RESULT_BUCKET } from '../services/storage/images';
 import { logger } from '../config/logger';
+import { UPLOAD_RELATIVE_IMAGE_PATH_RE } from '../lib/storagePathRegex';
 import type { TryOnJob, ProductCategory } from '../types';
 
 const VALID_CATEGORIES: ProductCategory[] = ['clothing', 'bags', 'glasses'];
@@ -44,18 +45,18 @@ router.post(
       .isString()
       .notEmpty()
       .isLength({ max: 200 })
-      .matches(/^[a-zA-Z0-9_-]+\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$|^anonymous\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$/i)
+      .matches(UPLOAD_RELATIVE_IMAGE_PATH_RE)
       .withMessage('personImagePath must be a valid storage path from upload'),
     body('productImagePath')
       .isString()
       .notEmpty()
       .isLength({ max: 200 })
-      .matches(/^[a-zA-Z0-9_-]+\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$/i)
+      .matches(UPLOAD_RELATIVE_IMAGE_PATH_RE)
       .withMessage('productImagePath must be a valid storage path from upload'),
     body('category')
       .isIn(VALID_CATEGORIES)
       .withMessage(`category must be one of: ${VALID_CATEGORIES.join(', ')}`),
-    body('productDescription').optional().isString().isLength({ max: 400 }),
+    body('productDescription').optional({ nullable: true }).isString().isLength({ max: 400 }),
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {

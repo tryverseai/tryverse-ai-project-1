@@ -12,7 +12,7 @@
   - `https://<your-domain>/auth?signup=true`
   - Optional alias: `?invite=true`
 
-Send that URL in your invite email. The URL alone is not strong security; for strict enforcement, use Supabase [Auth hooks](https://supabase.com/docs/guides/auth/auth-hooks) or an allowlist table and validate before `signUp`.
+Send that URL in your invite email. The URL alone is not strong security; for strict enforcement, validate the email against an allowlist (or your CRM) before exposing sign-up, or gate `signUp` in Convex Auth / your backend.
 
 **Copy**
 

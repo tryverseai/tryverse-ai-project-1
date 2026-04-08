@@ -1,17 +1,8 @@
-# Convex migration (TryVerse)
+# Convex (TryVerse)
 
-Full migration from Supabase → Convex is **multi-phase**. This repo now contains:
+The web app and Convex backend use **Convex Auth** (password) with **`@convex-dev/auth`**. Data and auth state live in Convex; the Express API handles try-on, uploads, and widget HTTP endpoints.
 
-| Delivered | Purpose |
-|-----------|---------|
-| `convex/schema.ts` | Tables mirroring `public.*` (with optional `legacy_id` for UUID parity) |
-| `convex/auth.config.ts` | Validates **Supabase** access tokens (hybrid: same auth, new DB) |
-| `convex/profiles.ts`, `plans.ts`, `modelLibrary.ts` | First Convex API surface |
-| `ConvexProviderGate` + `VITE_CONVEX_URL` | React client + JWT forwarding |
-
-The **Express API** and **Supabase Postgres** are still the source of truth until you backfill Convex and switch reads/writes.
-
-## Phase 0 — Link your “TryVerse” Convex project
+## Local setup
 
 ```bash
 cd tryverse-ai-virtual-fashion
@@ -19,45 +10,31 @@ npm install
 npm run convex:dev
 ```
 
-Select your existing deployment. Set Convex env vars (**Dashboard → Settings → Environment**):
-
-- `SUPABASE_JWT_ISSUER` = `https://<ref>.supabase.co/auth/v1`
-- `SUPABASE_JWKS_URL` = `https://<ref>.supabase.co/auth/v1/.well-known/jwks.json`
-
-Add to `.env`:
+Link the deployment when prompted. Ensure **`tryverse-ai-virtual-fashion/.env`** (or `.env.local`) includes:
 
 ```env
 VITE_CONVEX_URL=https://<your-deployment>.convex.cloud
 ```
 
-Restart Vite. Sign in; `useQuery(api.profiles.getMyProfile, {})` should resolve once the profile row exists in Convex.
+Restart Vite after changes.
 
-## Phase 1 — Backfill data
+## Convex dashboard — environment variables
 
-1. Export from Supabase (CSV or SQL `COPY`).
-2. Write a **one-off** Convex mutation (or `npx convex import`) to insert rows.
-3. For `tryverse_model_library`, set **`legacy_id`** to the old Postgres UUID so IDs match `GET /api/models` during dual-run.
+Required for sign-in and JWT issuance:
 
-## Phase 2 — Frontend
+- **`JWT_PRIVATE_KEY`** — PEM PKCS#8 private key (RS256). Set via CLI with stdin if the value has spaces/newlines.
+- **`JWKS`** — Public JWKS JSON for the same keypair (see `@convex-dev/auth` docs / `generateKeys` helper).
 
-Replace `supabase.from(...)` usage with `useQuery` / `useMutation` per feature (Billing, Overview, Api keys, etc.). Keep Supabase Auth until you move to Clerk / Convex Auth.
+Optional / email:
 
-## Phase 3 — Backend (`backend/`)
+- **`AUTH_RESEND_KEY`** — Resend API key for password-reset OTP email.
+- **`AUTH_EMAIL_FROM`** — Verified sender, e.g. `TryVerse <auth@yourdomain.com>`.
 
-Options:
+`auth.config.ts` uses **`CONVEX_SITE_URL`** when set by Convex (built-in); for local dev the fallback issuer origin is `http://localhost:8080` to match the Vite port.
 
-1. **ConvexHttpClient** from Node with the user’s JWT for user-scoped calls, plus deploy key only for admin scripts, or  
-2. Move try-on + credits + admin paths into **Convex mutations/actions** and delete duplicate Postgres access.
+## Scripts
 
-Until then, production continues to use `supabaseAdmin` in Express unchanged.
+- `npm run convex:dev` — push schema, watch, codegen
+- `npm run convex:deploy` — production deploy
 
-## Phase 4 — Decommission Supabase DB
-
-After traffic proves Convex-only:
-
-- Remove Supabase client usage, migrations, and RLS-dependent flows.
-- Keep Supabase **Auth** only if still needed, or migrate identities to Clerk.
-
----
-
-**Scope note:** Completing phases 1–4 touches most files in `tryverse-ai-virtual-fashion` and `backend`. This document tracks intent; use `convex/README.md` for day-to-day Convex CLI commands.
+See **`convex/README.md`** for function layout and CLI notes.

@@ -339,7 +339,7 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
 
 /**
  * Atomically decrements credits for a user after a successful try-on.
- * Uses a Supabase RPC to ensure atomicity.
+ * Updates credits via Convex (atomic at the document level).
  */
 export async function decrementCredits(userId: string): Promise<void> {
   if (env.NODE_ENV !== 'production' && env.TRYON_SKIP_CREDIT_CHECK) {

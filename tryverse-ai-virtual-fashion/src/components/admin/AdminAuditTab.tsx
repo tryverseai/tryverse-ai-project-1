@@ -82,7 +82,7 @@ function buildFallbackSummary(e: AuditEntry): string {
     const ban = d.ban_duration ?? d.banDuration;
     const blocked = d.blocked;
     if (e.action === "user_banned" && ban) {
-      return `User blocked. Supabase ban duration: ${String(ban)}.${typeof blocked === "boolean" ? ` Profile is_blocked: ${blocked}.` : ""}`;
+      return `User blocked. Ban duration: ${String(ban)}.${typeof blocked === "boolean" ? ` Profile is_blocked: ${blocked}.` : ""}`;
     }
     if (e.action === "user_unbanned") {
       return `User unblocked.${typeof blocked === "boolean" ? ` blocked flag in payload: ${blocked}.` : ""}`;

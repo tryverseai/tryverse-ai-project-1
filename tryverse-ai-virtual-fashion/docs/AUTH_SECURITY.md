@@ -1,22 +1,20 @@
-# Authentication Security (Supabase)
+# Authentication security (Convex Auth)
 
-Configure these settings in **Supabase Dashboard → Authentication → Settings**:
+TryVerse uses **Convex Auth** with the **Password** provider (`convex/auth.ts`). Sessions are JWT-based; signing keys are **only** on the Convex deployment (`JWT_PRIVATE_KEY`, `JWKS`).
 
-## Email Verification
-- **Enable "Confirm email"** so new signups must verify before signing in.
-- Path: Authentication → Providers → Email → Confirm email = ON
+## Operational checklist
 
-## Session & JWT
-- **JWT Expiry**: Recommended 3600 seconds (1 hour) for access tokens.
-- **Refresh token rotation**: Enable for stolen-token revocation.
-- Path: Authentication → Settings → JWT expiry
+- **Keys**: Generate and set `JWT_PRIVATE_KEY` and `JWKS` in the Convex dashboard. Rotate by generating a new pair and updating both vars in one maintenance window.
+- **Site URL**: Use the HTTPS origin your users hit for production (Convex sets `CONVEX_SITE_URL` for the deployment; local dev typically uses `http://localhost:8080` per `auth.config.ts` fallback).
+- **Password reset**: Configure **`AUTH_RESEND_KEY`** (and optionally **`AUTH_EMAIL_FROM`**) so `ResendOTPPasswordReset` can send OTP email. Use a verified domain in Resend for production.
 
-## Password Reset
-- Supabase password reset links expire after 1 hour by default.
-- Configure in Authentication → Email Templates → Reset Password if needed.
+## Frontend
 
-## Frontend (safe to expose)
-- `VITE_SUPABASE_URL` — your project URL
-- `VITE_SUPABASE_PUBLISHABLE_KEY` — the **anon** key (public by design; RLS protects data)
+- **`VITE_CONVEX_URL`** — public Convex deployment URL (safe to expose).
+- Do **not** put private keys, `BACKEND_SHARED_SECRET`, or admin secrets in Vite env vars.
 
-Never expose the **service_role** key in frontend code.
+## Node API
+
+The Express backend uses **`CONVEX_URL`** and **`BACKEND_SHARED_SECRET`** (see `backend/.env.example`) to call Convex from trusted server routes — not user JWTs for those paths unless explicitly designed.
+
+Never expose the service/deploy secrets in client bundles or public repos.

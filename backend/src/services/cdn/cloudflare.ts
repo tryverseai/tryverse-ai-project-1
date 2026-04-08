@@ -10,11 +10,11 @@ import { logger } from '../../config/logger';
  * - Brand widget performance (images load instantly on embedded sites)
  *
  * Configuration options:
- * A) Cloudflare proxy in front of Supabase Storage (add CNAME → your-bucket.supabase.co)
+ * A) Cloudflare proxy in front of your image origin (signed URLs from storage, R2, etc.)
  * B) Cloudflare Images (upload via API, serve via CDN)
- * C) Cloudflare R2 (alternative object storage, fully CDN-native)
+ * C) Cloudflare R2 (object storage, CDN-native)
  *
- * For MVP: Option A (zero additional cost, just DNS config)
+ * For MVP: Option A is often enough (DNS + orange-cloud proxy).
  */
 
 export interface CdnUrlOptions {
@@ -26,10 +26,9 @@ export interface CdnUrlOptions {
 }
 
 /**
- * Converts a Supabase Storage URL to a Cloudflare-proxied CDN URL.
+ * Rewrites an HTTPS image URL to use CLOUDFLARE_CDN_DOMAIN as the host (orange-cloud proxy).
  *
- * If CLOUDFLARE_CDN_DOMAIN is set, it replaces the Supabase domain.
- * Otherwise, returns the original URL (graceful fallback).
+ * If CLOUDFLARE_CDN_DOMAIN is unset, returns the original URL.
  */
 export function getCdnUrl(storageUrl: string, options?: CdnUrlOptions): string {
   if (!env.CLOUDFLARE_CDN_DOMAIN || !storageUrl) return storageUrl;

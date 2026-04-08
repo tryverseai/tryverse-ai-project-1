@@ -2,8 +2,9 @@ import type { AuthConfig } from "convex/server";
 
 /**
  * Convex Auth (see `convex/auth.ts`). Dashboard env:
- * - JWT_PRIVATE_KEY, JWKS (from `node @convex-dev/auth/dist/cli/generateKeys.js` or docs)
- * - CONVEX_SITE_URL — e.g. https://your-app.com (or http://localhost:8080 for local)
+ * - JWT_PRIVATE_KEY, JWKS
+ * - SITE_URL — public app origin for email verification links (`@convex-dev/auth`); local: http://localhost:8080
+ * - CONVEX_SITE_URL — JWT issuer (often set automatically by Convex; this file falls back to localhost:8080 for domain)
  */
 export default {
   providers: [

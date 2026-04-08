@@ -16,7 +16,7 @@ export type LegacyUserMetadata = {
   plan?: string;
 };
 
-/** Drop-in shape for code that expected Supabase `User`. */
+/** Minimal user shape shared across dashboard and API helpers. */
 export type AppUser = {
   id: string;
   email?: string;

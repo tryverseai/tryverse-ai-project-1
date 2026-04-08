@@ -32,3 +32,7 @@ Thumbs.db
 *.sln
 *.sw?
 .cache/
+
+# Local agent / IDE artifacts
+**/.agents/
+**/.claude/

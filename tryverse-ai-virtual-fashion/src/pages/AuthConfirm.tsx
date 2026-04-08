@@ -7,7 +7,7 @@ import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendWelcomeEmail } from "@/lib/backendApi";
 
-/** Legacy route kept for bookmarks; Convex Auth confirms in-app without Supabase redirects. */
+/** Legacy route kept for bookmarks; Convex Auth confirms in-app. */
 export default function AuthConfirm() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();

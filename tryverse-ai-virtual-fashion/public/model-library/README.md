@@ -39,5 +39,3 @@ Served at `https://<your-app>/model-library/<filename>`.
 | `derrick.png` | `derrick`  | Derrick        |
 
 Set backend **`FRONTEND_URL`** to your public app URL so the API resolves `/model-library/...` paths.
-
-SQL: `supabase/manual_runs/apply_custom_female_model_portraits.sql`, `apply_female_stephanie_diane_batch.sql`, `apply_custom_male_model_portraits.sql`, `apply_max_li_xeng_male_models.sql`, `apply_jed_male_model.sql`, `apply_alex_alfred_derrick_male_models.sql` (or matching migrations).

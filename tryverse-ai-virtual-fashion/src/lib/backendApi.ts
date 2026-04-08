@@ -492,7 +492,7 @@ export async function submitSupportContact(payload: SupportContactPayload): Prom
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────────
-// Uses Supabase directly (RLS) so Products page works without backend dependency
+// Product list + signed URLs go through the backend API with the user’s session
 
 export interface Product {
   id: string;
@@ -777,7 +777,7 @@ export async function getAdminQueue(adminKey: string) {
   return adminFetch('/api/admin/queue', adminKey);
 }
 
-/** Block or unblock a user (profiles.is_blocked + Supabase auth). */
+/** Block or unblock a user (profiles.is_blocked + auth/session via backend). */
 export async function banAdminUser(adminKey: string, userId: string, unban = false) {
   return adminFetch(`/api/admin/users/${userId}/block`, adminKey, {
     method: 'POST',

@@ -3,7 +3,7 @@ import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { convexReactClient } from "@/lib/convexClient";
 
 /**
- * Convex Auth + data. Requires `VITE_CONVEX_URL` and Convex dashboard auth env (JWT keys, CONVEX_SITE_URL).
+ * Convex Auth + data. Requires `VITE_CONVEX_URL` and Convex dashboard env (JWT keys, SITE_URL, Resend, etc.).
  */
 export function ConvexProviderGate({ children }: { children: ReactNode }) {
   if (!convexReactClient) {

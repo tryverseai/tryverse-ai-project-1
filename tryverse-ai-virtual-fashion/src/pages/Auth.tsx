@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import {
 import { posthogCapture } from "@/lib/posthog";
 import { inviteSignupEnabled, b2cSignupEnabled } from "@/lib/featureFlags";
 import { postLoginRedirectPath, safeInAppRedirectPath } from "@/lib/safeUrl";
+import { readConvexAuthJwt } from "@/lib/convexAuthStorage";
 
 const roles = [
   "Founder",
@@ -28,29 +29,24 @@ const roles = [
   "Other",
 ];
 
-/** Supabase often surfaces raw SMTP/confirmation failures — copy varies by signup flow. */
-function signUpErrorToast(
-  error: Error,
-  flow: "individual" | "business"
-): {
+/** Map provider/email errors to friendly copy for sign-up toasts. */
+function signUpErrorToast(error: Error): {
   title: string;
   description: string;
   variant: "default" | "destructive";
 } {
-  const msg = (error.message || "").toLowerCase();
-  const isEmailDeliveryIssue =
-    msg.includes("confirmation email") ||
-    msg.includes("sending confirmation") ||
-    msg.includes("error sending") ||
-    (msg.includes("email") && (msg.includes("could not") || msg.includes("failed to send") || msg.includes("smtp")));
+  const raw = error.message || "";
+  const msg = raw.toLowerCase();
+  const isResendTestModeOnly =
+    msg.includes("only send testing emails") ||
+    (msg.includes("resend") && msg.includes("verify a domain")) ||
+    (msg.includes("403") && msg.includes("validation_error"));
 
-  if (isEmailDeliveryIssue) {
+  if (isResendTestModeOnly) {
     return {
-      title: "Check your email settings",
+      title: "Resend is in test mode",
       description:
-        flow === "individual"
-          ? "We couldn’t send the confirmation email. Check spam, wait a moment and try again, or sign in if you already verified. If it keeps failing, your project’s Supabase Auth email (SMTP) needs to be configured."
-          : "We couldn’t send the confirmation email. If you were invited, try again or contact us. You can also request access via Join waitlist on the site.",
+        "With Resend’s free tier you can only send to the email on your Resend account (check the error for the exact address). Sign up with that email to test, or verify a domain at resend.com/domains and set AUTH_EMAIL_FROM on Convex to a sender on that domain.",
       variant: "default",
     };
   }
@@ -142,6 +138,13 @@ const Auth = () => {
     );
   };
 
+  const waitForJwt = () => new Promise<void>((resolve) => setTimeout(resolve, 600));
+
+  const finishAuthIfSessionReady = async (): Promise<boolean> => {
+    await waitForJwt();
+    return Boolean(readConvexAuthJwt());
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -157,26 +160,46 @@ const Auth = () => {
       );
       if (error) {
         console.error("Signup error:", error);
-        const t = signUpErrorToast(error, "individual");
+        const t = signUpErrorToast(error);
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
       } else {
-        posthogCapture("user_signed_up", { email, account_type: "individual", immediate_session: true });
-        toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
-        setPassword("");
-        goToDashboardAfterAuth();
+        const hasSession = await finishAuthIfSessionReady();
+        if (!hasSession) {
+          toast({
+            title: "Could not finish sign-in",
+            description: "Try again in a moment or refresh the page. If it keeps happening, contact support.",
+            variant: "destructive",
+            duration: 8000,
+          });
+        } else {
+          posthogCapture("user_signed_up", { email, account_type: "individual" });
+          toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
+          setPassword("");
+          goToDashboardAfterAuth();
+        }
       }
     } else if (showBusinessSignupForm) {
       const finalRole = role === "Other" ? customRole : role;
       const { error } = await signUp(email, password, brandName, fullName, finalRole, "business");
       if (error) {
         console.error("Signup error:", error);
-        const t = signUpErrorToast(error, "business");
+        const t = signUpErrorToast(error);
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
       } else {
-        posthogCapture("user_signed_up", { email, account_type: "business", immediate_session: true });
-        toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
-        setPassword("");
-        goToDashboardAfterAuth();
+        const hasSession = await finishAuthIfSessionReady();
+        if (!hasSession) {
+          toast({
+            title: "Could not finish sign-in",
+            description: "Try again in a moment or refresh the page. If it keeps happening, contact support.",
+            variant: "destructive",
+            duration: 8000,
+          });
+        } else {
+          posthogCapture("user_signed_up", { email, account_type: "business" });
+          toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
+          setPassword("");
+          goToDashboardAfterAuth();
+        }
       }
     } else {
       const { error } = await signIn(email, password);
@@ -184,8 +207,18 @@ const Auth = () => {
         console.error("Sign in error:", error);
         toast({ title: "Sign in failed", description: error.message, variant: "destructive", duration: 6000 });
       } else {
-        posthogCapture("user_logged_in", { email });
-        goToDashboardAfterAuth();
+        const hasSession = await finishAuthIfSessionReady();
+        if (!hasSession) {
+          toast({
+            title: "Could not finish sign-in",
+            description: "Try again in a moment or refresh the page. If it keeps happening, contact support.",
+            variant: "destructive",
+            duration: 8000,
+          });
+        } else {
+          posthogCapture("user_logged_in", { email });
+          goToDashboardAfterAuth();
+        }
       }
     }
     setLoading(false);

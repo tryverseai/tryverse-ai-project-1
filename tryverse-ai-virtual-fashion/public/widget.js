@@ -1,14 +1,35 @@
 /**
- * TryVerse Widget
+ * TryVerse Widget (iframe preview)
  * Embeddable AI try-on widget for e-commerce websites
  * Version 1.0.0
+ *
+ * The iframe loads your TryVerse app’s /widget-preview route (same UI as the hosted app).
+ * Configure where that app is hosted:
+ *   - Set window.TRYVERSE_APP_ORIGIN = 'https://tryverse.ai' before this script, or
+ *   - Pass appOrigin in open({ ... }) / embed({ ... }), or
+ *   - Host this script from the same origin as the app (uses script URL origin).
+ * Default for local dev: http://localhost:8080
  */
 
 (function() {
   'use strict';
 
-  const WIDGET_API_URL = 'https://qzrwiuzgpgqlzadjdedv.supabase.co/functions/v1';
-  
+  function resolveAppOrigin(config) {
+    if (config && config.appOrigin) {
+      return String(config.appOrigin).replace(/\/$/, '');
+    }
+    if (typeof window !== 'undefined' && window.TRYVERSE_APP_ORIGIN) {
+      return String(window.TRYVERSE_APP_ORIGIN).replace(/\/$/, '');
+    }
+    try {
+      var cur = document.currentScript;
+      if (cur && cur.src) {
+        return new URL(cur.src).origin;
+      }
+    } catch (e) { /* ignore */ }
+    return 'http://localhost:8080';
+  }
+
   const TryVerse = {
     config: {},
     
@@ -38,6 +59,7 @@
      * Embed widget in container
      * @param {Object} options - Configuration options
      * @param {string} options.container - Container element ID
+     * @param {string} [options.appOrigin] - TryVerse app origin for the iframe (see open())
      */
     embed: function(options) {
       if (!options.apiKey) {
@@ -156,8 +178,8 @@
         productType: this.config.productType || 'clothing',
         mode: 'widget'
       });
-      
-      iframe.src = `https://id-preview--b0bc7569-dae1-4c6f-a1e8-6d7b9211d072.lovable.app/widget-preview?${params.toString()}`;
+      var base = resolveAppOrigin(this.config);
+      iframe.src = base + '/widget-preview?' + params.toString();
       iframe.allow = 'camera; microphone';
       
       return iframe;

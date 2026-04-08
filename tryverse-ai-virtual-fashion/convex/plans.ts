@@ -1,6 +1,6 @@
 import { query } from "./_generated/server";
 
-/** Public catalog of active pricing plans (replaces `plans` + `is_active` filter from Supabase). */
+/** Public catalog of active pricing plans. */
 export const listActivePlans = query({
   args: {},
   handler: async (ctx) => {

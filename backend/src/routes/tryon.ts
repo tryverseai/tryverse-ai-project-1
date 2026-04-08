@@ -18,6 +18,7 @@ import {
   cxListTryons,
 } from '../services/tryonConvexBridge';
 import { logger } from '../config/logger';
+import { UPLOAD_RELATIVE_IMAGE_PATH_RE } from '../lib/storagePathRegex';
 import type { TryOnJob, ProductCategory } from '../types';
 
 const router = Router();
@@ -55,17 +56,13 @@ router.post(
       .isString()
       .notEmpty()
       .isLength({ max: 200 })
-      .matches(
-        /^[a-zA-Z0-9_-]+\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$|^anonymous\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$/i
-      )
+      .matches(UPLOAD_RELATIVE_IMAGE_PATH_RE)
       .withMessage('personImagePath must be a valid storage path from upload'),
     body('productImagePath')
       .isString()
       .notEmpty()
       .isLength({ max: 200 })
-      .matches(
-        /^[a-zA-Z0-9_-]+\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$|^anonymous\/(person|garment)\/[a-zA-Z0-9_.-]+\.jpg$/i
-      )
+      .matches(UPLOAD_RELATIVE_IMAGE_PATH_RE)
       .withMessage('productImagePath must be a valid storage path from upload'),
     body('category')
       .isIn(VALID_CATEGORIES)
@@ -73,12 +70,12 @@ router.post(
         `category must be one of: ${VALID_CATEGORIES.join(', ')}`
       ),
     body('productDescription')
-      .optional()
+      .optional({ nullable: true })
       .isString()
       .isLength({ max: 400 })
       .withMessage('productDescription must be a string under 400 characters'),
     body('async')
-      .optional()
+      .optional({ nullable: true })
       .isBoolean(),
   ],
   handleValidationErrors,
