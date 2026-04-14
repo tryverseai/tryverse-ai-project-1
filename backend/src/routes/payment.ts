@@ -182,7 +182,13 @@ router.post(
         return;
       }
 
-      const event = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as PaystackWebhookEvent;
+      let event: PaystackWebhookEvent;
+      try {
+        event = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as PaystackWebhookEvent;
+      } catch {
+        res.status(400).json({ error: 'Invalid webhook payload' });
+        return;
+      }
       res.status(200).json({ received: true });
 
       handlePaystackWebhook(event).catch((err) => {
@@ -211,7 +217,13 @@ router.post(
         return;
       }
 
-      const event = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as FlutterwaveWebhookEvent;
+      let event: FlutterwaveWebhookEvent;
+      try {
+        event = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as FlutterwaveWebhookEvent;
+      } catch {
+        res.status(400).json({ error: 'Invalid webhook payload' });
+        return;
+      }
       res.status(200).json({ received: true });
 
       handleFlutterwaveWebhook(event).catch((err) => {

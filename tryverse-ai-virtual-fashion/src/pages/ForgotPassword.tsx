@@ -24,17 +24,19 @@ const ForgotPassword = () => {
         email: email.trim(),
         redirectTo: `${origin}/reset-password`,
       } as Record<string, unknown>);
-      toast({
-        title: "Check your email",
-        description: "We sent an 8-digit code. Enter it on the next screen with your new password.",
-      });
-      navigate("/reset-password", { state: { email: email.trim() }, replace: true });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast({ title: "Error", description: msg, variant: "destructive" });
+    } catch {
+      // L-1: Suppress provider errors to prevent email enumeration.
+      // We always show the same success message regardless of whether the
+      // address exists in our system.
     } finally {
       setLoading(false);
     }
+    // Always navigate and show the same message — avoids leaking whether an account exists.
+    toast({
+      title: "Check your email",
+      description: "If that email is registered, we've sent an 8-digit reset code. Enter it on the next screen.",
+    });
+    navigate("/reset-password", { state: { email: email.trim() }, replace: true });
   };
 
   return (

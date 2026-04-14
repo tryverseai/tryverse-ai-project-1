@@ -115,23 +115,39 @@ export function requireAuthenticatedActor(req: Request, res: Response, next: Nex
 }
 
 /**
- * Admin-only guard — checks for X-Admin-Key header.
- * Uses centralized env config (never process.env directly).
+ * Admin-only guard.
+ *
+ * Checks in order:
+ *  1. HttpOnly session cookie (preferred — key never leaves the server)
+ *  2. x-admin-key header (backward-compat for CLI / Postman access)
  */
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const adminKey = req.headers['x-admin-key'];
-  if (!adminKey || adminKey !== env.ADMIN_SECRET_KEY) {
-    logAudit({
-      event_type: 'failed_login',
-      actor: req.ip ? `ip:${req.ip}` : undefined,
-      action: 'admin_access_denied',
-      details: { path: req.path },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent'],
-    });
-    logger.warn('Admin access denied', { path: req.path, ip: req.ip });
-    res.status(403).json({ error: 'Admin access required' });
+  // Import inline to avoid circular dependency (adminSession ↔ auth)
+  const { validateAndRefreshSession, parseCookie, ADMIN_SESSION_COOKIE } =
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('../services/adminSession') as typeof import('../services/adminSession');
+
+  const sessionToken = parseCookie(req.headers.cookie, ADMIN_SESSION_COOKIE);
+  if (validateAndRefreshSession(sessionToken)) {
+    next();
     return;
   }
-  next();
+
+  // Fallback: raw key in header (still accepted for non-browser clients)
+  const adminKey = req.headers['x-admin-key'];
+  if (adminKey && adminKey === env.ADMIN_SECRET_KEY) {
+    next();
+    return;
+  }
+
+  logAudit({
+    event_type: 'failed_login',
+    actor: req.ip ? `ip:${req.ip}` : undefined,
+    action: 'admin_access_denied',
+    details: { path: req.path },
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent'],
+  });
+  logger.warn('Admin access denied', { path: req.path, ip: req.ip });
+  res.status(403).json({ error: 'Admin access required' });
 }

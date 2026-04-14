@@ -76,7 +76,14 @@ export function ComplianceOnboardingGate({ children }: { children: React.ReactNo
     }
   }, [user?.id, skipCompliance, user?.user_metadata?.account_type, convexOn, cxProfile, cxLoading]);
 
-  if (loading || !user) {
+  // Unauthenticated users: always pass through (no compliance needed)
+  if (!user) {
+    return <>{children}</>;
+  }
+
+  // Authenticated but profile still loading: render children but don't resolve the modal yet.
+  // This avoids flashing the modal before we know the compliance state.
+  if (loading) {
     return <>{children}</>;
   }
 

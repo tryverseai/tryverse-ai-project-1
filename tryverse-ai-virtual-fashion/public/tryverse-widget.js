@@ -11,7 +11,7 @@
  *       apiKey: 'YOUR_API_KEY',
  *       productImage: 'https://yoursite.com/product.jpg',
  *       category: 'clothing',
- *       backendUrl: 'https://api.tryverse.ai'  // optional
+ *       backendUrl: 'https://api.tryverseai.com'  // optional
  *     });
  *   </script>
  */

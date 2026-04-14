@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+﻿import { useState, useRef, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -279,6 +279,10 @@ const TryOnStudio = ({
       return;
     }
 
+    // H-4: Track uploaded file paths so we can log/attempt cleanup if the try-on fails to start
+    let uploadedPersonPath: string | null = null;
+    let uploadedProductPath: string | null = null;
+
     try {
       setPhase("uploading");
       setErrorMsg(null);
@@ -287,10 +291,12 @@ const TryOnStudio = ({
       // Step 1: Upload person image
       setUploadProgress("Uploading your photo…");
       const personUpload = await uploadImage(personImage.file, 'person');
+      uploadedPersonPath = personUpload.filePath;
 
       // Step 2: Upload product image
       setUploadProgress("Uploading product image…");
       const productUpload = await uploadImage(productImage.file, 'product');
+      uploadedProductPath = productUpload.filePath;
 
       // Step 3: Start AI inference
       setUploadProgress("Starting AI try-on…");
@@ -321,6 +327,13 @@ const TryOnStudio = ({
       const creditsOut = isCreditsExhaustedApiError(err);
       const kind = classifyTryOnError(msg, creditsOut);
       posthogCapture("try_on_failed", { category: selectedCategory, source: "try_on_studio", error: msg, credits_exhausted: creditsOut });
+      // H-4: Log orphaned upload paths so they can be cleaned up server-side if needed
+      if (uploadedPersonPath || uploadedProductPath) {
+        console.warn("[TryVerse] Try-on failed after upload — orphaned paths:", {
+          person: uploadedPersonPath,
+          product: uploadedProductPath,
+        });
+      }
       setErrorMsg(creditsOut ? SHOPPER_TRYON_UNAVAILABLE_MESSAGE : msg);
       setErrorKind(kind);
       setPhase("error");
@@ -926,48 +939,44 @@ const TryOnStudio = ({
                           : "bg-destructive/10"
                     }`}
                   >
-                    <AlertCircle
-                      className={`h-7 w-7 ${
-                        errorKind === "credits"
-                          ? "text-primary"
-                          : errorKind === "person_photo"
-                            ? "text-amber-600"
-                            : "text-destructive"
-                      }`}
-                    />
+                    {errorKind === "credits" ? (
+                      <span className="text-3xl">✨</span>
+                    ) : (
+                      <AlertCircle
+                        className={`h-7 w-7 ${
+                          errorKind === "person_photo" ? "text-amber-600" : "text-destructive"
+                        }`}
+                      />
+                    )}
                   </div>
                   <h3 className="font-display text-xl font-semibold text-foreground mb-2">
                     {errorKind === "credits"
-                      ? "Try-on unavailable"
+                      ? "You've used all your free try-ons"
                       : errorKind === "person_photo"
                         ? "We couldn’t use this photo"
                         : "Something went wrong"}
                   </h3>
-                  <p className="text-sm text-muted-foreground mb-6">{errorMsg || "Please try again."}</p>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    {errorKind === "credits"
+                      ? "Your free try-on credits have been used up. Upgrade your plan to keep trying on outfits."
+                      : errorMsg || "Please try again."}
+                  </p>
                   <div className="flex flex-col gap-3 items-center">
-                    <Button onClick={handleReset} variant="outline" className="gap-2">
-                      <RotateCcw className="h-4 w-4" /> Try again
-                    </Button>
-                    {errorKind === "credits" && (
-                      <p className="text-xs text-muted-foreground max-w-sm">
-                        {embedded ? (
-                          <>
-                            Add try-on credits under{" "}
-                            <Link to={resolvedCreditsPath} className="underline font-medium text-foreground/80 hover:text-foreground">
-                              Profile &amp; plan
-                            </Link>
-                            .
-                          </>
-                        ) : (
-                          <>
-                            Store team: add try-on credits under{" "}
-                            <Link to={resolvedCreditsPath} className="underline font-medium text-foreground/80 hover:text-foreground">
-                              Dashboard → Billing
-                            </Link>
-                            .
-                          </>
-                        )}
-                      </p>
+                    {errorKind === "credits" ? (
+                      <>
+                        <Button asChild className="gap-2 px-6">
+                          <Link to={resolvedCreditsPath}>
+                            {embedded ? "View Profile & Plan" : "Upgrade Plan"}
+                          </Link>
+                        </Button>
+                        <Button onClick={handleReset} variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                          <RotateCcw className="h-3.5 w-3.5" /> Try again
+                        </Button>
+                      </>
+                    ) : (
+                      <Button onClick={handleReset} variant="outline" className="gap-2">
+                        <RotateCcw className="h-4 w-4" /> Try again
+                      </Button>
                     )}
                   </div>
                 </motion.div>

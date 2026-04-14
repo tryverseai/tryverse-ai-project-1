@@ -69,7 +69,7 @@ export function ForBrandsSection() {
             <div className="rounded-xl bg-foreground/[0.03] p-5 font-mono text-sm">
               <p className="text-muted-foreground mb-2">{"<!-- Add to your product page -->"}</p>
               <p className="text-foreground">
-                {"<"}<span className="text-foreground/70">script</span> src=<span className="text-foreground/60">"https://tryverse.ai/widget.js"</span>{">"}
+                {"<"}<span className="text-foreground/70">script</span> src=<span className="text-foreground/60">"https://tryverseai.com/widget.js"</span>{">"}
               </p>
               <p className="text-foreground">{"</"}<span className="text-foreground/70">script</span>{">"}</p>
               <p className="text-foreground mt-3">

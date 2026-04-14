@@ -4,8 +4,8 @@
 
 | Who | Where | What they see |
 |-----|-------|---------------|
-| **Brand (e.g. Zara admin)** | `tryverse.ai` | Full TryVerse platform: Dashboard, Try-On Studio, API Keys, Billing |
-| **Brand's shoppers** | Brand site (e.g. `zara.com`) | **Only the widget** — a modal or inline component. They never visit tryverse.ai |
+| **Brand (e.g. Zara admin)** | `tryverseai.com` | Full TryVerse platform: Dashboard, Try-On Studio, API Keys, Billing |
+| **Brand's shoppers** | Brand site (e.g. `zara.com`) | **Only the widget** — a modal or inline component. They never visit tryverseai.com |
 
 ---
 
@@ -25,7 +25,7 @@ Shoppers **never** see the TryVerse landing page, Dashboard, or Try-On Studio.
 
 ---
 
-## Brand Admin Experience (tryverse.ai)
+## Brand Admin Experience (tryverseai.com)
 
 Brand teams (e.g. Zara) log into the TryVerse platform to:
 
@@ -74,7 +74,7 @@ Brand teams (e.g. Zara) log into the TryVerse platform to:
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                    TRYVERSE PLATFORM (tryverse.ai)                               │
+│                    TRYVERSE PLATFORM (tryverseai.com)                               │
 │  Used by brand admins — NOT embedded on brand sites                              │
 │                                                                                  │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  ┌───────────────────────┐ │
@@ -98,6 +98,6 @@ Brand teams (e.g. Zara) log into the TryVerse platform to:
 | Component | Who uses it | Where |
 |-----------|-------------|-------|
 | **Widget** (`tryverse-widget.js`) | Shoppers | On brand sites (e.g. zara.com) |
-| **Platform** (React app) | Brand admins | tryverse.ai |
-| **Try-On Studio** | Brand admins | tryverse.ai/studio |
-| **Backend API** | Both widget and platform | api.tryverse.ai |
+| **Platform** (React app) | Brand admins | tryverseai.com |
+| **Try-On Studio** | Brand admins | tryverseai.com/studio |
+| **Backend API** | Both widget and platform | api.tryverseai.com |

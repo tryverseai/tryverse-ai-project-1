@@ -1,7 +1,11 @@
 /**
- * Fetch with manual redirect handling and per-hop hostname checks (SSRF mitigation).
+ * Fetch with manual redirect handling, per-hop hostname checks (SSRF mitigation),
+ * and a response size cap to prevent OOM from malicious large responses.
  */
 const MAX_REDIRECTS = 5;
+
+/** Maximum bytes we will buffer from a remote image URL (10 MB). */
+export const MAX_REMOTE_RESPONSE_BYTES = 10 * 1024 * 1024;
 
 export type HostBlockFn = (hostname: string) => boolean;
 
@@ -37,6 +41,13 @@ export async function fetchWithSsrfRedirectChecks(
       const nextUrl = new URL(loc, url).href;
       url = nextUrl;
       continue;
+    }
+
+    // Reject responses that advertise a body larger than our cap before we
+    // even start buffering — protects against slow or large payloads.
+    const contentLength = res.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > MAX_REMOTE_RESPONSE_BYTES) {
+      throw new Error('Remote image exceeds maximum allowed size');
     }
 
     return res as globalThis.Response;

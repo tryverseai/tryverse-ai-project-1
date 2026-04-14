@@ -49,6 +49,160 @@ export function widgetBackendPublicUrl(): string {
 
 export type TryOnCategory = 'clothing' | 'bags' | 'glasses';
 
+// ─── Typed API error (replaces `Error & { status?; code?; retryAfter? }`) ────
+
+/**
+ * All HTTP errors thrown by `handleResponse` and `adminFetch` are instances
+ * of `ApiError`.  Use `instanceof ApiError` to discriminate API failures from
+ * network/parse errors.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+    public readonly retryAfter?: number,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// ─── Admin response shapes ────────────────────────────────────────────────────
+
+/** Platform-level metrics returned by GET /api/admin/metrics */
+export interface AdminMetrics {
+  users: { total: number };
+  tryons: { total: number; today: number; thisMonth: number; successRate: number };
+  subscriptions: { active: number };
+  revenue: { ngn: number; usd: number; totalPayments: number };
+  usageOverTime: Array<{ date: string; tryons: number; newUsers: number }>;
+}
+
+/**
+ * A single admin user row.  The backend merges a Convex profile
+ * (Record<string, unknown>) with `is_banned`, so extra fields may be present.
+ */
+export interface AdminUser {
+  user_id?: string;
+  email?: string;
+  account_type?: 'individual' | 'business' | null;
+  plan_id?: string | null;
+  is_blocked?: boolean;
+  is_banned: boolean;
+  created_at?: string | null;
+  [key: string]: unknown;
+}
+
+export interface AdminUserList {
+  users: AdminUser[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+}
+
+/**
+ * A single admin try-on row.  The backend returns a merged Convex object,
+ * so extra fields may be present.
+ */
+export interface AdminTryOn {
+  id?: string;
+  status?: string;
+  category?: string;
+  user_id?: string;
+  created_at?: string | null;
+  completed_at?: string | null;
+  [key: string]: unknown;
+}
+
+export interface AdminTryOnList {
+  tryons: AdminTryOn[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+}
+
+export interface AdminQueueStatus {
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+  delayed: number;
+  paused: boolean;
+}
+
+export interface AdminSettings {
+  [key: string]: unknown;
+}
+
+export interface AdminHealth {
+  status: 'ok' | 'degraded' | 'down';
+  uptime?: number;
+  redis?: { ok: boolean };
+  convex?: { ok: boolean };
+  [key: string]: unknown;
+}
+
+export interface AdminActivityItem {
+  id?: string;
+  event_type?: string;
+  actor?: string;
+  action?: string;
+  timestamp?: string;
+  [key: string]: unknown;
+}
+
+export interface AdminApiKey {
+  id: string;
+  name?: string;
+  status?: string;
+  key_preview?: string;
+  user_id?: string;
+  brand_name?: string;
+  last_used?: string | null;
+  created_at?: string | null;
+  [key: string]: unknown;
+}
+
+export interface AdminDomain {
+  id?: string;
+  domain: string;
+  user_id?: string;
+  [key: string]: unknown;
+}
+
+export interface AdminLogEntry {
+  level: string;
+  message: string;
+  timestamp?: string;
+  [key: string]: unknown;
+}
+
+export interface AdminAuditEntry {
+  id?: string;
+  event_type?: string;
+  actor?: string;
+  action?: string;
+  target_id?: string;
+  severity?: string;
+  timestamp?: string;
+  [key: string]: unknown;
+}
+
+/** Brand-level analytics returned by GET /api/analytics */
+export interface BrandAnalytics {
+  overview: {
+    totalTryons: number;
+    completedTryons: number;
+    failedTryons: number;
+    successRate: number;
+    avgProcessingMs: number;
+    creditsUsed: number;
+    creditsRemaining: number;
+  };
+  byCategory: Array<{ category: string; count: number; successRate: number }>;
+  dailyTrend: Array<{ date: string; count: number; completed: number }>;
+  topProducts: Array<{ productImage: string; count: number; category: string }>;
+  widgetEngagement: { totalWidgetTryons: number; widgetConversionRate: number };
+  period: { days: number };
+}
+
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
 async function getAuthHeaders(): Promise<HeadersInit> {
@@ -60,23 +214,84 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   return headers;
 }
 
-async function getAuthToken(): Promise<string | null> {
+/** Synchronous — no async needed since readConvexAuthJwt is synchronous. */
+function getAuthToken(): string | null {
   return readConvexAuthJwt();
+}
+
+/**
+ * Reads an error body from a non-OK response.
+ * Tries JSON first (`error` or `message` field + optional `code`);
+ * falls back to plain text; falls back to the `fallback` string on parse failure.
+ * Used by both handleResponse (full API) and widget inline error paths.
+ */
+async function parseApiErrorBody(
+  res: Response,
+  fallback: string
+): Promise<{ message: string; code?: string }> {
+  let message = fallback;
+  let code: string | undefined;
+  try {
+    const contentType = res.headers.get('content-type') ?? '';
+    if (contentType.includes('application/json')) {
+      const body = (await res.json()) as { error?: string; message?: string; code?: string };
+      message = body.error || body.message || message;
+      if (typeof body.code === 'string') code = body.code;
+    } else {
+      const text = await res.text();
+      if (text) message = text;
+    }
+  } catch { /* ignore parse error — keep fallback */ }
+  return { message, code };
 }
 
 async function handleResponse<T>(res: Response, context?: { feature?: string }): Promise<T> {
   if (!res.ok) {
-    let message = `Request failed: ${res.status}`;
-    let code: string | undefined;
-    try {
-      const body = (await res.json()) as { error?: string; message?: string; code?: string };
-      message = body.error || body.message || message;
-      if (typeof body.code === 'string') code = body.code;
-    } catch { /* ignore parse error */ }
-    const err = new Error(message) as Error & { status?: number; code?: string };
-    err.status = res.status;
-    if (code) err.code = code;
-    if (res.status !== 402) {
+    let retryAfter: number | undefined;
+
+    const { message: parsedMessage, code } = await parseApiErrorBody(
+      res,
+      `Request failed: ${res.status}`
+    );
+    let message = parsedMessage;
+
+    // 429 — Rate limited: extract Retry-After hint
+    if (res.status === 429) {
+      const ra = res.headers.get('retry-after');
+      retryAfter = ra ? parseInt(ra, 10) : undefined;
+      message = retryAfter
+        ? `Too many requests — please wait ${retryAfter}s before trying again.`
+        : 'Too many requests — please slow down and try again shortly.';
+    }
+
+    // 503 / 5xx — infrastructure failure; use a clearer message
+    if (res.status === 503) {
+      message = 'Service temporarily unavailable. Please try again in a moment.';
+    } else if (res.status >= 500 && !code) {
+      message = message.startsWith('Request failed')
+        ? 'An unexpected server error occurred. Please try again.'
+        : message;
+    }
+
+    // 401 — Expired or missing token: dispatch a global event so AuthContext can sign out
+    if (res.status === 401) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('tryverse:auth:expired'));
+      }
+    }
+
+    // 403 ACCOUNT_SUSPENDED — dispatch specific event + set friendly message
+    if (res.status === 403 && code === 'ACCOUNT_SUSPENDED') {
+      message = 'Your account has been suspended. Please contact support@tryverseai.com for assistance.';
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('tryverse:auth:suspended'));
+      }
+    }
+
+    const err = new ApiError(message, res.status, code, retryAfter);
+
+    // Skip Sentry for expected non-server errors (402, 429, 403)
+    if (res.status !== 402 && res.status !== 429 && res.status !== 403) {
       try {
         const { captureSentryException } = await import('@/lib/sentry');
         captureSentryException(err, {
@@ -92,18 +307,17 @@ async function handleResponse<T>(res: Response, context?: { feature?: string }):
 
 /** Backend returns 402 + code CREDITS_EXHAUSTED when the account has no try-on credits left. */
 export function isCreditsExhaustedApiError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const e = err as Error & { status?: number; code?: string };
-  return e.status === 402 || e.code === 'CREDITS_EXHAUSTED';
+  if (!(err instanceof ApiError)) return false;
+  return err.status === 402 || err.code === 'CREDITS_EXHAUSTED';
 }
 
-/** Same wording the backend returns for 402 — use for studio UIs that need a fallback. */
+/** Shown when a user's free try-on credits run out (402 / CREDITS_EXHAUSTED). */
 export const SHOPPER_TRYON_UNAVAILABLE_MESSAGE =
-  "Virtual try-on isn't available right now. Please try again later or contact the store.";
+  "You've used all your free try-on credits. Upgrade your plan to keep trying on outfits.";
 
 // ─── Emails ───────────────────────────────────────────────────────────────────
 
-export async function sendWelcomeEmail(params: { name?: string; brandName?: string }) {
+export async function sendWelcomeEmail(params: { name?: string; brandName?: string }): Promise<void> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${BACKEND_URL}/api/emails/welcome`, {
     method: 'POST',
@@ -114,7 +328,7 @@ export async function sendWelcomeEmail(params: { name?: string; brandName?: stri
   await res.json();
 }
 
-export async function sendApiKeyDeliveryEmail(params: { keyName: string; keyPreview: string }) {
+export async function sendApiKeyDeliveryEmail(params: { keyName: string; keyPreview: string }): Promise<void> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${BACKEND_URL}/api/emails/api-key-delivery`, {
     method: 'POST',
@@ -131,7 +345,7 @@ export async function uploadImage(
   file: File,
   type: 'person' | 'product'
 ): Promise<{ filePath: string; type: string }> {
-  const token = await getAuthToken();
+  const token = getAuthToken();
   const formData = new FormData();
   formData.append('image', file);
   formData.append('type', type);
@@ -229,19 +443,9 @@ export async function widgetRequestTryOnWithApiKey(
     }),
   });
   if (!res.ok) {
-    let message = `Request failed: ${res.status}`;
-    let code: string | undefined;
-    try {
-      const body = (await res.json()) as { error?: string; message?: string; code?: string };
-      message = body.error || body.message || message;
-      if (typeof body.code === 'string') code = body.code;
-    } catch {
-      /* ignore */
-    }
-    const err = new Error(message) as Error & { status?: number; code?: string };
-    err.status = res.status;
-    if (code) err.code = code;
-    throw err;
+    // Widget requests use API keys — skip auth events and Sentry noise from handleResponse.
+    const { message, code } = await parseApiErrorBody(res, `Request failed: ${res.status}`);
+    throw new ApiError(message, res.status, code);
   }
   return res.json() as Promise<WidgetTryOnStartResponse>;
 }
@@ -323,7 +527,7 @@ export async function createPersonPathFromModel(modelId: string): Promise<string
 
 export async function getSignedImageUrl(path: string): Promise<string> {
   if (path.startsWith('http')) return path;
-  const token = await getAuthToken();
+  const token = getAuthToken();
   const res = await fetch(
     `${BACKEND_URL}/api/upload/signed-url?path=${encodeURIComponent(path)}`,
     { headers: token ? { Authorization: `Bearer ${token}` } : {} }
@@ -332,14 +536,24 @@ export async function getSignedImageUrl(path: string): Promise<string> {
   return data.url;
 }
 
-export async function getTryOnHistory(page = 1, category?: TryOnCategory) {
+/**
+ * Fetches try-on history using cursor-based pagination (O(limit) read — no
+ * full table scan). Pass `cursor: null` to start from the most recent try-on;
+ * pass the returned `nextCursor` to get the next page.
+ */
+export async function getTryOnHistory(
+  _page = 1, // kept for call-site compatibility; cursor mode is used instead
+  category?: TryOnCategory,
+  cursor: string | null = null
+) {
   const headers = await getAuthHeaders();
-  const params = new URLSearchParams({ page: String(page), limit: '20' });
+  const params = new URLSearchParams({ limit: '20', cursor: cursor ?? '' });
   if (category) params.append('category', category);
   const res = await fetch(`${BACKEND_URL}/api/tryon?${params}`, { headers });
   return handleResponse<{
     tryons: (TryOnResponse & { id?: string; tryonId?: string; createdAt?: string })[];
-    pagination: { page: number; limit: number; total: number; pages: number };
+    nextCursor: string | null;
+    isDone: boolean;
   }>(res);
 }
 
@@ -517,7 +731,7 @@ export async function resolveProductImageDisplayUrl(pathOrUrl: string | null): P
       { headers }
     );
     if (!res.ok) return null;
-    const { url } = await res.json();
+    const { url } = (await res.json()) as { url?: string };
     return url || null;
   } catch {
     return null;
@@ -558,13 +772,13 @@ export async function createProduct(data: {
   });
   const product = await handleResponse<Product>(res);
   const image_display_url = await resolveProductImageDisplayUrl(product.image_url);
-  return { ...product, image_display_url } as Product;
+  return { ...product, image_display_url };
 }
 
 export async function updateProduct(
   id: string,
   data: { name?: string; image_url?: string; category?: TryOnCategory; product_url?: string }
-) {
+): Promise<Product> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${BACKEND_URL}/api/products/${encodeURIComponent(id)}`, {
     method: 'PUT',
@@ -573,7 +787,7 @@ export async function updateProduct(
   });
   const product = await handleResponse<Product>(res);
   const image_display_url = await resolveProductImageDisplayUrl(product.image_url);
-  return { ...product, image_display_url } as Product;
+  return { ...product, image_display_url };
 }
 
 export async function deleteProduct(id: string) {
@@ -589,10 +803,10 @@ export async function deleteProduct(id: string) {
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
-export async function getBrandAnalytics(days = 30) {
+export async function getBrandAnalytics(days = 30): Promise<BrandAnalytics> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${BACKEND_URL}/api/analytics?days=${days}`, { headers });
-  return handleResponse(res);
+  return handleResponse<BrandAnalytics>(res);
 }
 
 // ─── Widget domains ───────────────────────────────────────────────────────────
@@ -616,26 +830,34 @@ export async function getSupportedCategories() {
   }>(res);
 }
 
-// ─── Admin (requires X-Admin-Key) ──────────────────────────────────────────────
+// ─── Admin session (HttpOnly cookie — key never stored in JS memory) ──────────
 
-const ADMIN_KEY_STORAGE = 'tryverse_admin_key';
-const ADMIN_KEY_LAST_ACTIVE = 'tryverse_admin_key_last_active';
+/**
+ * The admin key is no longer stored in sessionStorage or any JS-accessible
+ * storage. Instead, a short-lived HttpOnly cookie is issued by the server after
+ * the key is validated. All admin API calls use `credentials: 'include'` so the
+ * browser attaches the cookie automatically — the key itself is never readable
+ * from JavaScript, blocking XSS exfiltration.
+ *
+ * The `adminKey` parameter on public functions is kept for TypeScript
+ * compatibility but is no longer passed to the server.
+ */
 
-/** Minutes of inactivity (away from admin page) before auto sign-out. No timeout while on admin page. */
-const ADMIN_IDLE_TIMEOUT_MINUTES = 15;
+// Sentinel stored in sessionStorage — just tracks "browser tab has an active
+// session" for UI state restoration. NOT the admin key.
+const ADMIN_SESSION_FLAG = 'tryverse_admin_session_active';
 
 export function getStoredAdminKey(): string | null {
   try {
-    return sessionStorage.getItem(ADMIN_KEY_STORAGE);
+    return sessionStorage.getItem(ADMIN_SESSION_FLAG) === '1' ? 'session' : null;
   } catch {
     return null;
   }
 }
 
-export function setStoredAdminKey(key: string): void {
+export function setStoredAdminKey(_key: string): void {
   try {
-    sessionStorage.setItem(ADMIN_KEY_STORAGE, key);
-    setAdminKeyLastActive();
+    sessionStorage.setItem(ADMIN_SESSION_FLAG, '1');
   } catch {
     /* ignore */
   }
@@ -643,42 +865,74 @@ export function setStoredAdminKey(key: string): void {
 
 export function clearStoredAdminKey(): void {
   try {
-    sessionStorage.removeItem(ADMIN_KEY_STORAGE);
-    sessionStorage.removeItem(ADMIN_KEY_LAST_ACTIVE);
+    sessionStorage.removeItem(ADMIN_SESSION_FLAG);
   } catch {
     /* ignore */
   }
 }
 
-export function setAdminKeyLastActive(): void {
+/** No-op — kept for call-site compatibility. Heartbeat is handled server-side. */
+export function setAdminKeyLastActive(): void {}
+
+/** No-op — kept for call-site compatibility. Expiry is handled by the server session. */
+export function isAdminSessionExpired(): boolean { return false; }
+
+/**
+ * Login: validates the admin key on the server; server sets an HttpOnly cookie.
+ * Throws if the key is invalid.
+ */
+export async function adminLogin(key: string): Promise<void> {
+  const res = await fetch(`${BACKEND_URL}/api/admin/session`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key }),
+  });
+  if (!res.ok) throw new Error('Invalid admin key');
+  setStoredAdminKey('session'); // mark UI state only
+}
+
+/**
+ * Logout: revokes the server session and clears the cookie.
+ */
+export async function adminLogout(): Promise<void> {
+  clearStoredAdminKey();
   try {
-    sessionStorage.setItem(ADMIN_KEY_LAST_ACTIVE, String(Date.now()));
+    await fetch(`${BACKEND_URL}/api/admin/session`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
   } catch {
-    /* ignore */
+    /* best-effort — cookie will expire anyway */
   }
 }
 
-/** True if admin has been away longer than the idle timeout (should re-enter key). */
-export function isAdminSessionExpired(): boolean {
+/**
+ * Checks if the current session cookie is still valid.
+ * Used on admin page mount to restore authenticated state without re-entering the key.
+ */
+export async function checkAdminSession(): Promise<boolean> {
   try {
-    const lastActive = sessionStorage.getItem(ADMIN_KEY_LAST_ACTIVE);
-    if (!lastActive) return true;
-    const elapsed = Date.now() - parseInt(lastActive, 10);
-    return elapsed > ADMIN_IDLE_TIMEOUT_MINUTES * 60 * 1000;
+    const res = await fetch(`${BACKEND_URL}/api/admin/session/check`, {
+      credentials: 'include',
+    });
+    return res.ok;
   } catch {
-    return true;
+    return false;
   }
 }
 
-async function adminFetch(path: string, adminKey: string, options?: RequestInit) {
+async function adminFetch<T = unknown>(path: string, _adminKey: string, options?: RequestInit): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${BACKEND_URL}${path}`, {
       ...options,
+      // Attach HttpOnly session cookie automatically
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-key': adminKey,
         ...options?.headers,
+        // x-admin-key intentionally omitted — HttpOnly cookie handles authentication
       },
     });
   } catch (e) {
@@ -700,26 +954,25 @@ async function adminFetch(path: string, adminKey: string, options?: RequestInit)
     }
     throw new Error(`Failed to fetch (${target}): ${hint}`);
   }
-  if (res.status === 403) throw new Error('Invalid admin key');
+  if (res.status === 403) throw new ApiError('Invalid admin key', 403);
   if (!res.ok) {
     let message = `Admin API error (${res.status})`;
     try {
-      const body = await res.json();
+      const body = (await res.json()) as { error?: string; details?: Array<{ message?: string }> };
       if (typeof body?.error === 'string') message = body.error;
-      const details = body?.details as { message?: string }[] | undefined;
-      if (Array.isArray(details) && details[0]?.message) {
-        message = `${message}: ${details[0].message}`;
+      if (Array.isArray(body?.details) && body.details[0]?.message) {
+        message = `${message}: ${body.details[0].message}`;
       }
     } catch {
       /* ignore */
     }
-    throw new Error(message);
+    throw new ApiError(message, res.status);
   }
-  return res.json();
+  return res.json() as Promise<T>;
 }
 
-export async function getAdminMetrics(adminKey: string) {
-  return adminFetch('/api/admin/metrics', adminKey);
+export async function getAdminMetrics(adminKey: string): Promise<AdminMetrics> {
+  return adminFetch<AdminMetrics>('/api/admin/metrics', adminKey);
 }
 
 export async function getAdminModelLibrary(adminKey: string) {
@@ -745,93 +998,97 @@ export async function getAdminUsers(
   limit = 50,
   search?: string,
   accountType?: 'all' | 'business' | 'individual'
-) {
+): Promise<AdminUserList> {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (search) params.append('search', search);
   if (accountType && accountType !== 'all') params.append('accountType', accountType);
-  return adminFetch(`/api/admin/users?${params}`, adminKey);
+  return adminFetch<AdminUserList>(`/api/admin/users?${params}`, adminKey);
 }
 
 export async function patchAdminUserAccountType(
   adminKey: string,
   userId: string,
   account_type: 'business' | 'individual'
-) {
-  return adminFetch(`/api/admin/users/${userId}/profile`, adminKey, {
+): Promise<{ ok: boolean }> {
+  return adminFetch<{ ok: boolean }>(`/api/admin/users/${userId}/profile`, adminKey, {
     method: 'PATCH',
     body: JSON.stringify({ account_type }),
   });
 }
 
-export async function getAdminTryons(adminKey: string, page = 1, limit = 50, status?: string) {
+export async function getAdminTryons(adminKey: string, page = 1, limit = 50, status?: string): Promise<AdminTryOnList> {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (status) params.append('status', status);
-  return adminFetch(`/api/admin/tryons?${params}`, adminKey);
+  return adminFetch<AdminTryOnList>(`/api/admin/tryons?${params}`, adminKey);
 }
 
-export async function getAdminRevenue(adminKey: string, days = 30) {
-  return adminFetch(`/api/admin/revenue?days=${days}`, adminKey);
+export async function getAdminRevenue(adminKey: string, days = 30): Promise<Record<string, unknown>> {
+  return adminFetch<Record<string, unknown>>(`/api/admin/revenue?days=${days}`, adminKey);
 }
 
-export async function getAdminQueue(adminKey: string) {
-  return adminFetch('/api/admin/queue', adminKey);
+export async function getAdminQueue(adminKey: string): Promise<AdminQueueStatus> {
+  return adminFetch<AdminQueueStatus>('/api/admin/queue', adminKey);
 }
 
 /** Block or unblock a user (profiles.is_blocked + auth/session via backend). */
-export async function banAdminUser(adminKey: string, userId: string, unban = false) {
-  return adminFetch(`/api/admin/users/${userId}/block`, adminKey, {
+export async function banAdminUser(adminKey: string, userId: string, unban = false): Promise<{ ok: boolean }> {
+  return adminFetch<{ ok: boolean }>(`/api/admin/users/${userId}/block`, adminKey, {
     method: 'POST',
     body: JSON.stringify({ blocked: !unban }),
   });
 }
 
-export async function adjustUserCredits(adminKey: string, userId: string, credits: { freeCredits?: number; monthlyCredits?: number }) {
-  return adminFetch(`/api/admin/users/${userId}/credits`, adminKey, {
+export async function adjustUserCredits(
+  adminKey: string,
+  userId: string,
+  credits: { freeCredits?: number; monthlyCredits?: number }
+): Promise<{ ok: boolean }> {
+  return adminFetch<{ ok: boolean }>(`/api/admin/users/${userId}/credits`, adminKey, {
     method: 'PATCH',
     body: JSON.stringify(credits),
   });
 }
 
-export async function retryTryOn(adminKey: string, tryonId: string) {
-  return adminFetch(`/api/admin/tryons/${tryonId}/retry`, adminKey, { method: 'POST' });
+export async function retryTryOn(adminKey: string, tryonId: string): Promise<{ ok: boolean }> {
+  return adminFetch<{ ok: boolean }>(`/api/admin/tryons/${tryonId}/retry`, adminKey, { method: 'POST' });
 }
 
-export async function pauseAdminQueue(adminKey: string) {
-  return adminFetch('/api/admin/queue/pause', adminKey, { method: 'POST' });
+export async function pauseAdminQueue(adminKey: string): Promise<{ ok: boolean }> {
+  return adminFetch<{ ok: boolean }>('/api/admin/queue/pause', adminKey, { method: 'POST' });
 }
 
-export async function resumeAdminQueue(adminKey: string) {
-  return adminFetch('/api/admin/queue/resume', adminKey, { method: 'POST' });
+export async function resumeAdminQueue(adminKey: string): Promise<{ ok: boolean }> {
+  return adminFetch<{ ok: boolean }>('/api/admin/queue/resume', adminKey, { method: 'POST' });
 }
 
-export async function getAdminSettings(adminKey: string) {
-  return adminFetch('/api/admin/settings', adminKey);
+export async function getAdminSettings(adminKey: string): Promise<AdminSettings> {
+  return adminFetch<AdminSettings>('/api/admin/settings', adminKey);
 }
 
-export async function getAdminHealth(adminKey: string) {
-  return adminFetch('/api/admin/health', adminKey);
+export async function getAdminHealth(adminKey: string): Promise<AdminHealth> {
+  return adminFetch<AdminHealth>('/api/admin/health', adminKey);
 }
 
-export async function getAdminActivity(adminKey: string, limit = 20) {
-  return adminFetch(`/api/admin/activity?limit=${limit}`, adminKey);
+export async function getAdminActivity(adminKey: string, limit = 20): Promise<{ items: AdminActivityItem[] }> {
+  return adminFetch<{ items: AdminActivityItem[] }>(`/api/admin/activity?limit=${limit}`, adminKey);
 }
 
-export async function getAdminApiKeys(adminKey: string) {
-  return adminFetch('/api/admin/api-keys', adminKey);
+export async function getAdminApiKeys(adminKey: string): Promise<{ keys: AdminApiKey[] }> {
+  return adminFetch<{ keys: AdminApiKey[] }>('/api/admin/api-keys', adminKey);
 }
 
-export async function revokeAdminApiKey(adminKey: string, keyId: string) {
-  return adminFetch(`/api/admin/api-keys/${keyId}/revoke`, adminKey, { method: 'POST' });
+export async function revokeAdminApiKey(adminKey: string, keyId: string): Promise<{ ok: boolean }> {
+  return adminFetch<{ ok: boolean }>(`/api/admin/api-keys/${keyId}/revoke`, adminKey, { method: 'POST' });
 }
 
-export async function getAdminDomains(adminKey: string) {
-  return adminFetch('/api/admin/domains', adminKey);
+export async function getAdminDomains(adminKey: string): Promise<{ domains: AdminDomain[] }> {
+  return adminFetch<{ domains: AdminDomain[] }>('/api/admin/domains', adminKey);
 }
 
-export async function getAdminLogs(adminKey: string, limit = 200, level?: string) {
+export async function getAdminLogs(adminKey: string, limit = 200, level?: string): Promise<{ logs: AdminLogEntry[] }> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (level) params.append('level', level);
-  return adminFetch(`/api/admin/logs?${params}`, adminKey);
+  return adminFetch<{ logs: AdminLogEntry[] }>(`/api/admin/logs?${params}`, adminKey);
 }
 
 export async function getAdminSentryConfig(adminKey: string): Promise<{ enabled: boolean; issuesUrl?: string }> {
@@ -843,11 +1100,11 @@ export async function getAdminAudit(
   limit = 100,
   offset = 0,
   filters?: { eventType?: string; severity?: 'error' | 'warn' | 'info' }
-) {
+): Promise<{ entries: AdminAuditEntry[]; total: number }> {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   if (filters?.eventType) params.append('event_type', filters.eventType);
   else if (filters?.severity) params.append('severity', filters.severity);
-  return adminFetch(`/api/admin/audit?${params}`, adminKey);
+  return adminFetch<{ entries: AdminAuditEntry[]; total: number }>(`/api/admin/audit?${params}`, adminKey);
 }
 
 export async function clearAdminLogs(adminKey: string): Promise<{ ok: boolean; message?: string }> {

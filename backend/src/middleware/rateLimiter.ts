@@ -57,13 +57,16 @@ export const tryonRateLimit = rateLimit({
   handler: rateLimitResponse,
 });
 
-// Upload endpoint — 30 uploads per minute
+// Upload endpoint — 30 uploads per minute.
+// Key order: authenticated user ID → widget API key ID (multi-tenant) → IP.
+// Using API key ID for widget traffic ensures each merchant gets their own
+// bucket instead of sharing a single IP limit with all their shoppers.
 export const uploadRateLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  keyGenerator: (req) => req.user?.id || req.apiKey?.id || req.ip || 'unknown',
   handler: rateLimitResponse,
 });
 

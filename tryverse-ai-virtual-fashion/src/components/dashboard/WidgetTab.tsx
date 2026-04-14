@@ -25,7 +25,7 @@ import { isConvexDataEnabled } from "@/lib/convexData";
 const getScriptBase = () =>
   (typeof window !== 'undefined' ? window.location.origin : '') ||
   import.meta.env.VITE_APP_URL ||
-  'https://app.tryverse.ai';
+  'https://tryverseai.com';
 const getPopupSnippet = (apiKey: string) => {
   const backend = widgetBackendPublicUrl();
   const scriptBase = getScriptBase();

@@ -10,10 +10,60 @@ import type { ProductCategory } from '../../types';
  * Optional `variant` (e.g. idm vs fashn vs flux for clothing) avoids serving the wrong engine output.
  * Identical image combinations return cached result — no AI inference.
  * TTL: 24 hours (reduces AI costs for popular products).
+ *
+ * Two-tier storage:
+ *  1. In-memory Map (always active) — survives Redis downtime, instant lookup
+ *  2. Redis (when available)        — survives server restarts, shared across workers
  */
 
 const CACHE_TTL_SECONDS = 24 * 60 * 60; // 24 hours
+const CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
 const CACHE_PREFIX = 'tryon:';
+
+// ── In-memory fallback cache ──────────────────────────────────────────────────
+/** Maximum number of entries kept in memory (oldest evicted when exceeded). */
+const MEM_CACHE_MAX = 500;
+
+interface MemCacheEntry {
+  resultPath: string;
+  expiresAt: number;
+}
+
+const memCache = new Map<string, MemCacheEntry>();
+
+/** Remove all expired entries. Called lazily on each write. */
+function evictExpired(): void {
+  const now = Date.now();
+  for (const [key, entry] of memCache) {
+    if (entry.expiresAt <= now) memCache.delete(key);
+  }
+}
+
+/** Evict the oldest entry when the cache is full. */
+function evictOldest(): void {
+  const oldest = memCache.keys().next().value;
+  if (oldest) memCache.delete(oldest);
+}
+
+function memGet(key: string): string | null {
+  const entry = memCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    memCache.delete(key);
+    return null;
+  }
+  return entry.resultPath;
+}
+
+function memSet(key: string, resultPath: string): void {
+  evictExpired();
+  if (memCache.size >= MEM_CACHE_MAX) evictOldest();
+  memCache.set(key, { resultPath, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
+function memDel(key: string): void {
+  memCache.delete(key);
+}
 
 /**
  * Computes SHA-256 hash of image buffer for cache key.
@@ -36,7 +86,8 @@ export function buildCacheKey(
 }
 
 /**
- * Looks up a cached result. Returns stored result path or null.
+ * Looks up a cached result. Checks in-memory store first, then Redis.
+ * Returns the stored result path or null on a cache miss.
  */
 export async function getCachedResultByHash(
   personImageHash: string,
@@ -44,26 +95,36 @@ export async function getCachedResultByHash(
   category: ProductCategory,
   variant?: string
 ): Promise<string | null> {
+  const key = buildCacheKey(personImageHash, productImageHash, category, variant);
+
+  // 1. Check in-memory cache (always available, even without Redis)
+  const memHit = memGet(key);
+  if (memHit) {
+    logger.info('Cache hit (memory)', { key: key.slice(-24) });
+    return memHit;
+  }
+
+  // 2. Check Redis when available
   try {
     const redis = getRedisClient();
-    if (redis.status !== 'ready') return null;
-
-    const key = buildCacheKey(personImageHash, productImageHash, category, variant);
-    const cached = await redis.get(key);
-
-    if (cached) {
-      logger.info('Cache hit', { key: key.slice(-24), ttl: CACHE_TTL_SECONDS });
-      return cached;
+    if (redis.status === 'ready') {
+      const redisHit = await redis.get(key);
+      if (redisHit) {
+        // Warm the memory cache so the next hit is instant
+        memSet(key, redisHit);
+        logger.info('Cache hit (redis)', { key: key.slice(-24) });
+        return redisHit;
+      }
     }
-    return null;
   } catch (err) {
-    logger.warn('Cache lookup failed', { error: String(err) });
-    return null;
+    logger.warn('Redis cache lookup failed', { error: String(err) });
   }
+
+  return null;
 }
 
 /**
- * Stores a try-on result in the cache.
+ * Stores a try-on result in both the in-memory cache and Redis (when available).
  */
 export async function setCachedResultByHash(
   personImageHash: string,
@@ -72,21 +133,27 @@ export async function setCachedResultByHash(
   resultPath: string,
   variant?: string
 ): Promise<void> {
+  const key = buildCacheKey(personImageHash, productImageHash, category, variant);
+
+  // Always write to memory cache
+  memSet(key, resultPath);
+  logger.info('Result cached (memory)', { key: key.slice(-24), ttl: CACHE_TTL_SECONDS });
+
+  // Also write to Redis when available
   try {
     const redis = getRedisClient();
-    if (redis.status !== 'ready') return;
-
-    const key = buildCacheKey(personImageHash, productImageHash, category, variant);
-    await redis.setex(key, CACHE_TTL_SECONDS, resultPath);
-    logger.info('Result cached', { key: key.slice(-24), ttl: CACHE_TTL_SECONDS });
+    if (redis.status === 'ready') {
+      await redis.setex(key, CACHE_TTL_SECONDS, resultPath);
+      logger.info('Result cached (redis)', { key: key.slice(-24) });
+    }
   } catch (err) {
-    logger.warn('Cache write failed', { error: String(err) });
+    logger.warn('Redis cache write failed', { error: String(err) });
   }
 }
 
 
 /**
- * Invalidates a cached result.
+ * Invalidates a cached result from both memory and Redis.
  */
 export async function invalidateCacheEntry(
   personImageHash: string,
@@ -94,11 +161,13 @@ export async function invalidateCacheEntry(
   category: ProductCategory,
   variant?: string
 ): Promise<void> {
+  const key = buildCacheKey(personImageHash, productImageHash, category, variant);
+  memDel(key);
   try {
     const redis = getRedisClient();
-    if (redis.status !== 'ready') return;
-    const key = buildCacheKey(personImageHash, productImageHash, category, variant);
-    await redis.del(key);
+    if (redis.status === 'ready') {
+      await redis.del(key);
+    }
     logger.info('Cache invalidated', { key: key.slice(-24) });
   } catch (err) {
     logger.warn('Cache invalidation failed', { error: String(err) });
@@ -127,19 +196,33 @@ export async function getCacheStats(): Promise<{ keys: number; memoryMb: number 
 }
 
 /**
- * Deletes all `tryon:*` result cache keys (does not touch Bull queue keys).
+ * Deletes all `tryon:*` result cache keys from memory and Redis.
+ * Does not touch Bull queue keys.
  */
 export async function clearAllTryonResultCache(): Promise<number> {
+  // Clear all in-memory try-on entries
+  let memCount = 0;
+  for (const key of memCache.keys()) {
+    if (key.startsWith(CACHE_PREFIX)) {
+      memCache.delete(key);
+      memCount++;
+    }
+  }
+
+  let redisCount = 0;
   try {
     const redis = getRedisClient();
-    if (redis.status !== 'ready') return 0;
-    const keys = await redis.keys(`${CACHE_PREFIX}*`);
-    if (!keys.length) return 0;
-    const n = await redis.del(...keys);
-    logger.info('Try-on result cache cleared', { keysDeleted: n });
-    return n;
+    if (redis.status === 'ready') {
+      const keys = await redis.keys(`${CACHE_PREFIX}*`);
+      if (keys.length) {
+        redisCount = await redis.del(...keys);
+      }
+    }
   } catch (err) {
-    logger.warn('Try-on cache clear failed', { error: String(err) });
-    return 0;
+    logger.warn('Try-on Redis cache clear failed', { error: String(err) });
   }
+
+  const total = memCount + redisCount;
+  logger.info('Try-on result cache cleared', { memCount, redisCount, total });
+  return total;
 }

@@ -25,11 +25,10 @@ import { Input } from "@/components/ui/input";
 import { TechnologySection } from "@/components/TechnologySection";
 import {
   getStoredAdminKey,
-  setStoredAdminKey,
   clearStoredAdminKey,
-  getAdminMetrics,
-  isAdminSessionExpired,
-  setAdminKeyLastActive,
+  adminLogin,
+  adminLogout,
+  checkAdminSession,
 } from "@/lib/backendApi";
 import { toast } from "sonner";
 import { AdminOverviewTab } from "@/components/admin/AdminOverviewTab";
@@ -67,23 +66,24 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState("Overview");
 
   useEffect(() => {
-    const key = getStoredAdminKey();
-    if (!key) {
+    // On mount: verify the HttpOnly session cookie is still valid without
+    // ever exposing the key to JavaScript. Falls back to sessionStorage flag
+    // for the synchronous "is UI unlocked" check, then async-confirms with the server.
+    const localFlag = getStoredAdminKey();
+    if (!localFlag) {
       setStoredKey(null);
       return;
     }
-    // If away from admin page for too long, require re-auth
-    if (isAdminSessionExpired()) {
-      clearStoredAdminKey();
-      setStoredKey(null);
-      toast.info("Admin session expired. Please sign in again.");
-      return;
-    }
-    setStoredKey(key);
-    setAdminKeyLastActive();
-    // Heartbeat: keep session alive while actively on admin page
-    const interval = setInterval(setAdminKeyLastActive, 60 * 1000);
-    return () => clearInterval(interval);
+    // Verify with server (session may have expired server-side)
+    void checkAdminSession().then((valid) => {
+      if (!valid) {
+        clearStoredAdminKey();
+        setStoredKey(null);
+        toast.info("Admin session expired. Please sign in again.");
+      } else {
+        setStoredKey('session');
+      }
+    });
   }, []);
 
   const handleUnlock = async (e: React.FormEvent) => {
@@ -95,9 +95,10 @@ const Admin = () => {
     setLoading(true);
     setError("");
     try {
-      await getAdminMetrics(adminKey);
-      setStoredAdminKey(adminKey);
-      setStoredKey(adminKey);
+      // adminLogin POSTs the key to the backend which validates it and sets an
+      // HttpOnly session cookie. The key is never stored in JS memory after this.
+      await adminLogin(adminKey);
+      setStoredKey('session'); // sentinel — UI knows we're logged in; key is NOT stored
       setAdminKey("");
       toast.success("Admin access granted");
     } catch {
@@ -109,6 +110,7 @@ const Admin = () => {
   };
 
   const handleLock = () => {
+    void adminLogout(); // revokes server session + clears cookie
     clearStoredAdminKey();
     setStoredKey(null);
     toast.success("Logged out");

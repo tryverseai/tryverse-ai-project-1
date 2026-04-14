@@ -11,13 +11,17 @@ export const listMyProducts = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
     const userId = identity.subject;
-    let rows = await ctx.db
-      .query("products")
-      .withIndex("by_userId", (q) => q.eq("user_id", userId))
-      .collect();
-    if (category) {
-      rows = rows.filter((r) => r.category === category);
-    }
+    // Use the composite index when a category filter is active to avoid scanning
+    // all of the user's products.
+    let rows = category
+      ? await ctx.db
+          .query("products")
+          .withIndex("by_user_category", (q) => q.eq("user_id", userId).eq("category", category))
+          .collect()
+      : await ctx.db
+          .query("products")
+          .withIndex("by_userId", (q) => q.eq("user_id", userId))
+          .collect();
     rows.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
     const total = rows.length;
     const from = (page - 1) * limit;
@@ -115,12 +119,13 @@ export const updateProduct = mutation({
   handler: async (ctx, { id, ...patch }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
-    const rows = await ctx.db
+    // O(1) lookup by legacy_id; fallback to linear scan only when id looks like a
+    // Convex internal _id (no dashes — legacy UUIDs always contain dashes).
+    const doc = await ctx.db
       .query("products")
-      .withIndex("by_userId", (q) => q.eq("user_id", identity.subject))
-      .collect();
-    const doc = rows.find((r) => (r.legacy_id ?? r._id) === id);
-    if (!doc) throw new Error("Not found");
+      .withIndex("by_legacyId", (q) => q.eq("legacy_id", id))
+      .unique();
+    if (!doc || doc.user_id !== identity.subject) throw new Error("Not found");
     const now = new Date().toISOString();
     const updates: Record<string, unknown> = { updated_at: now };
     if (patch.name !== undefined) updates.name = patch.name;
@@ -148,12 +153,12 @@ export const deleteProduct = mutation({
   handler: async (ctx, { id }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
-    const rows = await ctx.db
+    // O(1) lookup via the by_legacyId index with ownership verification.
+    const doc = await ctx.db
       .query("products")
-      .withIndex("by_userId", (q) => q.eq("user_id", identity.subject))
-      .collect();
-    const doc = rows.find((r) => (r.legacy_id ?? r._id) === id);
-    if (!doc) throw new Error("Not found");
+      .withIndex("by_legacyId", (q) => q.eq("legacy_id", id))
+      .unique();
+    if (!doc || doc.user_id !== identity.subject) throw new Error("Not found");
     await ctx.db.delete(doc._id);
   },
 });

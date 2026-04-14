@@ -1,7 +1,7 @@
 import Bull from 'bull';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
-import type { TryOnJob } from '../../types';
+import type { TryOnJob, TryOnResult, BullJobStatus } from '../../types';
 
 let tryOnQueue: Bull.Queue<TryOnJob> | null = null;
 
@@ -56,15 +56,19 @@ export async function enqueueTryOnJob(jobData: TryOnJob): Promise<string> {
   return String(job.id);
 }
 
+/** Shape returned by both job-status helpers. */
+export interface JobStatusResult {
+  status: BullJobStatus;
+  progress: number;
+  /** Pipeline result, present when the job completed successfully. */
+  result?: TryOnResult;
+  error?: string;
+}
+
 /**
  * Gets job status by ID.
  */
-export async function getJobStatus(jobId: string): Promise<{
-  status: string;
-  progress: number;
-  result?: unknown;
-  error?: string;
-}> {
+export async function getJobStatus(jobId: string): Promise<JobStatusResult> {
   const queue = getTryOnQueue();
   if (!queue) return { status: 'unknown', progress: 0 };
 
@@ -72,13 +76,15 @@ export async function getJobStatus(jobId: string): Promise<{
   if (!job) return { status: 'not_found', progress: 0 };
 
   const state = await job.getState();
-  const progress = job.progress() as number;
+  // Bull's progress() can be a number or an object; normalise to number.
+  const rawProgress = job.progress();
+  const progress = typeof rawProgress === 'number' ? rawProgress : 0;
 
   return {
-    status: state,
-    progress: typeof progress === 'number' ? progress : 0,
-    result: job.returnvalue,
-    error: job.failedReason,
+    status: state as BullJobStatus,
+    progress,
+    result: job.returnvalue as TryOnResult | undefined,
+    error: job.failedReason ?? undefined,
   };
 }
 
@@ -89,29 +95,25 @@ export async function getJobStatus(jobId: string): Promise<{
 export async function getJobStatusForUser(
   jobId: string,
   userId: string
-): Promise<{
-  status: string;
-  progress: number;
-  result?: unknown;
-  error?: string;
-} | null> {
+): Promise<JobStatusResult | null> {
   const queue = getTryOnQueue();
   if (!queue) return null;
 
   const job = await queue.getJob(jobId);
   if (!job || !job.data) return null;
 
-  const jobData = job.data as TryOnJob;
-  const jobUserId = jobData.userId ?? null;
+  // Queue is typed as Bull.Queue<TryOnJob> — no cast needed.
+  const jobUserId = job.data.userId ?? null;
   if (jobUserId !== userId) return null;
 
   const state = await job.getState();
-  const progress = job.progress() as number;
+  const rawProgress = job.progress();
+  const progress = typeof rawProgress === 'number' ? rawProgress : 0;
 
   return {
-    status: state,
-    progress: typeof progress === 'number' ? progress : 0,
-    result: job.returnvalue,
-    error: job.failedReason,
+    status: state as BullJobStatus,
+    progress,
+    result: job.returnvalue as TryOnResult | undefined,
+    error: job.failedReason ?? undefined,
   };
 }

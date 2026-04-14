@@ -14,7 +14,7 @@ const router = Router();
 const INDIVIDUAL_EARLY_ACCESS_FILLERS = {
   brand_name_suffix: '(personal interest)',
   role: 'Individual waitlist',
-  website_url: 'https://tryverse.ai',
+  website_url: 'https://tryverseai.com',
   platform: 'Personal',
   product_range: 'n/a',
   monthly_revenue: 'n/a',

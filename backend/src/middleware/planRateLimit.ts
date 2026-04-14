@@ -16,6 +16,36 @@ const PLAN_LIMITS: Record<string, { windowSec: number; max: number }> = {
   enterprise: { windowSec: 60, max: 100 },
 };
 
+// ---------------------------------------------------------------------------
+// In-memory fallback used when Redis is unavailable.
+// Applies the most conservative limit (free tier) to every identifier so that
+// an outage cannot be used to bypass rate limiting.
+// ---------------------------------------------------------------------------
+const FALLBACK_CONFIG = PLAN_LIMITS.free; // 1 req / 10 s
+interface FallbackEntry { count: number; windowStart: number }
+const fallbackCounters = new Map<string, FallbackEntry>();
+
+function checkFallbackLimit(identifier: string): boolean {
+  const now = Date.now();
+  const windowMs = FALLBACK_CONFIG.windowSec * 1000;
+  const entry = fallbackCounters.get(identifier);
+  if (!entry || now - entry.windowStart > windowMs) {
+    fallbackCounters.set(identifier, { count: 1, windowStart: now });
+    return true; // allowed
+  }
+  if (entry.count >= FALLBACK_CONFIG.max) return false; // blocked
+  entry.count += 1;
+  return true; // allowed
+}
+
+// Periodically prune stale fallback entries so the Map does not grow unbounded.
+setInterval(() => {
+  const cutoff = Date.now() - FALLBACK_CONFIG.windowSec * 1000 * 2;
+  for (const [k, v] of fallbackCounters) {
+    if (v.windowStart < cutoff) fallbackCounters.delete(k);
+  }
+}, 60_000);
+
 export async function planAwareTryonRateLimit(
   req: Request,
   res: Response,
@@ -29,6 +59,15 @@ export async function planAwareTryonRateLimit(
   try {
     const redis = getRedisClient();
     if (redis.status !== 'ready') {
+      // Redis not available — apply conservative in-memory limit instead of failing open
+      logger.warn('Redis unavailable for rate-limit check; using in-memory fallback', { identifier });
+      if (!checkFallbackLimit(identifier)) {
+        res.status(429).json({
+          error: 'Too many try-on requests. Please slow down.',
+          retryAfter: FALLBACK_CONFIG.windowSec,
+        });
+        return;
+      }
       next();
       return;
     }
@@ -39,6 +78,10 @@ export async function planAwareTryonRateLimit(
     const results = await multi.exec();
 
     if (!results) {
+      if (!checkFallbackLimit(identifier)) {
+        res.status(429).json({ error: 'Too many try-on requests. Please slow down.', retryAfter: config.windowSec });
+        return;
+      }
       next();
       return;
     }
@@ -67,7 +110,12 @@ export async function planAwareTryonRateLimit(
 
     next();
   } catch (err) {
-    logger.warn('Rate limit check failed, allowing request', { error: String(err) });
+    // Redis error — apply conservative in-memory limit rather than allowing unlimited traffic
+    logger.warn('Rate limit check error; using in-memory fallback', { error: String(err) });
+    if (!checkFallbackLimit(identifier)) {
+      res.status(429).json({ error: 'Too many try-on requests. Please slow down.', retryAfter: config.windowSec });
+      return;
+    }
     next();
   }
 }

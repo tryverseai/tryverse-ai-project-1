@@ -13,7 +13,15 @@ export const getUserRowById = query({
   args: { secret: v.string(), userId: v.string() },
   handler: async (ctx, { secret, userId }) => {
     requireBackendSecret(secret);
-    return await ctx.db.get(userId as Id<"users">);
+    // The auth subject may be a compound string "authAccountId|userDocId".
+    // Extract the actual users-table document ID (segment after the last '|').
+    const docId = userId.includes("|") ? userId.split("|").pop()! : userId;
+    try {
+      return await ctx.db.get(docId as Id<"users">);
+    } catch {
+      // ID is still not a valid Convex document ID — return null gracefully.
+      return null;
+    }
   },
 });
 
@@ -236,12 +244,16 @@ export const listTryonsForUser = query({
   },
   handler: async (ctx, { secret, userId, limit, offset, category }) => {
     requireBackendSecret(secret);
+    // Use the by_user_created composite index so Convex scans only this user's
+    // rows (already ordered by created_at desc) — eliminates the full table scan
+    // and removes the in-memory sort that was here before.
     let rows = await ctx.db
       .query("tryons")
-      .withIndex("by_userId", (q) => q.eq("user_id", userId))
+      .withIndex("by_user_created", (q) => q.eq("user_id", userId))
+      .order("desc")
       .collect();
     if (category) rows = rows.filter((r) => r.category === category);
-    rows.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+    // No manual sort needed — index already delivers desc order
     const total = rows.length;
     const slice = rows.slice(offset, offset + limit);
     return {
@@ -254,6 +266,43 @@ export const listTryonsForUser = query({
         completed_at: t.completed_at ?? null,
       })),
       total,
+    };
+  },
+});
+
+/**
+ * Cursor-based try-on history — reads exactly `numItems` rows per call.
+ * Uses Convex native `.paginate()` on the by_user_created index so no rows
+ * outside the requested page are ever loaded from storage.
+ *
+ * `cursor` must be the opaque `continueCursor` string returned by the previous
+ * call; pass `null` to start from the most recent try-on.
+ */
+export const listTryonsForUserCursor = query({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    numItems: v.number(),
+    cursor: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, { secret, userId, numItems, cursor }) => {
+    requireBackendSecret(secret);
+    const result = await ctx.db
+      .query("tryons")
+      .withIndex("by_user_created", (q) => q.eq("user_id", userId))
+      .order("desc")
+      .paginate({ numItems, cursor: cursor ?? null });
+    return {
+      tryons: result.page.map((t) => ({
+        id: t.legacy_id ?? String(t._id),
+        status: t.status,
+        category: t.category,
+        result_image: t.result_image ?? null,
+        created_at: t.created_at ?? null,
+        completed_at: t.completed_at ?? null,
+      })),
+      nextCursor: result.isDone ? null : result.continueCursor,
+      isDone: result.isDone,
     };
   },
 });
@@ -560,6 +609,56 @@ export const getModelForResolvePath = query({
       is_active: row.is_active,
       free_tier_eligible: row.free_tier_eligible,
     };
+  },
+});
+
+/**
+ * Atomically checks and reserves one try-on credit for `userId`.
+ * Convex mutations are serialized at the document level, so two concurrent
+ * requests cannot both succeed when only one credit remains — eliminating the
+ * read-then-check race in the Node credit service.
+ *
+ * Returns { ok: true, creditType } on success (credit has been decremented).
+ * Returns { ok: false, reason } when no credits remain (no write is made).
+ */
+export const reserveCredit = mutation({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db
+      .query("profiles")
+      .withIndex("by_userId", (q) => q.eq("id", userId))
+      .unique();
+    if (!row) return { ok: false as const, reason: "Profile not found" };
+
+    // Enterprise / unlimited plan — no decrement needed
+    if (Number(row.monthly_credits_total) === -1) {
+      return { ok: true as const, creditType: "monthly" as const };
+    }
+
+    const planId = typeof row.plan_id === "string" ? row.plan_id : "free";
+    const monthlyRem = Number(row.monthly_credits_remaining ?? 0);
+
+    // Paid plan with monthly credits remaining
+    if (planId !== "free" && monthlyRem > 0) {
+      await ctx.db.patch(row._id, {
+        monthly_credits_remaining: monthlyRem - 1,
+        updated_at: new Date().toISOString(),
+      } as never);
+      return { ok: true as const, creditType: "monthly" as const };
+    }
+
+    // Free tier credits
+    const freeRem = Number(row.free_credits_remaining ?? 0);
+    if (freeRem > 0) {
+      await ctx.db.patch(row._id, {
+        free_credits_remaining: freeRem - 1,
+        updated_at: new Date().toISOString(),
+      } as never);
+      return { ok: true as const, creditType: "free" as const };
+    }
+
+    return { ok: false as const, reason: "No credits remaining" };
   },
 });
 

@@ -5,7 +5,7 @@
  *
  * The iframe loads your TryVerse app’s /widget-preview route (same UI as the hosted app).
  * Configure where that app is hosted:
- *   - Set window.TRYVERSE_APP_ORIGIN = 'https://tryverse.ai' before this script, or
+ *   - Set window.TRYVERSE_APP_ORIGIN = 'https://tryverseai.com' before this script, or
  *   - Pass appOrigin in open({ ... }) / embed({ ... }), or
  *   - Host this script from the same origin as the app (uses script URL origin).
  * Default for local dev: http://localhost:8080

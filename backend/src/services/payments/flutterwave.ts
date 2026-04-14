@@ -51,7 +51,7 @@ export async function initializeFlutterwavePayment(params: {
       customizations: {
         title: 'TryVerse',
         description: `Subscribe to ${params.planId} plan`,
-        logo: 'https://tryverse.ai/logo.png',
+        logo: 'https://tryverseai.com/logo.png',
       },
     },
     {

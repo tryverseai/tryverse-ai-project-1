@@ -1,19 +1,23 @@
-import { useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, BarChart3, Settings, Key, Code, LayoutDashboard, CreditCard, BookOpen,
 } from "lucide-react";
-import { TryOnGuideTab } from "@/components/dashboard/TryOnGuideTab";
-import { OverviewTab } from "@/components/dashboard/OverviewTab";
-import { ApiKeysTab } from "@/components/dashboard/ApiKeysTab";
-import { WidgetTab } from "@/components/dashboard/WidgetTab";
-import { AnalyticsTab } from "@/components/dashboard/AnalyticsTab";
-import { ProductsTab } from "@/components/dashboard/ProductsTab";
-import { SettingsTab } from "@/components/dashboard/SettingsTab";
-import { BillingTab } from "@/components/dashboard/BillingTab";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+// Eagerly load the default tab — zero extra latency on first visit
+import { TryOnGuideTab } from "@/components/dashboard/TryOnGuideTab";
+
+// Lazy-load all other tabs: each is a separate chunk fetched only when opened
+const OverviewTab  = lazy(() => import("@/components/dashboard/OverviewTab").then((m) => ({ default: m.OverviewTab })));
+const AnalyticsTab = lazy(() => import("@/components/dashboard/AnalyticsTab").then((m) => ({ default: m.AnalyticsTab })));
+const ProductsTab  = lazy(() => import("@/components/dashboard/ProductsTab").then((m) => ({ default: m.ProductsTab })));
+const ApiKeysTab   = lazy(() => import("@/components/dashboard/ApiKeysTab").then((m) => ({ default: m.ApiKeysTab })));
+const WidgetTab    = lazy(() => import("@/components/dashboard/WidgetTab").then((m) => ({ default: m.WidgetTab })));
+const BillingTab   = lazy(() => import("@/components/dashboard/BillingTab").then((m) => ({ default: m.BillingTab })));
+const SettingsTab  = lazy(() => import("@/components/dashboard/SettingsTab").then((m) => ({ default: m.SettingsTab })));
 
 const DEFAULT_TAB = "Try-On guide";
 
@@ -28,7 +32,7 @@ const sidebarItems = [
   { icon: Settings, label: "Settings" },
 ];
 
-const tabComponents: Record<string, React.FC> = {
+const tabComponents: Record<string, React.ComponentType> = {
   [DEFAULT_TAB]: TryOnGuideTab,
   Overview: OverviewTab,
   Analytics: AnalyticsTab,
@@ -39,21 +43,30 @@ const tabComponents: Record<string, React.FC> = {
   Settings: SettingsTab,
 };
 
+/** Minimal spinner shown while a tab chunk is loading */
+const TabLoader = () => (
+  <div className="flex items-center justify-center py-24">
+    <div className="h-7 w-7 rounded-full border-2 border-muted border-t-foreground animate-spin" />
+  </div>
+);
+
 const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(DEFAULT_TAB);
   const { user } = useAuth();
   const brandName = user?.user_metadata?.brand_name || "Your Brand";
 
+  // Depend on the primitive string `tabParam` rather than the full URLSearchParams
+  // object (which is recreated every render), to avoid spurious effect re-runs.
   useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (tab && tabComponents[tab]) {
-      setActiveTab(tab);
+    if (tabParam && tabComponents[tabParam]) {
+      setActiveTab(tabParam);
       return;
     }
     setActiveTab(DEFAULT_TAB);
     setSearchParams({ tab: DEFAULT_TAB }, { replace: true });
-  }, [searchParams, setSearchParams]);
+  }, [tabParam, setSearchParams]);
 
   const selectTab = (label: string) => {
     setActiveTab(label);
@@ -64,7 +77,9 @@ const Dashboard = () => {
     const ActiveComponent = tabComponents[activeTab] || TryOnGuideTab;
     return (
       <ErrorBoundary>
-        <ActiveComponent />
+        <Suspense fallback={<TabLoader />}>
+          <ActiveComponent />
+        </Suspense>
       </ErrorBoundary>
     );
   };

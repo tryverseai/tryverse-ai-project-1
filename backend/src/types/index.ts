@@ -7,6 +7,41 @@ export type ProductCategory =
   | 'bags'       // Handbags, backpacks, clutches, totes — FASHN
   | 'glasses';   // Sunglasses, prescription eyewear, goggles — FASHN
 
+/** Lifecycle states a try-on record can be in (mirrors Convex schema). */
+export type TryOnStatus = 'queued' | 'processing' | 'completed' | 'failed';
+
+/** Possible states for an API key. */
+export type ApiKeyStatus = 'active' | 'revoked';
+
+/** Storage sub-folder for uploaded images. */
+export type StorageFolder = 'person' | 'garment';
+
+/**
+ * Bull/BullMQ job state strings returned by `job.getState()`, plus two
+ * synthetic values produced by `getJobStatus` when the queue is unavailable
+ * (`'unknown'`) or the job ID was not found (`'not_found'`).
+ */
+export type BullJobStatus =
+  | 'waiting'
+  | 'active'
+  | 'completed'
+  | 'failed'
+  | 'delayed'
+  | 'paused'
+  | 'unknown'
+  | 'not_found';
+
+/**
+ * Known usage-event types recorded via `cxInsertUsageEvent`.
+ * The trailing `(string & {})` member lets callers pass arbitrary strings
+ * while TypeScript still autocompletes the well-known values.
+ */
+export type UsageEventType =
+  | 'tryon_completed'
+  | 'tryon_failed'
+  | 'subscription_activated'
+  | (string & {});
+
 export interface TryOnJob {
   jobId: string;
   userId: string | null;
@@ -21,9 +56,12 @@ export interface TryOnJob {
 
 export interface TryOnResult {
   jobId: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed';
+  status: TryOnStatus;
   resultUrl?: string;
+  /** User-facing error message — sanitized, no vendor internals. */
   error?: string;
+  /** Machine-readable error code (e.g. NO_PERSON_DETECTED, TIMEOUT). */
+  errorCode?: string;
   processingTimeMs?: number;
 }
 
@@ -31,7 +69,7 @@ export interface ApiKeyPayload {
   id: string;
   userId: string;
   keyValue: string;
-  status: string;
+  status: ApiKeyStatus;
   name: string;
 }
 

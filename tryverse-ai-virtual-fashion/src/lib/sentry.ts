@@ -30,7 +30,8 @@ export function initSentry(): boolean {
 }
 
 export function setSentryUser(user: { id: string; email?: string } | null): void {
-  if (!dsn) return;
+  // Use the same trim-check as initSentry to handle whitespace-only DSN values.
+  if (typeof dsn !== "string" || !dsn.trim()) return;
   if (user) {
     Sentry.setUser({ id: user.id, email: user.email ?? undefined });
   } else {
@@ -42,15 +43,9 @@ export function captureSentryException(
   error: Error,
   context?: { tags?: Record<string, string>; extra?: Record<string, unknown> }
 ): void {
-  if (!dsn) return;
+  if (typeof dsn !== "string" || !dsn.trim()) return;
   Sentry.captureException(error, {
     tags: context?.tags,
     extra: context?.extra,
   });
 }
-
-export function isSentryEnabled(): boolean {
-  return !!dsn;
-}
-
-export { Sentry };

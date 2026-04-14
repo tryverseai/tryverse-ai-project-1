@@ -3,7 +3,7 @@
  * Simple, responsive, and brand-aligned.
  */
 
-const DEFAULT_APP_URL = 'https://app.tryverse.ai';
+const DEFAULT_APP_URL = 'https://tryverseai.com';
 
 const STYLES = `
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

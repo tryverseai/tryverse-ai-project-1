@@ -1,29 +1,30 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { body, param } from 'express-validator';
-import { v4 as uuidv4 } from 'uuid';
 import { requireAuth, optionalAuth, requireAuthenticatedActor } from '../middleware/auth';
 import { optionalApiKey } from '../middleware/apiKey';
 import { tryonRateLimit } from '../middleware/rateLimiter';
 import { planAwareTryonRateLimit } from '../middleware/planRateLimit';
 import { handleValidationErrors } from '../middleware/validate';
 import { checkCredits, SHOPPER_TRYON_UNAVAILABLE_MESSAGE } from '../services/credits';
-import { enqueueTryOnJob, getJobStatusForUser, getTryOnQueue } from '../services/queue/producer';
-import { executeTryOnPipeline } from '../services/ai/pipeline';
+import { getJobStatusForUser } from '../services/queue/producer';
 import { getSupportedCategories } from '../services/ai/replicate';
 import { getSignedUrl, RESULT_BUCKET } from '../services/storage/images';
 import {
-  cxInsertTryon,
   cxGetTryonForUser,
   cxDeleteTryonForUser,
   cxListTryons,
+  cxListTryonsCursor,
 } from '../services/tryonConvexBridge';
+import {
+  createAndDispatchTryOn,
+  TryOnDbError,
+} from '../services/tryOnOrchestrator';
 import { logger } from '../config/logger';
 import { UPLOAD_RELATIVE_IMAGE_PATH_RE } from '../lib/storagePathRegex';
-import type { TryOnJob, ProductCategory } from '../types';
+import { VALID_TRY_ON_CATEGORIES, SIGNED_URL_TTL_SECONDS } from '../lib/constants';
+import type { ProductCategory } from '../types';
 
 const router = Router();
-
-const VALID_CATEGORIES: ProductCategory[] = ['clothing', 'bags', 'glasses'];
 
 /**
  * GET /api/tryon/categories
@@ -65,9 +66,9 @@ router.post(
       .matches(UPLOAD_RELATIVE_IMAGE_PATH_RE)
       .withMessage('productImagePath must be a valid storage path from upload'),
     body('category')
-      .isIn(VALID_CATEGORIES)
+      .isIn(VALID_TRY_ON_CATEGORIES)
       .withMessage(
-        `category must be one of: ${VALID_CATEGORIES.join(', ')}`
+        `category must be one of: ${VALID_TRY_ON_CATEGORIES.join(', ')}`
       ),
     body('productDescription')
       .optional({ nullable: true })
@@ -115,75 +116,49 @@ router.post(
         return;
       }
 
-      const tryonLegacyId = uuidv4();
+      let dispatch;
       try {
-        await cxInsertTryon({
-          legacyId: tryonLegacyId,
+        dispatch = await createAndDispatchTryOn({
           userId,
-          personImage: personImagePath,
-          productImage: productImagePath,
-          category,
-          status: 'queued',
+          apiKeyId: req.apiKey?.id || null,
+          personImagePath,
+          productImagePath,
+          category: category as ProductCategory,
+          productDescription: productDescription || undefined,
+          asyncMode,
+          widgetMode: !!req.apiKey,
         });
-      } catch (dbError) {
-        logger.error('Failed to create tryon record', { error: String(dbError) });
-        res.status(500).json({ error: 'Failed to initiate try-on' });
-        return;
+      } catch (err) {
+        if (err instanceof TryOnDbError) {
+          res.status(500).json({ error: 'Failed to initiate try-on' });
+          return;
+        }
+        throw err;
       }
 
-      const jobId = uuidv4();
-      const jobData: TryOnJob = {
-        jobId,
-        userId,
-        apiKeyId: req.apiKey?.id || null,
-        personImageUrl: personImagePath,
-        productImageUrl: productImagePath,
-        category: category as ProductCategory,
-        productDescription: productDescription || undefined,
-        tryonDbId: tryonLegacyId,
-        widgetMode: !!req.apiKey,
-      };
-
-      const queue = getTryOnQueue();
-
-      if (asyncMode && queue) {
-        await enqueueTryOnJob(jobData);
-
-        logger.info('Try-on job queued', {
-          jobId,
-          tryonId: tryonLegacyId,
-          userId,
-          category,
-        });
-
+      if (dispatch.dispatched === 'queued') {
         res.status(202).json({
           success: true,
-          tryonId: tryonLegacyId,
-          jobId,
+          tryonId: dispatch.tryonLegacyId,
+          jobId: dispatch.jobId,
           status: 'queued',
           category,
           message: 'Try-on job queued. Poll /api/tryon/:tryonId for status.',
-          estimatedWaitSeconds: 30,
+          estimatedWaitSeconds: dispatch.estimatedWaitSeconds,
         });
       } else {
-        // Sync processing (no queue or explicitly requested)
-        logger.info('Processing try-on synchronously', {
-          jobId,
-          tryonId: tryonLegacyId,
-          category,
-        });
-
-        const result = await executeTryOnPipeline(jobData);
-
+        const { result } = dispatch;
         res.status(200).json({
           success: result.status === 'completed',
-          tryonId: tryonLegacyId,
-          jobId,
+          tryonId: dispatch.tryonLegacyId,
+          jobId: dispatch.jobId,
           status: result.status,
           category,
           resultUrl: result.resultUrl,
           processingTimeMs: result.processingTimeMs,
+          // Sanitized public message + stable code — no vendor internals
           error: result.error,
+          errorCode: result.errorCode,
         });
       }
     } catch (err) {
@@ -220,14 +195,20 @@ router.get(
 
       let resultUrl: string | null = null;
       if (tryon.status === 'completed' && tryon.result_image) {
-        resultUrl = await getSignedUrl(RESULT_BUCKET, tryon.result_image, 3600);
+        resultUrl = await getSignedUrl(RESULT_BUCKET, tryon.result_image, SIGNED_URL_TTL_SECONDS);
       }
 
+      // NOTE: This single-record response uses camelCase timestamps (createdAt, completedAt)
+      // while the list endpoint (GET /) uses snake_case (created_at, completed_at) to match
+      // the raw Convex row shape.  This is a known divergence preserved for backward compat.
       res.json({
         tryonId: tryon.id,
         status: tryon.status,
         category: tryon.category,
         resultUrl,
+        // H-3: Surface failure reason so the frontend can show a meaningful error message.
+        // error_message comes from cxPatchTryon when the pipeline finishes; falls back if absent.
+        error: tryon.status === 'failed' ? (tryon.error_message ?? 'Processing failed') : undefined,
         createdAt: tryon.created_at,
         completedAt: tryon.completed_at,
       });
@@ -287,7 +268,15 @@ router.get(
 
 /**
  * GET /api/tryon
- * Lists a user's try-on history, optionally filtered by category.
+ * Lists a user's try-on history.
+ *
+ * Cursor mode (preferred — O(numItems) read):
+ *   ?limit=20&cursor=<opaque>   — returns { tryons, nextCursor, isDone }
+ *
+ * Page mode (backward-compat — O(n_user) read):
+ *   ?page=1&limit=20            — returns { tryons, pagination }
+ *
+ * Pass `cursor=null` or omit `cursor` to start from the most recent try-on.
  */
 router.get(
   '/',
@@ -295,6 +284,39 @@ router.get(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const limit = Math.min(parseInt(String(req.query.limit || '20'), 10), 100);
+      const cursorParam = req.query.cursor; // present (even if empty string) = cursor mode
+
+      if (cursorParam !== undefined) {
+        // ── Cursor mode: bounded O(numItems) read ────────────────────────────
+        const cursor = typeof cursorParam === 'string' && cursorParam.length > 0
+          ? cursorParam
+          : null;
+
+        const { tryons, nextCursor, isDone } = await cxListTryonsCursor(
+          req.user!.id,
+          limit,
+          cursor
+        );
+
+        const results = await Promise.all(
+          tryons.map(async (t) => ({
+            id: t.id,
+            status: t.status,
+            category: t.category,
+            created_at: t.created_at,
+            completed_at: t.completed_at,
+            resultUrl:
+              t.status === 'completed' && t.result_image
+                ? await getSignedUrl(RESULT_BUCKET, t.result_image, SIGNED_URL_TTL_SECONDS).catch(() => null)
+                : null,
+          }))
+        );
+
+        res.json({ tryons: results, nextCursor, isDone });
+        return;
+      }
+
+      // ── Page mode: backward-compat (now uses the composite index) ─────────
       const page = Math.max(parseInt(String(req.query.page || '1'), 10), 1);
       const offset = (page - 1) * limit;
       const categoryFilter = req.query.category as ProductCategory | undefined;
@@ -303,7 +325,7 @@ router.get(
         req.user!.id,
         limit,
         offset,
-        categoryFilter && VALID_CATEGORIES.includes(categoryFilter) ? categoryFilter : undefined
+        categoryFilter && VALID_TRY_ON_CATEGORIES.includes(categoryFilter) ? categoryFilter : undefined
       );
 
       const results = await Promise.all(
@@ -314,8 +336,8 @@ router.get(
           created_at: t.created_at,
           completed_at: t.completed_at,
           resultUrl:
-            t.status === 'completed' && t.result_image
-              ? await getSignedUrl(RESULT_BUCKET, t.result_image, 3600).catch(() => null)
+              t.status === 'completed' && t.result_image
+              ? await getSignedUrl(RESULT_BUCKET, t.result_image, SIGNED_URL_TTL_SECONDS).catch(() => null)
               : null,
         }))
       );

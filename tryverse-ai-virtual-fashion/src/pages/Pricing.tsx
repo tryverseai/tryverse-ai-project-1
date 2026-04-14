@@ -223,8 +223,10 @@ const Pricing = () => {
             return;
           }
           if (convexPlans.length === 0) {
+            // M-4: Trigger seed but stay in loading state — the Convex subscription
+            // will update `convexPlans` once seeding completes, re-running this effect.
             await seedPlansIfEmpty({});
-            if (!cancelled) setPlansLoading(false);
+            // Keep plansLoading = true; wait for convexPlans to become non-empty.
             return;
           }
           if (!cancelled) {
@@ -262,7 +264,7 @@ const Pricing = () => {
 
   const handleSubscribe = async (plan: PlanRow) => {
     if (plan.id === "enterprise") {
-      window.open("mailto:sales@tryverse.ai?subject=TryVerse%20Enterprise%20%2F%20custom%20plan", "_blank");
+      window.open("mailto:sales@tryverseai.com?subject=TryVerse%20Enterprise%20%2F%20custom%20plan", "_blank");
       return;
     }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from "react";
+import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -49,6 +49,16 @@ const CATEGORIES: { id: TryOnCategory; label: string }[] = [
   { id: "glasses", label: "Eyewear" },
 ];
 
+/** Type guard — narrows an unknown string to TryOnCategory. */
+function isTryOnCategory(value: unknown): value is TryOnCategory {
+  return value === "clothing" || value === "bags" || value === "glasses";
+}
+
+/** Coerce a Convex-returned string to TryOnCategory, falling back to 'clothing'. */
+function toTryOnCategory(value: unknown): TryOnCategory {
+  return isTryOnCategory(value) ? value : "clothing";
+}
+
 /** Renders validated image URLs via CSS background (avoids raw user/state → img src for SAST). */
 function productImageBgStyle(raw: string | null | undefined): CSSProperties | undefined {
   const s = safeImageSrcForDom(raw);
@@ -86,7 +96,7 @@ export function ProductsTab() {
   const [form, setForm] = useState({
     name: "",
     image_url: "",
-    category: "clothing" as TryOnCategory,
+    category: "clothing" satisfies TryOnCategory,
     product_url: "",
   });
   const [uploading, setUploading] = useState(false);
@@ -138,7 +148,7 @@ export function ProductsTab() {
         const enriched: Product[] = await Promise.all(
           raw.map(async (p) => ({
             ...p,
-            category: p.category as TryOnCategory,
+            category: toTryOnCategory(p.category),
             image_display_url: await resolveProductImageDisplayUrl(p.image_url),
           }))
         );
@@ -231,7 +241,7 @@ export function ProductsTab() {
           toast.success("Product updated");
           setProducts((prev) =>
             prev.map((x) =>
-              x.id === editingProduct.id ? { ...updated, image_display_url, category: updated.category as TryOnCategory } : x
+              x.id === editingProduct.id ? { ...updated, image_display_url, category: toTryOnCategory(updated.category) } : x
             )
           );
         } else {
@@ -244,7 +254,7 @@ export function ProductsTab() {
           const image_display_url = await resolveProductImageDisplayUrl(created.image_url);
           toast.success("Product created");
           setProducts((prev) => [
-            { ...created, category: created.category as TryOnCategory, image_display_url },
+            { ...created, category: toTryOnCategory(created.category), image_display_url },
             ...prev,
           ]);
         }
@@ -290,8 +300,9 @@ export function ProductsTab() {
     }
   };
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(nameQuery.toLowerCase())
+  const filtered = useMemo(
+    () => products.filter((p) => p.name.toLowerCase().includes(nameQuery.toLowerCase())),
+    [products, nameQuery]
   );
 
   const displayImage = (p: Product) => p.image_display_url || p.image_url;
@@ -329,7 +340,7 @@ export function ProductsTab() {
         </div>
         <Select
           value={categoryFilter || "all"}
-          onValueChange={(v) => setCategoryFilter(v === "all" ? "" : (v as TryOnCategory))}
+          onValueChange={(v) => setCategoryFilter(isTryOnCategory(v) ? v : "")}
         >
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="All categories" />
@@ -570,7 +581,7 @@ export function ProductsTab() {
               <Select
                 value={form.category}
                 onValueChange={(v) =>
-                  setForm((f) => ({ ...f, category: v as TryOnCategory }))
+                  setForm((f) => ({ ...f, category: isTryOnCategory(v) ? v : f.category }))
                 }
               >
                 <SelectTrigger>

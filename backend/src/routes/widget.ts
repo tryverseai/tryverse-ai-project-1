@@ -1,6 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { body } from 'express-validator';
-import { v4 as uuidv4 } from 'uuid';
 import { requireAuth } from '../middleware/auth';
 import { requireApiKey, validateDomain } from '../middleware/apiKey';
 import { listActiveModels } from '../services/models/modelLibrary';
@@ -9,18 +8,13 @@ import { handleValidationErrors } from '../middleware/validate';
 import { checkCredits, SHOPPER_TRYON_UNAVAILABLE_MESSAGE } from '../services/credits';
 import { env } from '../config/env';
 import { anyApi, convexMutationTrusted, convexQueryTrusted } from '../config/convexHttp';
-import {
-  cxInsertTryon,
-  cxGetTryonForUser,
-} from '../services/tryonConvexBridge';
-import { enqueueTryOnJob, getTryOnQueue } from '../services/queue/producer';
-import { executeTryOnPipeline } from '../services/ai/pipeline';
+import { cxGetTryonForUser } from '../services/tryonConvexBridge';
+import { createAndDispatchTryOn, TryOnDbError } from '../services/tryOnOrchestrator';
 import { getSignedUrl, RESULT_BUCKET } from '../services/storage/images';
 import { logger } from '../config/logger';
 import { UPLOAD_RELATIVE_IMAGE_PATH_RE } from '../lib/storagePathRegex';
-import type { TryOnJob, ProductCategory } from '../types';
-
-const VALID_CATEGORIES: ProductCategory[] = ['clothing', 'bags', 'glasses'];
+import { VALID_TRY_ON_CATEGORIES, SIGNED_URL_TTL_SECONDS } from '../lib/constants';
+import type { ProductCategory } from '../types';
 
 const router = Router();
 
@@ -31,9 +25,10 @@ const router = Router();
  * Requires API key authentication + domain validation.
  *
  * Body:
- *   - personImagePath: string
- *   - garmentImagePath: string
- *   - category: 'clothing' | 'jewelry' | 'glasses'
+ *   - personImagePath: string       (path returned by POST /api/upload)
+ *   - productImagePath: string      (path returned by POST /api/upload)
+ *   - category: ProductCategory     (clothing | bags | glasses)
+ *   - productDescription?: string
  */
 router.post(
   '/request',
@@ -54,8 +49,8 @@ router.post(
       .matches(UPLOAD_RELATIVE_IMAGE_PATH_RE)
       .withMessage('productImagePath must be a valid storage path from upload'),
     body('category')
-      .isIn(VALID_CATEGORIES)
-      .withMessage(`category must be one of: ${VALID_CATEGORIES.join(', ')}`),
+      .isIn(VALID_TRY_ON_CATEGORIES)
+      .withMessage(`category must be one of: ${VALID_TRY_ON_CATEGORIES.join(', ')}`),
     body('productDescription').optional({ nullable: true }).isString().isLength({ max: 400 }),
   ],
   handleValidationErrors,
@@ -80,6 +75,11 @@ router.post(
       // Credit check
       const creditCheck = await checkCredits(userId);
       if (!creditCheck.allowed) {
+        logger.info('Widget: credits exhausted', {
+          userId,
+          reason: creditCheck.reason,
+          creditsRemaining: creditCheck.creditsRemaining,
+        });
         res.status(402).json({
           error: SHOPPER_TRYON_UNAVAILABLE_MESSAGE,
           code: 'CREDITS_EXHAUSTED',
@@ -87,53 +87,41 @@ router.post(
         return;
       }
 
-      const tryonLegacyId = uuidv4();
+      let dispatch;
       try {
-        await cxInsertTryon({
-          legacyId: tryonLegacyId,
+        dispatch = await createAndDispatchTryOn({
           userId,
-          personImage: personImagePath,
-          productImage: productImagePath,
-          category,
-          status: 'queued',
+          apiKeyId: req.apiKey!.id,
+          personImagePath,
+          productImagePath,
+          category: category as ProductCategory,
+          productDescription: productDescription || undefined,
+          asyncMode: true,
+          widgetMode: true,
         });
-      } catch (dbError) {
-        logger.error('Widget: Failed to create tryon record', { error: String(dbError) });
-        res.status(500).json({ error: 'Failed to initiate try-on' });
-        return;
+      } catch (err) {
+        if (err instanceof TryOnDbError) {
+          res.status(500).json({ error: 'Failed to initiate try-on' });
+          return;
+        }
+        throw err;
       }
 
-      const jobId = uuidv4();
-      const jobData: TryOnJob = {
-        jobId,
-        userId,
-        apiKeyId: req.apiKey!.id,
-        personImageUrl: personImagePath,
-        productImageUrl: productImagePath,
-        category: category as ProductCategory,
-        productDescription: productDescription || undefined,
-        tryonDbId: tryonLegacyId,
-        widgetMode: true,
-      };
-
-      const queue = getTryOnQueue();
-
-      if (queue) {
-        await enqueueTryOnJob(jobData);
+      if (dispatch.dispatched === 'queued') {
         res.status(202).json({
           success: true,
-          tryonId: tryonLegacyId,
-          jobId,
+          tryonId: dispatch.tryonLegacyId,
+          jobId: dispatch.jobId,
           status: 'queued',
-          pollUrl: `/api/tryon/${tryonLegacyId}`,
-          estimatedWaitSeconds: 30,
+          pollUrl: `/api/tryon/${dispatch.tryonLegacyId}`,
+          estimatedWaitSeconds: dispatch.estimatedWaitSeconds,
         });
       } else {
-        // Sync fallback
-        const result = await executeTryOnPipeline(jobData);
+        // Sync fallback (queue unavailable)
+        const { result } = dispatch;
         res.status(200).json({
           success: result.status === 'completed',
-          tryonId: tryonLegacyId,
+          tryonId: dispatch.tryonLegacyId,
           status: result.status,
           resultUrl: result.resultUrl,
           error: result.error,
@@ -169,7 +157,7 @@ router.get(
 
       let resultUrl: string | null = null;
       if (tryon.status === 'completed' && tryon.result_image) {
-        resultUrl = await getSignedUrl(RESULT_BUCKET, tryon.result_image, 3600);
+        resultUrl = await getSignedUrl(RESULT_BUCKET, tryon.result_image, SIGNED_URL_TTL_SECONDS);
       }
 
       res.json({

@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useConvexAuth } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { inviteSignupEnabled, b2cSignupEnabled } from "@/lib/featureFlags";
-import type { AccountType } from "@/lib/accountType";
+import { normalizeAccountType, type AccountType } from "@/lib/accountType";
 import { complianceDoneSessionKey } from "@/lib/complianceStorage";
-import { readConvexAuthJwt } from "@/lib/convexAuthStorage";
+import { readConvexAuthJwt, clearConvexAuthJwt } from "@/lib/convexAuthStorage";
 
 export type LegacyUserMetadata = {
   account_type?: AccountType;
@@ -47,12 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { signIn: convexSignIn, signOut: convexSignOut } = useAuthActions();
   const sessionUser = useQuery(api.authSession.sessionUser, isAuthenticated ? {} : "skip");
   const userRow = useQuery(api.userBootstrap.myUserRow, isAuthenticated ? {} : "skip");
-  const profile = useQuery(api.profiles.getMyProfile, isAuthenticated ? {} : "skip");
-  const upsertProfile = useMutation(api.profiles.upsertProfileForUser);
   const [tokenTick, setTokenTick] = useState(0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    // Same-tab token refresh tick (cross-tab storage events)
     const onStorage = (e: StorageEvent) => {
       if (e.key?.includes("__convexAuthJWT")) setTokenTick((n) => n + 1);
     };
@@ -60,10 +59,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  // H-7 / H-6: Listen for API-layer auth events dispatched by handleResponse.
+  // On 401 (expired token) or 403 ACCOUNT_SUSPENDED, force sign-out.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const forceSignOut = () => {
+      void convexSignOut();
+      clearConvexAuthJwt();
+    };
+    window.addEventListener("tryverse:auth:expired", forceSignOut);
+    window.addEventListener("tryverse:auth:suspended", forceSignOut);
+    return () => {
+      window.removeEventListener("tryverse:auth:expired", forceSignOut);
+      window.removeEventListener("tryverse:auth:suspended", forceSignOut);
+    };
+  }, [convexSignOut]);
+
   const user = useMemo((): AppUser | null => {
     if (!isAuthenticated || !sessionUser) return null;
-    const rawType = String(userRow?.account_type ?? "business").toLowerCase();
-    const account_type: AccountType = rawType === "individual" ? "individual" : "business";
+    // M-1: Only set account_type when userRow has loaded; leave undefined while loading
+    // so routing gates stay in their loading state rather than defaulting to "business".
+    const account_type: AccountType | undefined =
+      normalizeAccountType(userRow?.account_type) ?? undefined;
     return {
       id: sessionUser.id,
       email: sessionUser.email ?? undefined,
@@ -76,23 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [isAuthenticated, sessionUser, userRow]);
 
-  useEffect(() => {
-    if (!user || profile === undefined) return;
-    if (profile !== null) return;
-    const acct = user.user_metadata.account_type ?? "business";
-    const cap = acct === "individual" ? 5 : 20;
-    void upsertProfile({
-      userId: user.id,
-      patch: {
-        account_type: acct,
-        brand_name: user.user_metadata.brand_name,
-        full_name: user.user_metadata.full_name,
-        role: user.user_metadata.role,
-        free_credits_remaining: cap,
-        free_credits_total: cap,
-      },
-    });
-  }, [user, profile, upsertProfile]);
+  // H-2: Profile bootstrap is intentionally handled only in useSyncedConvexProfile
+  // (used by ComplianceOnboardingGate which wraps every authenticated route).
+  // Duplicating upsertProfile here caused two concurrent mutations on first login.
 
   const loading =
     convexAuthLoading || (isAuthenticated && (sessionUser === undefined || userRow === undefined));
@@ -155,6 +158,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     const uid = user?.id;
     await convexSignOut();
+    // L-3: Explicitly remove the JWT so stale tokens can't survive a silent Convex signOut failure.
+    clearConvexAuthJwt();
     if (uid) sessionStorage.removeItem(complianceDoneSessionKey(uid));
     setTokenTick((n) => n + 1);
   };

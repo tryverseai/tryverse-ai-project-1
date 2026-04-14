@@ -4,23 +4,43 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Content Security Policy
+      • frame-src / object-src 'none'  — blocks clickjacking and Flash/plugin attacks
+      • base-uri 'self'                — prevents <base> tag injection (dangling-markup XSS)
+      • connect-src https: wss:        — limits outbound fetch/XHR to HTTPS only;
+                                         blocks data-URI exfiltration and plain-HTTP leaks
+      • script-src / style-src include 'unsafe-inline' because React + Vite
+        require it at runtime; use a nonce-based CSP when switching to SSR.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: blob: https:;
+      font-src 'self' data:;
+      connect-src 'self' https: wss:;
+      frame-src 'none';
+      object-src 'none';
+      base-uri 'self';
+    " />
     <title>TryVerse AI — Virtual Try-On for Fashion & Jewelry</title>
     <meta name="description" content="AI-powered virtual try-on platform for fashion and jewelry brands. Let shoppers see how clothes, accessories, and jewelry look on them before buying. Boost conversions by 3x." />
     <meta name="author" content="TryVerse AI" />
     <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="/" />
+    <link rel="canonical" href="https://tryverseai.com/" />
 
     <meta property="og:title" content="TryVerse AI — Experience It on You First" />
     <meta property="og:description" content="AI-powered virtual try-on for fashion and jewelry brands. See it on you before you buy. Boost conversions by 3x." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="/" />
-    <meta property="og:image" content="/og-image.jpg" />
+    <meta property="og:url" content="https://tryverseai.com/" />
+    <meta property="og:image" content="https://tryverseai.com/og-image.jpg" />
     <meta property="og:site_name" content="TryVerse AI" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="TryVerse AI — Virtual Try-On for Fashion" />
     <meta name="twitter:description" content="AI-powered virtual try-on. See how clothes and accessories look on you before buying." />
-    <meta name="twitter:image" content="/og-image.jpg" />
+    <meta name="twitter:image" content="https://tryverseai.com/og-image.jpg" />
 
     <script type="application/ld+json">
     {
@@ -29,7 +49,7 @@
       "name": "TryVerse AI",
       "applicationCategory": "BusinessApplication",
       "description": "AI-powered virtual try-on platform for fashion and jewelry brands. Embeddable widget that lets shoppers visualize products on themselves.",
-      "url": "https://tryverse.ai",
+      "url": "https://tryverseai.com",
       "operatingSystem": "Web",
       "offers": [
         {

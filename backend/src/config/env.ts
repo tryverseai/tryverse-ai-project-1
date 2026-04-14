@@ -50,6 +50,10 @@ export const env = {
   // ── Redis ─────────────────────────────────────────────────────────────────
   REDIS_URL: optionalEnv('REDIS_URL', 'redis://localhost:6379'),
 
+  // ── FASHN AI — direct API (https://api.fashn.ai) ─────────────────────────
+  /** Direct FASHN AI API key (fa-…). When set, FASHN try-ons bypass Replicate entirely. */
+  FASHN_API_KEY: optionalEnv('FASHN_API_KEY', ''),
+
   // ── Replicate AI — model IDs per category ─────────────────────────────────
   REPLICATE_API_TOKEN: requireEnv('REPLICATE_API_TOKEN'),
   /**
@@ -208,7 +212,7 @@ export const env = {
   // ── Security ──────────────────────────────────────────────────────────────
   ADMIN_SECRET_KEY: requireEnv('ADMIN_SECRET_KEY'),
   WIDGET_ALLOWED_ORIGINS: optionalEnv('WIDGET_ALLOWED_ORIGINS', '*'),
-  /** Comma-separated hostnames allowed for Host header on prod HTTPS upgrade (e.g. api.tryverse.ai). Empty = derive from FRONTEND_URL only. */
+  /** Comma-separated hostnames allowed for Host header on prod HTTPS upgrade (e.g. api.tryverseai.com). Empty = derive from FRONTEND_URL only. */
   PUBLIC_API_HOSTNAMES: optionalEnv('PUBLIC_API_HOSTNAMES', ''),
   /** Allow ?api_key= in production (default false — use x-api-key header). */
   ALLOW_API_KEY_IN_QUERY: optionalBool('ALLOW_API_KEY_IN_QUERY', false),

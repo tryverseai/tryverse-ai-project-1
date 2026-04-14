@@ -11,6 +11,7 @@ import {
   inferFashnGarmentCategory,
   inferIsLongGarment,
 } from './garmentDescriptor';
+import { isFashnDirectEnabled, runFashnDirect } from './fashn';
 
 import type { ProductCategory } from '../../types';
 
@@ -278,15 +279,18 @@ async function runIdmClothing(input: VtonInput): Promise<VtonOutput> {
   return replicateRunWithRetry(input, model, buildInput, modelShortName);
 }
 
-/** FASHN Try-On for clothing — same Replicate model as accessories; uses `one-pieces` for dresses/gowns. */
+/** FASHN Try-On for clothing — direct FASHN API when key is set, Replicate otherwise. */
 async function runFashnClothing(input: VtonInput): Promise<VtonOutput> {
-  const model = env.REPLICATE_MODEL_ACCESSORIES;
-  const modelShortName = model.split('/')[1]?.split(':')[0] || model;
-
   const inferOpts = { useAutoForGenericDescription: env.TRYON_FASHN_CATEGORY_AUTO };
 
-  const buildInput = (inp: VtonInput): Record<string, unknown> => {
+  /**
+   * Payload builder shared by both direct API and Replicate paths.
+   * For direct API, sanitiseForDirectApi (in fashn.ts) strips Replicate-only
+   * fields before sending. Those fields are kept here solely for the Replicate fallback.
+   */
+  const buildPayload = (inp: VtonInput): Record<string, unknown> => {
     const fashnCat = inferFashnGarmentCategory(inp.productHeightOverWidth, inp.productDescription, inferOpts);
+    // long_top: only relevant for Replicate path (Replicate fashn/tryon); stripped for direct API
     const longTop =
       fashnCat === 'one-pieces' ||
       fashnCat === 'auto' ||
@@ -295,6 +299,7 @@ async function runFashnClothing(input: VtonInput): Promise<VtonOutput> {
       model_image: inp.personImageUrl,
       garment_image: inp.productImageUrl,
       category: fashnCat,
+      // Fields below are Replicate-only; sanitiseForDirectApi strips them for the direct API
       adjust_hands: false,
       restore_background: true,
       restore_clothes: env.TRYON_FASHN_RESTORE_CLOTHES,
@@ -306,13 +311,26 @@ async function runFashnClothing(input: VtonInput): Promise<VtonOutput> {
     };
   };
 
+  if (isFashnDirectEnabled()) {
+    const fashnCat = inferFashnGarmentCategory(
+      input.productHeightOverWidth,
+      input.productDescription,
+      inferOpts
+    );
+    logger.info('Starting FASHN clothing (direct API)', { fashnCategory: fashnCat });
+    return runFashnDirect(input, buildPayload, 'fashn-clothing');
+  }
+
+  // Replicate fallback when no direct FASHN key is configured
+  const model = env.REPLICATE_MODEL_ACCESSORIES;
+  const modelShortName = model.split('/')[1]?.split(':')[0] || model;
   const fashnCat = inferFashnGarmentCategory(
     input.productHeightOverWidth,
     input.productDescription,
     inferOpts
   );
-  logger.info('Starting FASHN clothing', { model: modelShortName, fashnCategory: fashnCat });
-  return replicateRunWithRetry(input, model, buildInput, modelShortName);
+  logger.info('Starting FASHN clothing (Replicate)', { model: modelShortName, fashnCategory: fashnCat });
+  return replicateRunWithRetry(input, model, buildPayload, modelShortName);
 }
 
 /**
@@ -359,9 +377,17 @@ export async function runVtonInference(
     return runIdmClothing(input);
   }
 
+  // ── Bags / Glasses: route through direct FASHN API when key is set ──────────
+  if ((input.category === 'bags' || input.category === 'glasses') && isFashnDirectEnabled()) {
+    const { buildInput } = getModelConfig(input.category);
+    const label = input.category === 'bags' ? 'fashn-bags' : 'fashn-glasses';
+    logger.info(`Starting ${label} (direct API)`, { category: input.category });
+    return runFashnDirect(input, buildInput, label);
+  }
+
   const { model, buildInput } = getModelConfig(input.category);
   const modelShortName = model.split('/')[1]?.split(':')[0] || model;
-  logger.info('Starting inference', { category: input.category, model: modelShortName });
+  logger.info('Starting inference (Replicate)', { category: input.category, model: modelShortName });
   return replicateRunWithRetry(input, model, buildInput, modelShortName);
 }
 

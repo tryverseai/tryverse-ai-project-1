@@ -12,26 +12,21 @@ import {
   weeklySummaryEmail,
 } from './templates';
 
-const appUrl = env.FRONTEND_URL || 'https://app.tryverse.ai';
+const appUrl = env.FRONTEND_URL || 'https://tryverseai.com';
 
 async function getUserEmailAndName(userId: string): Promise<{ email: string | null; name: string }> {
+  // Use getProfileRow (indexed by auth subject) — getUserRowById uses db.get() which
+  // requires a Convex document _id and fails when passed the compound auth subject.
   const profile = await convexQueryTrusted<Record<string, unknown> | null>(anyApi.backendTrusted.getProfileRow, {
     secret: env.BACKEND_SHARED_SECRET,
     userId,
   });
-  const urow = await convexQueryTrusted<Record<string, unknown> | null>(anyApi.backendTrusted.getUserRowById, {
-    secret: env.BACKEND_SHARED_SECRET,
-    userId,
-  });
 
-  let email: string | null =
-    (typeof profile?.contact_email === 'string' && profile.contact_email) ||
-    (typeof urow?.email === 'string' && urow.email) ||
-    null;
+  const email: string | null =
+    (typeof profile?.contact_email === 'string' && profile.contact_email) || null;
   const name =
     (typeof profile?.full_name === 'string' && profile.full_name) ||
     (typeof profile?.brand_name === 'string' && profile.brand_name) ||
-    (typeof urow?.name === 'string' && urow.name) ||
     '';
   return { email, name };
 }

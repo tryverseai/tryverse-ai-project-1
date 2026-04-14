@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,27 +14,38 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { ComplianceOnboardingGate } from "@/components/ComplianceOnboardingGate";
 import { CookieConsent } from "@/components/CookieConsent";
 import { ConvexProviderGate } from "@/components/ConvexProviderGate";
+
+// Eagerly loaded: landing, auth, and tiny utility pages (critical for FCP / first-visit UX)
 import Index from "./pages/Index";
-import Dashboard from "./pages/Dashboard";
-import IndividualDashboard from "./pages/IndividualDashboard";
-import Pricing from "./pages/Pricing";
-import About from "./pages/About";
-import PartnerWithUs from "./pages/PartnerWithUs";
 import Auth from "./pages/Auth";
 import AuthConfirm from "./pages/AuthConfirm";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import WidgetPreview from "./pages/WidgetPreview";
-import WidgetGuide from "./pages/WidgetGuide";
-import TermsOfService from "./pages/TermsOfService";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import DataProcessing from "./pages/DataProcessing";
-import Support from "./pages/Support";
-import ApiDocs from "./pages/ApiDocs";
-import TryOnStudio from "./pages/TryOnStudio";
-import Admin from "./pages/Admin";
-import EarlyAccess from "./pages/EarlyAccess";
 import NotFound from "./pages/NotFound";
+
+// Lazily loaded: heavy pages that are not needed on the first paint
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const IndividualDashboard = lazy(() => import("./pages/IndividualDashboard"));
+const TryOnStudio = lazy(() => import("./pages/TryOnStudio"));
+const Admin = lazy(() => import("./pages/Admin"));
+const ApiDocs = lazy(() => import("./pages/ApiDocs"));
+const WidgetPreview = lazy(() => import("./pages/WidgetPreview"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const About = lazy(() => import("./pages/About"));
+const PartnerWithUs = lazy(() => import("./pages/PartnerWithUs"));
+const EarlyAccess = lazy(() => import("./pages/EarlyAccess"));
+const WidgetGuide = lazy(() => import("./pages/WidgetGuide"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const DataProcessing = lazy(() => import("./pages/DataProcessing"));
+const Support = lazy(() => import("./pages/Support"));
+
+/** Minimal spinner shown while a lazy route chunk is loading. */
+const RouteLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="h-8 w-8 rounded-full border-2 border-muted border-t-foreground animate-spin" />
+  </div>
+);
 
 const queryClient = new QueryClient();
 
@@ -50,6 +62,7 @@ const App = () => (
         <BrowserRouter>
           <ScrollToTop />
           <ComplianceOnboardingGate>
+          <Suspense fallback={<RouteLoader />}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<ProtectedRoute><DashboardHomeRedirect /></ProtectedRoute>} />
@@ -73,7 +86,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
+            <Route path="/pricing" element={<Pricing />} />
             <Route path="/about" element={<About />} />
             <Route path="/partner" element={<PartnerWithUs />} />
             <Route path="/early-access" element={<EarlyAccess />} />
@@ -107,10 +120,11 @@ const App = () => (
               }
             />
             <Route path="/studio" element={<ProtectedRoute><TryOnStudio clothingOnly /></ProtectedRoute>} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="/try-on-studio" element={<ProtectedRoute><TryOnStudio clothingOnly /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
           </ComplianceOnboardingGate>
         </BrowserRouter>
       </TooltipProvider>

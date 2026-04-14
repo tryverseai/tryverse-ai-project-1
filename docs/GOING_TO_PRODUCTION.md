@@ -27,7 +27,7 @@ WIDGET_ALLOWED_ORIGINS=https://tryverse-frontend.up.railway.app
 **Multiple sites:**
 
 ```env
-WIDGET_ALLOWED_ORIGINS=https://app.tryverse.ai,https://www.clientstore.com
+WIDGET_ALLOWED_ORIGINS=https://tryverseai.com,https://www.clientstore.com
 ```
 
 **Never** use `*` when `NODE_ENV=production` — the server **refuses to start**.
@@ -50,10 +50,10 @@ Used for CORS, model-library image URL resolution, and (if `PUBLIC_API_HOSTNAMES
 
 Only needed if the **API** is on a **different hostname** than `FRONTEND_URL`.
 
-Example: app at `https://app.example.com`, API at `https://api.example.com`:
+Example: app at `https://tryverseai.com`, API at `https://api.tryverseai.com`:
 
 ```env
-PUBLIC_API_HOSTNAMES=api.example.com
+PUBLIC_API_HOSTNAMES=api.tryverseai.com
 ```
 
 If the API and app share the same host, or you only have one public URL, you can leave this **empty** (hostname is taken from `FRONTEND_URL`).
@@ -73,11 +73,11 @@ x-api-key: tv_live_...
 
 ---
 
-## Checklist when you get a **custom** domain later
+## Checklist when deploying with your custom domain (`tryverseai.com`)
 
-1. Update `FRONTEND_URL` to `https://yourdomain.com`.
-2. Update `WIDGET_ALLOWED_ORIGINS` to include `https://yourdomain.com` and any merchant origins.
-3. If API is on `api.yourdomain.com`, set `PUBLIC_API_HOSTNAMES=api.yourdomain.com`.
+1. Update `FRONTEND_URL` to `https://tryverseai.com`.
+2. Update `WIDGET_ALLOWED_ORIGINS` to include `https://tryverseai.com` and any merchant origins.
+3. If the API runs on a separate subdomain, set `PUBLIC_API_HOSTNAMES=api.tryverseai.com`.
 4. Point DNS / TLS at your host (same env vars, new strings).
 
 No code change required — only environment updates.

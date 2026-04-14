@@ -79,7 +79,7 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-admin-key'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-admin-key', 'Cookie'],
     exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
   })
 );
@@ -94,8 +94,10 @@ app.use(
 
 // ─── Body Parsing ─────────────────────────────────────────────────────────────
 app.use('/api/payment/webhook', express.text({ type: '*/*' }));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// 1 MB is ample for all JSON API payloads. File uploads go through multer
+// (its own 10 MB cap) and are not parsed by these middlewares.
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 app.use('/api', generalRateLimit);

@@ -18,7 +18,7 @@ const Index = () => {
           name="description"
           content="AI virtual try-on and fit intelligence for fashion brands (widget, API, dashboard) and for people who want a personal try-on studio. Reduce returns, lift conversions, try outfits at home."
         />
-        <link rel="canonical" href="https://tryverse.ai/" />
+        <link rel="canonical" href="https://tryverseai.com/" />
       </Helmet>
       <Navbar />
       <HeroSection />

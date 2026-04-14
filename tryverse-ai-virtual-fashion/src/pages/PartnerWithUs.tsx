@@ -27,7 +27,7 @@ const PartnerWithUs = () => (
     <Helmet>
       <title>Partner With Us — TryVerse AI Virtual Try-On</title>
       <meta name="description" content="Integrate TryVerse AI into your e-commerce store. The infrastructure powering virtual try-on for fashion brands. Reduce returns, boost conversions." />
-      <link rel="canonical" href="https://tryverse.ai/partner" />
+      <link rel="canonical" href="https://tryverseai.com/partner" />
     </Helmet>
     <Navbar />
     <main className="pt-[var(--navbar-height)] pb-24">
@@ -151,7 +151,7 @@ const PartnerWithUs = () => (
               <div className="rounded-xl bg-foreground/[0.03] p-5 font-mono text-sm">
                 <p className="text-muted-foreground mb-2">{"<!-- Add to your product page -->"}</p>
                 <p className="text-foreground">
-                  {"<"}<span className="text-foreground/70">script</span> src=<span className="text-foreground/60">"https://tryverse.ai/widget.js"</span>{">"}
+                  {"<"}<span className="text-foreground/70">script</span> src=<span className="text-foreground/60">"https://tryverseai.com/tryverse-widget.js"</span>{">"}
                 </p>
                 <p className="text-foreground">{"</"}<span className="text-foreground/70">script</span>{">"}</p>
                 <p className="text-foreground mt-3">

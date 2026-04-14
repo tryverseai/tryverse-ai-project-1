@@ -27,7 +27,7 @@ import {
   uploadResultBuffer,
 } from '../storage/images';
 import { cxPatchTryon, cxInsertUsageEvent } from '../tryonConvexBridge';
-import { decrementCredits, restoreCredits } from '../credits';
+import { restoreCredits } from '../credits';
 import { sendTryOnCompletedEmail } from '../email';
 import { captureAiError } from '../../config/sentry';
 import { logger } from '../../config/logger';
@@ -65,6 +65,63 @@ import type { TryOnJob, TryOnResult } from '../../types';
  *  Result returned to widget / dashboard
  * ═══════════════════════════════════════════════════════════════════
  */
+// ─── Public error classification ─────────────────────────────────────────────
+
+interface PublicError { code: string; message: string }
+
+/**
+ * Maps raw internal pipeline errors to stable public-facing codes and messages.
+ * Full error details are always logged server-side; clients only receive the
+ * sanitized version to prevent leaking vendor names, API URLs, or model internals.
+ */
+function classifyTryOnError(err: Error): PublicError {
+  const msg = err.message.toLowerCase();
+
+  // Content moderation
+  if (msg.includes('moderat') || msg.includes('nsfw') || msg.includes('inappropriate') ||
+      msg.includes('safety') || msg.includes('content policy')) {
+    return { code: 'CONTENT_MODERATED', message: 'This image was flagged by our content policy. Please use a different photo.' };
+  }
+  // No person / body not detected
+  if (msg.includes('no person') || msg.includes('no human') || msg.includes('body not') ||
+      msg.includes('person not') || msg.includes('could not detect') || msg.includes('no body')) {
+    return { code: 'NO_PERSON_DETECTED', message: 'We could not detect a person in the uploaded photo. Please try with a clearer, well-lit photo.' };
+  }
+  // Image quality
+  if (msg.includes('resolution') || msg.includes('too small') || msg.includes('image quality') ||
+      msg.includes('blurry') || msg.includes('low quality')) {
+    return { code: 'IMAGE_QUALITY', message: 'The image resolution or quality is too low. Please upload a clearer photo (at least 512×512 px).' };
+  }
+  // Timeout / slow model
+  if (msg.includes('timeout') || msg.includes('timed out') || msg.includes('deadline')) {
+    return { code: 'TIMEOUT', message: 'Processing took too long. Please try again in a moment.' };
+  }
+  // Rate limit / quota on vendor side
+  if (msg.includes('rate limit') || msg.includes('quota') || msg.includes('too many requests') ||
+      msg.includes('429') || msg.includes('capacity')) {
+    return { code: 'SERVICE_CAPACITY', message: 'Our try-on service is temporarily busy. Please try again in a few seconds.' };
+  }
+  // Credit / billing issues (should rarely surface here since credits are checked upfront)
+  if (msg.includes('credit') || msg.includes('billing') || msg.includes('payment required') ||
+      msg.includes('402')) {
+    return { code: 'SERVICE_CAPACITY', message: 'Service is temporarily unavailable. Please try again shortly.' };
+  }
+  // Auth failures against vendor APIs (config issue — don't leak "Replicate" etc.)
+  if (msg.includes('unauthorized') || msg.includes('forbidden') || msg.includes('401') ||
+      msg.includes('403') || msg.includes('invalid token') || msg.includes('api key')) {
+    return { code: 'SERVICE_ERROR', message: 'An internal service error occurred. Our team has been notified.' };
+  }
+  // Storage / upload errors
+  if (msg.includes('upload') || msg.includes('storage') || msg.includes('file') ||
+      msg.includes('bucket') || msg.includes('s3') || msg.includes('blob')) {
+    return { code: 'STORAGE_ERROR', message: 'Could not save your try-on result. Please try again.' };
+  }
+  // Default catch-all
+  return { code: 'PROCESSING_FAILED', message: 'Try-on processing failed. Please try again or use a different photo.' };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> {
   const { tryonDbId, personImageUrl, productImageUrl, category, userId, productDescription } = job;
   const startTime = Date.now();
@@ -132,7 +189,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       } else {
         clothingEngine = 'idm_vton';
       }
-      logger.info('tryon.route', { tryonDbId, garmentTopology, clothingEngine });
+      logger.info('tryon.pipeline: engine selected', { tryonDbId, garmentTopology, clothingEngine });
     }
 
     const cacheVariant =
@@ -164,7 +221,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       });
 
       if (userId) {
-        await decrementCredits(userId);
+        // Credit was already atomically reserved by checkCredits at request start — no decrement here.
         sendTryOnCompletedEmail(userId, cachedResultUrl).catch((e) =>
           logger.warn('Try-on completed email failed (cache hit)', { userId, error: String(e) })
         );
@@ -376,8 +433,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       completed_at: new Date().toISOString(),
     });
 
-    // ── STEP 12: Decrement credits ──────────────────────────────────────────
-    if (userId) await decrementCredits(userId);
+    // ── STEP 12: Credits already reserved atomically at request start — no decrement here.
 
     // ── STEP 12b: Send try-on completed email ──────────────────────────────
     if (userId) {
@@ -416,11 +472,17 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
     } as TryOnResult;
   } catch (err: unknown) {
     const error = err instanceof Error ? err : new Error(String(err));
+
+    // Classify before logging so the code is included in structured logs
+    const publicError = classifyTryOnError(error);
+
+    // Full internal message is logged server-side and sent to Sentry — never to the client
     logger.error('AI pipeline failed', {
       tryonDbId,
       category,
       userId,
-      error: error.message,
+      errorCode: publicError.code,
+      internalError: error.message, // raw vendor message stays server-side
     });
 
     captureAiError(error, { tryonDbId, category, userId, jobId: job.jobId });
@@ -435,11 +497,13 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       await cxInsertUsageEvent(userId, 'tryon_failed', {
         tryon_id: tryonDbId,
         category,
-        error: error.message,
+        // Store the public code (not the raw vendor message) in usage events
+        error_code: publicError.code,
       });
     }
 
-    return { jobId: job.jobId, status: 'failed', error: error.message };
+    // Return only the sanitized public message — no vendor names, API details, or stack traces
+    return { jobId: job.jobId, status: 'failed', error: publicError.message, errorCode: publicError.code };
   } finally {
     if (inferenceScratchPaths.length > 0) {
       try {

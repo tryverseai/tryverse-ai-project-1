@@ -1,25 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AppUser } from "@/contexts/AuthContext";
-import type { AccountType } from "@/lib/accountType";
+import { normalizeAccountType, type AccountType } from "@/lib/accountType";
 import { isConvexDataEnabled } from "@/lib/convexData";
 import { useSyncedConvexProfile } from "@/hooks/useSyncedConvexProfile";
 
-function accountTypeFromMetadata(user: AppUser | null): AccountType | null {
-  const raw = user?.user_metadata?.account_type;
-  if (typeof raw !== "string") return null;
-  const s = raw.trim().toLowerCase();
-  if (s === "individual") return "individual";
-  if (s === "business" || s === "brand") return "business";
-  return null;
-}
-
-function normalizeProfileType(value: string | null | undefined): AccountType | null {
-  if (value == null) return null;
-  const s = String(value).trim().toLowerCase();
-  if (s === "individual") return "individual";
-  if (s === "business" || s === "brand") return "business";
-  return null;
+function accountTypeFromUser(user: AppUser | null): AccountType | null {
+  return normalizeAccountType(user?.user_metadata?.account_type);
 }
 
 /** Loads `profiles.account_type` from Convex (with JWT metadata fallback). */
@@ -41,7 +28,7 @@ export function useProfileAccountType(): {
     }
 
     if (!convexOn) {
-      setAccountType(accountTypeFromMetadata(user) ?? "business");
+      setAccountType(accountTypeFromUser(user) ?? "business");
       setLoading(false);
       return;
     }
@@ -50,9 +37,10 @@ export function useProfileAccountType(): {
       setLoading(true);
       return;
     }
-    const meta = accountTypeFromMetadata(user);
-    const fromRow = normalizeProfileType(cxProfile?.account_type ?? null);
-    setAccountType(fromRow ?? meta ?? "business");
+
+    const fromProfile = normalizeAccountType(cxProfile?.account_type ?? null);
+    const fromMetadata = accountTypeFromUser(user);
+    setAccountType(fromProfile ?? fromMetadata ?? "business");
     setLoading(false);
   }, [user, convexOn, cxProfile, cxLoading]);
 

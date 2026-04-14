@@ -59,8 +59,32 @@ export async function cxInsertProfile(
 }
 
 export async function cxGetUserRow(userId: string): Promise<{ account_type?: string; email?: string; name?: string } | null> {
-  return convexQueryTrusted<any>(anyApi.backendTrusted.getUserRowById, {
-    ...trusted(),
-    userId,
-  });
+  // getUserRowById uses db.get() which requires a Convex document _id, but userId is
+  // the auth subject string — use getProfileRow (indexed by subject) instead.
+  const profile = await cxGetProfile(userId);
+  if (!profile) return null;
+  return {
+    account_type: profile.account_type ?? undefined,
+    email: profile.contact_email ?? undefined,
+    name: profile.full_name ?? undefined,
+  };
+}
+
+/**
+ * Atomically checks and reserves one try-on credit for `userId`.
+ * Convex mutations are serialized, so concurrent requests cannot both succeed
+ * when only one credit remains — this eliminates the read-then-check race.
+ *
+ * On success the credit is already decremented; do NOT call decrementCredits afterward.
+ * On failure call restoreCredits is NOT needed (no write occurred).
+ */
+export async function cxReserveCredit(userId: string): Promise<{
+  ok: boolean;
+  creditType?: 'monthly' | 'free';
+  reason?: string;
+}> {
+  return convexMutationTrusted<{ ok: boolean; creditType?: 'monthly' | 'free'; reason?: string }>(
+    anyApi.backendTrusted.reserveCredit,
+    { ...trusted(), userId }
+  );
 }

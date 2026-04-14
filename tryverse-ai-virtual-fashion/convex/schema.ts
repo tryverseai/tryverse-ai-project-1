@@ -132,7 +132,12 @@ export default defineSchema({
     tryons_count: v.number(),
     created_at: v.optional(v.string()),
     updated_at: v.optional(v.string()),
-  }).index("by_userId", ["user_id"]),
+  })
+    .index("by_userId", ["user_id"])
+    // Composite index: efficient category-filtered listing without a full table scan
+    .index("by_user_category", ["user_id", "category"])
+    // Allows O(1) lookup by legacy UUID in update/delete mutations
+    .index("by_legacyId", ["legacy_id"]),
 
   tryons: defineTable({
     legacy_id: v.optional(v.string()),
@@ -147,7 +152,9 @@ export default defineSchema({
   })
     .index("by_userId", ["user_id"])
     .index("by_status", ["status"])
-    .index("by_legacyId", ["legacy_id"]),
+    .index("by_legacyId", ["legacy_id"])
+    // Composite index: efficient per-user sorted history listing
+    .index("by_user_created", ["user_id", "created_at"]),
 
   usage_events: defineTable({
     legacy_id: v.optional(v.string()),

@@ -34,6 +34,11 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"];
 
+/** Type guard — narrows a raw string from the URL to a valid TabId. */
+function isTabId(value: string | null): value is TabId {
+  return tabs.some((t) => t.id === value);
+}
+
 interface HistoryItem {
   id: string;
   status: string;
@@ -44,7 +49,8 @@ interface HistoryItem {
 
 const IndividualDashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab") as TabId | null;
+  const rawTabParam = searchParams.get("tab");
+  const tabParam: TabId | null = isTabId(rawTabParam) ? rawTabParam : null;
   const [activeTab, setActiveTab] = useState<TabId>("guide");
   const { user, signOut } = useAuth();
   const [credits, setCredits] = useState<{
@@ -60,7 +66,9 @@ const IndividualDashboard = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (tabParam && tabs.some((t) => t.id === tabParam)) {
+    // tabParam is already narrowed to TabId | null by isTabId() above,
+    // so no second tabs.some() check is needed here.
+    if (tabParam) {
       setActiveTab(tabParam);
       return;
     }
@@ -93,13 +101,15 @@ const IndividualDashboard = () => {
     setCreationsLoading(true);
     try {
       const res = await getTryOnHistory(1);
-      const rows = (res.tryons || []).map((raw) => {
-        const r = raw as HistoryItem & { tryonId?: string };
-        return {
-          ...r,
-          id: r.id || r.tryonId || "",
-        };
-      });
+      // getTryOnHistory returns TryOnResponse & { id?; tryonId?; createdAt? }
+      // We normalise to HistoryItem without an unsafe cast.
+      const rows: HistoryItem[] = (res.tryons || []).map((raw) => ({
+        id: raw.id ?? raw.tryonId ?? "",
+        status: raw.status,
+        category: raw.category,
+        resultUrl: raw.resultUrl ?? null,
+        createdAt: raw.createdAt,
+      }));
       setCreations(rows.filter((r) => r.id && r.status === "completed" && r.resultUrl));
     } catch {
       toast.error("Could not load your creations.");
@@ -109,9 +119,12 @@ const IndividualDashboard = () => {
     }
   }, []);
 
+  // Fetch credits once on mount. Refresh only when the studio tab is left
+  // (i.e. after a try-on might have consumed a credit) via the `refreshCredits`
+  // callback passed to TryOnStudio. Do NOT re-fetch on every tab switch.
   useEffect(() => {
     void loadCredits();
-  }, [loadCredits, activeTab]);
+  }, [loadCredits]);
 
   useEffect(() => {
     if (activeTab === "creations") void loadCreations();
@@ -274,6 +287,8 @@ const IndividualDashboard = () => {
                             src={safeImageSrcForDom(item.resultUrl)}
                             alt=""
                             className="w-full h-full object-cover"
+                            loading="lazy"
+                            decoding="async"
                           />
                         )}
                       </div>

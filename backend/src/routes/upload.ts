@@ -1,11 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { uploadImageBuffer, getSignedUrl, INPUT_BUCKET } from '../services/storage/images';
+import type { StorageFolder } from '../types';
 import { optionalAuth, requireAuth } from '../middleware/auth';
 import { optionalApiKey } from '../middleware/apiKey';
 import { uploadRateLimit } from '../middleware/rateLimiter';
 import { logger } from '../config/logger';
-import { fetchWithSsrfRedirectChecks } from '../utils/ssrfFetch';
+import { fetchWithSsrfRedirectChecks, MAX_REMOTE_RESPONSE_BYTES } from '../utils/ssrfFetch';
 import { validateImageBuffer } from '../utils/validateImageBuffer';
 
 const router = Router();
@@ -54,15 +55,17 @@ router.post(
       }
 
       // 'person' = user/model photo; 'product' = any item to try on
-      const type = req.body.type as 'person' | 'product';
-      if (!type || !['person', 'product'].includes(type)) {
+      const rawType = req.body.type;
+      if (!rawType || !['person', 'product'].includes(String(rawType))) {
         res.status(400).json({ error: 'type must be "person" or "product"' });
         return;
       }
+      const type = rawType as 'person' | 'product';
 
       // Map 'product' to storage folder 'garment' (existing bucket structure)
-      const storageFolder = type === 'product' ? 'garment' : 'person';
-      const userId = (req as Request & { widgetUserId?: string }).widgetUserId || req.user?.id;
+      const storageFolder: StorageFolder = type === 'product' ? 'garment' : 'person';
+      // widgetUserId is declared on global Express.Request (types/index.ts)
+      const userId = req.widgetUserId || req.user?.id;
 
       let verifiedMime: string;
       try {
@@ -76,7 +79,7 @@ router.post(
       const filePath = await uploadImageBuffer(
         req.file.buffer,
         verifiedMime,
-        storageFolder as 'person' | 'garment',
+        storageFolder,
         userId
       );
 
@@ -150,7 +153,15 @@ router.post(
         res.status(400).json({ error: 'Failed to fetch image from URL' });
         return;
       }
-      const buffer = Buffer.from(await remoteImage.arrayBuffer());
+
+      // Read with a hard cap on body size to prevent OOM from a response
+      // that omits or lies about Content-Length.
+      const rawBuffer = await remoteImage.arrayBuffer();
+      if (rawBuffer.byteLength > MAX_REMOTE_RESPONSE_BYTES) {
+        res.status(400).json({ error: 'Remote image exceeds maximum allowed size (10 MB)' });
+        return;
+      }
+      const buffer = Buffer.from(rawBuffer);
 
       let mime: string;
       try {

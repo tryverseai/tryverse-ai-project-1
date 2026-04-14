@@ -16,11 +16,13 @@ export default function AuthConfirm() {
 
   useEffect(() => {
     if (loading) return;
-    setStatus(user?.email ? "success" : "invalid");
-  }, [loading, user?.email]);
+    // M-6: A valid session may not carry an email field (e.g. OAuth or custom providers).
+    // Gate on user existence, not on user.email, to avoid showing an error for valid sessions.
+    setStatus(user ? "success" : "invalid");
+  }, [loading, user]);
 
   useEffect(() => {
-    if (status === "success" && user?.email && !welcomeSentRef.current) {
+    if (status === "success" && user && !welcomeSentRef.current) {
       welcomeSentRef.current = true;
       const meta = user.user_metadata;
       sendWelcomeEmail({

@@ -57,7 +57,7 @@ export function errorHandler(
 
   res.status(500).json({
     error: 'Internal server error',
-    ...(process.env.NODE_ENV !== 'production' && { details: err.message }),
+    ...(env.NODE_ENV !== 'production' && { details: err.message }),
   });
 }
 
@@ -69,6 +69,6 @@ function inferFeatureFromPath(path: string): string {
   return 'api';
 }
 
-export function notFoundHandler(req: Request, res: Response): void {
-  res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
+export function notFoundHandler(_req: Request, res: Response): void {
+  res.status(404).json({ error: 'Not found' });
 }

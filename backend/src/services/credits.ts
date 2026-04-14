@@ -9,6 +9,7 @@ import {
   cxInsertProfile,
   cxGetUserRow,
   cxGetPlan,
+  cxReserveCredit,
   type ConvexProfileRow,
 } from './creditsConvexBridge';
 
@@ -42,7 +43,10 @@ export const DEFAULT_FREE_CREDITS_INDIVIDUAL = 5;
 /** B2B / brand free try-on pool on free plan. */
 export const DEFAULT_FREE_CREDITS_BUSINESS = 20;
 
-/** @deprecated Use {@link DEFAULT_FREE_CREDITS_BUSINESS} or account-type helpers. */
+/**
+ * @deprecated Use {@link DEFAULT_FREE_CREDITS_BUSINESS} or {@link freePoolCapForAccountType}.
+ * Retained only for backward compatibility; will be removed in a future cleanup.
+ */
 export const DEFAULT_FREE_CREDITS = DEFAULT_FREE_CREDITS_BUSINESS;
 
 export function freePoolCapForAccountType(accountType: string | null | undefined): number {
@@ -248,6 +252,44 @@ async function hydrateProfileWithAccountType<T extends { account_type?: string |
 }
 
 /**
+ * Loads, hydrates, and normalizes a user's credit profile.
+ * Shared between `checkCredits` and `getCreditSummary` to keep the bootstrap
+ * sequence (get-or-create → hydrate account type → migrate legacy caps → reconcile
+ * individual cap) in one place.
+ *
+ * Does NOT trigger monthly credit resets — `checkCredits` does that separately
+ * to avoid resetting credits during a read-only summary request.
+ *
+ * Returns `null` only when the profile cannot be created or retrieved.
+ */
+async function buildCreditProfile(userId: string): Promise<ConvexProfileRow | null> {
+  let profile = await cxGetProfile(userId);
+
+  if (!profile) {
+    const acct = await accountTypeFromConvexUser(userId);
+    const cap = freePoolCapForAccountType(acct);
+    try {
+      await cxInsertProfile(userId, acct, cap, cap);
+    } catch (insertErr) {
+      logger.error('Failed to create profile', { userId, error: String(insertErr) });
+      return null;
+    }
+    profile = await cxGetProfile(userId);
+  }
+
+  if (!profile) return null;
+
+  profile = await hydrateProfileWithAccountType(userId, profile);
+  if (!profile) return null;
+
+  const migratedFree = await migrateLegacyFreeCreditsIfNeeded(userId, narrowCreditFields(profile));
+  profile = { ...profile, ...migratedFree };
+
+  const reconciled = await reconcileIndividualFreePoolCap(userId, narrowCreditFields(profile));
+  return { ...profile, ...reconciled };
+}
+
+/**
  * Checks if a user has credits remaining.
  * Priority: monthly credits (paid plan) > free credits.
  * Enterprise bypasses all checks.
@@ -258,35 +300,12 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
     return { allowed: true, creditsRemaining: 999999, creditType: 'monthly' };
   }
 
-  let profile = await cxGetProfile(userId);
-
-  if (!profile) {
-    const acct = await accountTypeFromConvexUser(userId);
-    const cap = freePoolCapForAccountType(acct);
-    try {
-      await cxInsertProfile(userId, acct, cap, cap);
-    } catch (insertErr) {
-      logger.error('Failed to create profile', { userId, error: String(insertErr) });
-      return { allowed: false, creditsRemaining: 0, creditType: 'free', reason: 'Profile not found' };
-    }
-    profile = await cxGetProfile(userId);
-  }
-
+  let profile = await buildCreditProfile(userId);
   if (!profile) {
     return { allowed: false, creditsRemaining: 0, creditType: 'free', reason: 'Profile not found' };
   }
 
-  profile = await hydrateProfileWithAccountType(userId, profile);
-  if (!profile) {
-    return { allowed: false, creditsRemaining: 0, creditType: 'free', reason: 'Profile not found' };
-  }
-
-  const migratedFree = await migrateLegacyFreeCreditsIfNeeded(userId, narrowCreditFields(profile));
-  profile = { ...profile, ...migratedFree };
-
-  const reconciled = await reconcileIndividualFreePoolCap(userId, narrowCreditFields(profile));
-  profile = { ...profile, ...reconciled };
-
+  // Trigger monthly credit reset (only checkCredits should do this, not getCreditSummary).
   await ensureMonthlyCreditReset(userId, narrowCreditFields(profile));
 
   const refreshed = await cxGetProfile(userId);
@@ -294,52 +313,77 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
 
   const pf = narrowCreditFields(profile);
 
-  // Enterprise/unlimited plan (-1 means unlimited)
+  // Enterprise / unlimited plan (-1 means unlimited) — no decrement needed
   if (pf.monthly_credits_total === -1) {
     return { allowed: true, creditsRemaining: -1, creditType: 'monthly' };
   }
 
-  // Paid plan with monthly credits
-  if (pf.plan_id && pf.plan_id !== 'free' && pf.monthly_credits_remaining > 0) {
-    return {
-      allowed: true,
-      creditsRemaining: pf.monthly_credits_remaining,
-      creditType: 'monthly',
-    };
-  }
+  // Fast-path: credits already exhausted — skip the reservation mutation
+  const hasPaidCredits = Boolean(pf.plan_id && pf.plan_id !== 'free' && pf.monthly_credits_remaining > 0);
+  const hasFreeCredits = pf.free_credits_remaining > 0;
 
-  // Paid plan but credits exhausted
-  if (pf.plan_id && pf.plan_id !== 'free' && pf.monthly_credits_remaining <= 0) {
+  if (!hasPaidCredits && !hasFreeCredits) {
+    if (pf.plan_id && pf.plan_id !== 'free') {
+      return {
+        allowed: false,
+        creditsRemaining: 0,
+        creditType: 'monthly',
+        reason:
+          'Your plan try-on credits are used up. Add more in Billing, or wait for your monthly reset. (This is separate from your Replicate account balance.)',
+      };
+    }
     return {
       allowed: false,
       creditsRemaining: 0,
-      creditType: 'monthly',
+      creditType: 'free',
       reason:
-        'Your plan try-on credits are used up. Add more in Billing, or wait for your monthly reset. (This is separate from your Replicate account balance.)',
+        'Your TryVerse try-on credits are used up (free tier is limited). Subscribe or upgrade in Billing for more. Note: your Replicate API wallet is separate and does not refill TryVerse credits.',
     };
   }
 
-  // Free tier
-  if (pf.free_credits_remaining > 0) {
+  // M-5: Atomically reserve (decrement) the credit inside a Convex mutation.
+  // Because Convex mutations are serialized at the document level, two concurrent
+  // requests cannot both succeed when only one credit remains — eliminating the
+  // read-then-check overdraft race.
+  // NOTE: The credit is now decremented here. Do NOT call decrementCredits in the
+  // pipeline for requests that go through this path; only restoreCredits on failure.
+  let reservation: Awaited<ReturnType<typeof cxReserveCredit>>;
+  try {
+    reservation = await cxReserveCredit(userId);
+  } catch (e) {
+    logger.error('Atomic credit reservation failed', { userId, error: String(e) });
+    return { allowed: false, creditsRemaining: 0, creditType: hasPaidCredits ? 'monthly' : 'free', reason: 'Credit reservation error' };
+  }
+
+  if (!reservation.ok) {
+    // Another concurrent request grabbed the last credit between our fast-path check and the mutation
     return {
-      allowed: true,
-      creditsRemaining: pf.free_credits_remaining,
-      creditType: 'free',
+      allowed: false,
+      creditsRemaining: 0,
+      creditType: hasPaidCredits ? 'monthly' : 'free',
+      reason: reservation.reason ?? 'No credits remaining',
     };
   }
+
+  const creditsAfterReserve = hasPaidCredits
+    ? pf.monthly_credits_remaining - 1
+    : pf.free_credits_remaining - 1;
 
   return {
-    allowed: false,
-    creditsRemaining: 0,
-    creditType: 'free',
-    reason:
-      'Your TryVerse try-on credits are used up (free tier is limited). Subscribe or upgrade in Billing for more. Note: your Replicate API wallet is separate and does not refill TryVerse credits.',
+    allowed: true,
+    creditsRemaining: Math.max(0, creditsAfterReserve),
+    creditType: (reservation.creditType ?? (hasPaidCredits ? 'monthly' : 'free')) as 'monthly' | 'free',
   };
 }
 
 /**
- * Atomically decrements credits for a user after a successful try-on.
- * Updates credits via Convex (atomic at the document level).
+ * @deprecated The try-on pipeline no longer calls this function.
+ * Credits are now reserved atomically by `checkCredits` via `cxReserveCredit`
+ * (a Convex mutation) at the start of each request, eliminating the
+ * read-then-decrement race condition.  Use `restoreCredits` on pipeline failure.
+ *
+ * Retained here only for admin / manual credit corrections.
+ * Do NOT re-introduce calls in the automatic try-on path.
  */
 export async function decrementCredits(userId: string): Promise<void> {
   if (env.NODE_ENV !== 'production' && env.TRYON_SKIP_CREDIT_CHECK) {
@@ -466,31 +510,12 @@ export async function getPlanId(userId: string): Promise<string> {
 
 /**
  * Returns credit usage summary for a user.
+ * Uses `buildCreditProfile` for the shared setup; does NOT trigger monthly resets
+ * (that is `checkCredits`'s responsibility).
  */
 export async function getCreditSummary(userId: string) {
-  let profile = await cxGetProfile(userId);
-
-  if (!profile) {
-    const acct = await accountTypeFromConvexUser(userId);
-    const cap = freePoolCapForAccountType(acct);
-    try {
-      await cxInsertProfile(userId, acct, cap, cap);
-    } catch {
-      /* ignore */
-    }
-    profile = await cxGetProfile(userId);
-  }
-
+  const profile = await buildCreditProfile(userId);
   if (!profile) return null;
-
-  profile = await hydrateProfileWithAccountType(userId, profile);
-  if (!profile) return null;
-
-  const migratedFree = await migrateLegacyFreeCreditsIfNeeded(userId, narrowCreditFields(profile));
-  profile = { ...profile, ...migratedFree };
-
-  const reconciled = await reconcileIndividualFreePoolCap(userId, narrowCreditFields(profile));
-  profile = { ...profile, ...reconciled };
 
   const pf = narrowCreditFields(profile);
 

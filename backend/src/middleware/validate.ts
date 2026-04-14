@@ -12,7 +12,9 @@ export function handleValidationErrors(req: Request, res: Response, next: NextFu
         : 'Validation failed';
     res.status(400).json({
       error: summary,
-      details: arr.map((e) => ({ field: e.type, message: e.msg })),
+      // 'path' is the validated field name in express-validator v6+; 'type' is a
+    // classifier string (e.g. "field") — not the field name.
+    details: arr.map((e) => ({ field: 'path' in e ? (e as { path: string }).path : e.type, message: e.msg })),
     });
     return;
   }

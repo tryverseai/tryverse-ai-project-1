@@ -138,10 +138,19 @@ const Auth = () => {
     );
   };
 
-  const waitForJwt = () => new Promise<void>((resolve) => setTimeout(resolve, 600));
-
+  /**
+   * Polls localStorage for the Convex Auth JWT every 150 ms, up to 6 seconds.
+   * The fixed 600 ms sleep was unreliable on slow devices — the JWT may not
+   * be written by the time the timeout fires.
+   */
   const finishAuthIfSessionReady = async (): Promise<boolean> => {
-    await waitForJwt();
+    const intervalMs = 150;
+    const maxWaitMs = 6000;
+    const start = Date.now();
+    while (Date.now() - start < maxWaitMs) {
+      if (readConvexAuthJwt()) return true;
+      await new Promise<void>((r) => setTimeout(r, intervalMs));
+    }
     return Boolean(readConvexAuthJwt());
   };
 

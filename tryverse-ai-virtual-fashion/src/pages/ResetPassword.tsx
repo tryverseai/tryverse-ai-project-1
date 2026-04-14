@@ -61,6 +61,8 @@ const ResetPassword = () => {
         newPassword: password,
       } as Record<string, unknown>);
       setSuccess(true);
+      // Navigates to /dashboard which DashboardHomeRedirect always resolves to the correct typed path.
+      // If DashboardHomeRedirect is ever removed, change this to navigate directly to the typed route.
       setTimeout(() => navigate("/dashboard", { replace: true }), 2000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

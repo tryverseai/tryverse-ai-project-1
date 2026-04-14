@@ -62,13 +62,32 @@ export type FashnGarmentSlot = 'tops' | 'bottoms' | 'one-pieces' | 'auto';
 const FASHN_BOTTOMS_RE =
   /\b(pants?|jeans|trousers|shorts|joggers|leggings|chinos|slacks|\bskirt\b|mini\s*skirt|midi\s*skirt|maxi\s*skirt|cargo)\b/i;
 
+/**
+ * Matches coordinated sets, two-piece outfits, or any product that covers
+ * both upper and lower body — these should use `one-pieces` so FASHN replaces
+ * the full outfit rather than just one half.
+ *
+ * Examples: "denim set", "matching shorts and shirt", "co-ord", "suit", "tuxedo",
+ *           "two-piece", "tracksuit", "sweat set", "loungewear set"
+ */
+const FASHN_OUTFIT_SET_RE =
+  /\b(set\b|co-?ords?|matching\s+set|two[\s-]piece|2[\s-]piece|twin[\s-]set|tracksuit|sweatsuit|sweat\s*set|lounge\s*set|suit\b|tuxedo|blazer\s*(and|&)\s*(pant|trouser|short)|outfit\b|ensemble|jumpsuit|playsuit|romper)\b/i;
+
 export interface InferFashnGarmentCategoryOpts {
   /** When true, blank/placeholder captions use `auto` so full-length dresses are not forced into `tops`. */
   useAutoForGenericDescription?: boolean;
 }
 
 /**
- * Maps product cues to FASHN garment category (dresses/jumpsuits → one-pieces).
+ * Maps product cues to FASHN garment category.
+ *
+ * Priority order (highest to lowest):
+ *  1. Coordinated sets / full outfits → `one-pieces`  (before bottoms check so "shorts set" → one-pieces, not bottoms)
+ *  2. Full-length dresses / gowns     → `one-pieces`
+ *  3. Explicit bottoms keywords       → `bottoms`
+ *  4. Generic/blank description       → `auto`  (FASHN v1.6 auto-detection)
+ *  5. Tall product image aspect ratio → `one-pieces`
+ *  6. Fallback                        → `tops`
  */
 export function inferFashnGarmentCategory(
   productHeightOverWidth?: number,
@@ -76,14 +95,34 @@ export function inferFashnGarmentCategory(
   opts?: InferFashnGarmentCategoryOpts
 ): FashnGarmentSlot {
   const raw = (productDescription ?? '').trim();
+
+  // 1. Matching sets / full outfits (must run BEFORE bottoms regex — "shorts set" is a set, not just bottoms)
+  if (raw && FASHN_OUTFIT_SET_RE.test(raw)) {
+    return 'one-pieces';
+  }
+
+  // 2. Full-length dresses/gowns
+  if (raw && IDM_FULL_BODY_GARMENT_RE.test(raw)) {
+    return 'one-pieces';
+  }
+
+  // 3. Explicit bottoms-only keywords
   if (raw && FASHN_BOTTOMS_RE.test(raw)) {
     return 'bottoms';
   }
+
+  // 4. Generic/blank → let FASHN auto-detect
   if (opts?.useAutoForGenericDescription && isBlankOrGeneric(raw)) {
     return 'auto';
   }
-  const idmSlot = inferIdmVtonGarmentCategory(productHeightOverWidth, productDescription);
-  if (idmSlot === 'dresses') return 'one-pieces';
+
+  // 5. Tall product image (aspect ratio suggests a full-length garment)
+  const hw = productHeightOverWidth;
+  if (hw !== undefined && Number.isFinite(hw) && hw > 1.06) {
+    return 'one-pieces';
+  }
+
+  // 6. Default: upper-body garment
   return 'tops';
 }
 

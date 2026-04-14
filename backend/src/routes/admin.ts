@@ -66,7 +66,86 @@ async function setUserBlockedState(userId: string, blocked: boolean, req: Reques
   logger.info(`Admin: User ${blocked ? 'banned' : 'unbanned'}`, { userId, displayLabel });
 }
 
-// All admin routes require X-Admin-Key header
+// ─── Session management (unauthenticated — these create / destroy sessions) ──
+import {
+  createAdminSession,
+  revokeAdminSession,
+  validateAndRefreshSession,
+  parseCookie,
+  ADMIN_SESSION_COOKIE,
+} from '../services/adminSession';
+
+const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: 'strict' as const,
+  secure: env.NODE_ENV === 'production',
+  maxAge: 15 * 60 * 1000, // 15 minutes (ms for Express res.cookie)
+  path: '/api/admin',
+};
+
+/**
+ * POST /api/admin/session
+ * Validates the admin key and issues an HttpOnly session cookie.
+ * Replaces the previous pattern of storing the raw key in sessionStorage.
+ */
+router.post(
+  '/session',
+  [body('key').isString().notEmpty().isLength({ max: 512 })],
+  handleValidationErrors,
+  (req: Request, res: Response): void => {
+    const { key } = req.body as { key: string };
+    if (key !== env.ADMIN_SECRET_KEY) {
+      logAudit({
+        event_type: 'failed_login',
+        actor: req.ip ? `ip:${req.ip}` : undefined,
+        action: 'admin_session_create_denied',
+        details: { reason: 'invalid_key' },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+      logger.warn('Admin session: invalid key', { ip: req.ip });
+      res.status(403).json({ error: 'Invalid admin key' });
+      return;
+    }
+    const token = createAdminSession();
+    res.cookie(ADMIN_SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
+    logAudit({
+      event_type: 'admin_login',
+      actor: req.ip ? `ip:${req.ip}` : undefined,
+      action: 'admin_session_created',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    });
+    res.json({ ok: true });
+  }
+);
+
+/**
+ * DELETE /api/admin/session
+ * Revokes the current session and clears the cookie.
+ */
+router.delete('/session', (req: Request, res: Response): void => {
+  const token = parseCookie(req.headers.cookie, ADMIN_SESSION_COOKIE);
+  revokeAdminSession(token);
+  res.clearCookie(ADMIN_SESSION_COOKIE, { path: '/api/admin' });
+  res.json({ ok: true });
+});
+
+/**
+ * GET /api/admin/session/check
+ * Returns 200 if the session cookie is valid; 401 otherwise.
+ * Used by the frontend on page mount to restore admin state without re-entering the key.
+ */
+router.get('/session/check', (req: Request, res: Response): void => {
+  const token = parseCookie(req.headers.cookie, ADMIN_SESSION_COOKIE);
+  if (validateAndRefreshSession(token)) {
+    res.json({ ok: true });
+    return;
+  }
+  res.status(401).json({ ok: false });
+});
+
+// ─── All subsequent routes require a valid session ────────────────────────────
 router.use(requireAdmin);
 
 /**
@@ -774,7 +853,9 @@ router.get('/api-keys', async (req: Request, res: Response, next: NextFunction):
     const keysWithBrand = keys.map((k) => ({
       id: k.id,
       user_id: k.user_id,
-      key_value: k.key_value,
+      // key_value is intentionally excluded from the response — only the
+      // truncated preview is returned to limit blast radius if this endpoint
+      // is ever accessed by an unauthorised actor.
       name: k.name,
       status: k.status,
       last_used: k.last_used,

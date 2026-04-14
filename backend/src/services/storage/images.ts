@@ -4,6 +4,33 @@ import sharp from 'sharp';
 import { convexUploadBuffer, convexDeleteStorageIds, storagePathToConvexId } from '../convexStorageBridge';
 import { anyApi, convexQueryTrusted } from '../../config/convexHttp';
 
+// ---------------------------------------------------------------------------
+// Signed-URL in-memory cache
+// Convex storage URLs do not expire, but we cache to prevent N signing
+// round-trips per list request. TTL is kept well below any real expiry.
+// ---------------------------------------------------------------------------
+const SIGNED_URL_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_CACHE_ENTRIES = 2_000;
+
+interface CacheEntry { url: string; expiresAt: number }
+const signedUrlCache = new Map<string, CacheEntry>();
+
+function getCachedUrl(key: string): string | undefined {
+  const entry = signedUrlCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) { signedUrlCache.delete(key); return undefined; }
+  return entry.url;
+}
+
+function setCachedUrl(key: string, url: string): void {
+  if (signedUrlCache.size >= MAX_CACHE_ENTRIES) {
+    // Evict the 200 oldest entries to bound memory usage
+    const toDelete = [...signedUrlCache.keys()].slice(0, 200);
+    toDelete.forEach((k) => signedUrlCache.delete(k));
+  }
+  signedUrlCache.set(key, { url, expiresAt: Date.now() + SIGNED_URL_CACHE_TTL_MS });
+}
+
 const INPUT_BUCKET = env.STORAGE_BUCKET_INPUTS;
 const RESULT_BUCKET = env.STORAGE_BUCKET_RESULTS;
 
@@ -78,11 +105,37 @@ export async function storeResultImage(
   userId?: string
 ): Promise<string> {
   void tryonId;
-  const response = await fetch(imageUrl);
-  if (!response.ok) throw new Error(`Failed to fetch result image: ${response.statusText}`);
 
-  const arrayBuffer = await response.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
+  // Basic SSRF guard: only allow HTTPS URLs pointing to non-private hosts.
+  // This function is currently unused but is protected defensively.
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(imageUrl);
+  } catch {
+    throw new Error('storeResultImage: invalid URL');
+  }
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error('storeResultImage: only HTTPS URLs are allowed');
+  }
+  const PRIVATE_HOST = /^(localhost|127\.|0\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1)/i;
+  if (PRIVATE_HOST.test(parsedUrl.hostname)) {
+    throw new Error('storeResultImage: URL host not allowed');
+  }
+
+  const response = await fetch(imageUrl);
+  if (!response.ok) throw new Error(`Failed to fetch result image: ${response.status}`);
+
+  // Cap response size before buffering to prevent OOM
+  const RESULT_IMAGE_MAX_BYTES = 20 * 1024 * 1024; // 20 MB cap for result images
+  const contentLength = response.headers.get('content-length');
+  if (contentLength && parseInt(contentLength, 10) > RESULT_IMAGE_MAX_BYTES) {
+    throw new Error('storeResultImage: remote image exceeds size limit');
+  }
+  const rawBuffer = await response.arrayBuffer();
+  if (rawBuffer.byteLength > RESULT_IMAGE_MAX_BYTES) {
+    throw new Error('storeResultImage: remote image exceeds size limit');
+  }
+  const buffer = Buffer.from(rawBuffer);
 
   const optimized = await sharp(buffer)
     .jpeg({
@@ -104,12 +157,16 @@ export async function getSignedUrl(
   _expiresInSeconds: number = env.IMAGE_EXPIRY_SECONDS
 ): Promise<string> {
   void _expiresInSeconds;
+  const cached = getCachedUrl(filePath);
+  if (cached) return cached;
   try {
     const storageId = storagePathToConvexId(filePath);
-    return await convexQueryTrusted<string>(anyApi.trustedStorage.storageGetUrl, {
+    const url = await convexQueryTrusted<string>(anyApi.trustedStorage.storageGetUrl, {
       secret: env.BACKEND_SHARED_SECRET,
       storageId,
     });
+    setCachedUrl(filePath, url);
+    return url;
   } catch (err) {
     logger.error('getSignedUrl failed', { filePath: filePath.slice(0, 120), error: String(err) });
     throw err instanceof Error ? err : new Error(String(err));

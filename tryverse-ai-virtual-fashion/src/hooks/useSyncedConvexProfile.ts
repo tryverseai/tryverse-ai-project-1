@@ -3,6 +3,12 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { isConvexDataEnabled } from "@/lib/convexData";
+import { normalizeAccountType } from "@/lib/accountType";
+
+// Free-pool credit caps mirror backend/src/services/credits.ts DEFAULT_FREE_CREDITS_*.
+// Keep these in sync if the backend values change.
+const FREE_CREDITS_INDIVIDUAL = 5;
+const FREE_CREDITS_BUSINESS = 20;
 
 /**
  * Convex profile for the signed-in user; bootstraps via {@link api.profiles.upsertProfileForUser} when missing.
@@ -29,8 +35,9 @@ export function useSyncedConvexProfile() {
     attempted.current = true;
     let cancelled = false;
     setBootstrapping(true);
-    const acct = user.user_metadata.account_type ?? "business";
-    const cap = acct === "individual" ? 5 : 20;
+    // normalizeAccountType handles aliases ("brand" → "business") and casing.
+    const acct = normalizeAccountType(user.user_metadata.account_type) ?? "business";
+    const cap = acct === "individual" ? FREE_CREDITS_INDIVIDUAL : FREE_CREDITS_BUSINESS;
     void (async () => {
       try {
         await upsert({

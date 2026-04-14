@@ -13,6 +13,8 @@ const publicLinks = [
   { label: "About", href: "/about" },
 ];
 
+const SPRING_TRANSITION = { type: "spring" as const, stiffness: 260, damping: 22 };
+
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
@@ -85,8 +87,6 @@ export function Navbar() {
     navigate("/");
   };
 
-  const spring = { type: "spring" as const, stiffness: 260, damping: 22 };
-
   return (
     <motion.nav
       className="fixed top-0 left-0 right-0 z-50 bg-background/98 backdrop-blur-md border-b border-border/40"
@@ -103,7 +103,7 @@ export function Navbar() {
         animate={{
           maxWidth: isDesktop ? (isCompact ? 720 : 1280) : "100%",
         }}
-        transition={spring}
+        transition={SPRING_TRANSITION}
         style={{ width: "100%" }}
       >
         <Link
@@ -148,7 +148,7 @@ export function Navbar() {
         <motion.div
           className="hidden md:flex items-center"
           animate={{ gap: isCompact ? 6 : 12 }}
-          transition={spring}
+          transition={SPRING_TRANSITION}
         >
           {user ? (
             <>
