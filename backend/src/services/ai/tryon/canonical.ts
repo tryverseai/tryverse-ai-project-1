@@ -22,12 +22,14 @@ export async function validatePersonForTryOn(buffer: Buffer): Promise<PersonVali
   const meta = await sharp(buffer).metadata();
   const w = meta.width ?? 0;
   const h = meta.height ?? 0;
-  if (w < 320 || h < 320) {
-    return { ok: false, reason: 'Photo is too small; use at least ~320px on the shortest side.' };
+  // Allow smaller catalog / model thumbnails (still usable for VTON after upscale path).
+  if (w < 280 || h < 280) {
+    return { ok: false, reason: 'Photo is too small; use at least ~280px on the shortest side.' };
   }
 
   const ratio = h / w;
-  if (ratio < 0.55) {
+  // Full-body studio shots can be fairly wide; 0.48 avoids rejecting valid library models.
+  if (ratio < 0.48) {
     return {
       ok: false,
       reason: 'Photo is very wide/landscape; use a taller portrait so the full subject is visible.',

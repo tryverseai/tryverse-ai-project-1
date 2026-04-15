@@ -15,6 +15,12 @@ function optionalEnv(key: string, defaultValue = ''): string {
   return process.env[key] || defaultValue;
 }
 
+/** Strip UTF-8 BOM and surrounding whitespace — common cause of "API key is invalid" from Resend. */
+function sanitizeEnvLine(raw: string | undefined, defaultValue = ''): string {
+  if (!raw) return defaultValue;
+  return raw.replace(/^\uFEFF/, '').trim();
+}
+
 function optionalBool(key: string, defaultValue = false): boolean {
   const val = process.env[key];
   if (!val) return defaultValue;
@@ -201,8 +207,12 @@ export const env = {
   FRONTEND_URL: optionalEnv('FRONTEND_URL', 'http://localhost:8080'),
 
   // ── Email (Resend) ─────────────────────────────────────────────────────
-  RESEND_API_KEY: optionalEnv('RESEND_API_KEY', ''),
-  EMAIL_FROM: optionalEnv('EMAIL_FROM', 'TryVerse <onboarding@resend.dev>'),
+  /** Trimmed — trailing newlines/quotes in .env break Resend with "API key is invalid". */
+  RESEND_API_KEY: sanitizeEnvLine(process.env['RESEND_API_KEY'], ''),
+  EMAIL_FROM: sanitizeEnvLine(
+    process.env['EMAIL_FROM'],
+    'TryVerse <onboarding@resend.dev>'
+  ),
 
   // ── Storage ───────────────────────────────────────────────────────────────
   STORAGE_BUCKET_INPUTS: optionalEnv('STORAGE_BUCKET_INPUTS', 'tryon-inputs'),

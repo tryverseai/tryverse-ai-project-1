@@ -149,6 +149,57 @@ function nmsFaceCountBoxes(boxes: FaceCountBox[], iouThresh: number): FaceCountB
   return kept;
 }
 
+/**
+ * BlazeFace often returns two boxes on one subject (partial overlap, chin/hair split, glare).
+ * NMS at a single IoU still leaves some pairs; this pass removes obvious duplicate detections
+ * so curated model library shots are not rejected as "multiple faces".
+ */
+function dedupeFaceCountBoxesForSingleSubject(
+  boxes: FaceCountBox[],
+  detW: number,
+  detH: number
+): FaceCountBox[] {
+  if (boxes.length < 2) return boxes;
+  const minSide = Math.min(detW, detH);
+  /** Max center distance (px in detection space) to treat as same subject when boxes barely overlap. */
+  const nearCenterPx = minSide * 0.12;
+
+  const list = [...boxes].sort((a, b) => b.prob - a.prob);
+  const out: FaceCountBox[] = [];
+
+  while (list.length) {
+    const anchor = list.shift()!;
+    out.push(anchor);
+    const ax = anchor.x + anchor.w / 2;
+    const ay = anchor.y + anchor.h / 2;
+    const aArea = anchor.w * anchor.h;
+
+    for (let i = list.length - 1; i >= 0; i--) {
+      const b = list[i]!;
+      const iouVal = iouFaceCountBoxes(anchor, b);
+      const bx = b.x + b.w / 2;
+      const by = b.y + b.h / 2;
+      const dist = Math.hypot(bx - ax, by - ay);
+      const bArea = b.w * b.h;
+      const smallArea = Math.min(aArea, bArea);
+      const largeArea = Math.max(aArea, bArea);
+      const areaRatio = largeArea > 0 ? smallArea / largeArea : 0;
+      const probRatio = anchor.prob > 0 ? b.prob / anchor.prob : 1;
+
+      const overlappingFragments = iouVal >= 0.1;
+      const nearAndSizedAsDuplicate =
+        dist < nearCenterPx &&
+        (areaRatio < 0.52 || probRatio < 0.82 || iouVal >= 0.04);
+
+      if (overlappingFragments || nearAndSizedAsDuplicate) {
+        list.splice(i, 1);
+      }
+    }
+  }
+
+  return out;
+}
+
 function boxesFromNormalizedFaces(
   faces: NormalizedFace[],
   detW: number,
@@ -196,7 +247,9 @@ async function countFacesWithModel(buffer: Buffer, model: BlazeFaceModel): Promi
     if (boxes.length === 0 && faces.length > 0) {
       boxes = boxesFromNormalizedFaces(faces, detW, detH, null);
     }
-    return nmsFaceCountBoxes(boxes, 0.42).length;
+    // Slightly looser NMS + duplicate merge: one real subject was often counted as 2 (library models).
+    const merged = dedupeFaceCountBoxesForSingleSubject(nmsFaceCountBoxes(boxes, 0.5), detW, detH);
+    return merged.length;
   } catch {
     return 0;
   } finally {

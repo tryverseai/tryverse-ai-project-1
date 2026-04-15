@@ -1,10 +1,12 @@
 import Resend from "@auth/core/providers/resend";
 import { RandomReader, generateRandomString } from "@oslojs/crypto/random";
+import { trimResendSecret } from "./resendEnv";
 
 const base = Resend({
   id: "resend-otp-reset",
-  apiKey: process.env.AUTH_RESEND_KEY ?? "",
-  from: process.env.AUTH_EMAIL_FROM ?? "TryVerse <onboarding@resend.dev>",
+  apiKey: trimResendSecret(process.env.AUTH_RESEND_KEY),
+  from:
+    trimResendSecret(process.env.AUTH_EMAIL_FROM) || "TryVerse <onboarding@resend.dev>",
 });
 
 /**
@@ -34,13 +36,13 @@ export const ResendOTPPasswordReset = {
     },
   ) {
     const email = params.identifier;
-    const apiKey = params.provider.apiKey as string;
+    const apiKey = trimResendSecret(params.provider.apiKey as string | undefined);
     if (!apiKey) {
       throw new Error("AUTH_RESEND_KEY is not set in Convex environment variables.");
     }
     const from =
-      typeof params.provider.from === "string" && params.provider.from.length > 0
-        ? params.provider.from
+      typeof params.provider.from === "string" && trimResendSecret(params.provider.from).length > 0
+        ? trimResendSecret(params.provider.from)
         : "TryVerse <onboarding@resend.dev>";
     const token = params.token;
     const res = await fetch("https://api.resend.com/emails", {
@@ -64,6 +66,11 @@ export const ResendOTPPasswordReset = {
         detail = JSON.stringify(await res.json());
       } catch {
         detail = await res.text();
+      }
+      if (/invalid.*api.*key|api key is invalid/i.test(detail)) {
+        throw new Error(
+          "Email could not be sent: Resend API key is invalid. In the Convex dashboard set AUTH_RESEND_KEY to a current key from https://resend.com/api-keys (same key as backend RESEND_API_KEY is fine)."
+        );
       }
       throw new Error(`Resend error: ${detail}`);
     }

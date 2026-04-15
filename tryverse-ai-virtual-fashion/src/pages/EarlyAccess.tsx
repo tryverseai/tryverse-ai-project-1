@@ -202,7 +202,7 @@ const EarlyAccess = () => {
       setSubmitted(true);
       toast.success(
         result.emailSent === false
-          ? "Request received. Confirmation email wasn’t sent (check Resend / server logs)."
+          ? "Request received. We could not send the confirmation email yet — check spam, or ask the team to verify RESEND_API_KEY (backend) and AUTH_RESEND_KEY (Convex) at resend.com/api-keys."
           : "Request sent — check your inbox."
       );
     } catch (err) {
@@ -275,7 +275,7 @@ const EarlyAccess = () => {
       setSubmitted(true);
       toast.success(
         result.emailSent === false
-          ? "Application received. Confirmation email wasn’t sent (Resend: verify your domain or use a test inbox — see server logs)."
+          ? "Application received. Confirmation email was not delivered — verify RESEND_API_KEY in backend/.env and AUTH_RESEND_KEY in Convex (same active key from resend.com/api-keys), then verify your domain or use Resend’s test inbox rules."
           : "Application sent — check your inbox for a confirmation."
       );
     } catch (err) {

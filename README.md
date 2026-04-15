@@ -106,6 +106,14 @@ The app still works — you'll just see slower response times.
 
 ---
 
+## Production deployment (Vercel + Railway)
+
+Step-by-step host wiring (API on Railway, UI on Vercel, Convex in the cloud) is in **[`docs/DEPLOY_VERCEL_RAILWAY.md`](docs/DEPLOY_VERCEL_RAILWAY.md)**.  
+Vercel project **root directory** should be `tryverse-ai-virtual-fashion` (uses [`vercel.json`](tryverse-ai-virtual-fashion/vercel.json) for SPA routing).  
+Railway service **root directory** should be `backend`.
+
+---
+
 ## Project structure
 
 ```

@@ -5,14 +5,16 @@
  */
 import Resend from "@auth/core/providers/resend";
 import { RandomReader, generateRandomString } from "@oslojs/crypto/random";
+import { trimResendSecret } from "./resendEnv";
 
 /** Keep this id identical on the Resend() factory and export — Auth.js merge uses the factory id for stored verification rows. */
 const VERIFY_PROVIDER_ID = "resend-otp-verify";
 
 const base = Resend({
   id: VERIFY_PROVIDER_ID,
-  apiKey: process.env.AUTH_RESEND_KEY ?? "",
-  from: process.env.AUTH_EMAIL_FROM ?? "TryVerse <onboarding@resend.dev>",
+  apiKey: trimResendSecret(process.env.AUTH_RESEND_KEY),
+  from:
+    trimResendSecret(process.env.AUTH_EMAIL_FROM) || "TryVerse <onboarding@resend.dev>",
 });
 
 const baseOpts =
@@ -48,13 +50,13 @@ export const ResendEmailSignupVerification = {
     },
   ) {
     const email = params.identifier;
-    const apiKey = params.provider.apiKey as string;
+    const apiKey = trimResendSecret(params.provider.apiKey as string | undefined);
     if (!apiKey) {
       throw new Error("AUTH_RESEND_KEY is not set in Convex environment variables.");
     }
     const from =
-      typeof params.provider.from === "string" && params.provider.from.length > 0
-        ? params.provider.from
+      typeof params.provider.from === "string" && trimResendSecret(params.provider.from).length > 0
+        ? trimResendSecret(params.provider.from)
         : "TryVerse <onboarding@resend.dev>";
     const token = params.token;
     const res = await fetch("https://api.resend.com/emails", {
@@ -78,6 +80,11 @@ export const ResendEmailSignupVerification = {
         detail = JSON.stringify(await res.json());
       } catch {
         detail = await res.text();
+      }
+      if (/invalid.*api.*key|api key is invalid/i.test(detail)) {
+        throw new Error(
+          "Email could not be sent: Resend API key is invalid. Set AUTH_RESEND_KEY in the Convex dashboard to a current key from https://resend.com/api-keys."
+        );
       }
       throw new Error(`Resend error: ${detail}`);
     }
