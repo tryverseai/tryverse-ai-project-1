@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { getAdminModelLibrary, patchAdminModelLibrary, type TryverseModel } from "@/lib/backendApi";
+import {
+  getAdminModelLibrary,
+  patchAdminModelLibrary,
+  postAdminModelLibraryBulkFreeTier,
+  type TryverseModel,
+} from "@/lib/backendApi";
 import { toast } from "sonner";
 
 type Row = TryverseModel & { is_active: boolean; free_tier_eligible: boolean; created_at: string };
@@ -14,6 +19,7 @@ export function AdminModelLibraryTab({ adminKey }: { adminKey: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [patchingId, setPatchingId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -45,6 +51,38 @@ export function AdminModelLibraryTab({ adminKey }: { adminKey: string }) {
     }
   };
 
+  const bulkFreeTier = async (mode: "all_in_catalog" | "defaults_only" | "all_rows") => {
+    const ok =
+      mode === "all_in_catalog"
+        ? confirm(
+            "Unlock every in-catalog preset for Free-plan users? (They still need try-on credits.)"
+          )
+        : mode === "all_rows"
+          ? confirm(
+              "TESTING: Set EVERY model row to “unlocked for Free plan” (including hidden/inactive rows). Continue?"
+            )
+          : confirm(
+              "Restrict Free-plan users to Diane + Andrew only? (Paid plans keep full in-catalog access.)"
+            );
+    if (!ok) return;
+    setBulkBusy(true);
+    try {
+      const res = await postAdminModelLibraryBulkFreeTier(adminKey, mode);
+      toast.success(
+        mode === "all_in_catalog"
+          ? `Unlocked ${res.updated} preset row(s) for Free tier`
+          : mode === "all_rows"
+            ? `Testing unlock: updated ${res.updated} row(s) — all marked free-tier eligible`
+            : `Reset Free tier to defaults (${res.updated} row(s) updated)`
+      );
+      await load();
+    } catch {
+      toast.error("Bulk update failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -54,9 +92,45 @@ export function AdminModelLibraryTab({ adminKey }: { adminKey: string }) {
             Model library
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            <strong>In catalog</strong> shows the preset to shoppers. <strong>Free tier</strong> lets users on the free plan
-            run try-ons with that preset (default: Diane + Andrew). Paid plans may use any in-catalog model.
+            <strong>In catalog</strong> shows the preset in the app and widget. <strong>Unlocked for Free plan</strong> means
+            users on Free / trial can select that preset when they have try-on credits. Paid plans can use any in-catalog
+            preset. Changes apply immediately in the user dashboard (Try on / Models tabs).
           </p>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="gap-2"
+              disabled={loading || bulkBusy}
+              onClick={() => void bulkFreeTier("all_in_catalog")}
+            >
+              {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Unlock all in-catalog for Free plan
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={loading || bulkBusy}
+              onClick={() => void bulkFreeTier("defaults_only")}
+            >
+              {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Free plan: Diane + Andrew only
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="gap-2"
+              disabled={loading || bulkBusy}
+              onClick={() => void bulkFreeTier("all_rows")}
+            >
+              {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Testing: unlock every model row
+            </Button>
+          </div>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2 shrink-0">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -89,7 +163,7 @@ export function AdminModelLibraryTab({ adminKey }: { adminKey: string }) {
                     {m.is_active ? "in catalog" : "hidden"}
                   </Badge>
                   <Badge variant={m.free_tier_eligible ? "outline" : "secondary"} className="text-[10px] bg-background/90">
-                    {m.free_tier_eligible ? "free tier" : "paid only"}
+                    {m.free_tier_eligible ? "unlocked (Free plan)" : "paid plan only"}
                   </Badge>
                 </div>
                 {patchingId === m.id && (
@@ -118,7 +192,7 @@ export function AdminModelLibraryTab({ adminKey }: { adminKey: string }) {
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <Label htmlFor={`free-${m.id}`} className="text-xs text-muted-foreground cursor-pointer">
-                    Free tier OK
+                    Unlocked for Free plan
                   </Label>
                   <Switch
                     id={`free-${m.id}`}

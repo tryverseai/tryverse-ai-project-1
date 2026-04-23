@@ -992,6 +992,18 @@ export async function patchAdminModelLibrary(
   });
 }
 
+/** Bulk: which presets free-plan users can run (dashboard + API enforced). */
+export async function postAdminModelLibraryBulkFreeTier(
+  adminKey: string,
+  mode: 'all_in_catalog' | 'defaults_only' | 'all_rows'
+) {
+  return adminFetch<{ ok: boolean; mode: string; updated: number }>(
+    '/api/admin/model-library/bulk-free-tier',
+    adminKey,
+    { method: 'POST', body: JSON.stringify({ mode }) }
+  );
+}
+
 export async function getAdminUsers(
   adminKey: string,
   page = 1,

@@ -28,16 +28,30 @@ export async function meanAbsDiffDownscaled(a: Buffer, b: Buffer): Promise<numbe
   return sum / da.length;
 }
 
+export interface ValidateTryOnOutputOptions {
+  /** When true, skip the 64×64 luminance-variance check (FASHN etc. can look “flat” after downscale). */
+  skipFlatnessCheck?: boolean;
+  /** Default 8. Use a lower value (e.g. 3) for models that stay flatter at 64×64 without being corrupt. */
+  flatnessVarianceMin?: number;
+}
+
 /**
  * Lightweight quality gate on the generated raster (no extra ML).
  * Rejects empty/flat/broken dimensions before returning to clients.
  */
-export async function validateTryOnOutput(buffer: Buffer): Promise<OutputGateResult> {
+export async function validateTryOnOutput(
+  buffer: Buffer,
+  options?: ValidateTryOnOutputOptions
+): Promise<OutputGateResult> {
   const meta = await sharp(buffer).metadata();
   const w = meta.width ?? 0;
   const h = meta.height ?? 0;
   if (w < 256 || h < 256) {
     return { ok: false, reason: 'Generated image dimensions too small' };
+  }
+
+  if (options?.skipFlatnessCheck) {
+    return { ok: true };
   }
 
   const stats = await sharp(buffer)
@@ -51,13 +65,15 @@ export async function validateTryOnOutput(buffer: Buffer): Promise<OutputGateRes
   let sum = 0;
   let sumSq = 0;
   for (let i = 0; i < data.length; i += ch) {
-    const g = (data[i] + data[i + 1] + data[i + 2]) / 3;
+    const g =
+      ch >= 3 ? (data[i]! + data[i + 1]! + data[i + 2]!) / 3 : (data[i] ?? 0);
     sum += g;
     sumSq += g * g;
   }
   const mean = sum / Math.max(1, n);
   const variance = Math.max(0, sumSq / Math.max(1, n) - mean * mean);
-  if (variance < 8) {
+  const minVar = options?.flatnessVarianceMin ?? 8;
+  if (variance < minVar) {
     return { ok: false, reason: 'Generated image appears flat or corrupted' };
   }
 

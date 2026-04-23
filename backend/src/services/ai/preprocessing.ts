@@ -72,12 +72,23 @@ export async function preprocessPersonImage(imageUrl: string): Promise<Preproces
   }
 }
 
+export interface PreprocessProductOptions {
+  /** When true, never call rembg (keeps ghost mannequin / multi-piece product shots intact). */
+  skipBackgroundRemoval?: boolean;
+}
+
 /**
  * Preprocesses the product image for optimal try-on accuracy.
  * Removes background from product image so the AI model gets a clean overlay target.
  */
-export async function preprocessProductImage(imageUrl: string): Promise<PreprocessResult> {
-  logger.info('Preprocessing product image', { imageUrl: imageUrl.slice(0, 60) });
+export async function preprocessProductImage(
+  imageUrl: string,
+  options?: PreprocessProductOptions
+): Promise<PreprocessResult> {
+  logger.info('Preprocessing product image', {
+    imageUrl: imageUrl.slice(0, 60),
+    skipBackgroundRemoval: options?.skipBackgroundRemoval === true,
+  });
 
   try {
     const response = await fetch(imageUrl);
@@ -86,7 +97,11 @@ export async function preprocessProductImage(imageUrl: string): Promise<Preproce
     const meta = await sharp(buffer).metadata();
     const quality = assessImageQuality(meta.width || 0, meta.height || 0);
 
-    if (env.ENABLE_BACKGROUND_REMOVAL && quality !== 'low') {
+    if (
+      env.ENABLE_BACKGROUND_REMOVAL &&
+      quality !== 'low' &&
+      options?.skipBackgroundRemoval !== true
+    ) {
       try {
         const cleanedUrl = await removeBackground(imageUrl);
         return { processedImageUrl: cleanedUrl, originalUrl: imageUrl, wasProcessed: true, bodyDetected: false, quality };

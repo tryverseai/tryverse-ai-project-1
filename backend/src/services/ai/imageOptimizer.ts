@@ -16,11 +16,29 @@ export interface OptimizedImage {
  * - JPEG at TRYON_AI_JPEG_QUALITY (preserve detail for downstream models)
  * - Compute SHA-256 hash for caching
  */
-export async function optimizeImageForAI(imageUrl: string): Promise<OptimizedImage> {
-  const response = await fetch(imageUrl);
-  if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+const FETCH_RETRIES = 4;
+const FETCH_RETRY_BASE_MS = 600;
 
-  const inputBuffer = Buffer.from(await response.arrayBuffer());
+export async function optimizeImageForAI(imageUrl: string): Promise<OptimizedImage> {
+  let lastErr: unknown;
+  let inputBuffer: Buffer | undefined;
+  for (let attempt = 0; attempt < FETCH_RETRIES; attempt++) {
+    try {
+      const response = await fetch(imageUrl);
+      if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+      inputBuffer = Buffer.from(await response.arrayBuffer());
+      break;
+    } catch (e) {
+      lastErr = e;
+      if (attempt + 1 >= FETCH_RETRIES) throw e;
+      const wait = FETCH_RETRY_BASE_MS * (attempt + 1);
+      logger.warn('optimizeImageForAI: fetch retry', { attempt: attempt + 1, waitMs: wait });
+      await new Promise((r) => setTimeout(r, wait));
+    }
+  }
+  if (!inputBuffer) {
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  }
   const maxEdge = env.TRYON_AI_MAX_DIMENSION;
   const jpegQ = env.TRYON_AI_JPEG_QUALITY;
 

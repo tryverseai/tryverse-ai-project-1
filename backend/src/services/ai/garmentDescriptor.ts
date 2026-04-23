@@ -63,15 +63,19 @@ const FASHN_BOTTOMS_RE =
   /\b(pants?|jeans|trousers|shorts|joggers|leggings|chinos|slacks|\bskirt\b|mini\s*skirt|midi\s*skirt|maxi\s*skirt|cargo)\b/i;
 
 /**
- * Matches coordinated sets, two-piece outfits, or any product that covers
- * both upper and lower body — these should use `one-pieces` so FASHN replaces
- * the full outfit rather than just one half.
- *
- * Examples: "denim set", "matching shorts and shirt", "co-ord", "suit", "tuxedo",
- *           "two-piece", "tracksuit", "sweat set", "loungewear set"
+ * Coordinated / full-outfit products — `one-pieces` so FASHN replaces head-to-toe look.
+ * Intentionally excludes bare "set" / "outfit" (too many false positives on single tops).
  */
 const FASHN_OUTFIT_SET_RE =
-  /\b(set\b|co-?ords?|matching\s+set|two[\s-]piece|2[\s-]piece|twin[\s-]set|tracksuit|sweatsuit|sweat\s*set|lounge\s*set|suit\b|tuxedo|blazer\s*(and|&)\s*(pant|trouser|short)|outfit\b|ensemble|jumpsuit|playsuit|romper)\b/i;
+  /\b(co-?ords?|matching\s+set|two[\s-]piece|2[\s-]piece|twin[\s-]set|tracksuit|sweatsuit|sweat\s*set|lounge\s*set|(?:denim|knit|linen|matching)\s+set|\bsuit\b|tuxedo|blazer\s*(?:and|&)\s*(?:pant|trouser|short)s?|jumpsuit|playsuit|romper)\b/i;
+
+/** Explicit upper-body catalog copy — shirts/blouses must stay `tops` so shorts/skirts on the model are preserved. */
+const FASHN_TOP_STRONG_RE =
+  /\b(blouse|shirts?\b|button[-\s]?down|oxford|popover|polo\b|tee\b|t[-\s]?shirts?|tank\b|camisole|cardigan|sweater|pullover|knitwear|hoodie|crew\s*neck|v[-\s]?neck\s*(?:top|shirt|blouse)|tie[-\s]?front|wrap\s+(?:top|blouse|shirt)|cropped?\s+top|crop\s+top|peplum\s+top|tunic\s+top|long\s*sleeve\s+top|bell\s*sleeve|(?<![a-z])top)\b/i;
+
+/** Dress / gown / one-piece only — not bare "maxi"/"midi" (matches maxi skirts/cardigans) or "sleeveless" tops. */
+const FASHN_ONE_PIECE_GARMENT_RE =
+  /\b(dress|gown|jumpsuit|romper|bodysuit|one[\s-]?piece|mini\s+dress|maxi\s+dress|midi\s+dress|maxi\s+gown|midi\s+gown|wrap\s+dress|sheath|bodycon|frock|ball\s*gown|evening(\s*[-\s])?gown|prom\s*dress|mermaid|column|floor[-\s]?length|full[-\s]?length|tea[-\s]?length)\b/i;
 
 export interface InferFashnGarmentCategoryOpts {
   /** When true, blank/placeholder captions use `auto` so full-length dresses are not forced into `tops`. */
@@ -82,47 +86,50 @@ export interface InferFashnGarmentCategoryOpts {
  * Maps product cues to FASHN garment category.
  *
  * Priority order (highest to lowest):
- *  1. Coordinated sets / full outfits → `one-pieces`  (before bottoms check so "shorts set" → one-pieces, not bottoms)
- *  2. Full-length dresses / gowns     → `one-pieces`
- *  3. Explicit bottoms keywords       → `bottoms`
- *  4. Generic/blank description       → `auto`  (FASHN v1.6 auto-detection)
- *  5. Tall product image aspect ratio → `one-pieces`
- *  6. Fallback                        → `tops`
+ *  1. Strong shirt/blouse/top copy → `tops` (keeps model’s existing shorts/skirt)
+ *  2. Coordinated sets / jumpsuits / rompers → `one-pieces`
+ *  3. Bottoms keywords → `bottoms`
+ *  4. Dress / gown / full-length garment wording → `one-pieces`
+ *  5. Generic/blank description → `auto` (FASHN v1.6)
+ *  6. Default → `tops` (never infer `one-pieces` from portrait product crop alone)
  */
 export function inferFashnGarmentCategory(
-  productHeightOverWidth?: number,
+  _productHeightOverWidth?: number,
   productDescription?: string | null,
   opts?: InferFashnGarmentCategoryOpts
 ): FashnGarmentSlot {
   const raw = (productDescription ?? '').trim();
 
-  // 1. Matching sets / full outfits (must run BEFORE bottoms regex — "shorts set" is a set, not just bottoms)
+  // 1. Catalog copy clearly describes an upper-body garment — do not promote to one-piece.
+  if (raw && FASHN_TOP_STRONG_RE.test(raw) && !FASHN_ONE_PIECE_GARMENT_RE.test(raw)) {
+    return 'tops';
+  }
+
+  // 2. Matching sets / jumpsuits / rompers (before bottoms so "shorts + top" co-ords still win)
   if (raw && FASHN_OUTFIT_SET_RE.test(raw)) {
     return 'one-pieces';
   }
 
-  // 2. Full-length dresses/gowns
-  if (raw && IDM_FULL_BODY_GARMENT_RE.test(raw)) {
-    return 'one-pieces';
-  }
-
-  // 3. Explicit bottoms-only keywords
+  // 3. Bottoms-only keywords (e.g. maxi skirt, jeans)
   if (raw && FASHN_BOTTOMS_RE.test(raw)) {
     return 'bottoms';
   }
 
-  // 4. Generic/blank → let FASHN auto-detect
+  // 4. Dress / gown / explicit full-length garment
+  if (raw && FASHN_ONE_PIECE_GARMENT_RE.test(raw)) {
+    return 'one-pieces';
+  }
+
+  if (raw && IDM_FULL_BODY_GARMENT_RE.test(raw)) {
+    return 'one-pieces';
+  }
+
+  // 5. Generic/blank → let FASHN auto-detect (full-length ghost mannequin without hurting tops)
   if (opts?.useAutoForGenericDescription && isBlankOrGeneric(raw)) {
     return 'auto';
   }
 
-  // 5. Tall product image (aspect ratio suggests a full-length garment)
-  const hw = productHeightOverWidth;
-  if (hw !== undefined && Number.isFinite(hw) && hw > 1.06) {
-    return 'one-pieces';
-  }
-
-  // 6. Default: upper-body garment
+  // 6. Default: upper-body try-on — preserves shorts unless copy says dress/set/gown.
   return 'tops';
 }
 
@@ -134,7 +141,7 @@ export interface IdmGarmentDescriptorOpts {
 }
 
 const IDM_FULL_BODY_GARMENT_RE =
-  /\b(dress|gown|jumpsuit|maxi\b|midi\b|frock|romper|sheath|bodycon|jumper(?:\s*[-\s])?dress|ball\s*gown|evening(\s*[-\s])?gown|prom\s*dress|mermaid|column)\b/i;
+  /\b(dress|gown|jumpsuit|maxi\s+dress|midi\s+dress|maxi\s+gown|frock|romper|sheath|bodycon|jumper(?:\s*[-\s])?dress|ball\s*gown|evening(\s*[-\s])?gown|prom\s*dress|mermaid|column)\b/i;
 
 /**
  * Maps product cues to IDM-VTON category (dresses = full-body, upper_body = tops etc.).
@@ -205,8 +212,7 @@ export function buildFashnClothingDescription(
   const cat = opts?.fashnCategory;
   const isLong =
     cat === 'one-pieces' ||
-    cat === 'auto' ||
-    inferIsLongGarment(opts?.productHeightOverWidth, productDescription);
+    (cat === 'auto' && inferIsLongGarment(opts?.productHeightOverWidth, productDescription));
   if (isLong) {
     core += GOWN_LENGTH_HINT;
   }

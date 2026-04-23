@@ -3,6 +3,8 @@ import { uploadImageBuffer } from '../storage/images';
 import { logger } from '../../config/logger';
 import { AppError } from '../../middleware/errorHandler';
 import { checkCredits, SHOPPER_TRYON_UNAVAILABLE_MESSAGE } from '../credits';
+import { cxGetProfile } from '../creditsConvexBridge';
+import { isFreeTierPlanId } from '../../lib/planTier';
 import { anyApi, convexQueryPublic, convexQueryTrusted } from '../../config/convexHttp';
 
 const SSRF_BLOCKED_HOSTS =
@@ -164,6 +166,17 @@ export async function resolveModelToPersonPath(modelIdOrSlug: string, userId: st
   const creditCheck = await checkCredits(userId);
   if (!creditCheck.allowed) {
     throw new AppError(SHOPPER_TRYON_UNAVAILABLE_MESSAGE, 402, 'CREDITS_EXHAUSTED');
+  }
+
+  const profile = await cxGetProfile(userId);
+  const planId = profile?.plan_id ?? 'free';
+  const eligible = freeTierEligibleFromRow(row);
+  if (isFreeTierPlanId(planId) && !eligible) {
+    throw new AppError(
+      'This preset is available on paid plans. Upgrade to unlock the full model library.',
+      403,
+      'MODEL_NOT_ALLOWED_FOR_PLAN'
+    );
   }
 
   const absoluteUrl = resolveModelImageUrl(row.image_url);

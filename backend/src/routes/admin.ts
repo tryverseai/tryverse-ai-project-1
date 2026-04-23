@@ -220,6 +220,47 @@ router.patch(
 );
 
 /**
+ * POST /api/admin/model-library/bulk-free-tier
+ * Unlock presets for free-plan users: all in-catalog, every DB row (testing), or defaults (Diane + Andrew).
+ */
+router.post(
+  '/model-library/bulk-free-tier',
+  [
+    body('mode')
+      .isIn(['all_in_catalog', 'defaults_only', 'all_rows'])
+      .withMessage('mode must be all_in_catalog, defaults_only, or all_rows'),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { mode } = matchedData(req) as {
+        mode: 'all_in_catalog' | 'defaults_only' | 'all_rows';
+      };
+      const result = (await convexMutationTrusted(anyApi.backendTrusted.bulkSetModelLibraryFreeTier, {
+        secret: env.BACKEND_SHARED_SECRET,
+        mode,
+      })) as { ok: true; updated: number };
+      await logAudit({
+        event_type: 'admin_action',
+        actor: 'admin',
+        action: 'model_library_bulk_free_tier',
+        target_id: 'model_library',
+        details: {
+          summary: `Bulk free-tier preset access: ${mode} (${result.updated} rows updated)`,
+          mode,
+          rows_updated: result.updated,
+        },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+      res.json({ ok: true, mode, updated: result.updated });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
  * GET /api/admin/metrics
  * High-level platform metrics dashboard.
  */

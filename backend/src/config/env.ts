@@ -102,18 +102,41 @@ export const env = {
   TRYON_FASHN_FALLBACK_IDM: optionalBool('TRYON_FASHN_FALLBACK_IDM', true),
   /** Let FASHN infer garment slot (`category=auto`) when the product caption is blank/generic (fixes gowns sent as `tops`). */
   TRYON_FASHN_CATEGORY_AUTO: optionalBool('TRYON_FASHN_CATEGORY_AUTO', true),
-  /** FASHN output: skip aggressive sharpen (can worsen soft faces). */
+  /** FASHN output: mild encode + ground shadow (no aggressive sharpen). */
   TRYON_FASHN_LIGHT_POST: optionalBool('TRYON_FASHN_LIGHT_POST', true),
   /**
-   * Off by default: pasting face+neck from the original photo onto FASHN output often leaves seams / “combs”
-   * on sleeveless or light tops (original neckline vs generated garment). Enable only if identity needs a nudge.
+   * Paste a tight face region from the input onto FASHN output (`faceOnlyMode` — minimal neck to avoid garment seams).
    */
-  TRYON_FASHN_FACE_LOCK: optionalBool('TRYON_FASHN_FACE_LOCK', false),
+  TRYON_FASHN_FACE_LOCK: optionalBool('TRYON_FASHN_FACE_LOCK', true),
+  /**
+   * FASHN `segmentation_free`: when true (default), the API uses a less rigid garment mask — often fewer hem/notch artifacts.
+   */
+  FASHN_SEGMENTATION_FREE: optionalBool('FASHN_SEGMENTATION_FREE', true),
+  /**
+   * For FASHN clothing, skip Replicate rembg on the product image (preserves ties, ghost-mannequin edges, multi-piece layouts).
+   * Only applies when `ENABLE_BACKGROUND_REMOVAL` is true.
+   */
+  TRYON_FASHN_SKIP_PRODUCT_BG_REMOVAL: optionalBool('TRYON_FASHN_SKIP_PRODUCT_BG_REMOVAL', true),
+  /**
+   * Minimum 64×64 luminance variance for output gate (FASHN only; main path uses 8).
+   */
+  TRYON_OUTPUT_FLATNESS_MIN_VARIANCE_FASHN: optionalFloat(
+    'TRYON_OUTPUT_FLATNESS_MIN_VARIANCE_FASHN',
+    3,
+    1,
+    8
+  ),
   /**
    * When false (default), FASHN does a full garment swap. `true` blends old outfit layers and often causes
    * horizontal smear / edge bleed on tops (meant for accessories keeping the rest of the outfit).
    */
   TRYON_FASHN_RESTORE_CLOTHES: optionalBool('TRYON_FASHN_RESTORE_CLOTHES', false),
+  /**
+   * FASHN try-on `nsfw_filter`. When true (default), FASHN may reject images it classifies as NSFW;
+   * failures surface as a generic content-policy message. Set false for local testing or if false
+   * positives block legitimate fashion photos (review FASHN / product policy before turning off in prod).
+   */
+  FASHN_NSFW_FILTER: optionalBool('FASHN_NSFW_FILTER', true),
 
   // Preprocessing — background removal (rembg)
   REPLICATE_MODEL_REMBG: optionalEnv(
@@ -168,9 +191,9 @@ export const env = {
   ENABLE_IMAGE_MODERATION: optionalBool('ENABLE_IMAGE_MODERATION', false),
 
   /** Longest edge (px) for images fed to try-on models (768–1536). */
-  TRYON_AI_MAX_DIMENSION: optionalInt('TRYON_AI_MAX_DIMENSION', 1024, 768, 1536),
+  TRYON_AI_MAX_DIMENSION: optionalInt('TRYON_AI_MAX_DIMENSION', 1152, 768, 1536),
   /** JPEG quality when preparing tensors (higher = closer to upload, slightly larger payloads). */
-  TRYON_AI_JPEG_QUALITY: optionalInt('TRYON_AI_JPEG_QUALITY', 92, 85, 98),
+  TRYON_AI_JPEG_QUALITY: optionalInt('TRYON_AI_JPEG_QUALITY', 94, 85, 98),
   /** IDM-VTON diffusion steps (20–50). Higher often looks cleaner; slower per run. */
   IDM_VTON_DENOISE_STEPS: optionalInt('IDM_VTON_DENOISE_STEPS', 50, 20, 50),
   /** IDM-VTON CFG / guidance (typical 1.5–3). */

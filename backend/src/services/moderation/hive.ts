@@ -35,6 +35,9 @@ const BLOCK_THRESHOLDS: Record<string, number> = {
  * Returns safe: false with a reason if content is inappropriate.
  */
 export async function moderateImage(imageUrl: string): Promise<ModerationResult> {
+  if (env.ENABLE_IMAGE_MODERATION !== true) {
+    return { safe: true, classes: {} };
+  }
   if (!env.HIVE_API_KEY) {
     // Moderation disabled — allow all
     return { safe: true, classes: {} };

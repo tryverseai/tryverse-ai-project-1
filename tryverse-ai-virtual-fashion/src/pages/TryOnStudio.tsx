@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -57,6 +57,20 @@ function sortTryverseModelsForDisplay(models: TryverseModel[]): TryverseModel[] 
     if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
     return a.display_name.localeCompare(b.display_name);
   });
+}
+
+/** Mirrors backend `isFreeTierPlanId` — presets may be restricted to `free_tier_eligible` models. */
+function isFreeTierStudioPlan(plan: string | null | undefined): boolean {
+  const p = String(plan ?? "free")
+    .trim()
+    .toLowerCase();
+  return p === "free" || p === "free_trial" || p === "trial";
+}
+
+function modelEligibleOnFreeTier(m: TryverseModel): boolean {
+  if (typeof m.free_tier_eligible === "boolean") return m.free_tier_eligible;
+  const s = m.slug.trim().toLowerCase();
+  return s === "diane" || s === "andrew";
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -126,8 +140,10 @@ const TryOnStudio = ({
   const { user } = useAuth();
   const convexOn = isConvexDataEnabled();
   const convexModels = useQuery(api.modelLibrary.listActiveModels, convexOn ? {} : "skip");
-  /** When true, preset models are usable (logged-in user still has try-on credits). */
+  /** When true, user has try-on credits (preset models may still be plan-gated per model). */
   const [studioModelsUnlocked, setStudioModelsUnlocked] = useState(false);
+  /** From GET /api/credits — drives free-plan vs paid preset access. */
+  const [studioCreditsPlan, setStudioCreditsPlan] = useState<string | null>(null);
 
   const categories = clothingOnly
     ? ALL_CATEGORIES.filter((c) => c.id === "clothing")
@@ -228,6 +244,7 @@ const TryOnStudio = ({
   useEffect(() => {
     if (!user) {
       setStudioModelsUnlocked(false);
+      setStudioCreditsPlan(null);
       return;
     }
     let cancelled = false;
@@ -237,9 +254,13 @@ const TryOnStudio = ({
         const hasCredits =
           c.isUnlimited || c.freeCreditsRemaining + c.monthlyCreditsRemaining > 0;
         setStudioModelsUnlocked(hasCredits);
+        setStudioCreditsPlan(c.plan);
       })
       .catch(() => {
-        if (!cancelled) setStudioModelsUnlocked(false);
+        if (!cancelled) {
+          setStudioModelsUnlocked(false);
+          setStudioCreditsPlan(null);
+        }
       });
     return () => {
       cancelled = true;
@@ -354,6 +375,18 @@ const TryOnStudio = ({
       return;
     }
 
+    const sel = libraryModels.find((x) => x.id === selectedModel);
+    if (
+      sel &&
+      isFreeTierStudioPlan(studioCreditsPlan) &&
+      !modelEligibleOnFreeTier(sel)
+    ) {
+      toast.error("This preset requires a paid plan.", {
+        description: "Upgrade to unlock the full model library, or pick another model.",
+      });
+      return;
+    }
+
     try {
       setPhase("uploading");
       setErrorMsg(null);
@@ -443,7 +476,13 @@ const TryOnStudio = ({
     (m) => m.gender === (genderFilter === "Female" ? "female" : "male")
   );
 
-  const isModelLockedForUser = (_m: TryverseModel) => !studioModelsUnlocked;
+  const isModelLockedForUser = (m: TryverseModel) => {
+    if (!studioModelsUnlocked) return true;
+    if (isFreeTierStudioPlan(studioCreditsPlan)) {
+      return !modelEligibleOnFreeTier(m);
+    }
+    return false;
+  };
 
   const selectedPresetLocked =
     !!selectedModel &&
@@ -700,6 +739,22 @@ const TryOnStudio = ({
                         </Link>
                       </p>
                     )}
+                    {user &&
+                      studioModelsUnlocked &&
+                      isFreeTierStudioPlan(studioCreditsPlan) &&
+                      filteredModels.some((m) => !modelEligibleOnFreeTier(m)) && (
+                        <p className="text-xs text-muted-foreground rounded-lg border border-border/60 bg-muted/40 px-3 py-2 mt-2">
+                          <span className="font-medium text-foreground">Free plan:</span> only presets marked for the free
+                          tier are unlocked here.{" "}
+                          <Link
+                            to="/pricing"
+                            className="text-foreground font-medium underline underline-offset-2 hover:no-underline"
+                          >
+                            Upgrade
+                          </Link>{" "}
+                          for the full library.
+                        </p>
+                      )}
                   </div>
                       <div className="flex gap-2">
                         {(["Female", "Male"] as const).map((g) => (
@@ -736,10 +791,21 @@ const TryOnStudio = ({
                                 type="button"
                                 onClick={() => {
                                   if (locked) {
-                                    toast.message("Try-on credits needed", {
-                                      description:
-                                        "Add credits to unlock preset models, or sign in if you haven't yet.",
-                                    });
+                                    if (
+                                      studioModelsUnlocked &&
+                                      isFreeTierStudioPlan(studioCreditsPlan) &&
+                                      !modelEligibleOnFreeTier(model)
+                                    ) {
+                                      toast.message("Included on paid plans", {
+                                        description:
+                                          "Upgrade to unlock this preset, or choose another model.",
+                                      });
+                                    } else {
+                                      toast.message("Try-on credits needed", {
+                                        description:
+                                          "Add credits to unlock preset models, or sign in if you haven't yet.",
+                                      });
+                                    }
                                     return;
                                   }
                                   setSelectedModel(model.id);

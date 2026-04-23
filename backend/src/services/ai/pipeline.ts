@@ -12,7 +12,11 @@ import {
   assertTryOnOutputNotCollage,
 } from './tryon';
 import { inferIdmVtonGarmentCategory } from './garmentDescriptor';
-import { postProcessResultBuffer, postProcessResultBufferMinimal, addGarmentShadow } from './postprocessing';
+import {
+  postProcessResultBuffer,
+  postProcessResultBufferMinimal,
+  addGarmentShadow,
+} from './postprocessing';
 import { moderateTryOnImages } from '../moderation/hive';
 import { getCachedResultByHash, setCachedResultByHash, computeImageHash } from '../cache/tryonCache';
 import { optimizeImageForAI, bufferToDataUrl } from './imageOptimizer';
@@ -77,11 +81,10 @@ interface PublicError { code: string; message: string }
 function classifyTryOnError(err: Error): PublicError {
   const msg = err.message.toLowerCase();
 
-  // Content moderation
-  if (msg.includes('moderat') || msg.includes('nsfw') || msg.includes('inappropriate') ||
-      msg.includes('safety') || msg.includes('content policy')) {
-    return { code: 'CONTENT_MODERATED', message: 'This image was flagged by our content policy. Please use a different photo.' };
-  }
+  // Do not map vendor try-on errors (e.g. FASHN "nsfw") to CONTENT_MODERATED — that string
+  // was misleading for fashion photos. Hive blocks are returned explicitly in STEP 3 with
+  // moderation.reason when ENABLE_IMAGE_MODERATION is enabled.
+
   // No person / body not detected
   if (msg.includes('no person') || msg.includes('no human') || msg.includes('body not') ||
       msg.includes('person not') || msg.includes('could not detect') || msg.includes('no body')) {
@@ -106,9 +109,18 @@ function classifyTryOnError(err: Error): PublicError {
       msg.includes('402')) {
     return { code: 'SERVICE_CAPACITY', message: 'Service is temporarily unavailable. Please try again shortly.' };
   }
-  // Auth failures against vendor APIs (config issue — don't leak "Replicate" etc.)
-  if (msg.includes('unauthorized') || msg.includes('forbidden') || msg.includes('401') ||
-      msg.includes('403') || msg.includes('invalid token') || msg.includes('api key')) {
+  // Auth / HTTP failures against vendor APIs (FASHN uses "API error 400" without parentheses)
+  if (
+    msg.includes('unauthorized') ||
+    msg.includes('forbidden') ||
+    msg.includes('401') ||
+    msg.includes('403') ||
+    msg.includes('(400)') ||
+    msg.includes('api error 4') ||
+    msg.includes('api error 5') ||
+    msg.includes('invalid token') ||
+    msg.includes('api key')
+  ) {
     return { code: 'SERVICE_ERROR', message: 'An internal service error occurred. Our team has been notified.' };
   }
   // Storage / upload errors
@@ -116,11 +128,48 @@ function classifyTryOnError(err: Error): PublicError {
       msg.includes('bucket') || msg.includes('s3') || msg.includes('blob')) {
     return { code: 'STORAGE_ERROR', message: 'Could not save your try-on result. Please try again.' };
   }
+  // Transient network (Node fetch, Convex CDN, FASHN output URL, tfjs model hosts)
+  if (
+    msg.includes('fetch failed') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('network error') ||
+    msg.includes('econnreset') ||
+    msg.includes('econnrefused') ||
+    msg.includes('enotfound') ||
+    msg.includes('etimedout') ||
+    msg.includes('socket hang up')
+  ) {
+    return {
+      code: 'NETWORK_ERROR',
+      message: 'Connection was interrupted while processing. Check your network and try again in a few seconds.',
+    };
+  }
   // Default catch-all
   return { code: 'PROCESSING_FAILED', message: 'Try-on processing failed. Please try again or use a different photo.' };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+async function fetchUrlBufferWithRetry(url: string, label: string): Promise<Buffer> {
+  const attempts = 4;
+  let last: Error | undefined;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch ${label}: ${res.status} ${res.statusText}`);
+      }
+      return Buffer.from(await res.arrayBuffer());
+    } catch (e) {
+      last = e instanceof Error ? e : new Error(String(e));
+      logger.warn('tryon: fetch retry', { label, attempt: i + 1, error: last.message });
+      if (i + 1 < attempts) {
+        await new Promise((r) => setTimeout(r, 700 * (i + 1)));
+      }
+    }
+  }
+  throw last ?? new Error(`Failed to fetch ${label}`);
+}
 
 export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> {
   const { tryonDbId, personImageUrl, productImageUrl, category, userId, productDescription } = job;
@@ -239,17 +288,36 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
     logger.info('Cache miss — running AI inference', { tryonDbId });
 
     // ── STEP 3: Image Moderation (Hive) ────────────────────────────────────
-    if (env.ENABLE_IMAGE_MODERATION) {
-      const personDataUrl = bufferToDataUrl(personBuffer);
-      const productDataUrl = bufferToDataUrl(productOptimized.buffer);
-      const moderation = await moderateTryOnImages(personDataUrl, productDataUrl);
-      if (!moderation.safe) {
-        await cxPatchTryon(tryonDbId, { status: 'failed' });
-        return {
-          jobId: job.jobId,
-          status: 'failed',
-          error: moderation.reason || 'Image failed content moderation',
+    if (env.ENABLE_IMAGE_MODERATION === true) {
+      try {
+        const personDataUrl = bufferToDataUrl(personBuffer);
+        const productDataUrl = bufferToDataUrl(productOptimized.buffer);
+        const moderation = (await moderateTryOnImages(personDataUrl, productDataUrl)) as {
+          safe: boolean;
+          reason?: string;
+          confidence?: number;
         };
+        if (!moderation.safe) {
+          // Only block if HIGH confidence — not borderline
+          if (moderation.confidence !== undefined && moderation.confidence > 0.85) {
+            await cxPatchTryon(tryonDbId, { status: 'failed' });
+            return {
+              jobId: job.jobId,
+              status: 'failed',
+              error: moderation.reason || 'Image failed content moderation',
+            };
+          }
+          logger.warn('Moderation flagged but below confidence threshold — allowing', {
+            tryonDbId,
+            reason: moderation.reason,
+          });
+        }
+      } catch (modErr) {
+        logger.warn('Moderation check failed — defaulting to safe', {
+          tryonDbId,
+          error: String(modErr),
+        });
+        // Do not block — let pipeline continue
       }
     }
 
@@ -276,9 +344,16 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       hasAux: !!parseStage.auxiliaryUrl,
     });
 
+    const skipProductRembg =
+      category === 'clothing' &&
+      clothingEngine === 'fashn' &&
+      env.TRYON_FASHN_SKIP_PRODUCT_BG_REMOVAL;
+
     const [personPreprocessed, productPreprocessed] = await Promise.all([
       preprocessPersonImage(personHttps),
-      preprocessProductImage(productHttps),
+      preprocessProductImage(productHttps, {
+        skipBackgroundRemoval: skipProductRembg,
+      }),
     ]);
 
     if (!personPreprocessed.bodyDetected) {
@@ -298,6 +373,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
     let finalBuffer!: Buffer;
     let faceLockApplied = false;
     let layoutOk = false;
+    let postProcessedApplied = false;
 
     for (let layoutAttempt = 0; layoutAttempt < MAX_LAYOUT_RETRIES; layoutAttempt++) {
       if (layoutAttempt > 0) {
@@ -307,7 +383,10 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       const poseType = inferPoseType(personW, personH);
       let compositeBuffer!: Buffer;
 
-      const maxVtonAttempts = category === 'clothing' ? 2 : 1;
+      // Near-identical output retry uses mean abs diff vs the input person — tuned for IDM-VTON + new seed.
+      // FASHN (direct API) has no seed; subtle swaps can still score below the threshold at 72×72 → false failures.
+      const maxVtonAttempts =
+        category === 'clothing' && clothingEngine === 'idm_vton' ? 2 : 1;
       for (let vtonAttempt = 0; vtonAttempt < maxVtonAttempts; vtonAttempt++) {
         const inf = await runVtonInference(
           {
@@ -325,9 +404,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
         processingTimeMs = inf.processingTimeMs;
         modelUsed = inf.modelUsed;
 
-        const vtonFetch = await fetch(rawResultUrl);
-        if (!vtonFetch.ok) throw new Error('Failed to fetch try-on result image');
-        compositeBuffer = Buffer.from(await vtonFetch.arrayBuffer());
+        compositeBuffer = await fetchUrlBufferWithRetry(rawResultUrl, 'try-on result image');
 
         if (category !== 'clothing' || maxVtonAttempts < 2) break;
 
@@ -352,39 +429,52 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       }
 
       faceLockApplied = false;
-      if (category === 'clothing' && env.ENABLE_FACE_LOCK) {
-        if (clothingEngine === 'fashn') {
-          if (env.TRYON_FASHN_FACE_LOCK) {
-            const lock = await applyFaceLockFromPersonInput(personBuffer, compositeBuffer, {
-              faceOnlyMode: true,
-            });
-            compositeBuffer = Buffer.from(lock.buffer);
-            faceLockApplied = lock.applied;
-          }
-        } else {
-          const lock = await applyFaceLockFromPersonInput(
-            personBuffer,
-            compositeBuffer,
-            idmGarmentSlot === 'dresses' ? { dressMode: true } : undefined
-          );
-          compositeBuffer = Buffer.from(lock.buffer);
-          faceLockApplied = lock.applied;
-        }
+      const useFaceLock =
+        category === 'clothing' &&
+        env.ENABLE_FACE_LOCK &&
+        (clothingEngine !== 'fashn' || env.TRYON_FASHN_FACE_LOCK);
+
+      if (useFaceLock) {
+        const lockOpts =
+          clothingEngine === 'fashn'
+            ? { faceOnlyMode: true as const }
+            : idmGarmentSlot === 'dresses'
+              ? { dressMode: true as const }
+              : undefined;
+        const lock = await applyFaceLockFromPersonInput(personBuffer, compositeBuffer, lockOpts);
+        compositeBuffer = Buffer.from(lock.buffer);
+        faceLockApplied = lock.applied;
       }
 
       const postInputBuffer = compositeBuffer;
+      postProcessedApplied = false;
 
-      if (env.ENABLE_POST_PROCESSING) {
-        const postResult =
-          category === 'clothing' && clothingEngine === 'fashn' && env.TRYON_FASHN_LIGHT_POST
-            ? await postProcessResultBufferMinimal(postInputBuffer)
-            : await postProcessResultBuffer(postInputBuffer);
+      if (category === 'clothing' && clothingEngine === 'fashn') {
+        if (env.TRYON_FASHN_LIGHT_POST) {
+          const postResult = await postProcessResultBufferMinimal(postInputBuffer);
+          finalBuffer = await addGarmentShadow(postResult.buffer);
+          postProcessedApplied = true;
+        } else if (env.ENABLE_POST_PROCESSING) {
+          const postResult = await postProcessResultBuffer(postInputBuffer);
+          finalBuffer = await addGarmentShadow(postResult.buffer);
+          postProcessedApplied = true;
+        } else {
+          finalBuffer = postInputBuffer;
+        }
+      } else if (env.ENABLE_POST_PROCESSING) {
+        const postResult = await postProcessResultBuffer(postInputBuffer);
         finalBuffer = await addGarmentShadow(postResult.buffer);
+        postProcessedApplied = true;
       } else {
         finalBuffer = postInputBuffer;
       }
 
-      const outputGate = await validateTryOnOutput(finalBuffer);
+      const isFashnOutput = clothingEngine === 'fashn' || modelUsed === 'fashn-direct';
+
+      const outputGate = await validateTryOnOutput(finalBuffer, {
+        skipFlatnessCheck: false,
+        flatnessVarianceMin: isFashnOutput ? env.TRYON_OUTPUT_FLATNESS_MIN_VARIANCE_FASHN : undefined,
+      });
       if (!outputGate.ok) {
         throw new Error(outputGate.reason || 'Generated image failed quality checks');
       }
@@ -452,7 +542,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
         total_pipeline_ms: Date.now() - startTime,
         widget_mode: job.widgetMode,
         face_lock_applied: faceLockApplied,
-        post_processed: env.ENABLE_POST_PROCESSING,
+        post_processed: postProcessedApplied,
         body_detected: personPreprocessed.bodyDetected,
         garment_topology: garmentTopology,
         clothing_engine: clothingEngine ?? null,

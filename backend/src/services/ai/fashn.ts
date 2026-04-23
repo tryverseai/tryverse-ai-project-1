@@ -13,6 +13,7 @@
 
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
+import { inferFashnGarmentCategory } from './garmentDescriptor';
 import type { VtonInput, VtonOutput } from './replicate';
 
 const FASHN_BASE_URL = 'https://api.fashn.ai/v1';
@@ -59,27 +60,45 @@ function wrapForDirectApi(inputs: Record<string, unknown>): Record<string, unkno
 
 /** Start a FASHN prediction. Returns the prediction ID. */
 async function startFashnRun(body: Record<string, unknown>): Promise<string> {
-  const res = await fetch(`${FASHN_BASE_URL}/run`, {
-    method: 'POST',
-    headers: fashnHeaders(),
-    body: JSON.stringify(wrapForDirectApi(body)),
-  });
+  const payload = wrapForDirectApi(body);
+  try {
+    const response = await fetch(`${FASHN_BASE_URL}/run`, {
+      method: 'POST',
+      headers: fashnHeaders(),
+      body: JSON.stringify(payload),
+    });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`FASHN /run failed (${res.status}): ${text}`);
+    const responseText = await response.text();
+
+    logger.info('FASHN API response', {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText,
+    });
+
+    if (!response.ok) {
+      throw new Error(`FASHN API error ${response.status}: ${responseText}`);
+    }
+
+    let data: FashnRunResponse;
+    try {
+      data = JSON.parse(responseText) as FashnRunResponse;
+    } catch {
+      throw new Error(`FASHN API invalid JSON: ${responseText}`);
+    }
+
+    if (data.error) {
+      throw new Error(`FASHN run error: ${data.error}`);
+    }
+    if (!data.id) {
+      throw new Error(`FASHN API returned no prediction ID: ${responseText}`);
+    }
+
+    return data.id;
+  } catch (err) {
+    logger.error('FASHN startRun failed', { error: String(err), payload });
+    throw err;
   }
-
-  const data = (await res.json()) as FashnRunResponse;
-
-  if (data.error) {
-    throw new Error(`FASHN run error: ${data.error}`);
-  }
-  if (!data.id) {
-    throw new Error('FASHN /run did not return a prediction ID');
-  }
-
-  return data.id;
 }
 
 /** Poll FASHN status until the prediction finishes. Returns the output URL. */
@@ -123,41 +142,56 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Build a clean payload for the FASHN direct API (tryon-v1.6).
- *
- * FASHN v1.6 only accepts a specific set of inputs — building explicitly
- * prevents Replicate-specific fields from causing 400 BadRequest errors.
- *
- * Accepted fields (tryon-v1.6):
- *   model_image, garment_image, category, mode, garment_photo_type,
- *   segmentation_free, seed, num_samples, output_format, moderation_level
- *
- * NOT accepted (removed in v1.5+, Replicate-specific only):
- *   adjust_hands, restore_background, restore_clothes, long_top,
- *   cover_feet, garment_description
- *
- * NOTE: 'auto' is a valid category in v1.6 — it lets the model auto-detect
- * the garment type. Do NOT remap it to 'one-pieces'.
+ * Normalize client/category hints to FASHN slots. Valid slots pass through; unknown hints
+ * reuse {@link inferFashnGarmentCategory} so portrait product crops alone never force `one-pieces`.
  */
-function sanitiseForDirectApi(raw: Record<string, unknown>): Record<string, unknown> {
-  // Pass category through as-is: 'tops', 'bottoms', 'one-pieces', or 'auto'.
-  // 'auto' is fully supported in v1.6 and gives better results than forcing 'one-pieces'.
-  const category = raw['category'] ?? 'auto';
+export function mapToFashnCategory(
+  category: string,
+  productDescription: string,
+  productHeightOverWidth?: number
+): 'tops' | 'bottoms' | 'one-pieces' | 'auto' {
+  const cat = (category || '').toLowerCase().trim();
+  if (cat === 'tops' || cat === 'bottoms' || cat === 'one-pieces' || cat === 'auto') {
+    return cat;
+  }
+  return inferFashnGarmentCategory(productHeightOverWidth, productDescription, {
+    useAutoForGenericDescription: env.TRYON_FASHN_CATEGORY_AUTO,
+  });
+}
+
+/**
+ * Build FASHN direct API inputs for `tryon-v1.6`.
+ *
+ * The hosted API rejects many Replicate-era keys (400 "not allowed"), e.g.
+ * adjust_hands, restore_background, restore_clothes, garment_description, long_top,
+ * nsfw_filter, flat_lay. Do not spread `rawPayload` — only send supported fields.
+ *
+ * Category still follows the same heuristics as Replicate (via rawPayload.category hint +
+ * mapToFashnCategory).
+ */
+export function buildFashnDirectInputs(
+  input: VtonInput,
+  rawPayload: Record<string, unknown>
+): Record<string, unknown> {
+  const categoryHint = String(rawPayload['category'] ?? input.category ?? '');
+  const fashnCategory = mapToFashnCategory(
+    categoryHint,
+    input.productDescription || '',
+    input.productHeightOverWidth
+  );
 
   return {
-    model_image: raw['model_image'],
-    garment_image: raw['garment_image'],
-    category,
+    model_image: input.personImageUrl,
+    garment_image: input.productImageUrl,
+    category: fashnCategory,
     mode: 'quality',
-    garment_photo_type: raw['garment_photo_type'] ?? 'auto',
-    // Disable segmentation-free mode so FASHN performs human parsing.
-    // This gives sharper garment boundaries and eliminates transition artifacts.
-    segmentation_free: false,
+    garment_photo_type: 'auto',
+    segmentation_free: env.FASHN_SEGMENTATION_FREE,
   };
 }
 
 /**
- * Run a FASHN try-on via the direct FASHN AI API.
+ * Run a FASHN try-on via the direct FASHN AI API (clothing, bags, glasses).
  *
  * @param input        - Canonical VtonInput (person + product URLs, category, etc.)
  * @param buildPayload - Category-specific function that maps VtonInput → FASHN request body
@@ -170,18 +204,16 @@ export async function runFashnDirect(
 ): Promise<VtonOutput> {
   const startTime = Date.now();
 
-  // Build the payload from the shared Replicate-style builder, then normalise it
-  // to what the direct FASHN API actually accepts.
   const rawPayload = buildPayload(input);
-  const payload = sanitiseForDirectApi(rawPayload);
+  const payload = buildFashnDirectInputs(input, rawPayload);
 
   logger.info('FASHN direct: starting prediction', {
     label,
     category: input.category,
     fashnCategory: payload['category'],
-    longTop: payload['long_top'],
-    coverFeet: payload['cover_feet'],
+    segmentationFree: payload['segmentation_free'],
     mode: payload['mode'],
+    garmentPhotoType: payload['garment_photo_type'],
   });
 
   const predictionId = await startFashnRun(payload);
@@ -205,3 +237,6 @@ export async function runFashnDirect(
     category: input.category,
   };
 }
+
+/** @deprecated Use {@link runFashnDirect}; kept as an alias for older call sites. */
+export const runFashnTryOn = runFashnDirect;

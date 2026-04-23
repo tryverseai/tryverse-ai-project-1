@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import { env } from '../../../config/env';
+import { logger } from '../../../config/logger';
 import { countDetectedFaces } from '../facePreservation';
 
 /** Production try-on canvas: 3:4 portrait, matches common VTON / catalog norms. */
@@ -36,7 +37,17 @@ export async function validatePersonForTryOn(buffer: Buffer): Promise<PersonVali
     };
   }
 
-  const faces = await countDetectedFaces(buffer);
+  let faces: number;
+  try {
+    faces = await countDetectedFaces(buffer);
+  } catch (err) {
+    // BlazeFace / tfjs can throw "fetch failed" when downloading model weights (offline, firewall, DNS).
+    // Assume a single subject so try-on can proceed instead of hard-failing the whole pipeline.
+    logger.warn('tryon.validate: face count failed; assuming one subject', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    faces = 1;
+  }
   if (faces > 1) {
     return {
       ok: false,

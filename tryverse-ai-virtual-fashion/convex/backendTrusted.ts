@@ -427,6 +427,41 @@ export const patchModelLibraryByLegacyId = mutation({
   },
 });
 
+/** Admin: set free_tier_eligible for all library rows (dashboard free-plan preset access). */
+export const bulkSetModelLibraryFreeTier = mutation({
+  args: {
+    secret: v.string(),
+    mode: v.union(
+      v.literal("all_in_catalog"),
+      v.literal("defaults_only"),
+      v.literal("all_rows")
+    ),
+  },
+  handler: async (ctx, { secret, mode }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db.query("tryverse_model_library").collect();
+    let updated = 0;
+    for (const row of rows) {
+      let eligible: boolean;
+      if (mode === "all_rows") {
+        eligible = true;
+      } else if (mode === "all_in_catalog") {
+        eligible = row.is_active;
+      } else {
+        const s = String(row.slug ?? "")
+          .trim()
+          .toLowerCase();
+        eligible = s === "diane" || s === "andrew";
+      }
+      if (row.free_tier_eligible !== eligible) {
+        await ctx.db.patch(row._id, { free_tier_eligible: eligible });
+        updated += 1;
+      }
+    }
+    return { ok: true as const, updated };
+  },
+});
+
 export const userAnalyticsSince = query({
   args: { secret: v.string(), userId: v.string(), sinceIso: v.string() },
   handler: async (ctx, { secret, userId, sinceIso }) => {

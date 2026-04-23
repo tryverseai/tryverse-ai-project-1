@@ -11,4 +11,5 @@ export {
   meanAbsDiffDownscaled,
   assertTryOnOutputNotCollage,
   type OutputGateResult,
+  type ValidateTryOnOutputOptions,
 } from './outputGate';
