@@ -16,9 +16,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { posthogCapture } from "@/lib/posthog";
-import { inviteSignupEnabled, b2cSignupEnabled } from "@/lib/featureFlags";
+import { inviteSignupEnabled, b2cSignupEnabled, FEATURE_FLAGS } from "@/lib/featureFlags";
 import { postLoginRedirectPath, safeInAppRedirectPath } from "@/lib/safeUrl";
-import { readConvexAuthJwt } from "@/lib/convexAuthStorage";
+import { readLocalSession } from "@/lib/localSession";
 
 const roles = [
   "Founder",
@@ -66,15 +66,16 @@ function hasBusinessInviteSignupParam(searchParams: URLSearchParams) {
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
+  const inviteOnly = FEATURE_FLAGS.INVITE_ONLY_MODE;
   const wantsBusinessInvite = hasBusinessInviteSignupParam(searchParams);
   /** Brand signup form — hidden when VITE_ENABLE_INVITE_SIGNUP=false */
-  const showBusinessSignupForm = wantsBusinessInvite && inviteSignupEnabled;
+  const showBusinessSignupForm = !inviteOnly && wantsBusinessInvite && inviteSignupEnabled;
   /** User opened business invite link while brand signups are paused — show waitlist message only */
-  const businessSignupPaused = wantsBusinessInvite && !inviteSignupEnabled;
+  const businessSignupPaused = !inviteOnly && wantsBusinessInvite && !inviteSignupEnabled;
 
   const wantsIndividualSignup = searchParams.get("signup") === "individual";
-  const showIndividualSignupForm = wantsIndividualSignup && b2cSignupEnabled;
-  const individualSignupPaused = wantsIndividualSignup && !b2cSignupEnabled;
+  const showIndividualSignupForm = !inviteOnly && wantsIndividualSignup && b2cSignupEnabled;
+  const individualSignupPaused = !inviteOnly && wantsIndividualSignup && !b2cSignupEnabled;
 
   const signupPausedToastSent = useRef(false);
 
@@ -138,20 +139,16 @@ const Auth = () => {
     );
   };
 
-  /**
-   * Polls localStorage for the Convex Auth JWT every 150 ms, up to 6 seconds.
-   * The fixed 600 ms sleep was unreliable on slow devices — the JWT may not
-   * be written by the time the timeout fires.
-   */
+  /** Wait until the local session row is readable (same pattern as legacy JWT polling). */
   const finishAuthIfSessionReady = async (): Promise<boolean> => {
     const intervalMs = 150;
     const maxWaitMs = 6000;
     const start = Date.now();
     while (Date.now() - start < maxWaitMs) {
-      if (readConvexAuthJwt()) return true;
+      if (readLocalSession()) return true;
       await new Promise<void>((r) => setTimeout(r, intervalMs));
     }
-    return Boolean(readConvexAuthJwt());
+    return Boolean(readLocalSession());
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -294,7 +291,7 @@ const Auth = () => {
                   follow up and send a signup link when you&apos;re cleared.
                 </p>
                 <Button asChild className="w-full gradient-primary text-primary-foreground h-12 shadow-soft">
-                  <Link to="/early-access">
+                  <Link to={inviteOnly ? "/waitlist" : "/early-access"}>
                     Join the waitlist
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -348,7 +345,10 @@ const Auth = () => {
               </p>
               <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
                 <span className="font-medium text-foreground">Not invited yet?</span> Anyone can request to join via{" "}
-                <Link to="/early-access" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
+                <Link
+                  to={inviteOnly ? "/waitlist" : "/early-access"}
+                  className="text-foreground font-medium underline underline-offset-2 hover:no-underline"
+                >
                   Join waitlist
                 </Link>
                 . We only enable sign-up for brands we&apos;ve invited.
@@ -378,7 +378,7 @@ const Auth = () => {
             </>
           )}
 
-          {!showBusinessSignupForm && !showIndividualSignupForm && (
+          {!inviteOnly && !showBusinessSignupForm && !showIndividualSignupForm && (
             <>
               <p className="text-sm text-muted-foreground mb-4 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 leading-relaxed">
                 <span className="font-medium text-foreground">New to TryVerse?</span> Choose how you&apos;ll use it:
@@ -516,11 +516,26 @@ const Auth = () => {
           </form>
 
           {!showBusinessSignupForm && !showIndividualSignupForm && (
-            <p className="text-sm text-muted-foreground text-center mt-4">
-              <Link to="/forgot-password" className="text-foreground font-medium hover:underline">
-                Forgot your password?
-              </Link>
-            </p>
+            <>
+              <p className="text-sm text-muted-foreground text-center mt-4">
+                <Link to="/forgot-password" className="text-foreground font-medium hover:underline">
+                  Forgot your password?
+                </Link>
+              </p>
+              {inviteOnly && (
+                <p className="text-sm text-muted-foreground text-center mt-5 space-x-3 space-y-2">
+                  <Link to="/waitlist" className="text-foreground/80 font-medium hover:underline inline-block">
+                    Request Access →
+                  </Link>
+                  <span className="text-border" aria-hidden>
+                    |
+                  </span>
+                  <Link to="/book-demo" className="text-foreground/80 font-medium hover:underline inline-block">
+                    Book a Demo →
+                  </Link>
+                </p>
+              )}
+            </>
           )}
 
           {(showBusinessSignupForm || showIndividualSignupForm) && (

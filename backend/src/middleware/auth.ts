@@ -5,12 +5,47 @@ import { logAudit } from '../services/audit';
 import { captureAuthError, Sentry } from '../config/sentry';
 import { createConvexClient, anyApi } from '../config/convexHttp';
 
+const LOCAL_AUTH_PREFIX = /^Local\s+/i;
+
+/** Browser-local session (no Convex JWT). Base64 JSON: `{ "sub": string, "email"?: string }`. */
+export function parseLocalAuthorizationHeader(
+  authHeader: string | undefined
+): { id: string; email: string } | null {
+  if (!authHeader || !LOCAL_AUTH_PREFIX.test(authHeader)) return null;
+  const raw = authHeader.replace(LOCAL_AUTH_PREFIX, '').trim();
+  if (!raw) return null;
+  try {
+    const json = JSON.parse(Buffer.from(raw, 'base64').toString('utf8')) as {
+      sub?: unknown;
+      email?: unknown;
+    };
+    if (typeof json.sub !== 'string' || !json.sub.trim()) return null;
+    return {
+      id: json.sub.trim(),
+      email: typeof json.email === 'string' ? json.email.trim() : '',
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Verifies Convex Auth JWT from the Authorization header (`Bearer`).
- * Sets req.user = { id, email } on success.
+ * Verifies identity from `Authorization`:
+ * 1. `Local <base64>` when {@link env.ALLOW_LOCAL_SESSION_AUTH}
+ * 2. `Bearer <Convex JWT>` via Convex `verifyBearerSession`
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
+
+  if (env.ALLOW_LOCAL_SESSION_AUTH) {
+    const local = parseLocalAuthorizationHeader(authHeader);
+    if (local) {
+      req.user = { id: local.id, email: local.email };
+      next();
+      return;
+    }
+  }
+
   if (!authHeader?.startsWith('Bearer ')) {
     logAudit({
       event_type: 'failed_login',
@@ -29,7 +64,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
 
-  const token = authHeader.slice(7);
+  const token = authHeader.slice(7).trim();
+  if (!token) {
+    res.status(401).json({ error: 'Missing or invalid authorization header' });
+    return;
+  }
   try {
     const client = createConvexClient();
     client.setAuth(token);
@@ -80,10 +119,22 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
  */
 export async function optionalAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
+
+  if (env.ALLOW_LOCAL_SESSION_AUTH) {
+    const local = parseLocalAuthorizationHeader(authHeader);
+    if (local) {
+      req.user = { id: local.id, email: local.email };
+      return next();
+    }
+  }
+
   if (!authHeader?.startsWith('Bearer ')) {
     return next();
   }
-  const token = authHeader.slice(7);
+  const token = authHeader.slice(7).trim();
+  if (!token) {
+    return next();
+  }
   try {
     const client = createConvexClient();
     client.setAuth(token);
@@ -93,9 +144,18 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
     } else if (session?.is_blocked) {
       res.status(403).json({ error: 'Account suspended', code: 'ACCOUNT_SUSPENDED' });
       return;
+    } else if (env.NODE_ENV !== 'production') {
+      logger.warn('optionalAuth: Bearer present but session not verified (check CONVEX_URL matches VITE_CONVEX_URL)', {
+        path: req.path,
+      });
     }
-  } catch {
-    // continue without user
+  } catch (err) {
+    if (env.NODE_ENV !== 'production') {
+      logger.warn('optionalAuth: bearer verification error', {
+        path: req.path,
+        error: String(err),
+      });
+    }
   }
   next();
 }

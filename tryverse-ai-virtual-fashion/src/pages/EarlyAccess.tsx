@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { submitEarlyAccessRequest, submitIndividualEarlyAccessRequest } from "@/lib/backendApi";
-import { inviteSignupEnabled } from "@/lib/featureFlags";
+import { inviteSignupEnabled, FEATURE_FLAGS } from "@/lib/featureFlags";
 import { X } from "lucide-react";
 
 const ROLES = [
@@ -137,6 +137,7 @@ function Field({
 type AccessFlow = "pick" | "business" | "individual";
 
 const EarlyAccess = () => {
+  const premiumWaitlistCopy = FEATURE_FLAGS.INVITE_ONLY_MODE;
   const navigate = useNavigate();
   const [open, setOpen] = useState(true);
   const [submitted, setSubmitted] = useState(false);
@@ -308,10 +309,14 @@ const EarlyAccess = () => {
             )}
           >
             <DialogPrimitive.Title className="sr-only">
-              TryVerse — Get early access for fashion brands
+              {premiumWaitlistCopy
+                ? "TryVerse — Apply for early access"
+                : "TryVerse — Get early access for fashion brands"}
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">
-              Waitlist and interest forms: choose business or individual, then complete the matching questionnaire.
+              {premiumWaitlistCopy
+                ? "Founding access: request early access as a business or individual. Applications are reviewed within 48 hours."
+                : "Waitlist and interest forms: choose business or individual, then complete the matching questionnaire."}
             </DialogPrimitive.Description>
 
             <DialogPrimitive.Close
@@ -331,8 +336,12 @@ const EarlyAccess = () => {
                 </p>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto">
                   {submissionKind === "individual"
-                    ? "Thanks — we’ll be in touch about personal virtual try-on access when spots open up."
-                    : "Thanks again — we’ll follow up to learn more about your store and share how TryVerse can support your goals."}
+                    ? premiumWaitlistCopy
+                      ? "Thank you. Applications are reviewed within 48 hours; we’ll reach out with next steps."
+                      : "Thanks — we’ll be in touch about personal virtual try-on access when spots open up."
+                    : premiumWaitlistCopy
+                      ? "Thank you. Applications are reviewed within 48 hours. Our team will follow up to align on fit and rollout."
+                      : "Thanks again — we’ll follow up to learn more about your store and share how TryVerse can support your goals."}
                 </p>
                 <Button className="mt-4 gradient-primary text-primary-foreground" onClick={() => handleOpenChange(false)}>
                   Back to home
@@ -343,13 +352,18 @@ const EarlyAccess = () => {
                       Already have an account? Log in
                     </Link>
                   </p>
-                  {inviteSignupEnabled && (
+                  {inviteSignupEnabled && !premiumWaitlistCopy && (
                     <p>
                       Approved for a brand workspace?{" "}
                       <Link to="/auth?signup=business" className="underline hover:text-foreground">
                         Business sign up
                       </Link>
                       .
+                    </p>
+                  )}
+                  {premiumWaitlistCopy && (
+                    <p className="text-muted-foreground">
+                      Invited brands receive a private onboarding link by email.
                     </p>
                   )}
                 </div>
@@ -360,13 +374,15 @@ const EarlyAccess = () => {
                   <div className="space-y-5">
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-2">
-                        TryVerse — Early access
+                        {premiumWaitlistCopy ? "TryVerse — Founding access" : "TryVerse — Early access"}
                       </p>
                       <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground leading-tight">
-                        How are you joining?
+                        {premiumWaitlistCopy ? "Apply for Early Access" : "How are you joining?"}
                       </h2>
                       <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-                        Choose one to continue — you&apos;ll get the right form.
+                        {premiumWaitlistCopy
+                          ? "Request founding member access. Applications are reviewed within 48 hours."
+                          : "Choose one to continue — you&apos;ll get the right form."}
                       </p>
                     </div>
                     <Field label="Registering as *" htmlFor="ea-register-as">
@@ -405,13 +421,15 @@ const EarlyAccess = () => {
                   <form onSubmit={handleSubmitIndividual} className="space-y-6">
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-2">
-                        TryVerse — Interest list
+                        {premiumWaitlistCopy ? "TryVerse — Founding access" : "TryVerse — Interest list"}
                       </p>
                       <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground leading-tight">
                         Personal virtual try-on
                       </h2>
                       <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-                        Tell us a bit about you — we&apos;ll reach out when we open more personal spots.
+                        {premiumWaitlistCopy
+                          ? "Request founding member access. Applications are reviewed within 48 hours."
+                          : "Tell us a bit about you — we&apos;ll reach out when we open more personal spots."}
                       </p>
                     </div>
                     <Field label="First name *" htmlFor="ind-first">
@@ -494,14 +512,16 @@ const EarlyAccess = () => {
                   <form onSubmit={handleSubmit} className="space-y-6">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-2">
-                      TryVerse — Early access
+                      {premiumWaitlistCopy ? "TryVerse — Founding access" : "TryVerse — Early access"}
                     </p>
                     <p className="text-xs text-muted-foreground mb-3">For fashion brands & retailers</p>
                     <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground leading-tight">
-                      Early access for fashion brands
+                      {premiumWaitlistCopy ? "Apply for Early Access" : "Early access for fashion brands"}
                     </h2>
                     <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-                      Help us understand your needs so we can prioritize early access.
+                      {premiumWaitlistCopy
+                        ? "Request founding member access. Applications are reviewed within 48 hours."
+                        : "Help us understand your needs so we can prioritize early access."}
                     </p>
                   </div>
                   <div className="space-y-4">

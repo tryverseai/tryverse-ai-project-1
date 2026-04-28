@@ -200,7 +200,9 @@ export default defineSchema({
     message: v.string(),
     status: v.string(),
     created_at: v.optional(v.string()),
-  }).index("by_email", ["email"]),
+  })
+    .index("by_email", ["email"])
+    .index("by_category", ["category"]),
 
   rate_limits: defineTable({
     legacy_id: v.optional(v.string()),

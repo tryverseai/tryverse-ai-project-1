@@ -1,5 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { authSubjectSegments, subjectsOverlap } from "./authSubjectKeys";
+import type { Doc } from "./_generated/dataModel";
+import { findProfileBySubjectKeys } from "./profileLookup";
 
 const profilePatch = v.object({
   plan_id: v.optional(v.string()),
@@ -30,11 +33,7 @@ export const getMyProfile = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
-    const userId = identity.subject;
-    return await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", userId))
-      .unique();
+    return await findProfileBySubjectKeys(ctx, identity.subject);
   },
 });
 
@@ -45,14 +44,19 @@ export const upsertProfileForUser = mutation({
   },
   handler: async (ctx, { userId, patch }) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity || identity.subject !== userId) {
+    if (!identity || !subjectsOverlap(identity.subject, userId)) {
       throw new Error("Not authorized");
     }
 
-    const existing = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", userId))
-      .unique();
+    const keySet = new Set([...authSubjectSegments(userId), ...authSubjectSegments(identity.subject)]);
+    let existing: Doc<"profiles"> | null = null;
+    for (const key of keySet) {
+      existing = await ctx.db
+        .query("profiles")
+        .withIndex("by_userId", (q) => q.eq("id", key))
+        .unique();
+      if (existing) break;
+    }
 
     const now = new Date().toISOString();
     const defaults = {
@@ -107,10 +111,7 @@ export const updateSettings = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
-    const existing = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", identity.subject))
-      .unique();
+    const existing = await findProfileBySubjectKeys(ctx, identity.subject);
     if (!existing) throw new Error("Profile not found");
     const now = new Date().toISOString();
     const updates: Record<string, unknown> = { updated_at: now };
@@ -129,10 +130,7 @@ export const completeCompliance = mutation({
   handler: async (ctx, { onboarding_goals, completed_at }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
-    const existing = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", identity.subject))
-      .unique();
+    const existing = await findProfileBySubjectKeys(ctx, identity.subject);
     if (!existing) throw new Error("Profile not found");
     await ctx.db.patch(existing._id, {
       compliance_onboarding_completed_at: completed_at,

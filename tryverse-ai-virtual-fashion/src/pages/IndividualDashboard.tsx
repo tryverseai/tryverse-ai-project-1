@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Images, Compass, UserRound, Trash2, Download, Loader2, Users, BookOpen } from "lucide-react";
 import { TryOnGuideContent } from "@/components/dashboard/TryOnGuideContent";
 import { useAuth } from "@/contexts/AuthContext";
-import { getTryOnHistory, getCredits, deleteTryOn } from "@/lib/backendApi";
+import { useSyncedConvexProfile } from "@/hooks/useSyncedConvexProfile";
+import { ApiError, getTryOnHistory, getCredits, deleteTryOn } from "@/lib/backendApi";
 import { toast } from "sonner";
 import { safeImageSrcForDom, openExternalHttpUrlInNewTab } from "@/lib/safeUrl";
 import { Link } from "react-router-dom";
@@ -53,6 +54,7 @@ const IndividualDashboard = () => {
   const tabParam: TabId | null = isTabId(rawTabParam) ? rawTabParam : null;
   const [activeTab, setActiveTab] = useState<TabId>("guide");
   const { user, signOut } = useAuth();
+  const { loading: cxProfileLoading, convexOn } = useSyncedConvexProfile();
   const [credits, setCredits] = useState<{
     plan: string;
     free: number;
@@ -61,6 +63,7 @@ const IndividualDashboard = () => {
     monthlyTotal: number;
     unlimited: boolean;
   } | null>(null);
+  const [creditsStatus, setCreditsStatus] = useState<"loading" | "ready" | "error">("loading");
   const [creations, setCreations] = useState<HistoryItem[]>([]);
   const [creationsLoading, setCreationsLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -82,18 +85,32 @@ const IndividualDashboard = () => {
   };
 
   const loadCredits = useCallback(async () => {
-    try {
-      const c = await getCredits();
-      setCredits({
-        plan: c.plan,
-        free: c.freeCreditsRemaining,
-        freeTotal: c.freeCreditsTotal,
-        monthly: c.monthlyCreditsRemaining,
-        monthlyTotal: c.monthlyCreditsTotal,
-        unlimited: c.isUnlimited,
-      });
-    } catch {
-      setCredits(null);
+    setCreditsStatus("loading");
+    const maxAttempts = 5;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const c = await getCredits();
+        setCredits({
+          plan: c.plan,
+          free: c.freeCreditsRemaining,
+          freeTotal: c.freeCreditsTotal,
+          monthly: c.monthlyCreditsRemaining,
+          monthlyTotal: c.monthlyCreditsTotal,
+          unlimited: c.isUnlimited,
+        });
+        setCreditsStatus("ready");
+        return;
+      } catch (e) {
+        const retry =
+          e instanceof ApiError && e.status === 404 && attempt < maxAttempts - 1;
+        if (retry) {
+          await new Promise((r) => setTimeout(r, 400));
+          continue;
+        }
+        setCredits(null);
+        setCreditsStatus("error");
+        return;
+      }
     }
   }, []);
 
@@ -119,12 +136,11 @@ const IndividualDashboard = () => {
     }
   }, []);
 
-  // Fetch credits once on mount. Refresh only when the studio tab is left
-  // (i.e. after a try-on might have consumed a credit) via the `refreshCredits`
-  // callback passed to TryOnStudio. Do NOT re-fetch on every tab switch.
+  // Wait for Convex profile bootstrap when Convex is enabled so `/api/credits` can resolve the row.
   useEffect(() => {
+    if (convexOn && cxProfileLoading) return;
     void loadCredits();
-  }, [loadCredits]);
+  }, [convexOn, cxProfileLoading, loadCredits]);
 
   useEffect(() => {
     if (activeTab === "creations") void loadCreations();
@@ -162,7 +178,7 @@ const IndividualDashboard = () => {
 
           <div className="rounded-2xl border border-border/60 bg-card/80 p-4 md:p-5 mb-8">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Your plan &amp; credits</p>
-            {credits ? (
+            {creditsStatus === "ready" && credits ? (
               <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-3">
                 <div>
                   <p className="font-display text-lg font-semibold text-foreground">{planLabel(credits.plan)}</p>
@@ -194,6 +210,10 @@ const IndividualDashboard = () => {
                   Change plan
                 </Link>
               </div>
+            ) : creditsStatus === "error" ? (
+              <p className="text-sm text-muted-foreground">
+                Could not load credits. Refresh the page or sign out and back in if this persists.
+              </p>
             ) : (
               <p className="text-sm text-muted-foreground">Loading credits…</p>
             )}
@@ -349,7 +369,7 @@ const IndividualDashboard = () => {
                 </div>
                 <div className="text-sm space-y-1">
                   <p className="text-muted-foreground">Plan &amp; try-ons</p>
-                  {credits ? (
+                  {creditsStatus === "ready" && credits ? (
                     <p className="text-foreground">
                       Plan: <strong>{planLabel(credits.plan)}</strong>
                       <br />
@@ -369,6 +389,8 @@ const IndividualDashboard = () => {
                         </>
                       ) : null}
                     </p>
+                  ) : creditsStatus === "loading" ? (
+                    <p className="text-muted-foreground">Loading…</p>
                   ) : (
                     <p className="text-muted-foreground">Could not load credits.</p>
                   )}

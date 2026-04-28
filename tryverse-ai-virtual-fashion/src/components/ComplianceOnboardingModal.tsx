@@ -6,8 +6,7 @@ import { ChevronRight, FileText, Shield, Database, Target, X } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { patchMyCompliance } from "@/lib/backendApi";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   TermsContent,
@@ -113,7 +112,6 @@ export function ComplianceOnboardingModal({
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const completeComplianceCv = useMutation(api.profiles.completeCompliance);
   const contentRef = useRef<HTMLDivElement>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -152,10 +150,7 @@ export function ComplianceOnboardingModal({
       const goals = selectedGoals.length > 0 ? selectedGoals : [];
       const completedAt = new Date().toISOString();
       try {
-        await completeComplianceCv({
-          onboarding_goals: goals,
-          completed_at: completedAt,
-        });
+        await patchMyCompliance(goals, completedAt);
 
         sessionStorage.setItem(complianceDoneSessionKey(userId), "1");
         onComplete();

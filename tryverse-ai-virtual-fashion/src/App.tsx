@@ -13,12 +13,13 @@ import { AccountTypeGate } from "@/components/AccountTypeGate";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { ComplianceOnboardingGate } from "@/components/ComplianceOnboardingGate";
 import { CookieConsent } from "@/components/CookieConsent";
-import { ConvexProviderGate } from "@/components/ConvexProviderGate";
 
 // Eagerly loaded: landing, auth, and tiny utility pages (critical for FCP / first-visit UX)
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import AuthInvite from "./pages/AuthInvite";
 import AuthConfirm from "./pages/AuthConfirm";
+import BookDemo from "./pages/BookDemo";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -52,7 +53,6 @@ const queryClient = new QueryClient();
 const App = () => (
   <HelmetProvider>
   <QueryClientProvider client={queryClient}>
-    <ConvexProviderGate>
     <AuthProvider>
       <PostHogProvider>
       <TooltipProvider>
@@ -90,7 +90,10 @@ const App = () => (
             <Route path="/about" element={<About />} />
             <Route path="/partner" element={<PartnerWithUs />} />
             <Route path="/early-access" element={<EarlyAccess />} />
+            <Route path="/waitlist" element={<EarlyAccess />} />
+            <Route path="/book-demo" element={<BookDemo />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/invite/:token" element={<AuthInvite />} />
             <Route path="/auth/confirm" element={<AuthConfirm />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
@@ -130,7 +133,6 @@ const App = () => (
       </TooltipProvider>
       </PostHogProvider>
     </AuthProvider>
-    </ConvexProviderGate>
   </QueryClientProvider>
   </HelmetProvider>
 );

@@ -31,6 +31,15 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/** Links in waitlist emails — uses PUBLIC_APP_URL or FRONTEND_URL (set https://tryverseai.com in production). */
+function publicEmailLinks() {
+  const base = env.PUBLIC_APP_URL.replace(/\/$/, '');
+  return {
+    bookDemoUrl: `${base}/book-demo`,
+    homeUrl: base,
+  };
+}
+
 router.post(
   '/',
   earlyAccessRateLimit,
@@ -84,8 +93,9 @@ router.post(
         prior_solution_notes,
       } = req.body as Record<string, unknown>;
 
+      let convexDocumentId: string | undefined;
       try {
-        await convexMutationTrusted(anyApi.backendTrusted.insertEarlyAccessRowTrusted, {
+        const inserted = (await convexMutationTrusted(anyApi.backendTrusted.insertEarlyAccessRowTrusted, {
           secret: env.BACKEND_SHARED_SECRET,
           row: {
             applicant_type: 'business',
@@ -107,6 +117,11 @@ router.post(
             heard_about: heard_about || null,
             prior_solution_notes: prior_solution_notes || null,
           },
+        })) as { id?: string };
+        convexDocumentId = inserted?.id;
+        logger.info('Early access (business) saved to Convex', {
+          convexDocumentId,
+          email: String(email).toLowerCase(),
         });
       } catch (error) {
         logger.error('Early access insert failed', { error: String(error) });
@@ -115,17 +130,34 @@ router.post(
       }
 
       const to = String(email).toLowerCase();
+      const urls = publicEmailLinks();
 
       const html = buildEarlyAccessConfirmationHtml(
         escapeHtml(String(first_name)),
-        escapeHtml(String(brand_name))
+        escapeHtml(String(brand_name)),
+        urls
       );
 
-      const text = `Hi ${String(first_name)},\n\nThanks for requesting early access to TryVerse for ${String(brand_name)}.\n\nWe've received your details and will follow up to learn more about your store and how we can support your goals.\n\n— The TryVerse team`;
+      const text = [
+        `Hi ${String(first_name)},`,
+        '',
+        `We've received your request for early access to TryVerse for ${String(brand_name)}.`,
+        '',
+        "We're currently in a limited private beta, onboarding select brands and individuals with priority access. Our team will reach out directly with next steps and your invite link as spots become available.",
+        '',
+        "If you'd like to explore TryVerse sooner with your team, we'd love to connect.",
+        '',
+        `Schedule a Private Demo → ${urls.bookDemoUrl}`,
+        '',
+        'Thank you for your interest.',
+        '— The TryVerse Team',
+        '',
+        urls.homeUrl.replace(/^https?:\/\//, ''),
+      ].join('\n');
 
       const emailSent = await sendEmail({
         to,
-        subject: 'We received your TryVerse early access request',
+        subject: 'TryVerse Early Access — Application Received',
         html,
         text,
       });
@@ -133,12 +165,13 @@ router.post(
       if (!emailSent) {
         logger.warn('Early access saved but confirmation email was not sent', {
           to,
+          convexDocumentId,
           hint:
             'Set RESEND_API_KEY in backend/.env. For Resend test mode, emails only go to your verified address; for production verify your domain at resend.com/domains and set EMAIL_FROM to an address on that domain.',
         });
       }
 
-      res.status(201).json({ success: true, emailSent });
+      res.status(201).json({ success: true, emailSent, id: convexDocumentId, convexDocumentId });
     } catch (err) {
       next(err);
     }
@@ -163,8 +196,9 @@ router.post(
         unknown
       >;
 
+      let convexDocumentId: string | undefined;
       try {
-        await convexMutationTrusted(anyApi.backendTrusted.insertEarlyAccessRowTrusted, {
+        const inserted = (await convexMutationTrusted(anyApi.backendTrusted.insertEarlyAccessRowTrusted, {
           secret: env.BACKEND_SHARED_SECRET,
           row: {
             applicant_type: 'individual',
@@ -186,6 +220,11 @@ router.post(
             heard_about: heard_about || null,
             prior_solution_notes: null,
           },
+        })) as { id?: string };
+        convexDocumentId = inserted?.id;
+        logger.info('Early access (individual) saved to Convex', {
+          convexDocumentId,
+          email: String(email).toLowerCase(),
         });
       } catch (error) {
         logger.error('Individual early access insert failed', { error: String(error) });
@@ -194,12 +233,28 @@ router.post(
       }
 
       const to = String(email).toLowerCase();
-      const html = buildIndividualWaitlistConfirmationHtml(escapeHtml(String(first_name)));
-      const text = `Hi ${String(first_name)},\n\nThanks for your interest in TryVerse for personal virtual try-on.\n\nWe've received your details and will be in touch.\n\n— The TryVerse team`;
+      const urls = publicEmailLinks();
+      const html = buildIndividualWaitlistConfirmationHtml(escapeHtml(String(first_name)), urls);
+      const text = [
+        `Hi ${String(first_name)},`,
+        '',
+        "We've received your request for early access to TryVerse.",
+        '',
+        "We're currently in a limited private beta, onboarding select brands and individuals with priority access. Our team will reach out directly with your invite link as spots become available.",
+        '',
+        'If you represent a brand or retail team and would like to explore TryVerse sooner, we\'d love to connect.',
+        '',
+        `Schedule a Private Demo → ${urls.bookDemoUrl}`,
+        '',
+        'Thank you for your interest.',
+        '— The TryVerse Team',
+        '',
+        urls.homeUrl.replace(/^https?:\/\//, ''),
+      ].join('\n');
 
       const emailSent = await sendEmail({
         to,
-        subject: 'We received your TryVerse interest',
+        subject: 'TryVerse Early Access — Application Received',
         html,
         text,
       });
@@ -207,10 +262,11 @@ router.post(
       if (!emailSent) {
         logger.warn('Individual early access saved but confirmation email was not sent', {
           to,
+          convexDocumentId,
         });
       }
 
-      res.status(201).json({ success: true, emailSent });
+      res.status(201).json({ success: true, emailSent, id: convexDocumentId, convexDocumentId });
     } catch (err) {
       next(err);
     }

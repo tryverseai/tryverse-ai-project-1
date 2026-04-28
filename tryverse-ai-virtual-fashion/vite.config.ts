@@ -11,7 +11,13 @@ export default defineConfig(() => ({
     strictPort: true,
     proxy: {
       // Dev: browser calls same origin (see BACKEND_URL in backendApi); Vite forwards to the API.
-      "/api": { target: "http://127.0.0.1:3001", changeOrigin: true },
+      // Long timeouts: sync try-on holds the POST open until the model finishes (can exceed 2–3 minutes).
+      "/api": {
+        target: "http://127.0.0.1:3001",
+        changeOrigin: true,
+        timeout: 600_000,
+        proxyTimeout: 600_000,
+      },
       "/health": { target: "http://127.0.0.1:3001", changeOrigin: true },
     },
     hmr: {

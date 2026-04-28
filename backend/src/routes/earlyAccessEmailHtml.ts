@@ -1,58 +1,99 @@
 import sanitizeHtml from 'sanitize-html';
 
-/**
- * Early access confirmation email (HTML).
- * Callers must pass values already escaped for HTML (e.g. via escapeHtml()).
- * Output is passed through sanitize-html with a strict allowlist for defense in depth.
- */
-export function buildEarlyAccessConfirmationHtml(
-  escapedFirstName: string,
-  escapedBrandName: string
-): string {
-  const inner =
-    '<p>Hi ' +
-    escapedFirstName +
-    ',</p>' +
-    '<p>Thanks for requesting early access to <strong>TryVerse</strong> for <strong>' +
-    escapedBrandName +
-    '</strong>.</p>' +
-    '<p>We’ve received your details and’ll follow up to learn more about your store and how we can support your goals.</p>' +
-    '<p>— The TryVerse team</p>';
+function escapeHtmlAttr(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
 
-  const sanitized = sanitizeHtml(inner, {
-    allowedTags: ['p', 'strong'],
-    allowedAttributes: {},
-  });
+function publicSiteLabel(homeUrl: string): string {
+  try {
+    return new URL(homeUrl).host;
+  } catch {
+    return 'tryverseai.com';
+  }
+}
 
+const SANITIZE_OPTIONS = {
+  allowedTags: ['p', 'strong', 'a', 'br'],
+  allowedAttributes: { a: ['href'] },
+} as const;
+
+function wrapEmailHtml(innerSanitized: string): string {
   return (
     '<!DOCTYPE html>\n' +
     '<html>\n' +
-    '<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">\n' +
-    sanitized +
+    '<body style="font-family: system-ui, -apple-system, Segoe UI, sans-serif; line-height: 1.55; color: #111; max-width: 560px;">\n' +
+    innerSanitized +
     '\n</body>\n' +
     '</html>'
   );
 }
 
-/** Personal waitlist / interest form confirmation. */
-export function buildIndividualWaitlistConfirmationHtml(escapedFirstName: string): string {
+export interface EarlyAccessEmailUrls {
+  bookDemoUrl: string;
+  homeUrl: string;
+}
+
+/**
+ * Early access confirmation (brand / business applicants).
+ * Callers must pass name values already escaped for HTML text nodes.
+ */
+export function buildEarlyAccessConfirmationHtml(
+  escapedFirstName: string,
+  escapedBrandName: string,
+  urls: EarlyAccessEmailUrls
+): string {
+  const hrefDemo = escapeHtmlAttr(urls.bookDemoUrl);
+  const hrefHome = escapeHtmlAttr(urls.homeUrl);
+  const siteLabel = escapeHtmlAttr(publicSiteLabel(urls.homeUrl));
   const inner =
     '<p>Hi ' +
     escapedFirstName +
     ',</p>' +
-    '<p>Thanks for your interest in <strong>TryVerse</strong> for personal virtual try-on.</p>' +
-    '<p>We’ve received your details and’ll be in touch when spots open up.</p>' +
-    '<p>— The TryVerse team</p>';
-  const sanitized = sanitizeHtml(inner, {
-    allowedTags: ['p', 'strong'],
-    allowedAttributes: {},
-  });
-  return (
-    '<!DOCTYPE html>\n' +
-    '<html>\n' +
-    '<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">\n' +
-    sanitized +
-    '\n</body>\n' +
-    '</html>'
-  );
+    '<p>We\'ve received your request for early access to <strong>TryVerse</strong> for <strong>' +
+    escapedBrandName +
+    '</strong>.</p>' +
+    '<p>We\'re currently in a limited private beta, onboarding select brands and individuals with priority access. Our team will reach out directly with next steps and your invite link as spots become available.</p>' +
+    '<p>If you\'d like to explore TryVerse sooner with your team, we\'d love to connect.</p>' +
+    '<p><a href="' +
+    hrefDemo +
+    '">Schedule a Private Demo</a> →</p>' +
+    '<p>Thank you for your interest.<br/>— The TryVerse Team</p>' +
+    '<p><a href="' +
+    hrefHome +
+    '">' +
+    siteLabel +
+    '</a></p>';
+
+  return wrapEmailHtml(sanitizeHtml(inner, SANITIZE_OPTIONS));
+}
+
+/** Personal / individual waitlist confirmation — same positioning as brand flow. */
+export function buildIndividualWaitlistConfirmationHtml(
+  escapedFirstName: string,
+  urls: EarlyAccessEmailUrls
+): string {
+  const hrefDemo = escapeHtmlAttr(urls.bookDemoUrl);
+  const hrefHome = escapeHtmlAttr(urls.homeUrl);
+  const siteLabel = escapeHtmlAttr(publicSiteLabel(urls.homeUrl));
+  const inner =
+    '<p>Hi ' +
+    escapedFirstName +
+    ',</p>' +
+    '<p>We\'ve received your request for early access to <strong>TryVerse</strong>.</p>' +
+    '<p>We\'re currently in a limited private beta, onboarding select brands and individuals with priority access. Our team will reach out directly with your invite link as spots become available.</p>' +
+    '<p>If you represent a brand or retail team and would like to explore TryVerse sooner, we\'d love to connect.</p>' +
+    '<p><a href="' +
+    hrefDemo +
+    '">Schedule a Private Demo</a> →</p>' +
+    '<p>Thank you for your interest.<br/>— The TryVerse Team</p>' +
+    '<p><a href="' +
+    hrefHome +
+    '">' +
+    siteLabel +
+    '</a></p>';
+
+  return wrapEmailHtml(sanitizeHtml(inner, SANITIZE_OPTIONS));
 }

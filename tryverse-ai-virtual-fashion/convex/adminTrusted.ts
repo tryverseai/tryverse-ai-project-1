@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
+import { authSubjectSegments } from "./authSubjectKeys";
 
 function requireBackendSecret(secret: string) {
   const expected = process.env.BACKEND_SHARED_SECRET;
@@ -126,11 +127,23 @@ export const adminListTryons = query({
     const total = rows.length;
     const slice = rows.slice(offset, offset + limit);
     const profiles = await ctx.db.query("profiles").collect();
-    const pmap = new Map(profiles.map((p) => [p.id, p] as const));
+    const pmap = new Map<string, (typeof profiles)[number]>();
+    for (const p of profiles) {
+      pmap.set(p.id, p);
+      for (const seg of authSubjectSegments(p.id)) {
+        if (!pmap.has(seg)) pmap.set(seg, p);
+      }
+    }
     return {
       tryons: slice.map((t) => {
         const uid = t.user_id ?? "";
-        const pr = uid ? pmap.get(uid) : undefined;
+        let pr = uid ? pmap.get(uid) : undefined;
+        if (!pr && uid) {
+          for (const seg of authSubjectSegments(uid)) {
+            pr = pmap.get(seg);
+            if (pr) break;
+          }
+        }
         return {
           id: t.legacy_id ?? String(t._id),
           user_id: t.user_id,

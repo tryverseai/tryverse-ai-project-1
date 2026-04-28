@@ -1,4 +1,5 @@
-import { readConvexAuthJwt } from '@/lib/convexAuthStorage';
+import { encodeLocalAuthorizationHeader } from '@/lib/localSession';
+import type { AccountType } from '@/lib/accountType';
 
 /**
  * True when VITE_BACKEND_URL is the usual local API — browser calls to :3001 often fail (offline URL,
@@ -11,15 +12,22 @@ function isLocalDefaultApiUrl(value: string): boolean {
 
 /**
  * Base URL for API calls from the web app.
- * - In **development**, use same-origin `/api` and `/health` (Vite → :3001) when URL is unset **or**
- *   still `http://localhost:3001` in .env — avoids `Failed to fetch (localhost:3001)` from direct cross-port calls.
- * - In **production**, set `VITE_BACKEND_URL` to your API origin when UI and API differ.
+ * - In **development**, default to same-origin `/api` (Vite → :3001) so LAN/mobile (`http://172.x:8080`)
+ *   never calls `http://localhost:3001` from the wrong device and avoids CORS failures. Set
+ *   `VITE_BACKEND_DIRECT=true` to force `VITE_BACKEND_URL` in dev (e.g. remote staging API).
+ * - In **production**, set `VITE_BACKEND_URL` when UI and API differ.
  */
 function resolveBackendBaseUrl(): string {
   const raw = typeof import.meta.env.VITE_BACKEND_URL === 'string' ? import.meta.env.VITE_BACKEND_URL : '';
   const trimmed = raw.trim();
+  const directEnv =
+    import.meta.env.VITE_BACKEND_DIRECT === 'true' ||
+    import.meta.env.VITE_BACKEND_USE_DIRECT_API === 'true';
 
   if (import.meta.env.DEV) {
+    if (!directEnv) {
+      return '';
+    }
     if (!trimmed || isLocalDefaultApiUrl(trimmed)) {
       return '';
     }
@@ -205,18 +213,86 @@ export interface BrandAnalytics {
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
+function pickAuthorizationHeader(): string | null {
+  return encodeLocalAuthorizationHeader();
+}
+
 async function getAuthHeaders(): Promise<HeadersInit> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const token = readConvexAuthJwt();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  const auth = pickAuthorizationHeader();
+  if (auth) {
+    headers['Authorization'] = auth;
   }
   return headers;
 }
 
-/** Synchronous — no async needed since readConvexAuthJwt is synchronous. */
-function getAuthToken(): string | null {
-  return readConvexAuthJwt();
+/**
+ * Raw `Authorization` header value for Local session (`Local <base64>`).
+ * Do not prefix with `Bearer` — that is only for Convex JWTs.
+ */
+function getAuthorizationHeaderValue(): string | null {
+  return pickAuthorizationHeader();
+}
+
+export type AccountBootstrapBody = {
+  accountType: AccountType;
+  email?: string;
+  brandName?: string;
+  fullName?: string;
+  role?: string;
+};
+
+/** Public invite gate — backed by `INVITE_TOKEN_MAP_JSON` on the API (not Convex). */
+export async function validateInviteToken(token: string): Promise<{ valid: boolean; email?: string }> {
+  const q = encodeURIComponent(token);
+  const res = await fetch(`${BACKEND_URL}/api/invite/validate?token=${q}`);
+  if (!res.ok) return { valid: false };
+  return (await res.json()) as { valid: boolean; email?: string };
+}
+
+export async function bootstrapLocalSession(body: AccountBootstrapBody): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/account/session/bootstrap`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      accountType: body.accountType,
+      brandName: body.brandName,
+      fullName: body.fullName,
+      role: body.role,
+      email: body.email,
+    }),
+  });
+  await handleResponse(res);
+}
+
+export async function getMyAccount(): Promise<{
+  user: { id: string; email: string };
+  profile: Record<string, unknown> | null;
+}> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/account/me`, { headers });
+  return handleResponse(res);
+}
+
+export async function patchMySettings(patch: Record<string, unknown>): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/account/settings`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(patch),
+  });
+  await handleResponse(res);
+}
+
+export async function patchMyCompliance(goals: string[], completedAt: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/account/compliance`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ onboarding_goals: goals, completed_at: completedAt }),
+  });
+  await handleResponse(res);
 }
 
 /**
@@ -273,10 +349,17 @@ async function handleResponse<T>(res: Response, context?: { feature?: string }):
         : message;
     }
 
-    // 401 — Expired or missing token: dispatch a global event so AuthContext can sign out
+    // 401 — Only force sign-out when the token was sent but rejected (expired / malformed).
+    // Missing actor (no Bearer) must not log the user out — that breaks dashboard reload races.
     if (res.status === 401) {
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('tryverse:auth:expired'));
+        const msg = (message || '').toLowerCase();
+        const shouldSignOut =
+          msg.includes('invalid or expired') ||
+          msg.includes('missing or invalid authorization');
+        if (shouldSignOut) {
+          window.dispatchEvent(new CustomEvent('tryverse:auth:expired'));
+        }
       }
     }
 
@@ -345,14 +428,14 @@ export async function uploadImage(
   file: File,
   type: 'person' | 'product'
 ): Promise<{ filePath: string; type: string }> {
-  const token = getAuthToken();
+  const auth = getAuthorizationHeaderValue();
   const formData = new FormData();
   formData.append('image', file);
   formData.append('type', type);
 
   const res = await fetch(`${BACKEND_URL}/api/upload`, {
     method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: auth ? { Authorization: auth } : {},
     body: formData,
   });
   return handleResponse(res);
@@ -527,10 +610,10 @@ export async function createPersonPathFromModel(modelId: string): Promise<string
 
 export async function getSignedImageUrl(path: string): Promise<string> {
   if (path.startsWith('http')) return path;
-  const token = getAuthToken();
+  const auth = getAuthorizationHeaderValue();
   const res = await fetch(
     `${BACKEND_URL}/api/upload/signed-url?path=${encodeURIComponent(path)}`,
-    { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+    { headers: auth ? { Authorization: auth } : {} }
   );
   const data = await handleResponse<{ url: string }>(res);
   return data.url;
@@ -650,7 +733,7 @@ export interface EarlyAccessPayload {
 
 export async function submitEarlyAccessRequest(
   payload: EarlyAccessPayload
-): Promise<{ success: boolean; id?: string; emailSent?: boolean }> {
+): Promise<{ success: boolean; id?: string; convexDocumentId?: string; emailSent?: boolean }> {
   const res = await fetch(`${BACKEND_URL}/api/early-access`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -665,7 +748,7 @@ export async function submitIndividualEarlyAccessRequest(payload: {
   what_interests_you: string;
   timeline: string;
   heard_about?: string | null;
-}): Promise<{ success: boolean; id?: string; emailSent?: boolean }> {
+}): Promise<{ success: boolean; id?: string; convexDocumentId?: string; emailSent?: boolean }> {
   const res = await fetch(`${BACKEND_URL}/api/early-access/individual`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -739,7 +822,7 @@ export async function resolveProductImageDisplayUrl(pathOrUrl: string | null): P
 }
 
 export async function getProducts(page = 1, limit = 20, category?: TryOnCategory) {
-  if (!readConvexAuthJwt()) throw new Error('Not authenticated');
+  if (!encodeLocalAuthorizationHeader()) throw new Error('Not authenticated');
   const headers = await getAuthHeaders();
   const q = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (category) q.set('category', category);

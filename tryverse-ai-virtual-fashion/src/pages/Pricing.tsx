@@ -4,9 +4,6 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Check, ArrowRight, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import {
@@ -17,7 +14,6 @@ import {
 import { captureSentryException } from "@/lib/sentry";
 import { assignTrustedPaymentCheckoutUrl } from "@/lib/safeUrl";
 import { cn } from "@/lib/utils";
-import { isConvexDataEnabled } from "@/lib/convexData";
 
 type PricingAudience = "individual" | "business";
 
@@ -58,6 +54,58 @@ const FALLBACK_CREATOR: PlanRow = {
     "Priority processing",
   ],
 };
+
+/** Static catalog (no browser Convex client). */
+const STATIC_PLAN_CATALOG: PlanRow[] = [
+  {
+    id: "free",
+    name: "Free",
+    price_ngn: 0,
+    price_usd: 0,
+    tryons_per_month: 5,
+    features: [
+      "5 try-ons/month on free pool (individual) · 20 on signup (brands)",
+      "Watermark",
+      "Basic quality",
+    ],
+  },
+  FALLBACK_PRO,
+  FALLBACK_CREATOR,
+  {
+    id: "starter",
+    name: "Starter",
+    price_ngn: 80000,
+    price_usd: 60,
+    tryons_per_month: 150,
+    features: [
+      "100–200 try-ons",
+      "50–100 products",
+      "HD images",
+      "Pilot-friendly limits",
+    ],
+  },
+  {
+    id: "growth",
+    name: "Growth",
+    price_ngn: 180000,
+    price_usd: 150,
+    tryons_per_month: 750,
+    features: [
+      "500–1000 try-ons",
+      "100–500 products",
+      "Analytics",
+      "API & widget embed",
+    ],
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    price_ngn: 0,
+    price_usd: 0,
+    tryons_per_month: -1,
+    features: ["Custom SLA", "Dedicated infrastructure", "Negotiated limits"],
+  },
+];
 
 const FREE_IDS = new Set(["free", "free_trial", "trial"]);
 
@@ -192,11 +240,7 @@ function isFreePlanId(id: string): boolean {
 }
 
 const Pricing = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const convexOn = isConvexDataEnabled();
-  const convexPlans = useQuery(api.plans.listActivePlans, convexOn ? {} : "skip");
-  const seedPlansIfEmpty = useMutation(api.seed.seedPlansIfEmpty);
   const [audience, setAudience] = useState<PricingAudience>("individual");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [plansLoading, setPlansLoading] = useState(true);
@@ -216,43 +260,12 @@ const Pricing = () => {
         setProviders(p);
         if (p.flutterwave) setCheckoutCurrency("USD");
         else if (p.paystack) setCheckoutCurrency("NGN");
-
-        if (convexOn) {
-          if (convexPlans === undefined) {
-            setPlansLoading(true);
-            return;
-          }
-          if (convexPlans.length === 0) {
-            // M-4: Trigger seed but stay in loading state — the Convex subscription
-            // will update `convexPlans` once seeding completes, re-running this effect.
-            await seedPlansIfEmpty({});
-            // Keep plansLoading = true; wait for convexPlans to become non-empty.
-            return;
-          }
-          if (!cancelled) {
-            setDbPlans(
-              convexPlans.map((r) => ({
-                id: r.id,
-                name: r.name,
-                price_ngn: r.price_ngn,
-                price_usd: r.price_usd,
-                tryons_per_month: r.tryons_per_month,
-                features: r.features,
-              }))
-            );
-            setPlansLoading(false);
-          }
-        } else {
-          if (!cancelled) {
-            setDbPlans([]);
-            setPlansLoading(false);
-            toast.error("Set VITE_CONVEX_URL to load plans.");
-          }
-        }
+        setDbPlans(STATIC_PLAN_CATALOG);
+        setPlansLoading(false);
       } catch {
         if (!cancelled) {
-          toast.error("Could not load plans");
-          setDbPlans([]);
+          toast.error("Could not load payment providers");
+          setDbPlans(STATIC_PLAN_CATALOG);
           setPlansLoading(false);
         }
       }
@@ -260,7 +273,7 @@ const Pricing = () => {
     return () => {
       cancelled = true;
     };
-  }, [convexOn, convexPlans, seedPlansIfEmpty]);
+  }, []);
 
   const handleSubscribe = async (plan: PlanRow) => {
     if (plan.id === "enterprise") {
@@ -268,18 +281,7 @@ const Pricing = () => {
       return;
     }
 
-    const paidNeedsDb = ["pro", "creator", "starter", "growth"].includes(plan.id);
-    if (paidNeedsDb && !dbPlans.some((p) => p.id === plan.id)) {
-      toast.error("This paid plan isn’t available yet. Run seed plans in Convex or contact support.");
-      return;
-    }
-
     if (plan.id === "free" || plan.id === "free_trial" || plan.id === "trial") {
-      if (!user) {
-        toast.error("Please sign in to get started");
-        navigate("/auth");
-        return;
-      }
       navigate("/dashboard");
       toast.success("You're on the free tier — opening your dashboard.");
       return;
@@ -295,12 +297,6 @@ const Pricing = () => {
     }
     if (effectiveCurrency === "USD" && plan.price_usd <= 0) {
       toast.error("This plan is not available for checkout in this currency");
-      return;
-    }
-
-    if (!user) {
-      toast.error("Please sign in to subscribe");
-      navigate("/auth");
       return;
     }
 

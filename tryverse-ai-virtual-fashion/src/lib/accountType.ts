@@ -1,5 +1,14 @@
 export type AccountType = "business" | "individual";
 
+/** Profile-like fields stored in the browser session (no remote auth provider). */
+export type LegacyUserMetadata = {
+  account_type?: AccountType;
+  brand_name?: string;
+  full_name?: string;
+  role?: string;
+  plan?: string;
+};
+
 const DASHBOARD_BUSINESS = "/dashboard/business";
 const DASHBOARD_INDIVIDUAL = "/dashboard/individual";
 

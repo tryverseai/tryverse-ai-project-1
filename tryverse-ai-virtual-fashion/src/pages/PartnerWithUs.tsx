@@ -6,6 +6,7 @@ import { GLASS_EASE, glassOuter, glassInner, glassInnerCard } from "@/lib/glassF
 import { Button } from "@/components/ui/button";
 import { ArrowRight, TrendingDown, TrendingUp, ShieldCheck, Code2, Sparkles, Globe, Zap, Shield } from "lucide-react";
 import { Link } from "react-router-dom";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { Helmet } from "react-helmet-async";
 
 const benefits = [
@@ -73,16 +74,33 @@ const PartnerWithUs = () => (
 
           <div className="text-center space-y-4">
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <Link to="/auth">
-                <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12">
-                  Sign up <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <Link to="/early-access">
-                <Button size="lg" variant="outline" className="text-base px-8 h-12">
-                  Join waitlist
-                </Button>
-              </Link>
+              {FEATURE_FLAGS.INVITE_ONLY_MODE ? (
+                <>
+                  <Link to="/waitlist">
+                    <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12">
+                      Join Waitlist <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link to="/book-demo">
+                    <Button size="lg" variant="outline" className="text-base px-8 h-12">
+                      Book a Demo
+                    </Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link to="/auth">
+                    <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12">
+                      Sign up <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link to="/early-access">
+                    <Button size="lg" variant="outline" className="text-base px-8 h-12">
+                      Join waitlist
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -127,16 +145,33 @@ const PartnerWithUs = () => (
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
-                <Link to="/auth">
-                  <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft">
-                    Sign up <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-                <Link to="/early-access">
-                  <Button size="lg" variant="outline">
-                    Join waitlist
-                  </Button>
-                </Link>
+                {FEATURE_FLAGS.INVITE_ONLY_MODE ? (
+                  <>
+                    <Link to="/waitlist">
+                      <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft">
+                        Join Waitlist <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <Link to="/book-demo">
+                      <Button size="lg" variant="outline">
+                        Book a Demo
+                      </Button>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/auth">
+                      <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft">
+                        Sign up <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <Link to="/early-access">
+                      <Button size="lg" variant="outline">
+                        Join waitlist
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </motion.div>
 

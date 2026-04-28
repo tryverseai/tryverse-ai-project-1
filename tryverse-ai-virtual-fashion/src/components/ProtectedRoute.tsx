@@ -1,17 +1,6 @@
-import { useAuth } from "@/contexts/AuthContext";
-import { Navigate, useLocation } from "react-router-dom";
-import { RouteFallbackSpinner } from "@/components/RouteFallbackSpinner";
-
+/**
+ * Routes are open: {@link AuthProvider} ensures a guest `Local` session so the API always has an actor.
+ */
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  const location = useLocation();
-
-  if (loading) return <RouteFallbackSpinner />;
-
-  if (!user) {
-    const redirect = encodeURIComponent(location.pathname + location.search);
-    return <Navigate to={`/auth?redirect=${redirect}`} replace state={{ from: location }} />;
-  }
-
   return <>{children}</>;
 }

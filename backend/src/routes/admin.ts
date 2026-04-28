@@ -355,7 +355,7 @@ router.get(
 
       res.json({
         users: usersWithBan,
-        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+        pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit) || 1) },
       });
     } catch (err) {
       next(err);
@@ -386,7 +386,7 @@ router.get('/tryons', async (req: Request, res: Response, next: NextFunction): P
 
     res.json({
       tryons: rows,
-      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit) || 1) },
     });
   } catch (err) {
     next(err);

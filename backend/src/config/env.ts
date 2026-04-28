@@ -11,6 +11,15 @@ function requireEnv(key: string): string {
   return value;
 }
 
+/** Like requireEnv but trims BOM/whitespace — avoids Convex `Unauthorized` when secrets differ only by newline. */
+function requireEnvTrimmed(key: string): string {
+  const value = sanitizeEnvLine(process.env[key], '');
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+  return value;
+}
+
 function optionalEnv(key: string, defaultValue = ''): string {
   return process.env[key] || defaultValue;
 }
@@ -51,7 +60,18 @@ export const env = {
   // ── Convex (primary DB + auth validation) ─────────────────────────────────
   CONVEX_URL: requireEnv('CONVEX_URL'),
   /** Shared secret for Node → Convex `backendTrusted.*` (set same value in Convex env). */
-  BACKEND_SHARED_SECRET: requireEnv('BACKEND_SHARED_SECRET'),
+  BACKEND_SHARED_SECRET: requireEnvTrimmed('BACKEND_SHARED_SECRET'),
+
+  /**
+   * Accept `Authorization: Local <base64url(JSON)>` with `{ "sub": "<user id>", "email"?: "..." }`.
+   * Intended for local-only / rebuilt auth without Convex JWT in the browser. **Insecure on the public
+   * internet** unless you treat it like a dev-only bypass — keep `false` in production unless you know
+   * the risk and set `ALLOW_LOCAL_SESSION_AUTH=true` explicitly.
+   */
+  ALLOW_LOCAL_SESSION_AUTH: optionalBool(
+    'ALLOW_LOCAL_SESSION_AUTH',
+    optionalEnv('NODE_ENV', 'development') !== 'production'
+  ),
 
   // ── Redis ─────────────────────────────────────────────────────────────────
   REDIS_URL: optionalEnv('REDIS_URL', 'redis://localhost:6379'),
@@ -228,6 +248,14 @@ export const env = {
 
   // ── Frontend ─────────────────────────────────────────────────────────────
   FRONTEND_URL: optionalEnv('FRONTEND_URL', 'http://localhost:8080'),
+  /**
+   * Public marketing site origin for links in transactional email (waitlist confirmations).
+   * Set PUBLIC_APP_URL=https://tryverseai.com in production if API FRONTEND_URL differs.
+   */
+  PUBLIC_APP_URL: sanitizeEnvLine(
+    process.env['PUBLIC_APP_URL'] || optionalEnv('FRONTEND_URL', 'http://localhost:8080'),
+    'http://localhost:8080'
+  ).replace(/\/$/, ''),
 
   // ── Email (Resend) ─────────────────────────────────────────────────────
   /** Trimmed — trailing newlines/quotes in .env break Resend with "API key is invalid". */
@@ -260,6 +288,12 @@ export const env = {
   JOB_CONCURRENCY: parseInt(optionalEnv('JOB_CONCURRENCY', '3'), 10),
   JOB_TIMEOUT_MS: parseInt(optionalEnv('JOB_TIMEOUT_MS', '180000'), 10),
   JOB_MAX_RETRIES: parseInt(optionalEnv('JOB_MAX_RETRIES', '3'), 10),
+
+  /**
+   * JSON object: { "secret-invite-token": "invited@email.com" } for GET /api/invite/validate.
+   * Does not replace Convex Auth; Express account bootstrap still runs after signup.
+   */
+  INVITE_TOKEN_MAP_JSON: optionalEnv('INVITE_TOKEN_MAP_JSON', '{}'),
 };
 
 /**

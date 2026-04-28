@@ -23,8 +23,10 @@ import productsRouter from './routes/products';
 import adminRouter from './routes/admin';
 import analyticsRouter from './routes/analytics';
 import emailsRouter from './routes/emails';
+import accountRouter from './routes/account';
 import earlyAccessRouter from './routes/earlyAccess';
 import supportRouter from './routes/support';
+import inviteRouter from './routes/invite';
 
 // ─── Sentry (must init before everything else) ────────────────────────────────
 initSentry();
@@ -69,12 +71,34 @@ const allowedOrigins = [
   ...(env.WIDGET_ALLOWED_ORIGINS === '*' ? [] : env.WIDGET_ALLOWED_ORIGINS.split(',')),
 ];
 
+/** Dev: browser opened via LAN IP (e.g. Vite "Network" URL) while API is on another port. */
+function isNonProductionLanDevOrigin(origin: string): boolean {
+  if (env.NODE_ENV === 'production') return false;
+  try {
+    const { hostname } = new URL(origin);
+    const h = hostname.toLowerCase();
+    if (h === 'localhost' || h === '127.0.0.1') return true;
+    if (h === '[::1]' || h.endsWith('.local')) return true;
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+    const m = /^172\.(\d{1,3})\./.exec(h);
+    if (m) {
+      const n = Number(m[1]);
+      if (n >= 16 && n <= 31) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (env.WIDGET_ALLOWED_ORIGINS === '*') return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (isNonProductionLanDevOrigin(origin)) return callback(null, true);
       callback(new Error(`CORS: Origin ${origin} not allowed`));
     },
     credentials: true,
@@ -166,6 +190,7 @@ async function mountBullBoard(): Promise<void> {
 // ─── API Routes ───────────────────────────────────────────────────────────────
 app.use('/api/early-access', earlyAccessRouter);
 app.use('/api/support', supportRouter);
+app.use('/api/invite', inviteRouter);
 app.use('/api/upload',    uploadRouter);
 app.use('/api/tryon',     tryonRouter);
 app.use('/api/credits',   creditsRouter);
@@ -177,6 +202,7 @@ app.use('/api/products',  productsRouter);
 app.use('/api/admin',     adminRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/emails',    emailsRouter);
+app.use('/api/account',   accountRouter);
 
 // ─── Sentry error handler ────────────────────────────────────────────────────
 try {
@@ -200,7 +226,13 @@ async function bootstrap(): Promise<void> {
       port: env.PORT,
       env: env.NODE_ENV,
       frontend: env.FRONTEND_URL,
+      convexUrl: env.CONVEX_URL.replace(/\/$/, ''),
     });
+    if (env.NODE_ENV !== 'production') {
+      logger.info(
+        'JWT verification uses CONVEX_URL above — it must match VITE_CONVEX_URL in the web app or Bearer auth will fail.'
+      );
+    }
     logger.info('Clothing try-on routing (effective)', {
       clothingUseFashn: env.TRYON_CLOTHING_USE_FASHN,
       fashnFallbackToIdm: env.TRYON_FASHN_FALLBACK_IDM,

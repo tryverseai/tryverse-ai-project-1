@@ -4,7 +4,7 @@ import { setSentryUser } from "@/lib/sentry";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function PostHogProvider({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
 
   useEffect(() => {
     initPostHog();
@@ -12,7 +12,7 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
-    if (user) {
+    if (user && isAuthenticated) {
       posthogIdentify(user.id, {
         email: user.email,
         created_at: user.created_at,
@@ -23,7 +23,7 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
       posthogReset();
       setSentryUser(null);
     }
-  }, [user, loading]);
+  }, [user, isAuthenticated, loading]);
 
   return <>{children}</>;
 }

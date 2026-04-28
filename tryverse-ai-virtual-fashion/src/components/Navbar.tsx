@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 const publicLinks = [
   { label: "Product", href: "/#features" },
@@ -26,7 +27,7 @@ export function Navbar() {
   const ticking = useRef(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { isAuthenticated, signOut } = useAuth();
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
@@ -150,7 +151,7 @@ export function Navbar() {
           animate={{ gap: isCompact ? 6 : 12 }}
           transition={SPRING_TRANSITION}
         >
-          {user ? (
+          {isAuthenticated ? (
             <>
               <Link to="/studio">
                 <Button variant="ghost" size="sm" className="text-sm">
@@ -165,6 +166,24 @@ export function Navbar() {
               <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-sm gap-1.5">
                 <LogOut className="h-3.5 w-3.5" /> Sign Out
               </Button>
+            </>
+          ) : FEATURE_FLAGS.INVITE_ONLY_MODE ? (
+            <>
+              <Link to="/auth">
+                <Button variant="ghost" size="sm" className="text-sm">
+                  Log In
+                </Button>
+              </Link>
+              <Link to="/waitlist">
+                <Button variant="outline" size="sm" className="text-sm">
+                  Join Waitlist
+                </Button>
+              </Link>
+              <Link to="/book-demo">
+                <Button size="sm" className="gradient-primary text-primary-foreground text-sm shadow-soft">
+                  Book a Demo
+                </Button>
+              </Link>
             </>
           ) : (
             <>
@@ -227,7 +246,7 @@ export function Navbar() {
               </a>
             )
           )}
-          {user ? (
+          {isAuthenticated ? (
             <>
               <Link to="/studio" onClick={() => setOpen(false)}>
                 <Button variant="outline" className="w-full mt-2">
@@ -249,6 +268,24 @@ export function Navbar() {
               >
                 <LogOut className="h-3.5 w-3.5" /> Sign Out
               </Button>
+            </>
+          ) : FEATURE_FLAGS.INVITE_ONLY_MODE ? (
+            <>
+              <Link to="/auth" onClick={() => setOpen(false)}>
+                <Button variant="outline" className="w-full mt-2">
+                  Log In
+                </Button>
+              </Link>
+              <Link to="/waitlist" onClick={() => setOpen(false)}>
+                <Button variant="outline" className="w-full">
+                  Join Waitlist
+                </Button>
+              </Link>
+              <Link to="/book-demo" onClick={() => setOpen(false)}>
+                <Button className="gradient-primary text-primary-foreground w-full">
+                  Book a Demo
+                </Button>
+              </Link>
             </>
           ) : (
             <>

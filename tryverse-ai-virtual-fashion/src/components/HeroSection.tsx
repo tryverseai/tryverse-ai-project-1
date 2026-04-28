@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import heroVideo1 from "@/assets/hero-video-1.mp4";
 import heroVideo2 from "@/assets/hero-video-2.mp4";
 import heroVideo3 from "@/assets/hero-video-3.mp4";
@@ -47,17 +48,35 @@ export function HeroSection() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
-            <Link to="/auth">
-              <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12 w-full sm:w-auto">
-                Sign up
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-            <Link to="/early-access">
-              <Button size="lg" variant="outline" className="text-base h-12 border-border w-full sm:w-auto">
-                Join waitlist
-              </Button>
-            </Link>
+            {FEATURE_FLAGS.INVITE_ONLY_MODE ? (
+              <>
+                <Link to="/waitlist">
+                  <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12 w-full sm:w-auto">
+                    Join Waitlist
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link to="/book-demo">
+                  <Button size="lg" variant="outline" className="text-base h-12 border-border w-full sm:w-auto">
+                    Book a Demo
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link to="/auth">
+                  <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12 w-full sm:w-auto">
+                    Sign up
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link to="/early-access">
+                  <Button size="lg" variant="outline" className="text-base h-12 border-border w-full sm:w-auto">
+                    Join waitlist
+                  </Button>
+                </Link>
+              </>
+            )}
             <Link to="/about">
               <Button size="lg" variant="ghost" className="text-base h-12 w-full sm:w-auto">
                 Learn More

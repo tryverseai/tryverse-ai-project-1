@@ -1,4 +1,5 @@
 import { query } from "./_generated/server";
+import { findProfileBySubjectKeys } from "./profileLookup";
 
 /** Signed-in user for dashboard hooks (Convex Auth JWT). */
 export const sessionUser = query({
@@ -21,10 +22,7 @@ export const verifyBearerSession = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", identity.subject))
-      .unique();
+    const profile = await findProfileBySubjectKeys(ctx, identity.subject);
     return {
       id: identity.subject,
       email: identity.email ?? null,

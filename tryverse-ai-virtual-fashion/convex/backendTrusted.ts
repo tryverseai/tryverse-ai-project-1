@@ -1,10 +1,12 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
+import { authSubjectSegments } from "./authSubjectKeys";
 
 function requireBackendSecret(secret: string) {
-  const expected = process.env.BACKEND_SHARED_SECRET;
-  if (!expected || secret !== expected) {
+  const expected = (process.env.BACKEND_SHARED_SECRET ?? "").trim();
+  const got = String(secret).trim();
+  if (!expected || got !== expected) {
     throw new Error("Unauthorized");
   }
 }
@@ -29,10 +31,14 @@ export const getProfileRow = query({
   args: { secret: v.string(), userId: v.string() },
   handler: async (ctx, { secret, userId }) => {
     requireBackendSecret(secret);
-    return await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", userId))
-      .unique();
+    for (const key of authSubjectSegments(userId)) {
+      const row = await ctx.db
+        .query("profiles")
+        .withIndex("by_userId", (q) => q.eq("id", key))
+        .unique();
+      if (row) return row;
+    }
+    return null;
   },
 });
 
@@ -82,10 +88,14 @@ export const patchProfileRow = mutation({
   },
   handler: async (ctx, { secret, userId, patch }) => {
     requireBackendSecret(secret);
-    const row = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", userId))
-      .unique();
+    let row = null;
+    for (const key of authSubjectSegments(userId)) {
+      row = await ctx.db
+        .query("profiles")
+        .withIndex("by_userId", (q) => q.eq("id", key))
+        .unique();
+      if (row) break;
+    }
     if (!row) throw new Error("Profile not found");
     const p = patch as Record<string, unknown>;
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -620,10 +630,11 @@ export const insertEarlyAccessRowTrusted = mutation({
     const cleaned = Object.fromEntries(
       Object.entries(r).filter(([, val]) => val !== null && val !== undefined)
     ) as Record<string, unknown>;
-    await ctx.db.insert("early_access_requests", {
+    const id = await ctx.db.insert("early_access_requests", {
       ...cleaned,
       created_at: new Date().toISOString(),
     } as never);
+    return { id: String(id) };
   },
 });
 

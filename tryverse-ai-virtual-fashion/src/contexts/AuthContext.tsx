@@ -1,20 +1,19 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useConvexAuth } from "convex/react";
-import { useAuthActions } from "@convex-dev/auth/react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { inviteSignupEnabled, b2cSignupEnabled } from "@/lib/featureFlags";
-import { normalizeAccountType, type AccountType } from "@/lib/accountType";
+import {
+  clearLocalSession,
+  emailToLocalSubject,
+  encodeLocalAuthorizationHeader,
+  ensureGuestLocalSession,
+  readLocalSession,
+  writeLocalSession,
+  isGuestLocalSession,
+  type LocalSessionV2,
+} from "@/lib/localSession";
+import { normalizeAccountType, type AccountType, type LegacyUserMetadata } from "@/lib/accountType";
 import { complianceDoneSessionKey } from "@/lib/complianceStorage";
-import { readConvexAuthJwt, clearConvexAuthJwt } from "@/lib/convexAuthStorage";
+import { bootstrapLocalSession, type AccountBootstrapBody } from "@/lib/backendApi";
 
-export type LegacyUserMetadata = {
-  account_type?: AccountType;
-  brand_name?: string;
-  full_name?: string;
-  role?: string;
-  plan?: string;
-};
+export type { LegacyUserMetadata };
 
 /** Minimal user shape shared across dashboard and API helpers. */
 export type AppUser = {
@@ -25,7 +24,8 @@ export type AppUser = {
 
 interface AuthContextType {
   user: AppUser | null;
-  /** Convex Auth JWT for API calls; `access_token` is read from the same storage the Convex client uses. */
+  /** False for anonymous `local:guest-…` sessions created after sign-out or first visit. */
+  isAuthenticated: boolean;
   session: { access_token: string } | null;
   loading: boolean;
   signUp: (
@@ -42,30 +42,25 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function sessionToAppUser(s: LocalSessionV2): AppUser {
+  return {
+    id: s.sub,
+    email: s.email || undefined,
+    user_metadata: s.user_metadata || {},
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { isLoading: convexAuthLoading, isAuthenticated } = useConvexAuth();
-  const { signIn: convexSignIn, signOut: convexSignOut } = useAuthActions();
-  const sessionUser = useQuery(api.authSession.sessionUser, isAuthenticated ? {} : "skip");
-  const userRow = useQuery(api.userBootstrap.myUserRow, isAuthenticated ? {} : "skip");
-  const [tokenTick, setTokenTick] = useState(0);
+  if (typeof window !== "undefined") {
+    ensureGuestLocalSession();
+  }
+  const [tick, setTick] = useState(0);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    // Same-tab token refresh tick (cross-tab storage events)
-    const onStorage = (e: StorageEvent) => {
-      if (e.key?.includes("__convexAuthJWT")) setTokenTick((n) => n + 1);
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
-  // H-7 / H-6: Listen for API-layer auth events dispatched by handleResponse.
-  // On 401 (expired token) or 403 ACCOUNT_SUSPENDED, force sign-out.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const forceSignOut = () => {
-      void convexSignOut();
-      clearConvexAuthJwt();
+      clearLocalSession();
+      setTick((n) => n + 1);
     };
     window.addEventListener("tryverse:auth:expired", forceSignOut);
     window.addEventListener("tryverse:auth:suspended", forceSignOut);
@@ -73,99 +68,106 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("tryverse:auth:expired", forceSignOut);
       window.removeEventListener("tryverse:auth:suspended", forceSignOut);
     };
-  }, [convexSignOut]);
+  }, []);
 
   const user = useMemo((): AppUser | null => {
-    if (!isAuthenticated || !sessionUser) return null;
-    // M-1: Only set account_type when userRow has loaded; leave undefined while loading
-    // so routing gates stay in their loading state rather than defaulting to "business".
-    const account_type: AccountType | undefined =
-      normalizeAccountType(userRow?.account_type) ?? undefined;
-    return {
-      id: sessionUser.id,
-      email: sessionUser.email ?? undefined,
-      user_metadata: {
-        account_type,
-        brand_name: userRow?.brand_name ?? undefined,
-        full_name: userRow?.full_name ?? undefined,
-        role: userRow?.role ?? undefined,
-      },
-    };
-  }, [isAuthenticated, sessionUser, userRow]);
+    void tick;
+    const s = readLocalSession();
+    if (!s) return null;
+    return sessionToAppUser(s);
+  }, [tick]);
 
-  // H-2: Profile bootstrap is intentionally handled only in useSyncedConvexProfile
-  // (used by ComplianceOnboardingGate which wraps every authenticated route).
-  // Duplicating upsertProfile here caused two concurrent mutations on first login.
+  const isAuthenticated = useMemo(() => {
+    void tick;
+    const s = readLocalSession();
+    if (!s) return false;
+    return !isGuestLocalSession(s);
+  }, [tick]);
 
-  const loading =
-    convexAuthLoading || (isAuthenticated && (sessionUser === undefined || userRow === undefined));
+  const loading = false;
 
   const session = useMemo(() => {
-    if (!user) return null;
-    const t = readConvexAuthJwt();
-    if (!t) return null;
-    void tokenTick;
-    return { access_token: t };
-  }, [user, tokenTick, isAuthenticated, loading]);
+    void tick;
+    const h = encodeLocalAuthorizationHeader();
+    if (!h) return null;
+    return { access_token: h };
+  }, [tick]);
 
   const signUp = async (
     email: string,
-    password: string,
+    _password: string,
     brandName: string,
     fullName?: string,
     role?: string,
     accountType: AccountType = "business"
   ) => {
-    if (accountType === "business" && !inviteSignupEnabled) {
-      return {
-        error: new Error(
-          "New accounts are not open yet. Join the waitlist — we’ll email you a link when your brand is approved."
-        ),
-        session: null,
-      };
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed) {
+      return { error: new Error("Email is required"), session: null };
     }
-    if (accountType === "individual" && !b2cSignupEnabled) {
-      return {
-        error: new Error("Personal sign-up is not available right now. Please try again later."),
-        session: null,
-      };
-    }
+    const sub = emailToLocalSubject(trimmed);
+    const meta: LegacyUserMetadata = {
+      account_type: accountType,
+      brand_name: brandName,
+      full_name: fullName,
+      role,
+    };
+    writeLocalSession({ sub, email: trimmed, user_metadata: meta });
+    setTick((n) => n + 1);
+
+    const body: AccountBootstrapBody = {
+      accountType,
+      brandName,
+      fullName,
+      role,
+      email: trimmed,
+    };
     try {
-      await convexSignIn("password", {
-        flow: "signUp",
-        email,
-        password,
-        brandName,
-        fullName,
-        role,
-        accountType,
-      } as Record<string, unknown>);
-      return { error: null, session: null };
+      await bootstrapLocalSession(body);
     } catch (e) {
-      return { error: e as Error, session: null };
+      return { error: e instanceof Error ? e : new Error(String(e)), session: null };
     }
+    return { error: null, session: null };
   };
 
-  const signIn = async (email: string, password: string) => {
-    try {
-      await convexSignIn("password", { flow: "signIn", email, password } as Record<string, unknown>);
-      return { error: null };
-    } catch (e) {
-      return { error: e as Error };
+  const signIn = async (email: string, _password: string) => {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed) {
+      return { error: new Error("Email is required") };
     }
+    const sub = emailToLocalSubject(trimmed);
+    const existing = readLocalSession();
+    const meta: LegacyUserMetadata =
+      existing?.sub === sub && existing.user_metadata
+        ? existing.user_metadata
+        : { account_type: "individual", full_name: trimmed.split("@")[0] };
+    writeLocalSession({ sub, email: trimmed, user_metadata: meta });
+    setTick((n) => n + 1);
+
+    try {
+      await bootstrapLocalSession({
+        accountType: normalizeAccountType(meta.account_type) ?? "individual",
+        email: trimmed,
+        brandName: meta.brand_name,
+        fullName: meta.full_name,
+        role: meta.role,
+      });
+    } catch (e) {
+      return { error: e instanceof Error ? e : new Error(String(e)) };
+    }
+    return { error: null };
   };
 
   const signOut = async () => {
     const uid = user?.id;
-    await convexSignOut();
-    // L-3: Explicitly remove the JWT so stale tokens can't survive a silent Convex signOut failure.
-    clearConvexAuthJwt();
+    clearLocalSession();
     if (uid) sessionStorage.removeItem(complianceDoneSessionKey(uid));
-    setTokenTick((n) => n + 1);
+    ensureGuestLocalSession();
+    setTick((n) => n + 1);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, session, loading, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

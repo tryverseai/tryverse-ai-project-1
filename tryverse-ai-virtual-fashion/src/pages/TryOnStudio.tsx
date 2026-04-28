@@ -39,9 +39,6 @@ import {
 import { posthogCapture } from "@/lib/posthog";
 import { captureSentryException } from "@/lib/sentry";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { isConvexDataEnabled } from "@/lib/convexData";
 
 /** Diane / Andrew pinned first in Studio lists so order stays correct even when DB sort_order differs (e.g. Zoe lower than Diane). */
 function sortTryverseModelsForDisplay(models: TryverseModel[]): TryverseModel[] {
@@ -138,8 +135,6 @@ const TryOnStudio = ({
   const [studioSection, setStudioSection] = useState<StudioSection>(() => (embedded ? "tryon" : "guide"));
   const audience = audienceProp ?? (embedded ? "individual" : "business");
   const { user } = useAuth();
-  const convexOn = isConvexDataEnabled();
-  const convexModels = useQuery(api.modelLibrary.listActiveModels, convexOn ? {} : "skip");
   /** When true, user has try-on credits (preset models may still be plan-gated per model). */
   const [studioModelsUnlocked, setStudioModelsUnlocked] = useState(false);
   /** From GET /api/credits — drives free-plan vs paid preset access. */
@@ -208,18 +203,7 @@ const TryOnStudio = ({
 
   useEffect(() => {
     let cancelled = false;
-    if (convexOn) {
-      if (convexModels === undefined) {
-        setModelsLoading(true);
-        return;
-      }
-      if (convexModels.length > 0) {
-        setLibraryModels(sortTryverseModelsForDisplay(convexModels as TryverseModel[]));
-        setModelsError(null);
-        setModelsLoading(false);
-        return;
-      }
-    }
+    setModelsLoading(true);
     void (async () => {
       try {
         const models = await getTryverseModels();
@@ -239,7 +223,7 @@ const TryOnStudio = ({
     return () => {
       cancelled = true;
     };
-  }, [convexOn, convexModels]);
+  }, []);
 
   useEffect(() => {
     if (!user) {
