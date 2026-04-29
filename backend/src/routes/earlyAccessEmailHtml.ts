@@ -15,10 +15,11 @@ function publicSiteLabel(homeUrl: string): string {
   }
 }
 
+/** Mutable shapes required by sanitize-html `IOptions` (not `readonly` tuples). */
 const SANITIZE_OPTIONS = {
   allowedTags: ['p', 'strong', 'a', 'br'],
   allowedAttributes: { a: ['href'] },
-} as const;
+};
 
 function wrapEmailHtml(innerSanitized: string): string {
   return (

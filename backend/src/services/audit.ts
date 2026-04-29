@@ -4,6 +4,7 @@ import { anyApi, convexMutationTrusted } from '../config/convexHttp';
 
 export type AuditEventType =
   | 'admin_action'
+  | 'admin_login'
   | 'failed_login'
   | 'rate_limit'
   | 'api_key_blocked'

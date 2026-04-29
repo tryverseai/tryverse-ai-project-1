@@ -83,8 +83,9 @@ export async function cxReserveCredit(userId: string): Promise<{
   creditType?: 'monthly' | 'free';
   reason?: string;
 }> {
-  return convexMutationTrusted<{ ok: boolean; creditType?: 'monthly' | 'free'; reason?: string }>(
-    anyApi.backendTrusted.reserveCredit,
-    { ...trusted(), userId }
-  );
+  const result = await convexMutationTrusted(anyApi.backendTrusted.reserveCredit, {
+    ...trusted(),
+    userId,
+  });
+  return result as { ok: boolean; creditType?: 'monthly' | 'free'; reason?: string };
 }

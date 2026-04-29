@@ -2,6 +2,7 @@ import { logger } from '../../config/logger';
 import { cxGetProfile } from '../creditsConvexBridge';
 import { userAnalyticsSince } from '../userAnalyticsConvexBridge';
 import { cxInsertUsageEvent } from '../tryonConvexBridge';
+import type { UsageEventType } from '../../types';
 
 /**
  * BRAND ANALYTICS SERVICE
@@ -158,7 +159,11 @@ export async function trackEvent(
   metadata?: Record<string, unknown>
 ): Promise<void> {
   try {
-    await cxInsertUsageEvent(userId, eventType, metadata);
+    await cxInsertUsageEvent(
+      userId,
+      eventType as UsageEventType,
+      metadata as Record<string, string | number | boolean | null> | undefined
+    );
   } catch (err) {
     logger.error('Failed to track event', { eventType, error: String(err) });
   }
