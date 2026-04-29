@@ -79,6 +79,15 @@ Set these for **Production** (and Preview if you want previews to hit a staging 
 
 Convex Auth / `SITE_URL` are configured on **Convex** (see below), not only in Vite.
 
+### Cursor / Git-first deploy
+
+- With **Git connected** on the Vercel project, every **`git push` to `main`** triggers a Production deploy — no CLI or dashboard clicks on each release.
+- **Optional GitHub Actions** (`.github/workflows/vercel-frontend-deploy.yml`): add GitHub Secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`. If Vercel is *also* set to deploy on Git push, you may get **two builds** per push; disable one side if that bothers you.
+
+### Cursor terminal (local CLI deploy)
+
+From `tryverse-ai-virtual-fashion`, run **`npx vercel login`** once, then **`npx vercel link`** → **`npx vercel deploy --prod`**. Alternatively set env var **`VERCEL_TOKEN`** locally (never commit it).
+
 ### Custom domain
 
 In Vercel: **Domains** → add `tryverseai.com` / `www` per your DNS plan.

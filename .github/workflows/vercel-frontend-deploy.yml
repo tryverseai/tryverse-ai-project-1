@@ -1,0 +1,39 @@
+# Optional CI deploy — use GitHub Secrets so pushes from Cursor can deploy without opening Vercel.
+#
+# FIRST (one-time, in GitHub: repo → Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN        — https://vercel.com/account/tokens → Create Token
+#   VERCEL_ORG_ID       — Vercel dashboard → Team / project → Settings → General (Team ID sometimes shown here)
+#   VERCEL_PROJECT_ID   — Same project → Settings → General → Project ID (starts with `prj_`)
+#
+# If you already use “Git” integration inside the Vercel project, each `git push` already deploys.
+# Then you do NOT need this workflow unless you want deploys ONLY from Actions.
+# Avoid running both if you dislike duplicate deployments per push (disable Production Auto Deploy under
+# Vercel → Project → Settings → Git, OR delete this workflow).
+#
+name: Deploy frontend to Vercel
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tryverse-ai-virtual-fashion/**"
+      - ".github/workflows/vercel-frontend-deploy.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tryverse-ai-virtual-fashion
+
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: npx vercel@latest deploy --prod --yes
