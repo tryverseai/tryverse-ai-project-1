@@ -340,6 +340,12 @@ async function handleResponse<T>(res: Response, context?: { feature?: string }):
         : 'Too many requests — please slow down and try again shortly.';
     }
 
+    /** POST to the static site (e.g. Vercel) returns 405 — means VITE_BACKEND_URL was not set to the Railway API. */
+    if (res.status === 405) {
+      message =
+        'Request blocked (HTTP 405). Your live app is probably posting to the website host instead of the API. In Vercel → Environment Variables set VITE_BACKEND_URL to your Railway backend HTTPS URL (not tryverseai.com), then redeploy.';
+    }
+
     // 503 / 5xx — infrastructure failure; use a clearer message
     if (res.status === 503) {
       message = 'Service temporarily unavailable. Please try again in a moment.';
@@ -373,8 +379,8 @@ async function handleResponse<T>(res: Response, context?: { feature?: string }):
 
     const err = new ApiError(message, res.status, code, retryAfter);
 
-    // Skip Sentry for expected non-server errors (402, 429, 403)
-    if (res.status !== 402 && res.status !== 429 && res.status !== 403) {
+    // Skip Sentry for expected non-server errors (402, 429, 403, 405 misconfig)
+    if (res.status !== 402 && res.status !== 429 && res.status !== 403 && res.status !== 405) {
       try {
         const { captureSentryException } = await import('@/lib/sentry');
         captureSentryException(err, {
@@ -776,10 +782,17 @@ export async function submitSupportContact(payload: SupportContactPayload): Prom
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    let message = 'Failed to submit';
+    if (res.status === 405) {
+      throw new Error(
+        'Request blocked (HTTP 405). In Vercel set VITE_BACKEND_URL to your Railway API HTTPS URL and redeploy so forms call the backend, not the static site.'
+      );
+    }
+    let message = `Failed to submit (HTTP ${res.status})`;
     try {
       const body = await res.json();
-      message = (body as { error?: string }).error || message;
+      if (typeof (body as { error?: string }).error === 'string') {
+        message = `${(body as { error: string }).error} (${res.status})`;
+      }
     } catch {
       /* ignore */
     }

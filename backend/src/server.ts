@@ -62,13 +62,20 @@ app.use(
 );
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
+function parseCommaOrigins(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 const allowedOrigins = [
-  env.FRONTEND_URL,
+  env.FRONTEND_URL.trim(),
   'http://localhost:8080',
   'http://127.0.0.1:8080',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
-  ...(env.WIDGET_ALLOWED_ORIGINS === '*' ? [] : env.WIDGET_ALLOWED_ORIGINS.split(',')),
+  ...(env.WIDGET_ALLOWED_ORIGINS === '*' ? [] : parseCommaOrigins(env.WIDGET_ALLOWED_ORIGINS)),
 ];
 
 /** Dev: browser opened via LAN IP (e.g. Vite "Network" URL) while API is on another port. */

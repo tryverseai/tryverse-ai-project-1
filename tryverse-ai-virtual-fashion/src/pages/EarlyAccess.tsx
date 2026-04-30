@@ -432,13 +432,13 @@ const EarlyAccess = () => {
                           : "Tell us a bit about you — we&apos;ll reach out when we open more personal spots."}
                       </p>
                     </div>
-                    <Field label="First name *" htmlFor="ind-first">
+                    <Field label="Full name *" htmlFor="ind-first">
                       <Input
                         id="ind-first"
                         required
                         value={indFirstName}
                         onChange={(e) => setIndFirstName(e.target.value)}
-                        autoComplete="given-name"
+                        autoComplete="name"
                       />
                     </Field>
                     <Field label="Email *" htmlFor="ind-email">
