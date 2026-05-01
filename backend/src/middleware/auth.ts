@@ -194,7 +194,10 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   }
 
   // Fallback: raw key in header (still accepted for non-browser clients)
-  const adminKey = req.headers['x-admin-key'];
+  const rawHdr = req.headers['x-admin-key'];
+  const first = Array.isArray(rawHdr) ? rawHdr[0] : rawHdr;
+  const adminKey =
+    typeof first === 'string' ? first.replace(/^\uFEFF/, '').trim() : '';
   if (adminKey && adminKey === env.ADMIN_SECRET_KEY) {
     next();
     return;

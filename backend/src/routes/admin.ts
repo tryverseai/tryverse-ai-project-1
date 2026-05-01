@@ -96,7 +96,10 @@ router.post(
   handleValidationErrors,
   (req: Request, res: Response): void => {
     const { key } = req.body as { key: string };
-    if (key !== env.ADMIN_SECRET_KEY) {
+    const submitted = String(key ?? '')
+      .replace(/^\uFEFF/, '')
+      .trim();
+    if (submitted !== env.ADMIN_SECRET_KEY) {
       logAudit({
         event_type: 'failed_login',
         actor: req.ip ? `ip:${req.ip}` : undefined,

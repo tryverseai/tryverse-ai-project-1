@@ -271,7 +271,8 @@ export const env = {
   IMAGE_EXPIRY_SECONDS: parseInt(optionalEnv('IMAGE_EXPIRY_SECONDS', '3600'), 10),
 
   // ── Security ──────────────────────────────────────────────────────────────
-  ADMIN_SECRET_KEY: requireEnv('ADMIN_SECRET_KEY'),
+  /** Trimmed like BACKEND_SHARED_SECRET — avoids Railway/Render pastes with trailing newline rejecting a correct key. */
+  ADMIN_SECRET_KEY: requireEnvTrimmed('ADMIN_SECRET_KEY'),
   WIDGET_ALLOWED_ORIGINS: optionalEnv('WIDGET_ALLOWED_ORIGINS', '*'),
   /** Comma-separated hostnames allowed for Host header on prod HTTPS upgrade (e.g. api.tryverseai.com). Empty = derive from FRONTEND_URL only. */
   PUBLIC_API_HOSTNAMES: optionalEnv('PUBLIC_API_HOSTNAMES', ''),
