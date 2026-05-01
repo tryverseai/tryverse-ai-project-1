@@ -1,5 +1,7 @@
+import { TRYVERSE_TRANSACTIONAL_FROM } from './fromAddress';
+
 /** Fixed outbound sender per product requirement for lifecycle invite mail. */
-export const FIXED_FROM = 'TryVerse <info@tryverseai.com>';
+export const FIXED_FROM = TRYVERSE_TRANSACTIONAL_FROM;
 
 function escapeHtml(s: string): string {
   return s

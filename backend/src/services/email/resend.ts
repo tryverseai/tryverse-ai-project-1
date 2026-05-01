@@ -20,8 +20,15 @@ export async function sendEmail(params: {
   const client = new Resend(apiKey);
 
   try {
+    const from = params.from ?? env.EMAIL_FROM;
+    logger.info('Resend send', {
+      to: params.to,
+      subject: params.subject,
+      from,
+      fromSource: params.from ? 'explicit' : 'EMAIL_FROM_env',
+    });
     const { data, error } = await client.emails.send({
-      from: params.from ?? env.EMAIL_FROM,
+      from,
       to: params.to,
       subject: params.subject,
       html: params.html,

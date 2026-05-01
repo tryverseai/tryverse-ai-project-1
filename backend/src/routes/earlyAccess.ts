@@ -4,6 +4,7 @@ import { earlyAccessRateLimit } from '../middleware/rateLimiter';
 import { handleValidationErrors } from '../middleware/validate';
 import { env } from '../config/env';
 import { anyApi, convexMutationTrusted } from '../config/convexHttp';
+import { TRYVERSE_TRANSACTIONAL_FROM } from '../email/fromAddress';
 import { sendEmail } from '../services/email/resend';
 import { logger } from '../config/logger';
 import { buildEarlyAccessConfirmationHtml, buildIndividualWaitlistConfirmationHtml } from './earlyAccessEmailHtml';
@@ -156,6 +157,7 @@ router.post(
       ].join('\n');
 
       const emailSent = await sendEmail({
+        from: TRYVERSE_TRANSACTIONAL_FROM,
         to,
         subject: 'TryVerse Early Access — Application Received',
         html,
@@ -253,6 +255,7 @@ router.post(
       ].join('\n');
 
       const emailSent = await sendEmail({
+        from: TRYVERSE_TRANSACTIONAL_FROM,
         to,
         subject: 'TryVerse Early Access — Application Received',
         html,
