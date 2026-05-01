@@ -7,6 +7,8 @@ export async function sendEmail(params: {
   subject: string;
   html: string;
   text?: string;
+  /** Override default {@link env.EMAIL_FROM} (e.g. fixed production marketing sender). */
+  from?: string;
 }): Promise<boolean> {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) {
@@ -19,7 +21,7 @@ export async function sendEmail(params: {
 
   try {
     const { data, error } = await client.emails.send({
-      from: env.EMAIL_FROM,
+      from: params.from ?? env.EMAIL_FROM,
       to: params.to,
       subject: params.subject,
       html: params.html,

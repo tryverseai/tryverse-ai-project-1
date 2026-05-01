@@ -115,3 +115,21 @@ export const widgetRateLimit = rateLimit({
   keyGenerator: (req) => req.apiKey?.id || req.ip || 'unknown',
   handler: rateLimitResponse,
 });
+
+/** Invite link validation — public GET */
+export const inviteValidateRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitResponse,
+});
+
+/** Invite lifecycle completion after signup */
+export const inviteCompleteRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitResponse,
+});

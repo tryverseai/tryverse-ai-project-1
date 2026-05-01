@@ -4,30 +4,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
-import { ArrowRight, ChevronLeft, Eye, EyeOff, Building2, Mail, Lock, User, Briefcase } from "lucide-react";
+import { ArrowRight, ChevronLeft, Eye, EyeOff, Building2, Mail, Lock, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { posthogCapture } from "@/lib/posthog";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
-import { postLoginRedirectPath, safeInAppRedirectPath } from "@/lib/safeUrl";
+import { safeInAppRedirectPath } from "@/lib/safeUrl";
 import { readLocalSession } from "@/lib/localSession";
-import { validateInviteToken } from "@/lib/backendApi";
-
-const roles = [
-  "Founder",
-  "Developer",
-  "Ecommerce Manager",
-  "Marketing Manager",
-  "Product Manager",
-  "Other",
-];
+import { completeInviteAfterSignup, validateInviteToken } from "@/lib/backendApi";
+import { dashboardPathForAccountType, type AccountType } from "@/lib/accountType";
 
 function signUpErrorToast(error: Error): {
   title: string;
@@ -57,6 +42,11 @@ function signUpErrorToast(error: Error): {
   };
 }
 
+/** Convex + API use `personal`; app session uses `individual`. */
+function inviteKindToBootstrapType(kind: "personal" | "business"): AccountType {
+  return kind === "personal" ? "individual" : "business";
+}
+
 const AuthInvite = () => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
@@ -65,13 +55,13 @@ const AuthInvite = () => {
   const [gateLoading, setGateLoading] = useState(true);
   const [gateValid, setGateValid] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  /** Convex lifecycle shape; legacy env tokens resolve as business. */
+  const [inviteKind, setInviteKind] = useState<"personal" | "business" | null>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [brandName, setBrandName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState("");
-  const [customRole, setCustomRole] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
@@ -95,20 +85,36 @@ const AuthInvite = () => {
     (async () => {
       if (!token?.trim()) {
         setGateValid(false);
+        setInviteKind(null);
         setGateLoading(false);
         return;
       }
       setGateLoading(true);
       try {
-        const { valid, email: em } = await validateInviteToken(token.trim());
+        const res = await validateInviteToken(token.trim());
         if (cancelled) return;
+        const valid = Boolean(res.valid);
         setGateValid(valid);
-        if (valid && em) {
-          setInviteEmail(em);
-          setEmail(em);
+        if (valid && "email" in res && res.email) {
+          setInviteEmail(res.email);
+          setEmail(res.email);
+          const apiKind =
+            res.accountType === "personal" ? ("personal" as const) : ("business" as const);
+          setInviteKind(apiKind);
+          if (typeof res.name === "string" && res.name.trim()) {
+            setFullName(res.name.trim());
+          }
+          if (typeof res.companyName === "string" && res.companyName.trim()) {
+            setCompanyName(res.companyName.trim());
+          }
+        } else {
+          setInviteKind(null);
         }
       } catch {
-        if (!cancelled) setGateValid(false);
+        if (!cancelled) {
+          setGateValid(false);
+          setInviteKind(null);
+        }
       } finally {
         if (!cancelled) setGateLoading(false);
       }
@@ -117,35 +123,6 @@ const AuthInvite = () => {
       cancelled = true;
     };
   }, [searchChecked, token]);
-
-  const goToDashboardAfterAuth = () => {
-    const rp = searchParams.get("redirect");
-    if (rp) sessionStorage.removeItem("tryverse_redirect");
-    const nextPath = postLoginRedirectPath(
-      rp || sessionStorage.getItem("tryverse_redirect") || "/dashboard"
-    );
-    const resolved = new URL(nextPath, window.location.origin);
-    if (resolved.origin !== window.location.origin) {
-      navigate("/dashboard", { replace: true });
-      return;
-    }
-    const pathOnly = resolved.pathname;
-    if (
-      pathOnly === "/dashboard" ||
-      pathOnly.startsWith("/dashboard/business") ||
-      pathOnly.startsWith("/dashboard/individual")
-    ) {
-      navigate(
-        { pathname: "/dashboard", search: resolved.search, hash: resolved.hash },
-        { replace: true }
-      );
-      return;
-    }
-    navigate(
-      { pathname: resolved.pathname, search: resolved.search, hash: resolved.hash },
-      { replace: true }
-    );
-  };
 
   const finishAuthIfSessionReady = async (): Promise<boolean> => {
     const intervalMs = 150;
@@ -158,17 +135,54 @@ const AuthInvite = () => {
     return Boolean(readLocalSession());
   };
 
+  const goToAccountDashboard = (acct: AccountType) => {
+    const rp = searchParams.get("redirect");
+    sessionStorage.removeItem("tryverse_redirect");
+    const defaultPath = dashboardPathForAccountType(acct);
+    if (rp) {
+      const resolved = safeInAppRedirectPath(rp, defaultPath);
+      navigate(resolved, { replace: true });
+      return;
+    }
+    navigate(defaultPath, { replace: true });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!gateValid) return;
+    if (!gateValid || !inviteKind || !token?.trim()) return;
+
+    const acctBootstrap = inviteKindToBootstrapType(inviteKind);
+
+    if (inviteKind === "business" && !companyName.trim()) {
+      toast({
+        title: "Company required",
+        description: "Enter your company name to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
-    const finalRole = role === "Other" ? customRole : role;
-    const { error } = await signUp(email, password, brandName, fullName, finalRole, "business");
-    if (error) {
-      console.error("Signup error:", error);
-      const t = signUpErrorToast(error);
-      toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
-    } else {
+    try {
+      const { error } =
+        inviteKind === "personal"
+          ? await signUp(
+              email,
+              password,
+              fullName.trim() || "My Try-Ons",
+              fullName.trim(),
+              undefined,
+              "individual"
+            )
+          : await signUp(email, password, companyName.trim(), fullName.trim(), undefined, "business");
+
+      if (error) {
+        console.error("Signup error:", error);
+        const t = signUpErrorToast(error);
+        toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
+        return;
+      }
+
       const hasSession = await finishAuthIfSessionReady();
       if (!hasSession) {
         toast({
@@ -177,14 +191,34 @@ const AuthInvite = () => {
           variant: "destructive",
           duration: 8000,
         });
-      } else {
-        posthogCapture("user_signed_up", { email, account_type: "business" });
-        toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
-        setPassword("");
-        goToDashboardAfterAuth();
+        return;
       }
+
+      try {
+        await completeInviteAfterSignup(token.trim(), email);
+      } catch (err) {
+        toast({
+          title: "Account created",
+          description:
+            err instanceof Error
+              ? `${err.message}. You’re signed in; if this persists, contact info@tryverseai.com`
+              : "We could not mark the invitation as used. You're signed in — contact info@tryverseai.com if this persists.",
+          variant: "default",
+          duration: 9000,
+        });
+      }
+
+      posthogCapture("user_signed_up", {
+        email,
+        account_type: acctBootstrap,
+        via: "lifecycle_invite",
+      });
+      toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
+      setPassword("");
+      goToAccountDashboard(acctBootstrap);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (!FEATURE_FLAGS.INVITE_ONLY_MODE) return null;
@@ -227,14 +261,14 @@ const AuthInvite = () => {
             <p className="text-sm text-muted-foreground">Checking your invitation…</p>
           ) : !gateValid ? (
             <div className="space-y-6">
-              <h1 className="font-display text-2xl font-bold text-foreground">Invitation required</h1>
-              <p className="text-muted-foreground leading-relaxed">
-                Access is currently invitation-only. Join the waitlist to request early access.
+              <h1 className="font-display text-2xl font-bold text-foreground">Invitation unavailable</h1>
+              <p className="text-muted-foreground leading-relaxed whitespace-pre-line">
+                {`This invitation link is invalid or has already been used.\nIf you believe this is an error, please contact info@tryverseai.com`}
               </p>
               <Button asChild className="w-full gradient-primary text-primary-foreground h-12 shadow-soft">
                 <Link to="/waitlist">
-                  Join Waitlist
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  Join the Waitlist
+                  <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
                 </Link>
               </Button>
               <p className="text-sm text-muted-foreground text-center">
@@ -246,14 +280,29 @@ const AuthInvite = () => {
             </div>
           ) : (
             <>
-              <h1 className="font-display text-2xl font-bold text-foreground mb-2">Create your TryVerse account</h1>
+              <h1 className="font-display text-2xl font-bold text-foreground mb-2">
+                {inviteKind === "personal" ? "Create your TryVerse account" : "Activate your business access"}
+              </h1>
               <p className="text-muted-foreground mb-6">
                 Complete setup with the email on your invitation ({inviteEmail}).
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    className="pl-10 h-12 bg-muted/40"
+                    required
+                    readOnly
+                    autoComplete="email"
+                    aria-readonly
+                  />
+                </div>
+                <div className="relative">
+                  <User className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Full name"
                     value={fullName}
@@ -262,57 +311,20 @@ const AuthInvite = () => {
                     required
                   />
                 </div>
-                <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Company name"
-                    value={brandName}
-                    onChange={(e) => setBrandName(e.target.value)}
-                    className="pl-10 h-12"
-                    required
-                  />
-                </div>
-                <div className="relative">
-                  <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Select value={role} onValueChange={setRole} required>
-                    <SelectTrigger className="pl-10 h-12">
-                      <SelectValue placeholder="Select your role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {role === "Other" && (
+                {inviteKind === "business" && (
                   <div className="relative">
-                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Building2 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Enter your role"
-                      value={customRole}
-                      onChange={(e) => setCustomRole(e.target.value)}
+                      placeholder="Company name"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
                       className="pl-10 h-12"
                       required
                     />
                   </div>
                 )}
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="email"
-                    placeholder="Work email"
-                    value={email}
-                    className="pl-10 h-12"
-                    required
-                    autoComplete="email"
-                    readOnly
-                  />
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Lock className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     type={showPassword ? "text" : "password"}
                     placeholder="Password"
@@ -321,19 +333,29 @@ const AuthInvite = () => {
                     className="pl-10 pr-10 h-12"
                     required
                     minLength={6}
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
 
-                <Button type="submit" className="w-full gradient-primary text-primary-foreground h-12 shadow-soft" disabled={loading}>
-                  {loading ? "Please wait..." : "Create account"}
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                <Button
+                  type="submit"
+                  className="w-full gradient-primary text-primary-foreground h-12 shadow-soft"
+                  disabled={loading}
+                >
+                  {loading
+                    ? "Please wait..."
+                    : inviteKind === "personal"
+                      ? "Create My Account"
+                      : "Activate Business Account"}
+                  {!loading ? <ArrowRight className="ml-2 h-4 w-4" aria-hidden /> : null}
                 </Button>
               </form>
 

@@ -242,12 +242,41 @@ export type AccountBootstrapBody = {
   role?: string;
 };
 
-/** Public invite gate — backed by `INVITE_TOKEN_MAP_JSON` on the API (not Convex). */
-export async function validateInviteToken(token: string): Promise<{ valid: boolean; email?: string }> {
+export type InviteValidationResult =
+  | { valid: false }
+  | {
+      valid: true;
+      email: string;
+      name?: string;
+      accountType?: 'personal' | 'business';
+      companyName?: string;
+    };
+
+/** Public invite gate — Convex lifecycle + legacy INVITE_TOKEN_MAP_JSON (via API). */
+export async function validateInviteToken(token: string): Promise<InviteValidationResult> {
   const q = encodeURIComponent(token);
-  const res = await fetch(`${BACKEND_URL}/api/invite/validate?token=${q}`);
+  const res = await fetch(`${BACKEND_URL}/api/auth/invite/validate?token=${q}`);
   if (!res.ok) return { valid: false };
-  return (await res.json()) as { valid: boolean; email?: string };
+  return (await res.json()) as InviteValidationResult;
+}
+
+/** Mark lifecycle invite accepted after successful signup (no-op for legacy env-map tokens). */
+export async function completeInviteAfterSignup(token: string, email: string): Promise<void> {
+  const res = await fetch(`${BACKEND_URL}/api/auth/invite/complete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, email: email.trim().toLowerCase() }),
+  });
+  if (!res.ok) {
+    let msg = 'Could not finalize invitation';
+    try {
+      const b = (await res.json()) as { error?: string };
+      if (typeof b.error === 'string') msg = b.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
 }
 
 export async function bootstrapLocalSession(body: AccountBootstrapBody): Promise<void> {
@@ -1221,6 +1250,106 @@ export async function clearAdminLogs(adminKey: string): Promise<{ ok: boolean; m
 
 export async function clearAdminAudit(adminKey: string): Promise<{ ok: boolean; message?: string }> {
   return adminFetch('/api/admin/audit/clear', adminKey, { method: 'POST' });
+}
+
+// ─── Admin — waitlist & lifecycle invites ─────────────────────────────────────
+
+export type AdminWaitlistRow = {
+  id: string;
+  applicant_type?: string | null;
+  first_name: string;
+  email: string;
+  brand_name: string;
+  role: string;
+  website_url: string;
+  platform: string;
+  timeline: string;
+  biggest_challenge: string;
+  created_at?: string | null;
+  waitlist_review_status?: string | null;
+};
+
+export async function getAdminWaitlistEarlyAccess(
+  adminKey: string
+): Promise<{ rows: AdminWaitlistRow[] }> {
+  return adminFetch<{ rows: AdminWaitlistRow[] }>('/api/admin/waitlist/early-access', adminKey, {
+    cache: 'no-store',
+  });
+}
+
+export async function patchAdminWaitlistReview(
+  adminKey: string,
+  docId: string,
+  waitlist_review_status: string
+): Promise<{ ok: boolean }> {
+  return adminFetch<{ ok: boolean }>(
+    `/api/admin/waitlist/early-access/${encodeURIComponent(docId)}/review`,
+    adminKey,
+    { method: 'PATCH', body: JSON.stringify({ waitlist_review_status }) }
+  );
+}
+
+export type AdminLifecycleInvite = {
+  token: string;
+  email: string;
+  name?: string;
+  accountType: string;
+  companyName?: string;
+  status: string;
+  createdAt: number;
+  sentAt?: number;
+  acceptedAt?: number;
+  createdBy?: string;
+  _creationTime?: number;
+};
+
+export async function adminCreateInvite(
+  adminKey: string,
+  body: {
+    email: string;
+    name?: string;
+    accountType: 'personal' | 'business';
+    companyName?: string;
+  }
+): Promise<{ token: string; inviteUrl: string; email: string; accountType: string }> {
+  return adminFetch('/api/admin/invites/create', adminKey, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function adminSendInvite(
+  adminKey: string,
+  token: string
+): Promise<{ success: boolean; sentTo: string; accountType: string }> {
+  return adminFetch('/api/admin/invites/send', adminKey, {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
+export async function getAdminInvites(
+  adminKey: string,
+  opts?: { status?: string; accountType?: string }
+): Promise<{ invites: AdminLifecycleInvite[] }> {
+  const q = new URLSearchParams();
+  if (opts?.status) q.set('status', opts.status);
+  if (opts?.accountType) q.set('accountType', opts.accountType);
+  const suffix = q.toString() ? `?${q.toString()}` : '';
+  return adminFetch<{ invites: AdminLifecycleInvite[] }>(`/api/admin/invites${suffix}`, adminKey, {
+    cache: 'no-store',
+  });
+}
+
+export async function adminDeleteInvite(
+  adminKey: string,
+  token: string
+): Promise<{ ok: boolean; deleted: boolean }> {
+  return adminFetch<{ ok: boolean; deleted: boolean }>(
+    `/api/admin/invites/${encodeURIComponent(token)}`,
+    adminKey,
+    { method: 'DELETE' }
+  );
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────

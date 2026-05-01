@@ -185,7 +185,28 @@ export default defineSchema({
     heard_about: v.optional(v.string()),
     prior_solution_notes: v.optional(v.string()),
     created_at: v.optional(v.string()),
+    /** Admin waitlist UX: omit or \"open\"; \"ignored\" = reviewed / deprioritized */
+    waitlist_review_status: v.optional(v.string()),
   }).index("by_email", ["email"]),
+
+  invites: defineTable({
+    token: v.string(),
+    email: v.string(),
+    name: v.optional(v.string()),
+    /** \"personal\" | \"business\" (business maps to Convex profile account_type \"business\") */
+    accountType: v.string(),
+    companyName: v.optional(v.string()),
+    /** pending | sent | accepted | expired */
+    status: v.string(),
+    createdAt: v.number(),
+    sentAt: v.optional(v.number()),
+    acceptedAt: v.optional(v.number()),
+    createdBy: v.optional(v.string()),
+  })
+    .index("by_token", ["token"])
+    .index("by_email", ["email"])
+    .index("by_status", ["status"])
+    .index("by_account_type", ["accountType"]),
 
   support_requests: defineTable({
     legacy_id: v.optional(v.string()),

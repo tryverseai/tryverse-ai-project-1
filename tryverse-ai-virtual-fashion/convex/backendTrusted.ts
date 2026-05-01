@@ -734,3 +734,39 @@ export const insertAllowedDomainForUser = mutation({
     return { ok: true as const };
   },
 });
+
+export const listEarlyAccessRequestsAdminTrusted = query({
+  args: { secret: v.string() },
+  handler: async (ctx, { secret }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db.query("early_access_requests").collect();
+    rows.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+    return rows.map((r) => ({
+      id: String(r._id),
+      applicant_type: r.applicant_type,
+      first_name: r.first_name,
+      email: r.email,
+      brand_name: r.brand_name,
+      role: r.role,
+      website_url: r.website_url,
+      platform: r.platform,
+      timeline: r.timeline,
+      biggest_challenge: r.biggest_challenge,
+      created_at: r.created_at,
+      waitlist_review_status: r.waitlist_review_status,
+    }));
+  },
+});
+
+export const patchEarlyAccessReviewTrusted = mutation({
+  args: {
+    secret: v.string(),
+    docId: v.id("early_access_requests"),
+    waitlist_review_status: v.string(),
+  },
+  handler: async (ctx, { secret, docId, waitlist_review_status }) => {
+    requireBackendSecret(secret);
+    await ctx.db.patch(docId, { waitlist_review_status });
+    return { ok: true as const };
+  },
+});

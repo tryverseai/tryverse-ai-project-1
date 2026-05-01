@@ -18,6 +18,7 @@ import type * as authSubjectKeys from "../authSubjectKeys.js";
 import type * as backendTrusted from "../backendTrusted.js";
 import type * as billing from "../billing.js";
 import type * as http from "../http.js";
+import type * as invites from "../invites.js";
 import type * as modelLibrary from "../modelLibrary.js";
 import type * as overview from "../overview.js";
 import type * as plans from "../plans.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   backendTrusted: typeof backendTrusted;
   billing: typeof billing;
   http: typeof http;
+  invites: typeof invites;
   modelLibrary: typeof modelLibrary;
   overview: typeof overview;
   plans: typeof plans;

@@ -14,6 +14,8 @@ import { getRecentLogs, clearLogBuffer } from '../config/logBuffer';
 import { logAudit } from '../services/audit';
 import { AppError } from '../middleware/errorHandler';
 import { listAllModelsForAdmin } from '../services/models/modelLibrary';
+import { sendEmail } from '../services/email/resend';
+import { businessInviteBodies, FIXED_FROM, personalInviteBodies } from '../email/inviteEmailBodies';
 
 const router = Router();
 
@@ -1122,5 +1124,274 @@ router.post('/audit/clear', async (_req: Request, res: Response, next: NextFunct
     next(err);
   }
 });
+
+/** Public marketing URL base for outbound invite links. */
+function lifecycleInviteAcceptUrl(token: string): string {
+  const base = env.PUBLIC_APP_URL.replace(/\/$/, '');
+  return `${base}/auth/invite/${encodeURIComponent(token)}`;
+}
+
+router.get('/waitlist/early-access', async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const rows = await convexQueryTrusted<
+      Array<{
+        id: string;
+        applicant_type?: string | null;
+        first_name: string;
+        email: string;
+        brand_name: string;
+        role: string;
+        website_url: string;
+        platform: string;
+        timeline: string;
+        biggest_challenge: string;
+        created_at?: string | null;
+        waitlist_review_status?: string | null;
+      }>
+    >(anyApi.backendTrusted.listEarlyAccessRequestsAdminTrusted, {
+      secret: env.BACKEND_SHARED_SECRET,
+    });
+    res.json({ rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch(
+  '/waitlist/early-access/:id/review',
+  [
+    param('id').trim().notEmpty().withMessage('id required'),
+    body('waitlist_review_status').trim().notEmpty().isLength({ max: 80 }),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = matchedData(req) as { id: string };
+      const { waitlist_review_status } = matchedData(req) as { waitlist_review_status: string };
+      await convexMutationTrusted(anyApi.backendTrusted.patchEarlyAccessReviewTrusted, {
+        secret: env.BACKEND_SHARED_SECRET,
+        docId: id,
+        waitlist_review_status,
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/invites/create',
+  [
+    body('email').trim().isEmail().isLength({ max: 254 }),
+    body('name').optional({ nullable: true }).isString().isLength({ max: 200 }),
+    body('accountType').isIn(['personal', 'business']),
+    body('companyName').optional({ nullable: true }).isString().isLength({ max: 400 }),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const b = matchedData(req) as {
+        email: string;
+        name?: string | null;
+        accountType: 'personal' | 'business';
+        companyName?: string | null;
+      };
+      const companyName = typeof b.companyName === 'string' ? b.companyName.trim() : '';
+      if (b.accountType === 'business' && !companyName) {
+        res.status(400).json({ error: 'companyName is required for business invitations' });
+        return;
+      }
+      const actor = req.ip ? `admin_ip:${req.ip}` : 'admin';
+      const out = (await convexMutationTrusted(anyApi.invites.createInviteTrusted, {
+        secret: env.BACKEND_SHARED_SECRET,
+        email: b.email.trim().toLowerCase(),
+        name: b.name?.trim() || undefined,
+        accountType: b.accountType,
+        companyName: b.accountType === 'business' ? companyName : undefined,
+        createdBy: actor,
+      })) as { token: string };
+
+      await logAudit({
+        event_type: 'admin_action',
+        actor: 'admin',
+        action: 'invite_create',
+        details: {
+          summary: `Created invite (${b.accountType}) for ${b.email.trim().toLowerCase()}`,
+          email: b.email.trim().toLowerCase(),
+          accountType: b.accountType,
+          token_preview: `${out.token.slice(0, 12)}…`,
+        },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+
+      const token = String(out.token);
+      res.status(201).json({
+        token,
+        inviteUrl: lifecycleInviteAcceptUrl(token),
+        email: b.email.trim().toLowerCase(),
+        accountType: b.accountType,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/invites/send',
+  [
+    body('token')
+      .trim()
+      .isLength({ min: 8, max: 280 })
+      .matches(/^inv_[a-zA-Z0-9]+$/),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { token } = matchedData(req) as { token: string };
+      const row = await convexQueryTrusted<{
+        token: string;
+        email: string;
+        name?: string;
+        accountType: string;
+        companyName?: string;
+        status: string;
+      } | null>(anyApi.invites.getInviteByTokenTrusted, {
+        secret: env.BACKEND_SHARED_SECRET,
+        token,
+      });
+
+      if (!row) {
+        res.status(404).json({ error: 'Invitation not found' });
+        return;
+      }
+      if (row.status !== 'pending') {
+        res.status(400).json({ error: `Invite is not pending (current: ${row.status})` });
+        return;
+      }
+
+      const inviteUrl = lifecycleInviteAcceptUrl(row.token);
+      const name = row.name ?? row.email.split('@')[0];
+
+      let subject: string;
+      let html: string;
+      let text: string;
+      if (row.accountType === 'personal') {
+        const b = personalInviteBodies({
+          name,
+          email: row.email,
+          inviteUrl,
+        });
+        ({ subject, html, text } = b);
+      } else {
+        const b = businessInviteBodies({
+          name,
+          email: row.email,
+          companyName: row.companyName ?? '',
+          inviteUrl,
+        });
+        ({ subject, html, text } = b);
+      }
+
+      const sent = await sendEmail({
+        to: row.email.toLowerCase(),
+        subject,
+        html,
+        text,
+        from: FIXED_FROM,
+      });
+
+      if (!sent) {
+        res.status(502).json({
+          error: 'Email provider did not confirm send — check RESEND_API_KEY and EMAIL_FROM / domain verification.',
+        });
+        return;
+      }
+
+      await convexMutationTrusted(anyApi.invites.markInviteSentTrusted, {
+        secret: env.BACKEND_SHARED_SECRET,
+        token,
+      });
+
+      await logAudit({
+        event_type: 'admin_action',
+        actor: 'admin',
+        action: 'invite_sent',
+        target_id: token,
+        details: {
+          summary: `Invitation email dispatched to ${row.email}`,
+          accountType: row.accountType,
+        },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+
+      res.json({ success: true, sentTo: row.email.toLowerCase(), accountType: row.accountType });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.get('/invites', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const statusFilter = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const accountTypeFilter =
+      typeof req.query.accountType === 'string' ? req.query.accountType : undefined;
+    const rows = await convexQueryTrusted<
+      Array<{
+        token: string;
+        email: string;
+        name?: string;
+        accountType: string;
+        companyName?: string;
+        status: string;
+        createdAt: number;
+        sentAt?: number;
+        acceptedAt?: number;
+        createdBy?: string;
+        _creationTime?: number;
+      }>
+    >(anyApi.invites.listInvitesTrusted, {
+      secret: env.BACKEND_SHARED_SECRET,
+      ...(statusFilter ? { statusFilter } : {}),
+      ...(accountTypeFilter ? { accountTypeFilter } : {}),
+    });
+    res.json({ invites: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete(
+  '/invites/:token',
+  [param('token').trim().isLength({ min: 8, max: 320 })],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { token } = matchedData(req) as { token: string };
+      const out = (await convexMutationTrusted(anyApi.invites.deleteInviteByTokenTrusted, {
+        secret: env.BACKEND_SHARED_SECRET,
+        token,
+      })) as { deleted: boolean };
+
+      await logAudit({
+        event_type: 'admin_action',
+        actor: 'admin',
+        action: 'invite_deleted',
+        target_id: token,
+        details: { summary: out.deleted ? 'Invite row removed' : 'No invite matched token' },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+
+      res.json({ ok: true, deleted: out.deleted });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 export default router;

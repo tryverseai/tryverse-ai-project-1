@@ -36,3 +36,5 @@ Thumbs.db
 # Local agent / IDE artifacts
 **/.agents/
 **/.claude/
+.vercel
+.env*.local

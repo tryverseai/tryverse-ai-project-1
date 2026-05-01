@@ -1,42 +1,32 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { env } from '../config/env';
+import { inviteValidateRateLimit } from '../middleware/rateLimiter';
+import { resolveInviteGate } from '../lib/inviteGate';
 
 const router = Router();
 
-function parseTokenMap(): Record<string, string> {
-  try {
-    const raw = env.INVITE_TOKEN_MAP_JSON?.trim() || '{}';
-    const o = JSON.parse(raw) as Record<string, unknown>;
-    const out: Record<string, string> = {};
-    for (const [k, v] of Object.entries(o)) {
-      if (typeof k === 'string' && typeof v === 'string' && k.trim() && v.trim()) {
-        out[k.trim()] = v.trim();
-      }
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
 /**
  * GET /api/invite/validate?token=...
- * Public. Maps token → email via INVITE_TOKEN_MAP_JSON (server env). Not part of API user auth.
- * Convex profile/bootstrap flows are unchanged; this only gates who may use the invite signup page.
+ * Legacy mount — forwards to shared resolver (INVITE_TOKEN_MAP_JSON + Convex lifecycle).
  */
-router.get('/validate', (req: Request, res: Response, next: NextFunction): void => {
+router.get('/validate', inviteValidateRateLimit, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const token = String(req.query.token ?? '').trim();
     if (!token) {
       res.json({ valid: false as const });
       return;
     }
-    const email = parseTokenMap()[token];
-    if (!email) {
+    const gate = await resolveInviteGate(token);
+    if (!gate.valid) {
       res.json({ valid: false as const });
       return;
     }
-    res.json({ valid: true as const, email });
+    res.json({
+      valid: true as const,
+      email: gate.email,
+      ...(gate.name ? { name: gate.name } : {}),
+      ...(gate.accountType ? { accountType: gate.accountType } : {}),
+      ...(gate.companyName ? { companyName: gate.companyName } : {}),
+    });
   } catch (err) {
     next(err);
   }

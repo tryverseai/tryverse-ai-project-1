@@ -27,6 +27,7 @@ import accountRouter from './routes/account';
 import earlyAccessRouter from './routes/earlyAccess';
 import supportRouter from './routes/support';
 import inviteRouter from './routes/invite';
+import authInviteRouter from './routes/authInvite';
 
 // ─── Sentry (must init before everything else) ────────────────────────────────
 initSentry();
@@ -198,6 +199,7 @@ async function mountBullBoard(): Promise<void> {
 app.use('/api/early-access', earlyAccessRouter);
 app.use('/api/support', supportRouter);
 app.use('/api/invite', inviteRouter);
+app.use('/api/auth/invite', authInviteRouter);
 app.use('/api/upload',    uploadRouter);
 app.use('/api/tryon',     tryonRouter);
 app.use('/api/credits',   creditsRouter);
