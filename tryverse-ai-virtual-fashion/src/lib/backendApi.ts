@@ -1013,7 +1013,24 @@ export async function adminLogin(key: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key }),
   });
-  if (!res.ok) throw new Error('Invalid admin key');
+  if (!res.ok) {
+    let msg = 'Invalid admin key';
+    try {
+      const b = (await res.json()) as { error?: string };
+      if (typeof b.error === 'string' && b.error.trim()) {
+        msg = b.error.trim();
+      }
+    } catch {
+      /* ignore */
+    }
+    if (res.status === 403) {
+      throw new Error(msg);
+    }
+    if (res.status === 400) {
+      throw new Error(msg === 'Invalid admin key' ? 'Invalid request — check the key field.' : msg);
+    }
+    throw new Error(msg);
+  }
   setStoredAdminKey('session'); // mark UI state only
 }
 

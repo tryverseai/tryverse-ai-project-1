@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { body, param, query, matchedData } from 'express-validator';
+import { normalizeAdminKeyInput } from '../lib/adminKey';
 import { requireAdmin } from '../middleware/auth';
 import { handleValidationErrors } from '../middleware/validate';
 import { logger } from '../config/logger';
@@ -92,13 +93,17 @@ const SESSION_COOKIE_OPTIONS = {
  */
 router.post(
   '/session',
-  [body('key').isString().notEmpty().isLength({ max: 512 })],
+  [
+    body('key')
+      .customSanitizer((v) => normalizeAdminKeyInput(v))
+      .notEmpty()
+      .withMessage('key is required')
+      .isLength({ max: 4096 })
+      .withMessage('key is too long'),
+  ],
   handleValidationErrors,
   (req: Request, res: Response): void => {
-    const { key } = req.body as { key: string };
-    const submitted = String(key ?? '')
-      .replace(/^\uFEFF/, '')
-      .trim();
+    const submitted = normalizeAdminKeyInput((req.body as { key?: string }).key);
     if (submitted !== env.ADMIN_SECRET_KEY) {
       logAudit({
         event_type: 'failed_login',
@@ -108,7 +113,11 @@ router.post(
         ip_address: req.ip,
         user_agent: req.headers['user-agent'],
       });
-      logger.warn('Admin session: invalid key', { ip: req.ip });
+      logger.warn('Admin session: invalid key', {
+        ip: req.ip,
+        submittedLen: submitted.length,
+        expectedLen: env.ADMIN_SECRET_KEY.length,
+      });
       res.status(403).json({ error: 'Invalid admin key' });
       return;
     }

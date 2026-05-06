@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import { normalizeAdminKeyInput } from '../lib/adminKey';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
@@ -18,6 +19,16 @@ function requireEnvTrimmed(key: string): string {
     throw new Error(`Missing required environment variable: ${key}`);
   }
   return value;
+}
+
+/** ADMIN_SECRET_KEY may be quoted in `.env`; strip so it matches the login field. */
+function requireAdminSecretFromEnv(): string {
+  const base = sanitizeEnvLine(process.env['ADMIN_SECRET_KEY'], '');
+  const v = normalizeAdminKeyInput(base);
+  if (!v) {
+    throw new Error('Missing required environment variable: ADMIN_SECRET_KEY');
+  }
+  return v;
 }
 
 function optionalEnv(key: string, defaultValue = ''): string {
@@ -271,8 +282,10 @@ export const env = {
   IMAGE_EXPIRY_SECONDS: parseInt(optionalEnv('IMAGE_EXPIRY_SECONDS', '3600'), 10),
 
   // ── Security ──────────────────────────────────────────────────────────────
-  /** Trimmed like BACKEND_SHARED_SECRET — avoids Railway/Render pastes with trailing newline rejecting a correct key. */
-  ADMIN_SECRET_KEY: requireEnvTrimmed('ADMIN_SECRET_KEY'),
+  /**
+   * Trimmed + optional quote-stripped — matches `normalizeAdminKeyInput` on POST /api/admin/session.
+   */
+  ADMIN_SECRET_KEY: requireAdminSecretFromEnv(),
   WIDGET_ALLOWED_ORIGINS: optionalEnv('WIDGET_ALLOWED_ORIGINS', '*'),
   /** Comma-separated hostnames allowed for Host header on prod HTTPS upgrade (e.g. api.tryverseai.com). Empty = derive from FRONTEND_URL only. */
   PUBLIC_API_HOSTNAMES: optionalEnv('PUBLIC_API_HOSTNAMES', ''),

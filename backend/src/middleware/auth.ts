@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { normalizeAdminKeyInput } from '../lib/adminKey';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { logAudit } from '../services/audit';
@@ -196,8 +197,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   // Fallback: raw key in header (still accepted for non-browser clients)
   const rawHdr = req.headers['x-admin-key'];
   const first = Array.isArray(rawHdr) ? rawHdr[0] : rawHdr;
-  const adminKey =
-    typeof first === 'string' ? first.replace(/^\uFEFF/, '').trim() : '';
+  const adminKey = normalizeAdminKeyInput(first);
   if (adminKey && adminKey === env.ADMIN_SECRET_KEY) {
     next();
     return;
