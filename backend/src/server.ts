@@ -63,6 +63,7 @@ app.use(
 );
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
+/** Trim comma-separated origins from WIDGET_ALLOWED_ORIGINS (same as splitting process.env in production). */
 function parseCommaOrigins(raw: string): string[] {
   return raw
     .split(',')
@@ -70,16 +71,17 @@ function parseCommaOrigins(raw: string): string[] {
     .filter(Boolean);
 }
 
-const allowedOrigins = [
-  env.FRONTEND_URL.trim(),
-  'http://localhost:8080',
-  'http://127.0.0.1:8080',
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  ...(env.WIDGET_ALLOWED_ORIGINS === '*' ? [] : parseCommaOrigins(env.WIDGET_ALLOWED_ORIGINS)),
-];
+const widgetOriginsRaw = env.WIDGET_ALLOWED_ORIGINS.trim();
 
-/** Dev: browser opened via LAN IP (e.g. Vite "Network" URL) while API is on another port. */
+const defaultProdOrigins = ['https://tryverseai.com', 'https://www.tryverseai.com'];
+const corsOriginsList: string[] | null =
+  !widgetOriginsRaw || widgetOriginsRaw === ''
+    ? defaultProdOrigins
+    : widgetOriginsRaw === '*'
+      ? null
+      : parseCommaOrigins(widgetOriginsRaw);
+
+/** Dev + LAN: Vite / local UIs not listed in WIDGET_ALLOWED_ORIGINS. */
 function isNonProductionLanDevOrigin(origin: string): boolean {
   if (env.NODE_ENV === 'production') return false;
   try {
@@ -104,14 +106,18 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      if (env.WIDGET_ALLOWED_ORIGINS === '*') return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (widgetOriginsRaw === '*') return callback(null, true);
+      const list =
+        corsOriginsList && corsOriginsList.length > 0
+          ? [...new Set([env.FRONTEND_URL.trim(), ...corsOriginsList])]
+          : [...new Set([env.FRONTEND_URL.trim(), ...defaultProdOrigins])];
+      if (list.includes(origin)) return callback(null, true);
       if (isNonProductionLanDevOrigin(origin)) return callback(null, true);
       callback(new Error(`CORS: Origin ${origin} not allowed`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-admin-key', 'Cookie'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-admin-key'],
     exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
   })
 );
