@@ -87,6 +87,8 @@ export const earlyAccessRateLimit = rateLimit({
   max: 15,
   standardHeaders: true,
   legacyHeaders: false,
+  /** OPTIONS preflight must not return 429 without CORS headers. */
+  skip: (req) => req.method === 'OPTIONS',
   handler: rateLimitResponse,
 });
 
@@ -96,6 +98,7 @@ export const supportContactRateLimit = rateLimit({
   max: 12,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS',
   handler: rateLimitResponse,
 });
 
