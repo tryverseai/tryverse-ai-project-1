@@ -18,6 +18,12 @@ export function createProductionHttpsRedirectMiddleware() {
   const allowedHttpsHosts = httpsRedirectAllowedHosts();
 
   return function httpsRedirectMiddleware(req: Request, res: Response, next: NextFunction): void {
+    // CORS preflight must never get a 301 — browsers won't follow it with CORS headers on the response.
+    if (req.method === 'OPTIONS') {
+      next();
+      return;
+    }
+
     const forwardedProto = req.headers['x-forwarded-proto'];
     if (forwardedProto !== 'http') {
       next();

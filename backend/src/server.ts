@@ -49,20 +49,7 @@ if (env.SENTRY_DSN) {
   } catch { /* skip */ }
 }
 
-// ─── Security ─────────────────────────────────────────────────────────────────
-// Enforce HTTPS in production (rely on X-Forwarded-Proto from reverse proxy)
-if (env.NODE_ENV === 'production') {
-  app.use(createProductionHttpsRedirectMiddleware());
-}
-// JSON API only — no HTML responses; CSP on API responses confuses scanners and adds no value here.
-app.use(
-  helmet({
-    contentSecurityPolicy: false,
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
-  })
-);
-
-// ─── CORS ─────────────────────────────────────────────────────────────────────
+// ─── CORS (before HTTPS redirect / helmet so OPTIONS preflight always gets ACAO) ─
 /** Trim comma-separated origins from WIDGET_ALLOWED_ORIGINS (same as splitting process.env in production). */
 function parseCommaOrigins(raw: string): string[] {
   return raw
@@ -124,6 +111,20 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-admin-key', 'Cookie'],
     exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
     optionsSuccessStatus: 204,
+  })
+);
+
+// ─── Security ─────────────────────────────────────────────────────────────────
+// Enforce HTTPS in production (rely on X-Forwarded-Proto from reverse proxy).
+// Runs after CORS so OPTIONS is not 301'd without ACAO (see httpsRedirect middleware).
+if (env.NODE_ENV === 'production') {
+  app.use(createProductionHttpsRedirectMiddleware());
+}
+// JSON API only — no HTML responses; CSP on API responses confuses scanners and adds no value here.
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
 
