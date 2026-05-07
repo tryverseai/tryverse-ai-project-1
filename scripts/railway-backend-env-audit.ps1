@@ -39,23 +39,39 @@ if ($jsonText -match "Unauthorized|Please login|Multiple services found|not link
 }
 
 if (($jsonText.Trim().Length -eq 0) -or ($jsonText -notmatch '[\{\[]')) {
-  Write-Host "Unexpected CLI output (expected JSON):" -ForegroundColor Red
-  Write-Host $jsonText.Trim()
+  Write-Host "Unexpected CLI output (expected JSON)." -ForegroundColor Red
+  Write-Host "Save output locally only: npx @railway/cli variable list --json > railway-vars.json" -ForegroundColor Yellow
   exit 1
 }
+
+function Extract-RailwayJsonObject([string]$s) {
+  $start = $s.IndexOf('{')
+  if ($start -lt 0) { throw "No JSON object start" }
+  $end = $s.LastIndexOf('}')
+  if ($end -le $start) { throw "No JSON object end" }
+  return $s.Substring($start, $end - $start + 1)
+}
+
+$table = @{ }
 try {
-  $obj = $jsonText | ConvertFrom-Json
+  $canonical = Extract-RailwayJsonObject $jsonText
+  $canonical = $canonical.TrimStart([char]0xFEFF)
+  $obj = $canonical | ConvertFrom-Json
   if ($obj -is [System.Collections.IDictionary]) {
     foreach ($k in $obj.Keys) {
       $table[$k.ToString()] = $obj[$k]
     }
-  } else {
+  }
+  elseif ($null -ne $obj) {
     foreach ($p in $obj.PSObject.Properties) {
       $table[$p.Name] = $p.Value
     }
   }
-} catch {
-  Write-Host "Could not parse JSON from Railway CLI. Raw output:`n$jsonText" -ForegroundColor Red
+}
+catch {
+  Write-Host "Could not parse Railway JSON safely. Error: $($_.Exception.Message)" -ForegroundColor Red
+  Write-Host "(Raw output omitted so secrets do not leak to logs.)" -ForegroundColor Yellow
+  Write-Host "Save locally only: npx @railway/cli variable list --json > railway-vars.json" -ForegroundColor Yellow
   exit 1
 }
 
