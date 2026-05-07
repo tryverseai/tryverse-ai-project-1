@@ -48,6 +48,42 @@ function resolveBackendBaseUrl(): string {
 /** Same-origin in dev (empty) or explicit API base in prod. */
 export const BACKEND_URL = resolveBackendBaseUrl();
 
+/**
+ * URL for `/api/*` routes. Dev + empty BACKEND_URL → `/api/...` (Vite proxies to backend :3001).
+ * Production requires `VITE_BACKEND_URL` or we throw instead of POSTing to the static host by mistake.
+ */
+function composeApiUrl(apiPath: string): string {
+  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`;
+  if (import.meta.env.PROD && !BACKEND_URL) {
+    throw new Error(
+      'API URL is not configured. In Vercel → Environment Variables, set VITE_BACKEND_URL to your Railway backend HTTPS URL, then redeploy.'
+    );
+  }
+  if (!BACKEND_URL) return path;
+  return `${BACKEND_URL.replace(/\/$/, '')}${path}`;
+}
+
+/**
+ * Public forms often surface the browser's vague "Failed to fetch" — add actionable context.
+ */
+async function fetchWithConnectivityHint(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e);
+    if (e instanceof TypeError || /\bfailed to fetch\b/i.test(raw) || /\bnetwork\b/i.test(raw)) {
+      const devHint = import.meta.env.DEV
+        ? ' Start the backend (cd backend && npm run dev — port 3001); the Vite dev server proxies /api to it.'
+        : '';
+      const prodHint = import.meta.env.PROD
+        ? ' On Vercel, set VITE_BACKEND_URL to your API origin; confirm Railway is up and CORS allows this site.'
+        : '';
+      throw new Error(`Cannot reach backend.${devHint}${prodHint} (${raw})`);
+    }
+    throw e;
+  }
+}
+
 /** Absolute API origin for widget snippets / external embeds (never empty). */
 export function widgetBackendPublicUrl(): string {
   const raw = import.meta.env.VITE_BACKEND_URL;
@@ -774,7 +810,7 @@ export interface EarlyAccessPayload {
 export async function submitEarlyAccessRequest(
   payload: EarlyAccessPayload
 ): Promise<{ success: boolean; id?: string; convexDocumentId?: string; emailSent?: boolean }> {
-  const res = await fetch(`${BACKEND_URL}/api/early-access`, {
+  const res = await fetchWithConnectivityHint(composeApiUrl('/api/early-access'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -789,7 +825,7 @@ export async function submitIndividualEarlyAccessRequest(payload: {
   timeline: string;
   heard_about?: string | null;
 }): Promise<{ success: boolean; id?: string; convexDocumentId?: string; emailSent?: boolean }> {
-  const res = await fetch(`${BACKEND_URL}/api/early-access/individual`, {
+  const res = await fetchWithConnectivityHint(composeApiUrl('/api/early-access/individual'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -810,7 +846,7 @@ export interface SupportContactPayload {
 }
 
 export async function submitSupportContact(payload: SupportContactPayload): Promise<{ ok: boolean }> {
-  const res = await fetch(`${BACKEND_URL}/api/support/contact`, {
+  const res = await fetchWithConnectivityHint(composeApiUrl('/api/support/contact'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
