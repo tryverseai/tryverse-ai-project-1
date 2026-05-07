@@ -1008,18 +1008,35 @@ export function setAdminKeyLastActive(): void {}
 export function isAdminSessionExpired(): boolean { return false; }
 
 /**
- * Login: validates the admin key on the server; server sets an HttpOnly cookie.
- * Throws if the key is invalid.
+ * In dev, `BACKEND_URL` is often empty so admin calls use same-origin `/api/*` (Vite proxy → :3001).
+ * Production requires `VITE_BACKEND_URL` or admin cannot reach the API.
  */
-export async function adminLogin(key: string): Promise<void> {
-  if (!BACKEND_URL) {
+function assertBackendUrlForProdAdmin(): void {
+  if (import.meta.env.PROD && !BACKEND_URL) {
     throw new Error(
       'API URL is not configured. In Vercel → Environment Variables, set VITE_BACKEND_URL to your Railway backend HTTPS URL (example: https://your-service.up.railway.app), then redeploy. Without this, the admin page cannot reach the API.'
     );
   }
+}
+
+/** POST/DELETE `/api/admin/session` or GET `/api/admin/session/check` — relative in dev when `BACKEND_URL` is empty. */
+function urlForAdminSession(path: '' | '/check'): string {
+  assertBackendUrlForProdAdmin();
+  const suffix = path === '' ? '/api/admin/session' : `/api/admin/session${path}`;
+  if (!BACKEND_URL) return suffix;
+  return `${BACKEND_URL.replace(/\/$/, '')}${suffix}`;
+}
+
+/**
+ * Login: validates the admin key on the server; server sets an HttpOnly cookie.
+ * Throws if the key is invalid.
+ */
+export async function adminLogin(key: string): Promise<void> {
+  const sessionUrl = urlForAdminSession('');
+  const atLabel = BACKEND_URL || '(dev: same-origin /api — start backend on :3001)';
   let res: Response;
   try {
-    res = await fetch(`${BACKEND_URL}/api/admin/session`, {
+    res = await fetch(sessionUrl, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -1028,7 +1045,7 @@ export async function adminLogin(key: string): Promise<void> {
   } catch (e) {
     const reason = e instanceof TypeError ? e.message : String(e);
     throw new Error(
-      `Cannot reach the API at ${BACKEND_URL}. Confirm the Railway service is running, VITE_BACKEND_URL matches it exactly, and CORS allows ${typeof window !== 'undefined' ? window.location.origin : 'this site'}. (${reason})`
+      `Cannot reach the API at ${atLabel}. In production set VITE_BACKEND_URL to your Railway URL. Confirm the API is running and CORS allows ${typeof window !== 'undefined' ? window.location.origin : 'this site'}. (${reason})`
     );
   }
   if (!res.ok) {
@@ -1058,7 +1075,7 @@ export async function adminLogin(key: string): Promise<void> {
 export async function adminLogout(): Promise<void> {
   clearStoredAdminKey();
   try {
-    await fetch(`${BACKEND_URL}/api/admin/session`, {
+    await fetch(urlForAdminSession(''), {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -1073,7 +1090,7 @@ export async function adminLogout(): Promise<void> {
  */
 export async function checkAdminSession(): Promise<boolean> {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/admin/session/check`, {
+    const res = await fetch(urlForAdminSession('/check'), {
       credentials: 'include',
     });
     return res.ok;
