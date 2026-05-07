@@ -37,6 +37,11 @@ function resolveBackendBaseUrl(): string {
   if (trimmed) {
     return trimmed.replace(/\/$/, '');
   }
+  // Production builds must set VITE_BACKEND_URL — defaulting to localhost breaks live sites
+  // (requests fail or hit the wrong host; Admin UI used to show a fake "Invalid admin key").
+  if (import.meta.env.PROD) {
+    return '';
+  }
   return 'http://localhost:3001';
 }
 
@@ -1007,12 +1012,25 @@ export function isAdminSessionExpired(): boolean { return false; }
  * Throws if the key is invalid.
  */
 export async function adminLogin(key: string): Promise<void> {
-  const res = await fetch(`${BACKEND_URL}/api/admin/session`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key }),
-  });
+  if (!BACKEND_URL) {
+    throw new Error(
+      'API URL is not configured. In Vercel → Environment Variables, set VITE_BACKEND_URL to your Railway backend HTTPS URL (example: https://your-service.up.railway.app), then redeploy. Without this, the admin page cannot reach the API.'
+    );
+  }
+  let res: Response;
+  try {
+    res = await fetch(`${BACKEND_URL}/api/admin/session`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+  } catch (e) {
+    const reason = e instanceof TypeError ? e.message : String(e);
+    throw new Error(
+      `Cannot reach the API at ${BACKEND_URL}. Confirm the Railway service is running, VITE_BACKEND_URL matches it exactly, and CORS allows ${typeof window !== 'undefined' ? window.location.origin : 'this site'}. (${reason})`
+    );
+  }
   if (!res.ok) {
     let msg = 'Invalid admin key';
     try {

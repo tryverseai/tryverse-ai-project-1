@@ -104,9 +104,13 @@ const Admin = () => {
       setStoredKey('session'); // sentinel — UI knows we're logged in; key is NOT stored
       setAdminKey("");
       toast.success("Admin access granted");
-    } catch {
-      setError("Invalid admin key");
-      toast.error("Invalid admin key");
+    } catch (err) {
+      const msg =
+        err instanceof Error && err.message.trim()
+          ? err.message.trim()
+          : "Invalid admin key";
+      setError(msg);
+      toast.error(msg.length > 180 ? `${msg.slice(0, 177)}…` : msg);
     } finally {
       setLoading(false);
     }
