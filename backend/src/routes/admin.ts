@@ -78,13 +78,26 @@ import {
   ADMIN_SESSION_COOKIE,
 } from '../services/adminSession';
 
-const SESSION_COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: 'strict' as const,
-  secure: env.NODE_ENV === 'production',
-  maxAge: 15 * 60 * 1000, // 15 minutes (ms for Express res.cookie)
-  path: '/api/admin',
-};
+/**
+ * Vercel (tryverseai.com) + Railway API (*.railway.app) = cross-site fetches.
+ * SameSite=Strict/Lax cookies are not sent on those requests; admin must use SameSite=None + Secure.
+ */
+function adminSessionCookieOptions(): {
+  httpOnly: boolean;
+  sameSite: 'none' | 'lax';
+  secure: boolean;
+  maxAge: number;
+  path: string;
+} {
+  const prod = env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    sameSite: prod ? 'none' : 'lax',
+    secure: prod,
+    maxAge: 15 * 60 * 1000, // 15 minutes (ms for Express res.cookie)
+    path: '/api/admin',
+  };
+}
 
 /**
  * POST /api/admin/session
@@ -122,7 +135,7 @@ router.post(
       return;
     }
     const token = createAdminSession();
-    res.cookie(ADMIN_SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
+    res.cookie(ADMIN_SESSION_COOKIE, token, adminSessionCookieOptions());
     logAudit({
       event_type: 'admin_login',
       actor: req.ip ? `ip:${req.ip}` : undefined,
@@ -141,7 +154,12 @@ router.post(
 router.delete('/session', (req: Request, res: Response): void => {
   const token = parseCookie(req.headers.cookie, ADMIN_SESSION_COOKIE);
   revokeAdminSession(token);
-  res.clearCookie(ADMIN_SESSION_COOKIE, { path: '/api/admin' });
+  const cookieOpts = adminSessionCookieOptions();
+  res.clearCookie(ADMIN_SESSION_COOKIE, {
+    path: cookieOpts.path,
+    sameSite: cookieOpts.sameSite,
+    secure: cookieOpts.secure,
+  });
   res.json({ ok: true });
 });
 
