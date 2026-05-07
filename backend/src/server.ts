@@ -107,18 +107,23 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (widgetOriginsRaw === '*') return callback(null, true);
+      const o = origin.trim().replace(/\/$/, '');
       const list =
         corsOriginsList && corsOriginsList.length > 0
           ? [...new Set([env.FRONTEND_URL.trim(), ...corsOriginsList])]
           : [...new Set([env.FRONTEND_URL.trim(), ...defaultProdOrigins])];
-      if (list.includes(origin)) return callback(null, true);
+      const normalizedList = list.map((x) => x.trim().replace(/\/$/, ''));
+      if (normalizedList.includes(o)) return callback(null, true);
       if (isNonProductionLanDevOrigin(origin)) return callback(null, true);
-      callback(new Error(`CORS: Origin ${origin} not allowed`));
+      // Never pass Error into cors callback — that invokes next(err) and preflight can miss CORS headers entirely.
+      logger.warn('CORS origin denied', { origin: o });
+      callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-admin-key'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-admin-key', 'Cookie'],
     exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
+    optionsSuccessStatus: 204,
   })
 );
 

@@ -41,6 +41,8 @@ export const generalRateLimit = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  /** CORS preflight must not consume quota or return 429 without ACAO. */
+  skip: (req) => req.method === 'OPTIONS',
   handler: rateLimitResponse,
 });
 
