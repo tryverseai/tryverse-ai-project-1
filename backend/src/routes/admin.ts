@@ -201,7 +201,13 @@ router.get('/model-library', async (_req: Request, res: Response, next: NextFunc
 router.patch(
   '/model-library/:id',
   [
-    param('id').isUUID().withMessage('id must be a model UUID'),
+    // Convex rows often use Convex document IDs; legacy rows may still use UUID strings.
+    param('id')
+      .trim()
+      .notEmpty()
+      .isLength({ min: 8, max: 128 })
+      .matches(/^[-a-zA-Z0-9_]+$/)
+      .withMessage('id must be a legacy model UUID or Convex document id'),
     body('is_active').optional().isBoolean(),
     body('free_tier_eligible').optional().isBoolean(),
   ],

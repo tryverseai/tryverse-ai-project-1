@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
+  ApiError,
   getAdminModelLibrary,
   patchAdminModelLibrary,
   postAdminModelLibraryBulkFreeTier,
@@ -44,8 +45,14 @@ export function AdminModelLibraryTab({ adminKey }: { adminKey: string }) {
       await patchAdminModelLibrary(adminKey, id, body);
       toast.success("Model updated");
       await load();
-    } catch {
-      toast.error("Could not update model");
+    } catch (e) {
+      const msg =
+        e instanceof ApiError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : "Could not update model";
+      toast.error(msg);
     } finally {
       setPatchingId(null);
     }
@@ -76,8 +83,14 @@ export function AdminModelLibraryTab({ adminKey }: { adminKey: string }) {
             : `Reset Free tier to defaults (${res.updated} row(s) updated)`
       );
       await load();
-    } catch {
-      toast.error("Bulk update failed");
+    } catch (e) {
+      const msg =
+        e instanceof ApiError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : "Bulk update failed";
+      toast.error(msg);
     } finally {
       setBulkBusy(false);
     }

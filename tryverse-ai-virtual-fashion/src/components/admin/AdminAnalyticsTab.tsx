@@ -66,7 +66,9 @@ export function AdminAnalyticsTab({ adminKey: _adminKey }: AdminAnalyticsTabProp
 
   const fetchData = useCallback(async () => {
     if (!isPostHogApiConfigured()) {
-      setError("PostHog API not configured. Add VITE_POSTHOG_PROJECT_ID and VITE_POSTHOG_PERSONAL_API_KEY to .env");
+      setError(
+        "PostHog API not configured. Locally: add VITE_POSTHOG_PROJECT_ID and VITE_POSTHOG_PERSONAL_API_KEY to .env — for production (e.g. Vercel): set the same names as Environment Variables, then redeploy."
+      );
       setLoading(false);
       return;
     }
@@ -213,7 +215,8 @@ export function AdminAnalyticsTab({ adminKey: _adminKey }: AdminAnalyticsTabProp
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 text-center">
           <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-            PostHog Analytics requires configuration. Add these to your <code className="bg-muted px-1 rounded">.env</code>:
+            PostHog Analytics requires configuration. Add these to local <code className="bg-muted px-1 rounded">.env</code> or
+            your host&apos;s env (production: e.g. Vercel project settings — then redeploy):
           </p>
           <p className="text-xs text-muted-foreground mt-2 font-mono">
             VITE_POSTHOG_PROJECT_ID=your_project_id
