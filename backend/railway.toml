@@ -1,0 +1,7 @@
+# Config-as-code for this service when Root Directory is set to `backend` in Railway.
+# See https://docs.railway.app/deploy/healthchecks
+#
+[deploy]
+healthcheckPath = "/health"
+# Cold starts + Convex/Redis timeouts on boot can exceed default windows on some tiers.
+healthcheckTimeout = 180
