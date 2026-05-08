@@ -73,14 +73,18 @@ const Auth = () => {
   const [searchParams] = useSearchParams();
   const inviteOnly = FEATURE_FLAGS.INVITE_ONLY_MODE;
   const wantsBusinessInvite = hasBusinessInviteSignupParam(searchParams);
-  /** Brand signup form — hidden when VITE_ENABLE_INVITE_SIGNUP=false */
-  const showBusinessSignupForm = !inviteOnly && wantsBusinessInvite && inviteSignupEnabled;
-  /** User opened business invite link while brand self-serve signup is paused — show signup message only */
-  const businessSignupPaused = !inviteOnly && wantsBusinessInvite && !inviteSignupEnabled;
+  /** Brand signup form — gated by invite env flags only; invite-only mode no longer disables /auth signup (beta gate handles access). */
+  const showBusinessSignupForm = wantsBusinessInvite && inviteSignupEnabled;
+  /** Business self-serve disabled but user landed on business signup URL — show paused messaging */
+  const businessSignupPaused = wantsBusinessInvite && !inviteSignupEnabled;
 
   const wantsIndividualSignup = searchParams.get("signup") === "individual";
-  const showIndividualSignupForm = !inviteOnly && wantsIndividualSignup && b2cSignupEnabled;
-  const individualSignupPaused = !inviteOnly && wantsIndividualSignup && !b2cSignupEnabled;
+  const showIndividualSignupForm = wantsIndividualSignup && b2cSignupEnabled;
+  const individualSignupPaused = wantsIndividualSignup && !b2cSignupEnabled;
+
+  /** Plain /auth: offer account creation above sign-in whenever we are not already in signup or paused flows */
+  const showSignupChooserHints =
+    !showBusinessSignupForm && !showIndividualSignupForm && !businessSignupPaused && !individualSignupPaused;
 
   const signupPausedToastSent = useRef(false);
 
@@ -345,14 +349,14 @@ const Auth = () => {
               ? "Create a personal account"
               : showBusinessSignupForm
                 ? "Create your TryVerse account"
-                : "Welcome back"}
+                : "Sign in or create an account"}
           </h1>
           <p className="text-muted-foreground mb-4">
             {showIndividualSignupForm
               ? "Upload your photo, try on clothes with AI, and download your favorites."
               : showBusinessSignupForm
                 ? "For invited brands only — use the email we approved for your workspace."
-                : "Sign in to continue."}
+                : "Use Sign Up to choose Individual or Business and register, or sign in below if you already have an account."}
           </p>
 
           {showBusinessSignupForm && (
@@ -407,7 +411,7 @@ const Auth = () => {
             </>
           )}
 
-          {!inviteOnly && !showBusinessSignupForm && !showIndividualSignupForm && (
+          {showSignupChooserHints && (
             <>
               <p className="text-sm text-muted-foreground mb-4 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 leading-relaxed">
                 <span className="font-medium text-foreground">New to TryVerse?</span> Choose how you&apos;ll use it:
