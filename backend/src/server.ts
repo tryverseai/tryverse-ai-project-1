@@ -5,7 +5,7 @@ import morgan from 'morgan';
 import { env, assertProductionSecurityConfig } from './config/env';
 import { logger } from './config/logger';
 import { initSentry, Sentry } from './config/sentry';
-import { connectRedis } from './config/redis';
+import { connectRedis, isApplicationRedisReady } from './config/redis';
 import { generalRateLimit } from './middleware/rateLimiter';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { requireAdmin } from './middleware/auth';
@@ -235,6 +235,9 @@ try {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
+/** Railway / Docker: must bind all interfaces — not only loopback — or the proxy cannot reach the app. */
+const LISTEN_HOST = '0.0.0.0';
+
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 async function bootstrap(): Promise<void> {
   await connectRedis();
@@ -242,12 +245,20 @@ async function bootstrap(): Promise<void> {
   await logStorageBucketStatus();
   await mountBullBoard();
 
-  app.listen(env.PORT, () => {
+  const port = env.PORT;
+  app.listen(port, LISTEN_HOST, () => {
+    logger.info('Server listening on 0.0.0.0 (all interfaces) — Railway/public routing can reach this process', {
+      host: LISTEN_HOST,
+      port,
+      processPort: process.env.PORT,
+      nodeEnv: env.NODE_ENV,
+    });
     logger.info('TryVerse Backend running', {
-      port: env.PORT,
+      port,
       env: env.NODE_ENV,
       frontend: env.FRONTEND_URL,
       convexUrl: env.CONVEX_URL.replace(/\/$/, ''),
+      redisSharedClientReady: isApplicationRedisReady(),
     });
     if (env.NODE_ENV !== 'production') {
       logger.info(
@@ -261,9 +272,13 @@ async function bootstrap(): Promise<void> {
       fashnModel: env.REPLICATE_MODEL_ACCESSORIES?.split(':')[0] ?? '(unset)',
       idmClothingModel: env.REPLICATE_MODEL_CLOTHING?.split(':')[0] ?? '(unset)',
     });
-    logger.info(`Health:     http://localhost:${env.PORT}/health`);
-    logger.info(`API:        http://localhost:${env.PORT}/api`);
-    logger.info(`Queue UI:   http://localhost:${env.PORT}/admin/queues`);
+    if (env.NODE_ENV === 'production') {
+      logger.info(`Production health check: GET http://0.0.0.0:${port}/health (Railway uses PORT=${process.env.PORT ?? port})`);
+    } else {
+      logger.info(`Health:     http://localhost:${port}/health`);
+      logger.info(`API:        http://localhost:${port}/api`);
+      logger.info(`Queue UI:   http://localhost:${port}/admin/queues`);
+    }
   });
 }
 

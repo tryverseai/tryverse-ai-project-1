@@ -29,7 +29,8 @@ USER tryverse
 
 EXPOSE 3001
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD wget -qO- http://localhost:3001/health || exit 1
+# Runtime PORT is injected by Railway; default 3001 for local Docker. Node-based check (no wget dependency).
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "const p=process.env.PORT||3001;require('http').get('http://127.0.0.1:'+p+'/health',(r)=>{r.resume();process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
 
 CMD ["node", "dist/server.js"]
