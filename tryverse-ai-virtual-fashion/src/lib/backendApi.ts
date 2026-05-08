@@ -298,14 +298,14 @@ export type InviteValidationResult =
 /** Public invite gate — Convex lifecycle + legacy INVITE_TOKEN_MAP_JSON (via API). */
 export async function validateInviteToken(token: string): Promise<InviteValidationResult> {
   const q = encodeURIComponent(token);
-  const res = await fetch(`${BACKEND_URL}/api/auth/invite/validate?token=${q}`);
+  const res = await fetchWithConnectivityHint(composeApiUrl(`/api/auth/invite/validate?token=${q}`));
   if (!res.ok) return { valid: false };
   return (await res.json()) as InviteValidationResult;
 }
 
 /** Mark lifecycle invite accepted after successful signup (no-op for legacy env-map tokens). */
 export async function completeInviteAfterSignup(token: string, email: string): Promise<void> {
-  const res = await fetch(`${BACKEND_URL}/api/auth/invite/complete`, {
+  const res = await fetchWithConnectivityHint(composeApiUrl('/api/auth/invite/complete'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token, email: email.trim().toLowerCase() }),
@@ -324,7 +324,7 @@ export async function completeInviteAfterSignup(token: string, email: string): P
 
 export async function bootstrapLocalSession(body: AccountBootstrapBody): Promise<void> {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${BACKEND_URL}/api/account/session/bootstrap`, {
+  const res = await fetchWithConnectivityHint(composeApiUrl('/api/account/session/bootstrap'), {
     method: 'POST',
     headers,
     body: JSON.stringify({

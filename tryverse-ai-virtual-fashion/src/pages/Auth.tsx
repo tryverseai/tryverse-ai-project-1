@@ -396,18 +396,6 @@ const Auth = () => {
                   Choose individual or business instead
                 </Link>
               </p>
-              <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
-                <span className="font-medium text-foreground">Just for you.</span> This account is for personal try-ons — no store or
-                API setup.                 Running a brand?{" "}
-                <button
-                  type="button"
-                  className="text-foreground font-medium underline underline-offset-2 hover:no-underline"
-                  onClick={() => openSignupChooser()}
-                >
-                  Continue as Business
-                </button>
-                .
-              </p>
             </>
           )}
 
@@ -450,9 +438,6 @@ const Auth = () => {
                     <SelectItem value="business">Business</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Locked to match your Sign Up choice (saved on your Convex profile).
-                </p>
               </div>
             )}
             {showIndividualSignupForm && (
