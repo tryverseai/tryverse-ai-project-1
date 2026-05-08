@@ -1,4 +1,4 @@
-import { encodeLocalAuthorizationHeader } from '@/lib/localSession';
+import { getBackendAuthBearerHeader } from '@/lib/backendAuthBearer';
 import type { AccountType } from '@/lib/accountType';
 
 /**
@@ -255,7 +255,7 @@ export interface BrandAnalytics {
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
 function pickAuthorizationHeader(): string | null {
-  return encodeLocalAuthorizationHeader();
+  return getBackendAuthBearerHeader();
 }
 
 async function getAuthHeaders(): Promise<HeadersInit> {
@@ -267,10 +267,7 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   return headers;
 }
 
-/**
- * Raw `Authorization` header value for Local session (`Local <base64>`).
- * Do not prefix with `Bearer` — that is only for Convex JWTs.
- */
+/** Convex Auth JWT bearer for widget / uploads that bypass `fetch` wrappers. */
 function getAuthorizationHeaderValue(): string | null {
   return pickAuthorizationHeader();
 }
@@ -908,7 +905,7 @@ export async function resolveProductImageDisplayUrl(pathOrUrl: string | null): P
 }
 
 export async function getProducts(page = 1, limit = 20, category?: TryOnCategory) {
-  if (!encodeLocalAuthorizationHeader()) throw new Error('Not authenticated');
+  if (!getBackendAuthBearerHeader()) throw new Error('Not authenticated');
   const headers = await getAuthHeaders();
   const q = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (category) q.set('category', category);

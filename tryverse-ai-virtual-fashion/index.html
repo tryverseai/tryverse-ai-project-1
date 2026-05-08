@@ -6,21 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!--
       Content Security Policy
-      • frame-src / object-src 'none'  — blocks clickjacking and Flash/plugin attacks
-      • base-uri 'self'                — prevents <base> tag injection (dangling-markup XSS)
-      • connect-src https: wss:        — limits outbound fetch/XHR to HTTPS only;
-                                         blocks data-URI exfiltration and plain-HTTP leaks
-      • script-src / style-src include 'unsafe-inline' because React + Vite
-        require it at runtime; use a nonce-based CSP when switching to SSR.
+      • script-src includes https://challenges.cloudflare.com — Turnstile api.js / widget scripts
+      • frame-src allows https://challenges.cloudflare.com — Turnstile renders in an iframe
+      • object-src 'none'
+      • base-uri 'self'
+      • connect-src https: wss: — outbound API (plus 'self' for same-origin)
+      • React + Vite need 'unsafe-inline' / 'unsafe-eval' in script-src for dev; prefer nonces in hardened SSR.
     -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com;
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: blob: https:;
       font-src 'self' data:;
       connect-src 'self' https: wss:;
-      frame-src 'none';
+      frame-src 'self' https://challenges.cloudflare.com;
       object-src 'none';
       base-uri 'self';
     " />

@@ -18,12 +18,12 @@ import {
 import { posthogCapture } from "@/lib/posthog";
 import { inviteSignupEnabled, b2cSignupEnabled, FEATURE_FLAGS } from "@/lib/featureFlags";
 import { postLoginRedirectPath, safeInAppRedirectPath } from "@/lib/safeUrl";
-import { readLocalSession } from "@/lib/localSession";
 import { Label } from "@/components/ui/label";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { useSignupChooser } from "@/components/signup/SignupChooserContext";
+import { turnstileSiteKey } from "@/lib/turnstileEnv";
 
-const TURNSTILE_SITE_KEY = String(import.meta.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY ?? "").trim();
+const TURNSTILE_SITE_KEY = turnstileSiteKey();
 
 const roles = [
   "Founder",
@@ -81,10 +81,6 @@ const Auth = () => {
   const wantsIndividualSignup = searchParams.get("signup") === "individual";
   const showIndividualSignupForm = wantsIndividualSignup && b2cSignupEnabled;
   const individualSignupPaused = wantsIndividualSignup && !b2cSignupEnabled;
-
-  /** Plain /auth: offer account creation above sign-in whenever we are not already in signup or paused flows */
-  const showSignupChooserHints =
-    !showBusinessSignupForm && !showIndividualSignupForm && !businessSignupPaused && !individualSignupPaused;
 
   const signupPausedToastSent = useRef(false);
 
@@ -150,19 +146,6 @@ const Auth = () => {
     );
   };
 
-  /** Wait until the local session row is readable (same pattern as legacy JWT polling). */
-  const finishAuthIfSessionReady = async (): Promise<boolean> => {
-    const intervalMs = 150;
-    const maxWaitMs = 6000;
-    const start = Date.now();
-    while (Date.now() - start < maxWaitMs) {
-      if (readLocalSession()) return true;
-      await new Promise<void>((r) => setTimeout(r, intervalMs));
-    }
-    return Boolean(readLocalSession());
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (TURNSTILE_SITE_KEY && !turnstileToken.trim()) {
       toast({
@@ -191,20 +174,10 @@ const Auth = () => {
         const t = signUpErrorToast(error);
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
       } else {
-        const hasSession = await finishAuthIfSessionReady();
-        if (!hasSession) {
-          toast({
-            title: "Could not finish sign-in",
-            description: "Try again in a moment or refresh the page. If it keeps happening, contact support.",
-            variant: "destructive",
-            duration: 8000,
-          });
-        } else {
-          posthogCapture("user_signed_up", { email, account_type: "individual" });
-          toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
-          setPassword("");
-          goToDashboardAfterAuth();
-        }
+        posthogCapture("user_signed_up", { email, account_type: "individual" });
+        toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
+        setPassword("");
+        goToDashboardAfterAuth();
       }
     } else if (showBusinessSignupForm) {
       const finalRole = role === "Other" ? customRole : role;
@@ -214,20 +187,10 @@ const Auth = () => {
         const t = signUpErrorToast(error);
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
       } else {
-        const hasSession = await finishAuthIfSessionReady();
-        if (!hasSession) {
-          toast({
-            title: "Could not finish sign-in",
-            description: "Try again in a moment or refresh the page. If it keeps happening, contact support.",
-            variant: "destructive",
-            duration: 8000,
-          });
-        } else {
-          posthogCapture("user_signed_up", { email, account_type: "business" });
-          toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
-          setPassword("");
-          goToDashboardAfterAuth();
-        }
+        posthogCapture("user_signed_up", { email, account_type: "business" });
+        toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
+        setPassword("");
+        goToDashboardAfterAuth();
       }
     } else {
       const { error } = await signIn(email, password, turnstilePass);
@@ -235,18 +198,8 @@ const Auth = () => {
         console.error("Sign in error:", error);
         toast({ title: "Sign in failed", description: error.message, variant: "destructive", duration: 6000 });
       } else {
-        const hasSession = await finishAuthIfSessionReady();
-        if (!hasSession) {
-          toast({
-            title: "Could not finish sign-in",
-            description: "Try again in a moment or refresh the page. If it keeps happening, contact support.",
-            variant: "destructive",
-            duration: 8000,
-          });
-        } else {
-          posthogCapture("user_logged_in", { email });
-          goToDashboardAfterAuth();
-        }
+        posthogCapture("user_logged_in", { email });
+        goToDashboardAfterAuth();
       }
     }
     setLoading(false);
@@ -344,20 +297,20 @@ const Auth = () => {
             </>
           ) : (
             <>
-          <h1 className="font-display text-2xl font-bold text-foreground mb-2">
+          <h1
+            className={`font-display text-2xl font-bold text-foreground ${showBusinessSignupForm ? "mb-2" : "mb-6"}`}
+          >
             {showIndividualSignupForm
               ? "Create a personal account"
               : showBusinessSignupForm
                 ? "Create your TryVerse account"
                 : "Sign in or create an account"}
           </h1>
-          <p className="text-muted-foreground mb-4">
-            {showIndividualSignupForm
-              ? "Upload your photo, try on clothes with AI, and download your favorites."
-              : showBusinessSignupForm
-                ? "For invited brands only — use the email we approved for your workspace."
-                : "Use Sign Up to choose Individual or Business and register, or sign in below if you already have an account."}
-          </p>
+          {showBusinessSignupForm ? (
+            <p className="text-muted-foreground mb-6">
+              For invited brands only — use the email we approved for your workspace.
+            </p>
+          ) : null}
 
           {showBusinessSignupForm && (
             <>
@@ -395,32 +348,6 @@ const Auth = () => {
                   <ChevronLeft className="h-4 w-4 shrink-0" />
                   Choose individual or business instead
                 </Link>
-              </p>
-            </>
-          )}
-
-          {showSignupChooserHints && (
-            <>
-              <p className="text-sm text-muted-foreground mb-4 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 leading-relaxed">
-                <span className="font-medium text-foreground">New to TryVerse?</span> Choose how you&apos;ll use it:
-              </p>
-              <div className="flex flex-col sm:flex-row gap-2 mb-6">
-                <Button
-                  type="button"
-                  variant="default"
-                  className="flex-1 h-11 gap-2 gradient-primary text-primary-foreground shadow-soft"
-                  onClick={() => openSignupChooser()}
-                >
-                  <User className="h-4 w-4" />
-                  Sign Up
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground mb-6">
-                After approval, open Sign Up, choose <span className="text-foreground font-medium">Business</span>, and use your
-                work email.
-                {!inviteSignupEnabled && (
-                  <span className="block mt-2">Business self-serve signup may be paused until your invite is enabled.</span>
-                )}
               </p>
             </>
           )}
@@ -535,14 +462,21 @@ const Auth = () => {
             </div>
 
             {TURNSTILE_SITE_KEY ? (
-              <div className="flex justify-center py-1">
+              <div className="flex min-h-[72px] w-full justify-center py-2">
                 <Turnstile
                   siteKey={TURNSTILE_SITE_KEY}
+                  options={{ appearance: "always", size: "normal" }}
                   onSuccess={(t) => setTurnstileToken(t)}
                   onExpire={() => setTurnstileToken("")}
                   onError={() => setTurnstileToken("")}
                 />
               </div>
+            ) : import.meta.env.DEV ? (
+              <p className="text-xs text-amber-600 dark:text-amber-500 text-center">
+                Turnstile: set{" "}
+                <code className="rounded bg-muted px-1">VITE_CLOUDFLARE_TURNSTILE_SITE_KEY</code> in .env — restart{" "}
+                <code className="rounded bg-muted px-1">npm run dev</code>.
+              </p>
             ) : null}
 
             <Button type="submit" className="w-full gradient-primary text-primary-foreground h-12 shadow-soft" disabled={loading}>

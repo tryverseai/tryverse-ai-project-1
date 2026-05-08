@@ -10,13 +10,13 @@ import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { posthogCapture } from "@/lib/posthog";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { safeInAppRedirectPath } from "@/lib/safeUrl";
-import { readLocalSession } from "@/lib/localSession";
 import { completeInviteAfterSignup, validateInviteToken } from "@/lib/backendApi";
 import { dashboardPathForAccountType, type AccountType } from "@/lib/accountType";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { useSignupChooser } from "@/components/signup/SignupChooserContext";
+import { turnstileSiteKey } from "@/lib/turnstileEnv";
 
-const TURNSTILE_SITE_KEY_INVITE = String(import.meta.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY ?? "").trim();
+const TURNSTILE_SITE_KEY_INVITE = turnstileSiteKey();
 
 function signUpErrorToast(error: Error): {
   title: string;
@@ -130,17 +130,6 @@ const AuthInvite = () => {
     };
   }, [searchChecked, token]);
 
-  const finishAuthIfSessionReady = async (): Promise<boolean> => {
-    const intervalMs = 150;
-    const maxWaitMs = 6000;
-    const start = Date.now();
-    while (Date.now() - start < maxWaitMs) {
-      if (readLocalSession()) return true;
-      await new Promise<void>((r) => setTimeout(r, intervalMs));
-    }
-    return Boolean(readLocalSession());
-  };
-
   const goToAccountDashboard = (acct: AccountType) => {
     const rp = searchParams.get("redirect");
     sessionStorage.removeItem("tryverse_redirect");
@@ -197,17 +186,6 @@ const AuthInvite = () => {
         console.error("Signup error:", error);
         const t = signUpErrorToast(error);
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
-        return;
-      }
-
-      const hasSession = await finishAuthIfSessionReady();
-      if (!hasSession) {
-        toast({
-          title: "Could not finish sign-in",
-          description: "Try again in a moment or refresh the page. If it keeps happening, contact support.",
-          variant: "destructive",
-          duration: 8000,
-        });
         return;
       }
 
@@ -365,14 +343,20 @@ const AuthInvite = () => {
                 </div>
 
                 {TURNSTILE_SITE_KEY_INVITE ? (
-                  <div className="flex justify-center py-1">
+                  <div className="flex min-h-[72px] w-full justify-center py-2">
                     <Turnstile
                       siteKey={TURNSTILE_SITE_KEY_INVITE}
+                      options={{ appearance: "always", size: "normal" }}
                       onSuccess={(t) => setTurnstileToken(t)}
                       onExpire={() => setTurnstileToken("")}
                       onError={() => setTurnstileToken("")}
                     />
                   </div>
+                ) : import.meta.env.DEV ? (
+                  <p className="text-xs text-amber-600 dark:text-amber-500 text-center">
+                    Turnstile: set <code className="rounded bg-muted px-1">VITE_CLOUDFLARE_TURNSTILE_SITE_KEY</code> in .env and
+                    restart the dev server.
+                  </p>
                 ) : null}
 
                 <Button
