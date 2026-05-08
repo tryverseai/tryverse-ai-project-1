@@ -281,6 +281,8 @@ export type AccountBootstrapBody = {
   brandName?: string;
   fullName?: string;
   role?: string;
+  /** Cloudflare Turnstile token — required in production when CLOUDFLARE_TURNSTILE_SECRET_KEY is set. */
+  turnstileToken?: string;
 };
 
 export type InviteValidationResult =
@@ -331,6 +333,7 @@ export async function bootstrapLocalSession(body: AccountBootstrapBody): Promise
       fullName: body.fullName,
       role: body.role,
       email: body.email,
+      turnstileToken: body.turnstileToken,
     }),
   });
   await handleResponse(res);
@@ -1338,6 +1341,39 @@ export async function clearAdminLogs(adminKey: string): Promise<{ ok: boolean; m
 
 export async function clearAdminAudit(adminKey: string): Promise<{ ok: boolean; message?: string }> {
   return adminFetch('/api/admin/audit/clear', adminKey, { method: 'POST' });
+}
+
+/** Pending closed-beta users (explicit beta_approved === false). */
+export type AdminPendingBetaRow = {
+  userId: string;
+  full_name?: string | null;
+  contact_email?: string | null;
+  brand_name?: string | null;
+  account_type: string;
+  created_at?: string | null;
+  beta_requested_at?: string | null;
+};
+
+export async function getAdminBetaPending(adminKey: string): Promise<{ profiles: AdminPendingBetaRow[] }> {
+  return adminFetch<{ profiles: AdminPendingBetaRow[] }>('/api/admin/beta-pending', adminKey, {
+    cache: 'no-store',
+  });
+}
+
+export async function approveAdminBetaAccess(adminKey: string, userId: string): Promise<{ ok: boolean }> {
+  return adminFetch<{ ok: boolean }>(
+    `/api/admin/beta-access/${encodeURIComponent(userId)}/approve`,
+    adminKey,
+    { method: 'POST', body: JSON.stringify({}) }
+  );
+}
+
+export async function rejectAdminBetaAccess(adminKey: string, userId: string): Promise<{ ok: boolean }> {
+  return adminFetch<{ ok: boolean }>(
+    `/api/admin/beta-access/${encodeURIComponent(userId)}/reject`,
+    adminKey,
+    { method: 'POST', body: JSON.stringify({}) }
+  );
 }
 
 // ─── Admin — waitlist & lifecycle invites ─────────────────────────────────────

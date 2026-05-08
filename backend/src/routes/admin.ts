@@ -1161,6 +1161,93 @@ router.post('/audit/clear', async (_req: Request, res: Response, next: NextFunct
   }
 });
 
+router.get('/beta-pending', async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const out = await convexQueryTrusted<{
+      profiles: Array<{
+        userId: string;
+        full_name?: string | null;
+        contact_email?: string | null;
+        brand_name?: string | null;
+        account_type: string;
+        created_at?: string | null;
+        beta_requested_at?: string | null;
+      }>;
+    }>(anyApi.adminTrusted.listPendingBetaAccessAdmin, {
+      secret: env.BACKEND_SHARED_SECRET,
+    });
+    res.json(out);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/beta-access/:userId/approve',
+  [
+    param('userId')
+      .trim()
+      .notEmpty()
+      .isLength({ min: 1, max: 512 })
+      .withMessage('userId required'),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { userId } = matchedData(req) as { userId: string };
+      await convexMutationTrusted(anyApi.adminTrusted.approveBetaAccessAdmin, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId,
+      });
+      await logAudit({
+        event_type: 'admin_action',
+        actor: 'admin',
+        action: 'beta_access_approve',
+        target_id: userId,
+        details: { summary: `Beta access approved for ${userId}` },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/beta-access/:userId/reject',
+  [
+    param('userId')
+      .trim()
+      .notEmpty()
+      .isLength({ min: 1, max: 512 })
+      .withMessage('userId required'),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { userId } = matchedData(req) as { userId: string };
+      await convexMutationTrusted(anyApi.adminTrusted.rejectBetaAccessAdmin, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId,
+      });
+      await logAudit({
+        event_type: 'admin_action',
+        actor: 'admin',
+        action: 'beta_access_reject',
+        target_id: userId,
+        details: { summary: `Beta access rejected for ${userId}` },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 /** Public marketing URL base for outbound invite links. */
 function lifecycleInviteAcceptUrl(token: string): string {
   const base = env.PUBLIC_APP_URL.replace(/\/$/, '');

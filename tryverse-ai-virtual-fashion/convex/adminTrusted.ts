@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import { authSubjectSegments } from "./authSubjectKeys";
 
 function requireBackendSecret(secret: string) {
@@ -422,5 +422,72 @@ export const clearAuditLogAdmin = mutation({
     for (const r of rows) {
       await ctx.db.delete(r._id);
     }
+  },
+});
+
+/** Profiles waiting for beta access (explicit beta_approved === false, not rejected). */
+export const listPendingBetaAccessAdmin = query({
+  args: { secret: v.string() },
+  handler: async (ctx, { secret }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db.query("profiles").collect();
+    const pending = rows
+      .filter((r) => r.beta_approved === false && r.beta_rejected !== true)
+      .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+    return {
+      profiles: pending.map((p) => ({
+        userId: p.id,
+        full_name: p.full_name ?? null,
+        contact_email: p.contact_email ?? null,
+        brand_name: p.brand_name ?? null,
+        account_type: p.account_type,
+        created_at: p.created_at ?? null,
+        beta_requested_at: p.beta_requested_at ?? null,
+      })),
+    };
+  },
+});
+
+async function profileRowForAdmin(ctx: MutationCtx, userId: string) {
+  for (const key of authSubjectSegments(userId)) {
+    const row = await ctx.db
+      .query("profiles")
+      .withIndex("by_userId", (q) => q.eq("id", key))
+      .unique();
+    if (row) return row;
+  }
+  return null;
+}
+
+export const approveBetaAccessAdmin = mutation({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const row = await profileRowForAdmin(ctx, userId);
+    if (!row) throw new Error("Profile not found");
+    const now = new Date().toISOString();
+    await ctx.db.patch(row._id, {
+      beta_approved: true,
+      beta_approved_at: now,
+      beta_rejected: false,
+      updated_at: now,
+    } as never);
+    return { ok: true as const };
+  },
+});
+
+export const rejectBetaAccessAdmin = mutation({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const row = await profileRowForAdmin(ctx, userId);
+    if (!row) throw new Error("Profile not found");
+    const now = new Date().toISOString();
+    await ctx.db.patch(row._id, {
+      beta_rejected: true,
+      beta_rejected_at: now,
+      updated_at: now,
+    } as never);
+    return { ok: true as const };
   },
 });

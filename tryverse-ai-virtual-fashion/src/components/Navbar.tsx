@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import { useSignupChooser } from "@/components/signup/SignupChooserContext";
 
 const publicLinks = [
   { label: "Product", href: "/#features" },
@@ -18,6 +19,7 @@ const SPRING_TRANSITION = { type: "spring" as const, stiffness: 260, damping: 22
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const { openSignupChooser } = useSignupChooser();
   const [isCompact, setIsCompact] = useState(false);
   /** Narrow “focus” layout only on md+ — on mobile full width avoids broken menu / tap targets */
   const [isDesktop, setIsDesktop] = useState(
@@ -174,11 +176,9 @@ export function Navbar() {
                   Log In
                 </Button>
               </Link>
-              <Link to="/waitlist">
-                <Button variant="outline" size="sm" className="text-sm">
-                  Join Waitlist
-                </Button>
-              </Link>
+              <Button type="button" variant="outline" size="sm" className="text-sm" onClick={() => openSignupChooser()}>
+                Sign Up
+              </Button>
               <Link to="/book-demo">
                 <Button size="sm" className="gradient-primary text-primary-foreground text-sm shadow-soft">
                   Book a Demo
@@ -192,16 +192,9 @@ export function Navbar() {
                   Log In
                 </Button>
               </Link>
-              <Link to="/early-access">
-                <Button variant="outline" size="sm" className="text-sm">
-                  Join waitlist
-                </Button>
-              </Link>
-              <Link to="/auth">
-                <Button size="sm" className="gradient-primary text-primary-foreground text-sm shadow-soft">
-                  Sign up
-                </Button>
-              </Link>
+              <Button type="button" size="sm" className="gradient-primary text-primary-foreground text-sm shadow-soft" onClick={() => openSignupChooser()}>
+                Sign Up
+              </Button>
             </>
           )}
         </motion.div>
@@ -276,11 +269,9 @@ export function Navbar() {
                   Log In
                 </Button>
               </Link>
-              <Link to="/waitlist" onClick={() => setOpen(false)}>
-                <Button variant="outline" className="w-full">
-                  Join Waitlist
-                </Button>
-              </Link>
+              <Button type="button" variant="outline" className="w-full" onClick={() => { setOpen(false); openSignupChooser(); }}>
+                Sign Up
+              </Button>
               <Link to="/book-demo" onClick={() => setOpen(false)}>
                 <Button className="gradient-primary text-primary-foreground w-full">
                   Book a Demo
@@ -294,16 +285,9 @@ export function Navbar() {
                   Log In
                 </Button>
               </Link>
-              <Link to="/early-access" onClick={() => setOpen(false)}>
-                <Button variant="outline" className="w-full">
-                  Join waitlist
-                </Button>
-              </Link>
-              <Link to="/auth" onClick={() => setOpen(false)}>
-                <Button className="gradient-primary text-primary-foreground w-full">
-                  Sign up
-                </Button>
-              </Link>
+              <Button type="button" className="gradient-primary text-primary-foreground w-full" onClick={() => { setOpen(false); openSignupChooser(); }}>
+                Sign Up
+              </Button>
             </>
           )}
         </div>

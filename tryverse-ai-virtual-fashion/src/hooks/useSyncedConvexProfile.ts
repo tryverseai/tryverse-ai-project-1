@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getMyAccount } from "@/lib/backendApi";
 
@@ -10,8 +10,21 @@ export type RemoteProfileRow = Record<string, unknown> | null;
  */
 export function useSyncedConvexProfile() {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<RemoteProfileRow | null>(null);
+  const [profile, setProfile] = useState<RemoteProfileRow>(null);
   const [loading, setLoading] = useState(false);
+
+  const reload = useCallback(async () => {
+    if (!user) {
+      setProfile(null);
+      return;
+    }
+    try {
+      const me = await getMyAccount();
+      setProfile(me.profile ?? null);
+    } catch {
+      setProfile(null);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -36,10 +49,21 @@ export function useSyncedConvexProfile() {
     };
   }, [user?.id]);
 
+  /** Poll while waiting for beta approval so the overlay can dismiss without refresh. */
+  useEffect(() => {
+    const p = profile as Record<string, unknown> | null;
+    if (!user || !p || p.beta_approved !== false) return undefined;
+    const id = window.setInterval(() => {
+      void reload();
+    }, 12_000);
+    return () => clearInterval(id);
+  }, [user, profile, reload]);
+
   return {
     profile,
     loading,
     bootstrapping: false,
     convexOn: false,
+    refetchProfile: reload,
   };
 }

@@ -47,6 +47,12 @@ export default defineSchema({
     widget_collect_analytics: v.optional(v.boolean()),
     widget_fit_recommendations: v.optional(v.boolean()),
     widget_show_models: v.optional(v.boolean()),
+    /** Closed beta: new signups pending admin approval — undefined/true = grandfathered full access */
+    beta_approved: v.optional(v.boolean()),
+    beta_requested_at: v.optional(v.string()),
+    beta_approved_at: v.optional(v.string()),
+    beta_rejected: v.optional(v.boolean()),
+    beta_rejected_at: v.optional(v.string()),
   }).index("by_userId", ["id"]),
 
   plans: defineTable({

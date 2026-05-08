@@ -25,6 +25,11 @@ const profilePatch = v.object({
   widget_collect_analytics: v.optional(v.boolean()),
   widget_fit_recommendations: v.optional(v.boolean()),
   widget_show_models: v.optional(v.boolean()),
+  beta_approved: v.optional(v.boolean()),
+  beta_requested_at: v.optional(v.string()),
+  beta_approved_at: v.optional(v.string()),
+  beta_rejected: v.optional(v.boolean()),
+  beta_rejected_at: v.optional(v.string()),
 });
 
 /** Current user's profile (Convex Auth JWT). */
@@ -81,6 +86,8 @@ export const upsertProfileForUser = mutation({
       widget_collect_analytics: patch.widget_collect_analytics,
       widget_fit_recommendations: patch.widget_fit_recommendations,
       widget_show_models: patch.widget_show_models,
+      beta_approved: patch.beta_approved ?? false,
+      beta_requested_at: patch.beta_requested_at ?? now,
       created_at: now,
       updated_at: now,
     };

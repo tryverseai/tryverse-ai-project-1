@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_ENABLE_INVITE_SIGNUP?: string;
   /** Set to "false" to block /auth?signup=individual (default: personal sign-up allowed). */
   readonly VITE_ENABLE_B2C_SIGNUP?: string;
+  /** Cloudflare Turnstile site key — shows widget on /auth when set. */
+  readonly VITE_CLOUDFLARE_TURNSTILE_SITE_KEY?: string;
 }
 
 declare module "*.mp4" {

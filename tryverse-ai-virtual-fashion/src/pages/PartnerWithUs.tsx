@@ -8,6 +8,7 @@ import { ArrowRight, TrendingDown, TrendingUp, ShieldCheck, Code2, Sparkles, Glo
 import { Link } from "react-router-dom";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { Helmet } from "react-helmet-async";
+import { useSignupChooser } from "@/components/signup/SignupChooserContext";
 
 const benefits = [
   { icon: TrendingDown, title: "Help Reduce Returns", description: "Customers know how items fit before buying." },
@@ -23,7 +24,9 @@ const reasons = [
   { icon: Shield, title: "Enterprise Ready", description: "Secure, reliable, and designed for production workloads." },
 ];
 
-const PartnerWithUs = () => (
+const PartnerWithUs = () => {
+  const { openSignupChooser } = useSignupChooser();
+  return (
   <div className="min-h-screen bg-background">
     <Helmet>
       <title>Partner With Us — TryVerse AI Virtual Try-On</title>
@@ -76,11 +79,9 @@ const PartnerWithUs = () => (
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
               {FEATURE_FLAGS.INVITE_ONLY_MODE ? (
                 <>
-                  <Link to="/waitlist">
-                    <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12">
-                      Join Waitlist <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
+                  <Button type="button" size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12" onClick={() => openSignupChooser()}>
+                    Sign Up <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
                   <Link to="/book-demo">
                     <Button size="lg" variant="outline" className="text-base px-8 h-12">
                       Book a Demo
@@ -89,14 +90,12 @@ const PartnerWithUs = () => (
                 </>
               ) : (
                 <>
-                  <Link to="/auth">
-                    <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12">
-                      Sign up <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
-                  <Link to="/early-access">
+                  <Button type="button" size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12" onClick={() => openSignupChooser()}>
+                    Sign Up <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  <Link to="/pricing">
                     <Button size="lg" variant="outline" className="text-base px-8 h-12">
-                      Join waitlist
+                      View pricing
                     </Button>
                   </Link>
                 </>
@@ -147,11 +146,9 @@ const PartnerWithUs = () => (
               <div className="flex flex-col sm:flex-row gap-3">
                 {FEATURE_FLAGS.INVITE_ONLY_MODE ? (
                   <>
-                    <Link to="/waitlist">
-                      <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft">
-                        Join Waitlist <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </Link>
+                    <Button type="button" size="lg" className="gradient-primary text-primary-foreground shadow-soft" onClick={() => openSignupChooser()}>
+                      Sign Up <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
                     <Link to="/book-demo">
                       <Button size="lg" variant="outline">
                         Book a Demo
@@ -160,14 +157,12 @@ const PartnerWithUs = () => (
                   </>
                 ) : (
                   <>
-                    <Link to="/auth">
-                      <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft">
-                        Sign up <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </Link>
-                    <Link to="/early-access">
+                    <Button type="button" size="lg" className="gradient-primary text-primary-foreground shadow-soft" onClick={() => openSignupChooser()}>
+                      Sign Up <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                    <Link to="/pricing">
                       <Button size="lg" variant="outline">
-                        Join waitlist
+                        View pricing
                       </Button>
                     </Link>
                   </>
@@ -219,6 +214,7 @@ const PartnerWithUs = () => (
     </main>
     <Footer />
   </div>
-);
+  );
+};
 
 export default PartnerWithUs;

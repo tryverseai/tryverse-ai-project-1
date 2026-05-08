@@ -7,6 +7,7 @@ import {
   Unlock,
   Loader2,
   Shield,
+  ShieldCheck,
   LayoutDashboard,
   Users,
   Zap,
@@ -44,11 +45,13 @@ import { AdminAuditTab } from "@/components/admin/AdminAuditTab";
 import { AdminAnalyticsTab } from "@/components/admin/AdminAnalyticsTab";
 import { AdminModelLibraryTab } from "@/components/admin/AdminModelLibraryTab";
 import { AdminInvitesTab } from "@/components/admin/AdminInvitesTab";
+import { AdminBetaAccessTab } from "@/components/admin/AdminBetaAccessTab";
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Overview" },
   { icon: BarChart3, label: "Analytics" },
   { icon: Users, label: "Users" },
+  { icon: ShieldCheck, label: "Beta Access" },
   { icon: Mail, label: "Invites" },
   { icon: Zap, label: "Try-ons" },
   { icon: Cpu, label: "Queue" },
@@ -132,6 +135,8 @@ const Admin = () => {
         return <AdminAnalyticsTab adminKey={storedKey} />;
       case "Users":
         return <AdminUsersTab adminKey={storedKey} />;
+      case "Beta Access":
+        return <AdminBetaAccessTab adminKey={storedKey} />;
       case "Invites":
         return <AdminInvitesTab adminKey={storedKey} />;
       case "Try-ons":

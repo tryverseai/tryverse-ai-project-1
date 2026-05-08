@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import { useSignupChooser } from "@/components/signup/SignupChooserContext";
 import heroVideo1 from "@/assets/hero-video-1.mp4";
 import heroVideo2 from "@/assets/hero-video-2.mp4";
 import heroVideo3 from "@/assets/hero-video-3.mp4";
@@ -15,6 +16,7 @@ import heroModel4 from "@/assets/hero-model-4.jpg";
 
 export function HeroSection() {
   const shouldReduceMotion = useReducedMotion();
+  const { openSignupChooser } = useSignupChooser();
   const models = [
     { video: heroVideo1, poster: heroModel1 },
     { video: heroVideo2, poster: heroModel2 },
@@ -50,12 +52,15 @@ export function HeroSection() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
             {FEATURE_FLAGS.INVITE_ONLY_MODE ? (
               <>
-                <Link to="/waitlist">
-                  <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12 w-full sm:w-auto">
-                    Join Waitlist
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
+                <Button
+                  type="button"
+                  size="lg"
+                  className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12 w-full sm:w-auto"
+                  onClick={() => openSignupChooser()}
+                >
+                  Sign Up
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
                 <Link to="/book-demo">
                   <Button size="lg" variant="outline" className="text-base h-12 border-border w-full sm:w-auto">
                     Book a Demo
@@ -64,15 +69,18 @@ export function HeroSection() {
               </>
             ) : (
               <>
-                <Link to="/auth">
-                  <Button size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12 w-full sm:w-auto">
-                    Sign up
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-                <Link to="/early-access">
+                <Button
+                  type="button"
+                  size="lg"
+                  className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12 w-full sm:w-auto"
+                  onClick={() => openSignupChooser()}
+                >
+                  Sign Up
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <Link to="/pricing">
                   <Button size="lg" variant="outline" className="text-base h-12 border-border w-full sm:w-auto">
-                    Join waitlist
+                    View pricing
                   </Button>
                 </Link>
               </>

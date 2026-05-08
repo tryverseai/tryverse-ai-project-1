@@ -34,9 +34,10 @@ interface AuthContextType {
     brandName: string,
     fullName?: string,
     role?: string,
-    accountType?: AccountType
+    accountType?: AccountType,
+    turnstileToken?: string
   ) => Promise<{ error: Error | null; session: null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string, turnstileToken?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -99,7 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     brandName: string,
     fullName?: string,
     role?: string,
-    accountType: AccountType = "business"
+    accountType: AccountType = "business",
+    turnstileToken?: string
   ) => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed) {
@@ -121,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fullName,
       role,
       email: trimmed,
+      ...(turnstileToken ? { turnstileToken } : {}),
     };
     try {
       await bootstrapLocalSession(body);
@@ -130,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null, session: null };
   };
 
-  const signIn = async (email: string, _password: string) => {
+  const signIn = async (email: string, _password: string, turnstileToken?: string) => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed) {
       return { error: new Error("Email is required") };
@@ -151,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         brandName: meta.brand_name,
         fullName: meta.full_name,
         role: meta.role,
+        ...(turnstileToken ? { turnstileToken } : {}),
       });
     } catch (e) {
       return { error: e instanceof Error ? e : new Error(String(e)) };

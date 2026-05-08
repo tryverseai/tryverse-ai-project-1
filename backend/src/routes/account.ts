@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth';
 import { cxGetProfile, cxInsertProfile, cxPatchProfile } from '../services/creditsConvexBridge';
 import { DEFAULT_FREE_CREDITS_BUSINESS, DEFAULT_FREE_CREDITS_INDIVIDUAL } from '../services/credits';
 import { logger } from '../config/logger';
+import { verifyTurnstileToken } from '../services/turnstile';
 
 const router = Router();
 
@@ -18,6 +19,14 @@ router.post(
       const userId = req.user!.id;
       const email = (req.user!.email || '').trim();
       const body = req.body as Record<string, unknown>;
+      const turnstileToken =
+        typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined;
+      const ip = typeof req.ip === 'string' ? req.ip : undefined;
+      if (!(await verifyTurnstileToken(turnstileToken, ip))) {
+        res.status(403).json({ error: 'Security verification failed. Please try again.' });
+        return;
+      }
+
       const accountTypeRaw = body.accountType;
       const at = accountTypeRaw === 'individual' ? 'individual' : 'business';
       const cap = at === 'individual' ? DEFAULT_FREE_CREDITS_INDIVIDUAL : DEFAULT_FREE_CREDITS_BUSINESS;

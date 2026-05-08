@@ -18,6 +18,11 @@ export interface ConvexProfileRow {
   is_blocked?: boolean;
   updated_at?: string | null;
   created_at?: string | null;
+  beta_approved?: boolean;
+  beta_requested_at?: string | null;
+  beta_approved_at?: string | null;
+  beta_rejected?: boolean;
+  beta_rejected_at?: string | null;
   [key: string]: unknown;
 }
 

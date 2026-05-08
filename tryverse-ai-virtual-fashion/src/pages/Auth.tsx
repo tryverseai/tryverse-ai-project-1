@@ -19,6 +19,11 @@ import { posthogCapture } from "@/lib/posthog";
 import { inviteSignupEnabled, b2cSignupEnabled, FEATURE_FLAGS } from "@/lib/featureFlags";
 import { postLoginRedirectPath, safeInAppRedirectPath } from "@/lib/safeUrl";
 import { readLocalSession } from "@/lib/localSession";
+import { Label } from "@/components/ui/label";
+import { Turnstile } from "@marsidev/react-turnstile";
+import { useSignupChooser } from "@/components/signup/SignupChooserContext";
+
+const TURNSTILE_SITE_KEY = String(import.meta.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY ?? "").trim();
 
 const roles = [
   "Founder",
@@ -70,7 +75,7 @@ const Auth = () => {
   const wantsBusinessInvite = hasBusinessInviteSignupParam(searchParams);
   /** Brand signup form — hidden when VITE_ENABLE_INVITE_SIGNUP=false */
   const showBusinessSignupForm = !inviteOnly && wantsBusinessInvite && inviteSignupEnabled;
-  /** User opened business invite link while brand signups are paused — show waitlist message only */
+  /** User opened business invite link while brand self-serve signup is paused — show signup message only */
   const businessSignupPaused = !inviteOnly && wantsBusinessInvite && !inviteSignupEnabled;
 
   const wantsIndividualSignup = searchParams.get("signup") === "individual";
@@ -88,9 +93,11 @@ const Auth = () => {
   const [customRole, setCustomRole] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { openSignupChooser } = useSignupChooser();
 
   useEffect(() => {
     if (redirectParam) {
@@ -105,7 +112,7 @@ const Auth = () => {
     toast({
       title: "Sign up isn’t open yet",
       description:
-        "Join the waitlist first. When we approve your brand, we’ll email you a link to create your TryVerse account.",
+        "Complete the interest form first. When we approve your brand, we’ll email you a link to create your TryVerse account.",
       duration: 11000,
     });
   }, [businessSignupPaused, toast]);
@@ -153,6 +160,16 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (TURNSTILE_SITE_KEY && !turnstileToken.trim()) {
+      toast({
+        title: "Security verification required",
+        description: "Complete the security check below, then try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const turnstilePass = turnstileToken.trim() || undefined;
+
     setLoading(true);
 
     if (showIndividualSignupForm) {
@@ -162,7 +179,8 @@ const Auth = () => {
         fullName.trim() || "My Try-Ons",
         fullName,
         undefined,
-        "individual"
+        "individual",
+        turnstilePass
       );
       if (error) {
         console.error("Signup error:", error);
@@ -186,7 +204,7 @@ const Auth = () => {
       }
     } else if (showBusinessSignupForm) {
       const finalRole = role === "Other" ? customRole : role;
-      const { error } = await signUp(email, password, brandName, fullName, finalRole, "business");
+      const { error } = await signUp(email, password, brandName, fullName, finalRole, "business", turnstilePass);
       if (error) {
         console.error("Signup error:", error);
         const t = signUpErrorToast(error);
@@ -208,7 +226,7 @@ const Auth = () => {
         }
       }
     } else {
-      const { error } = await signIn(email, password);
+      const { error } = await signIn(email, password, turnstilePass);
       if (error) {
         console.error("Sign in error:", error);
         toast({ title: "Sign in failed", description: error.message, variant: "destructive", duration: 6000 });
@@ -282,19 +300,24 @@ const Auth = () => {
             <>
               <h1 className="font-display text-2xl font-bold text-foreground mb-2">Sign up isn&apos;t open yet</h1>
               <p className="text-muted-foreground mb-4">
-                New accounts are invite-only. Right now we&apos;re only accepting brands through the waitlist — when yours is
-                approved, we&apos;ll email you a link to create your account.
+                New accounts are invite-only. Request access for your brand — when you&apos;re approved, we&apos;ll email you
+                a link to create your TryVerse account.
               </p>
               <div className="rounded-lg border border-border bg-muted/40 px-4 py-4 space-y-4 mb-6">
                 <p className="text-sm text-foreground leading-relaxed">
-                  <span className="font-medium">Next step:</span> request access and tell us about your store. We&apos;ll
-                  follow up and send a signup link when you&apos;re cleared.
+                  <span className="font-medium">Next step:</span> start Sign Up and choose Business, or complete the interest form
+                  at Early Access if you prefer.
                 </p>
-                <Button asChild className="w-full gradient-primary text-primary-foreground h-12 shadow-soft">
-                  <Link to={inviteOnly ? "/waitlist" : "/early-access"}>
-                    Join the waitlist
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
+                <Button
+                  type="button"
+                  className="w-full gradient-primary text-primary-foreground h-12 shadow-soft"
+                  onClick={() => openSignupChooser()}
+                >
+                  Sign Up
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <Button asChild variant="outline" className="w-full h-11">
+                  <Link to={inviteOnly ? "/waitlist" : "/early-access"}>Early access form</Link>
                 </Button>
                 <p className="text-sm text-muted-foreground text-center">
                   Already have an account?{" "}
@@ -344,14 +367,16 @@ const Auth = () => {
                 </Link>
               </p>
               <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
-                <span className="font-medium text-foreground">Not invited yet?</span> Anyone can request to join via{" "}
-                <Link
-                  to={inviteOnly ? "/waitlist" : "/early-access"}
+                <span className="font-medium text-foreground">Not invited yet?</span>{" "}
+                <button
+                  type="button"
                   className="text-foreground font-medium underline underline-offset-2 hover:no-underline"
+                  onClick={() => openSignupChooser()}
                 >
-                  Join waitlist
-                </Link>
-                . We only enable sign-up for brands we&apos;ve invited.
+                  Sign Up
+                </button>
+                {" "}
+                to choose Business — we enable accounts for invited brands first.
               </p>
             </>
           )}
@@ -369,10 +394,14 @@ const Auth = () => {
               </p>
               <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
                 <span className="font-medium text-foreground">Just for you.</span> This account is for personal try-ons — no store or
-                API setup. Running a brand?{" "}
-                <Link to="/auth?signup=business" className="text-foreground font-medium underline underline-offset-2 hover:no-underline">
-                  Continue as a business
-                </Link>
+                API setup.                 Running a brand?{" "}
+                <button
+                  type="button"
+                  className="text-foreground font-medium underline underline-offset-2 hover:no-underline"
+                  onClick={() => openSignupChooser()}
+                >
+                  Continue as Business
+                </button>
                 .
               </p>
             </>
@@ -384,25 +413,19 @@ const Auth = () => {
                 <span className="font-medium text-foreground">New to TryVerse?</span> Choose how you&apos;ll use it:
               </p>
               <div className="flex flex-col sm:flex-row gap-2 mb-6">
-                <Button asChild variant="default" className="flex-1 h-11 gap-2 gradient-primary text-primary-foreground shadow-soft">
-                  <Link to="/auth?signup=individual">
-                    <User className="h-4 w-4" />
-                    Sign up — Individual
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="flex-1 h-11 gap-2">
-                  <Link to="/auth?signup=business">
-                    <Building2 className="h-4 w-4" />
-                    Continue as Business
-                  </Link>
+                <Button
+                  type="button"
+                  variant="default"
+                  className="flex-1 h-11 gap-2 gradient-primary text-primary-foreground shadow-soft"
+                  onClick={() => openSignupChooser()}
+                >
+                  <User className="h-4 w-4" />
+                  Sign Up
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mb-6">
-                Brands on the waitlist: after you&apos;re approved, use the{" "}
-                <Link to="/auth?signup=business" className="text-foreground font-medium underline underline-offset-2">
-                  business
-                </Link>{" "}
-                link with your work email.
+                After approval, open Sign Up, choose <span className="text-foreground font-medium">Business</span>, and use your
+                work email.
                 {!inviteSignupEnabled && (
                   <span className="block mt-2">Business self-serve signup may be paused until your invite is enabled.</span>
                 )}
@@ -411,6 +434,23 @@ const Auth = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {(showIndividualSignupForm || showBusinessSignupForm) && (
+              <div className="space-y-2">
+                <Label htmlFor="auth-account-type-locked">Account type</Label>
+                <Select value={showIndividualSignupForm ? "individual" : "business"} disabled>
+                  <SelectTrigger id="auth-account-type-locked" className="h-12 bg-muted/50 opacity-90">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="individual">Individual</SelectItem>
+                    <SelectItem value="business">Business</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Locked to match your Sign Up choice (saved on your Convex profile).
+                </p>
+              </div>
+            )}
             {showIndividualSignupForm && (
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -505,6 +545,17 @@ const Auth = () => {
               </button>
             </div>
 
+            {TURNSTILE_SITE_KEY ? (
+              <div className="flex justify-center py-1">
+                <Turnstile
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onSuccess={(t) => setTurnstileToken(t)}
+                  onExpire={() => setTurnstileToken("")}
+                  onError={() => setTurnstileToken("")}
+                />
+              </div>
+            ) : null}
+
             <Button type="submit" className="w-full gradient-primary text-primary-foreground h-12 shadow-soft" disabled={loading}>
               {loading
                 ? "Please wait..."
@@ -523,11 +574,15 @@ const Auth = () => {
                 </Link>
               </p>
               {inviteOnly && (
-                <p className="text-sm text-muted-foreground text-center mt-5 space-x-3 space-y-2">
-                  <Link to="/waitlist" className="text-foreground/80 font-medium hover:underline inline-block">
-                    Request Access →
-                  </Link>
-                  <span className="text-border" aria-hidden>
+                <p className="text-sm text-muted-foreground text-center mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 items-center">
+                  <button
+                    type="button"
+                    className="text-foreground/80 font-medium hover:underline inline-block bg-transparent border-0 cursor-pointer p-0 font-[inherit]"
+                    onClick={() => openSignupChooser()}
+                  >
+                    Sign Up →
+                  </button>
+                  <span className="text-border hidden sm:inline" aria-hidden>
                     |
                   </span>
                   <Link to="/book-demo" className="text-foreground/80 font-medium hover:underline inline-block">

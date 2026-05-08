@@ -1,0 +1,14 @@
+-- Reference SQL for relational stores that mirror `profiles` (e.g. exports, backups, or a Postgres mirror).
+-- Source of truth in Convex is `convex/schema.ts` (`profiles.beta_*`). Apply equivalent DDL in your DB as needed.
+
+-- PostgreSQL-style (adjust table/column types to match your deployment):
+--
+-- ALTER TABLE profiles
+--   ADD COLUMN IF NOT EXISTS beta_approved boolean,
+--   ADD COLUMN IF NOT EXISTS beta_requested_at timestamptz,
+--   ADD COLUMN IF NOT EXISTS beta_approved_at timestamptz,
+--   ADD COLUMN IF NOT EXISTS beta_rejected boolean,
+--   ADD COLUMN IF NOT EXISTS beta_rejected_at timestamptz;
+--
+-- Optional backfill for rows created before Convex started writing beta flags:
+-- UPDATE profiles SET beta_approved = NULL WHERE beta_approved IS DISTINCT FROM TRUE AND beta_requested_at IS NULL;

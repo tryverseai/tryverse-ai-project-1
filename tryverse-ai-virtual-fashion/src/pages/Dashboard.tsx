@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
+import { BetaAccessOverlay } from "@/components/BetaAccessOverlay";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, BarChart3, Settings, Key, Code, LayoutDashboard, CreditCard, BookOpen,
@@ -85,10 +86,12 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="pt-[var(--navbar-height)]">
-        <div className="flex">
+    <>
+      <BetaAccessOverlay />
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-[var(--navbar-height)]">
+          <div className="flex">
           {/* Sidebar */}
           <aside className="hidden lg:flex flex-col w-60 min-h-[calc(100vh-var(--navbar-height))] border-r border-border p-4 pt-6 sticky top-[var(--navbar-height)]">
             <div className="mb-6">
@@ -139,9 +142,10 @@ const Dashboard = () => {
               {renderContent()}
             </div>
           </div>
-        </div>
-      </main>
-    </div>
+          </div>
+        </main>
+      </div>
+    </>
   );
 };
 

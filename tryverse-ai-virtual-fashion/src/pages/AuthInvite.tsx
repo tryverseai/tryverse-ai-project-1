@@ -13,6 +13,10 @@ import { safeInAppRedirectPath } from "@/lib/safeUrl";
 import { readLocalSession } from "@/lib/localSession";
 import { completeInviteAfterSignup, validateInviteToken } from "@/lib/backendApi";
 import { dashboardPathForAccountType, type AccountType } from "@/lib/accountType";
+import { Turnstile } from "@marsidev/react-turnstile";
+import { useSignupChooser } from "@/components/signup/SignupChooserContext";
+
+const TURNSTILE_SITE_KEY_INVITE = String(import.meta.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY ?? "").trim();
 
 function signUpErrorToast(error: Error): {
   title: string;
@@ -64,8 +68,10 @@ const AuthInvite = () => {
   const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
   const { signUp } = useAuth();
   const { toast } = useToast();
+  const { openSignupChooser } = useSignupChooser();
 
   useEffect(() => {
     if (!FEATURE_FLAGS.INVITE_ONLY_MODE) {
@@ -151,6 +157,16 @@ const AuthInvite = () => {
     e.preventDefault();
     if (!gateValid || !inviteKind || !token?.trim()) return;
 
+    if (TURNSTILE_SITE_KEY_INVITE && !turnstileToken.trim()) {
+      toast({
+        title: "Security verification required",
+        description: "Complete the security check below, then try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const ts = turnstileToken.trim() || undefined;
+
     const acctBootstrap = inviteKindToBootstrapType(inviteKind);
 
     if (inviteKind === "business" && !companyName.trim()) {
@@ -172,9 +188,10 @@ const AuthInvite = () => {
               fullName.trim() || "My Try-Ons",
               fullName.trim(),
               undefined,
-              "individual"
+              "individual",
+              ts
             )
-          : await signUp(email, password, companyName.trim(), fullName.trim(), undefined, "business");
+          : await signUp(email, password, companyName.trim(), fullName.trim(), undefined, "business", ts);
 
       if (error) {
         console.error("Signup error:", error);
@@ -265,11 +282,13 @@ const AuthInvite = () => {
               <p className="text-muted-foreground leading-relaxed whitespace-pre-line">
                 {`This invitation link is invalid or has already been used.\nIf you believe this is an error, please contact info@tryverseai.com`}
               </p>
-              <Button asChild className="w-full gradient-primary text-primary-foreground h-12 shadow-soft">
-                <Link to="/waitlist">
-                  Join the Waitlist
-                  <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
-                </Link>
+              <Button
+                type="button"
+                className="w-full gradient-primary text-primary-foreground h-12 shadow-soft"
+                onClick={() => openSignupChooser()}
+              >
+                Sign Up
+                <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
               </Button>
               <p className="text-sm text-muted-foreground text-center">
                 Already have an account?{" "}
@@ -344,6 +363,17 @@ const AuthInvite = () => {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+
+                {TURNSTILE_SITE_KEY_INVITE ? (
+                  <div className="flex justify-center py-1">
+                    <Turnstile
+                      siteKey={TURNSTILE_SITE_KEY_INVITE}
+                      onSuccess={(t) => setTurnstileToken(t)}
+                      onExpire={() => setTurnstileToken("")}
+                      onError={() => setTurnstileToken("")}
+                    />
+                  </div>
+                ) : null}
 
                 <Button
                   type="submit"

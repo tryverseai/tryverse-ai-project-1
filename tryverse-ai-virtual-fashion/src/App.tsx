@@ -13,6 +13,7 @@ import { AccountTypeGate } from "@/components/AccountTypeGate";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { ComplianceOnboardingGate } from "@/components/ComplianceOnboardingGate";
 import { CookieConsent } from "@/components/CookieConsent";
+import { SignupChooserProvider } from "@/components/signup/SignupChooserContext";
 
 // Eagerly loaded: landing, auth, and tiny utility pages (critical for FCP / first-visit UX)
 import Index from "./pages/Index";
@@ -61,6 +62,7 @@ const App = () => (
         <CookieConsent />
         <BrowserRouter>
           <ScrollToTop />
+          <SignupChooserProvider>
           <ComplianceOnboardingGate>
           <Suspense fallback={<RouteLoader />}>
           <Routes>
@@ -129,6 +131,7 @@ const App = () => (
           </Routes>
           </Suspense>
           </ComplianceOnboardingGate>
+          </SignupChooserProvider>
         </BrowserRouter>
       </TooltipProvider>
       </PostHogProvider>

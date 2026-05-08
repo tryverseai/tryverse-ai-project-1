@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
+import { BetaAccessOverlay } from "@/components/BetaAccessOverlay";
 import TryOnStudio from "@/pages/TryOnStudio";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Images, Compass, UserRound, Trash2, Download, Loader2, Users, BookOpen } from "lucide-react";
@@ -162,10 +163,12 @@ const IndividualDashboard = () => {
   const displayName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "You";
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
-      <Navbar />
-      <main className="pt-[var(--navbar-height)]">
-        <div className="max-w-5xl mx-auto px-4 md:px-6 pt-6 md:pt-8">
+    <>
+      <BetaAccessOverlay />
+      <div className="min-h-screen bg-background pb-24 md:pb-8">
+        <Navbar />
+        <main className="pt-[var(--navbar-height)]">
+          <div className="max-w-5xl mx-auto px-4 md:px-6 pt-6 md:pt-8">
           <div className="mb-6 md:mb-8">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Personal</p>
             <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
@@ -407,9 +410,10 @@ const IndividualDashboard = () => {
               </Button>
             </div>
           )}
-        </div>
-      </main>
-    </div>
+          </div>
+        </main>
+      </div>
+    </>
   );
 };
 

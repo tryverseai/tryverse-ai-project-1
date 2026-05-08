@@ -74,6 +74,8 @@ export const insertProfileRow = mutation({
       monthly_credits_total: 0,
       is_blocked: false,
       widget_activated: false,
+      beta_approved: false,
+      beta_requested_at: now,
       created_at: now,
       updated_at: now,
     });
