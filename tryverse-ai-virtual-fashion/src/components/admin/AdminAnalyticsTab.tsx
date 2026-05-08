@@ -224,7 +224,8 @@ export function AdminAnalyticsTab({ adminKey: _adminKey }: AdminAnalyticsTabProp
             VITE_POSTHOG_PERSONAL_API_KEY=your_personal_api_key
           </p>
           <p className="text-xs text-muted-foreground mt-2">
-            Get these from PostHog Project Settings and User API Keys.
+            Use Profile → Personal API Keys (needs query/HogQL read access). Do not paste the browser <code className="font-mono">phc_*</code> project token — it returns 403. EU projects should set{" "}
+            <code className="font-mono">VITE_POSTHOG_HOST=https://eu.i.posthog.com</code>.
           </p>
         </div>
       </motion.div>

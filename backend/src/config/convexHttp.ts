@@ -7,7 +7,17 @@ export function createConvexClient(): ConvexHttpClient {
   return new ConvexHttpClient(env.CONVEX_URL);
 }
 
-/** Turn common Convex failures into actionable HTTP responses (Convex throws plain Errors). */
+function normalizeConvexFailureMessage(raw: string): string {
+  let m = raw.trim();
+  m = m.replace(/^Uncaught Error:\s*/i, '');
+  if (m.length > 800) m = `${m.slice(0, 800)}…`;
+  return m || 'Convex request failed';
+}
+
+/**
+ * Convex trusted calls run from the API; surface function errors as 502 + message so admin
+ * (and operators) see failures instead of a generic production 500.
+ */
 function mapConvexTrustedFailure(err: unknown): never {
   const msg =
     err instanceof Error
@@ -21,8 +31,7 @@ function mapConvexTrustedFailure(err: unknown): never {
       502
     );
   }
-  if (err instanceof Error) throw err;
-  throw new Error(msg || 'Convex request failed');
+  throw new AppError(normalizeConvexFailureMessage(msg), 502);
 }
 
 /** Trusted server calls (shared secret inside Convex function args). */
