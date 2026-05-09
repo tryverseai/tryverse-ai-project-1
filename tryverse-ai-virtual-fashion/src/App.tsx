@@ -130,7 +130,8 @@ const App = () => (
               }
             />
             <Route path="/studio" element={<ProtectedRoute><TryOnStudio clothingOnly /></ProtectedRoute>} />
-            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+            {/* Admin unlocks via backend admin key + HttpOnly cookie — not Convex user session */}
+            <Route path="/admin" element={<Admin />} />
             <Route path="/try-on-studio" element={<ProtectedRoute><TryOnStudio clothingOnly /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
