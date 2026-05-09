@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import { authSubjectSegments } from "./authSubjectKeys";
 
 function requireBackendSecret(secret: string) {
@@ -106,6 +106,52 @@ export const patchProfileRow = mutation({
     }
     // Trusted server-only patch payload from Node credits service.
     await ctx.db.patch(row._id, updates as never);
+    return { ok: true as const };
+  },
+});
+
+async function profileRowForBackend(ctx: MutationCtx, userId: string) {
+  for (const key of authSubjectSegments(userId)) {
+    const row = await ctx.db
+      .query("profiles")
+      .withIndex("by_userId", (q) => q.eq("id", key))
+      .unique();
+    if (row) return row;
+  }
+  return null;
+}
+
+/** Mirrors adminTrusted.approveBetaAccessAdmin when that export is missing on the linked deployment. */
+export const approveBetaAccessBackendTrusted = mutation({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const row = await profileRowForBackend(ctx, userId);
+    if (!row) throw new Error("Profile not found");
+    const now = new Date().toISOString();
+    await ctx.db.patch(row._id, {
+      beta_approved: true,
+      beta_approved_at: now,
+      beta_rejected: false,
+      updated_at: now,
+    } as never);
+    return { ok: true as const };
+  },
+});
+
+/** Mirrors adminTrusted.rejectBetaAccessAdmin when that export is missing on the linked deployment. */
+export const rejectBetaAccessBackendTrusted = mutation({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const row = await profileRowForBackend(ctx, userId);
+    if (!row) throw new Error("Profile not found");
+    const now = new Date().toISOString();
+    await ctx.db.patch(row._id, {
+      beta_rejected: true,
+      beta_rejected_at: now,
+      updated_at: now,
+    } as never);
     return { ok: true as const };
   },
 });

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
-import { mutation, query, type MutationCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { authSubjectSegments } from "./authSubjectKeys";
 
 function requireBackendSecret(secret: string) {
@@ -428,29 +428,6 @@ export const clearAuditLogAdmin = mutation({
   },
 });
 
-/** Profiles waiting for beta access (not approved yet: false or missing flag, not rejected). */
-export const listPendingBetaAccessAdmin = query({
-  args: { secret: v.string() },
-  handler: async (ctx, { secret }) => {
-    requireBackendSecret(secret);
-    const rows = await ctx.db.query("profiles").collect();
-    const pending = rows
-      .filter((r) => r.beta_rejected !== true && r.beta_approved !== true)
-      .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
-    return {
-      profiles: pending.map((p) => ({
-        userId: p.id,
-        full_name: p.full_name ?? null,
-        contact_email: p.contact_email ?? null,
-        brand_name: p.brand_name ?? null,
-        account_type: p.account_type,
-        created_at: p.created_at ?? null,
-        beta_requested_at: p.beta_requested_at ?? null,
-      })),
-    };
-  },
-});
-
 async function profileRowForAdmin(ctx: MutationCtx, userId: string) {
   for (const key of authSubjectSegments(userId)) {
     const row = await ctx.db
@@ -461,6 +438,70 @@ async function profileRowForAdmin(ctx: MutationCtx, userId: string) {
   }
   return null;
 }
+
+/** Prefer profile.contact_email; if missing, read Convex Auth `users` doc (subject segments may contain users _id). */
+async function resolvedContactEmail(ctx: QueryCtx, profileRow: Doc<"profiles">): Promise<string | null> {
+  const fromProfile = typeof profileRow.contact_email === "string" ? profileRow.contact_email.trim() : "";
+  if (fromProfile) return fromProfile;
+  for (const seg of authSubjectSegments(profileRow.id)) {
+    try {
+      const u = await ctx.db.get(seg as Id<"users">);
+      const em = typeof u?.email === "string" ? u.email.trim() : "";
+      if (em) return em;
+    } catch {
+      /* invalid Id */
+    }
+  }
+  return null;
+}
+
+/** Profiles waiting for beta access (not approved yet: false or missing flag, not rejected). */
+export const listPendingBetaAccessAdmin = query({
+  args: { secret: v.string() },
+  handler: async (ctx, { secret }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db.query("profiles").collect();
+    const pending = rows
+      .filter((r) => r.beta_rejected !== true && r.beta_approved !== true)
+      .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+    const profiles = await Promise.all(
+      pending.map(async (p) => ({
+        userId: p.id,
+        full_name: p.full_name ?? null,
+        contact_email: await resolvedContactEmail(ctx, p),
+        brand_name: p.brand_name ?? null,
+        account_type: p.account_type,
+        created_at: p.created_at ?? null,
+        beta_requested_at: p.beta_requested_at ?? null,
+      }))
+    );
+    return { profiles };
+  },
+});
+
+/** Node fallback: fill missing contact_email for a list of profile subject ids. */
+export const batchResolveAuthEmailsAdmin = query({
+  args: { secret: v.string(), profileIds: v.array(v.string()) },
+  handler: async (ctx, { secret, profileIds }) => {
+    requireBackendSecret(secret);
+    const out: Record<string, string | null> = {};
+    for (const pid of profileIds) {
+      let profile: Doc<"profiles"> | null = null;
+      for (const key of authSubjectSegments(pid)) {
+        const row = await ctx.db
+          .query("profiles")
+          .withIndex("by_userId", (q) => q.eq("id", key))
+          .unique();
+        if (row) {
+          profile = row;
+          break;
+        }
+      }
+      out[pid] = profile ? await resolvedContactEmail(ctx, profile) : null;
+    }
+    return out;
+  },
+});
 
 export const approveBetaAccessAdmin = mutation({
   args: { secret: v.string(), userId: v.string() },

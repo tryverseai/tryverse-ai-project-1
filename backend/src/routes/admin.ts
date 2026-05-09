@@ -57,7 +57,33 @@ async function betaPendingFallbackFromProfiles(): Promise<{
       beta_requested_at: (p.beta_requested_at as string | undefined) ?? null,
     }))
     .sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
-  return { profiles: pending };
+
+  const needsEmail = pending.filter((row) => !(row.contact_email && String(row.contact_email).trim()));
+  let emailMap: Record<string, string | null> = {};
+  if (needsEmail.length > 0) {
+    try {
+      emailMap = await convexQueryTrusted<Record<string, string | null>>(anyApi.adminTrusted.batchResolveAuthEmailsAdmin, {
+        secret: env.BACKEND_SHARED_SECRET,
+        profileIds: needsEmail.map((row) => row.userId),
+      });
+    } catch (e) {
+      if (!convexFunctionMissing(e)) {
+        logger.warn('admin beta-pending: batchResolveAuthEmailsAdmin failed', {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+      // Old deploy: show rows without auth email enrichment
+    }
+  }
+
+  const merged = pending.map((row) => ({
+    ...row,
+    contact_email:
+      row.contact_email && String(row.contact_email).trim()
+        ? row.contact_email
+        : emailMap[row.userId] ?? null,
+  }));
+  return { profiles: merged };
 }
 
 /**
@@ -1272,10 +1298,24 @@ router.post(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { userId } = matchedData(req) as { userId: string };
-      await convexMutationTrusted(anyApi.adminTrusted.approveBetaAccessAdmin, {
-        secret: env.BACKEND_SHARED_SECRET,
-        userId,
-      });
+      const runApprove = async () => {
+        await convexMutationTrusted(anyApi.adminTrusted.approveBetaAccessAdmin, {
+          secret: env.BACKEND_SHARED_SECRET,
+          userId,
+        });
+      };
+      try {
+        await runApprove();
+      } catch (err) {
+        if (!convexFunctionMissing(err)) throw err;
+        logger.warn(
+          'admin beta approve: falling back to backendTrusted.approveBetaAccessBackendTrusted (deploy approveBetaAccessAdmin)'
+        );
+        await convexMutationTrusted(anyApi.backendTrusted.approveBetaAccessBackendTrusted, {
+          secret: env.BACKEND_SHARED_SECRET,
+          userId,
+        });
+      }
       await logAudit({
         event_type: 'admin_action',
         actor: 'admin',
@@ -1305,10 +1345,24 @@ router.post(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { userId } = matchedData(req) as { userId: string };
-      await convexMutationTrusted(anyApi.adminTrusted.rejectBetaAccessAdmin, {
-        secret: env.BACKEND_SHARED_SECRET,
-        userId,
-      });
+      const runReject = async () => {
+        await convexMutationTrusted(anyApi.adminTrusted.rejectBetaAccessAdmin, {
+          secret: env.BACKEND_SHARED_SECRET,
+          userId,
+        });
+      };
+      try {
+        await runReject();
+      } catch (err) {
+        if (!convexFunctionMissing(err)) throw err;
+        logger.warn(
+          'admin beta reject: falling back to backendTrusted.rejectBetaAccessBackendTrusted (deploy rejectBetaAccessAdmin)'
+        );
+        await convexMutationTrusted(anyApi.backendTrusted.rejectBetaAccessBackendTrusted, {
+          secret: env.BACKEND_SHARED_SECRET,
+          userId,
+        });
+      }
       await logAudit({
         event_type: 'admin_action',
         actor: 'admin',

@@ -69,9 +69,7 @@ export function AdminBetaAccessTab({ adminKey }: AdminBetaAccessTabProps) {
   };
 
   const doReject = async (userId: string) => {
-    const ok = confirm(
-      "Reject this signup? They'll see that access was not approved until you change Convex data manually."
-    );
+    const ok = confirm("Reject this signup? They will not have access until you approve them later.");
     if (!ok) return;
     setBusyId(userId);
     try {
@@ -94,8 +92,7 @@ export function AdminBetaAccessTab({ adminKey }: AdminBetaAccessTabProps) {
             Beta access
           </h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-            Approve or reject <strong>self-serve signups</strong> who are waiting for closed-beta access (
-            <code className="text-xs rounded bg-muted px-1">beta_approved</code> not true).
+            Review new signups and approve or reject access to the app.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => void load()} disabled={loading}>

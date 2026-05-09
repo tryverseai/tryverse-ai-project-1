@@ -65,8 +65,8 @@ const ForgotPassword = () => {
         </Link>
         <h1 className="font-display text-2xl font-bold text-foreground mb-2">Reset your password</h1>
         <p className="text-muted-foreground mb-6 leading-relaxed text-sm">
-          Enter the email for your TryVerse account. We&apos;ll send a one-time verification code using the email
-          service configured on your Convex deployment (<code className="text-xs">AUTH_RESEND_KEY</code>).
+          Enter the email for your TryVerse account. We&apos;ll send a one-time verification code so you can choose a
+          new password.
         </p>
         <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
           <div className="space-y-2">
