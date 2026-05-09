@@ -20,6 +20,46 @@ import { businessInviteBodies, FIXED_FROM, personalInviteBodies } from '../email
 
 const router = Router();
 
+function convexFunctionMissing(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /Could not find public function/i.test(msg);
+}
+
+/** When `listPendingBetaAccessAdmin` is not deployed yet, derive pending beta users from `adminListProfiles`. */
+async function betaPendingFallbackFromProfiles(): Promise<{
+  profiles: Array<{
+    userId: string;
+    full_name?: string | null;
+    contact_email?: string | null;
+    brand_name?: string | null;
+    account_type: string;
+    created_at?: string | null;
+    beta_requested_at?: string | null;
+  }>;
+}> {
+  const out = await convexQueryTrusted<{
+    profiles: Array<Record<string, unknown>>;
+    total: number;
+  }>(anyApi.adminTrusted.adminListProfiles, {
+    secret: env.BACKEND_SHARED_SECRET,
+    limit: 8000,
+    offset: 0,
+  });
+  const pending = out.profiles
+    .filter((p) => p.beta_rejected !== true && p.beta_approved !== true)
+    .map((p) => ({
+      userId: String(p.id),
+      full_name: (p.full_name as string | undefined) ?? null,
+      contact_email: (p.contact_email as string | undefined) ?? null,
+      brand_name: (p.brand_name as string | undefined) ?? null,
+      account_type: String(p.account_type ?? 'business'),
+      created_at: (p.created_at as string | undefined) ?? null,
+      beta_requested_at: (p.beta_requested_at as string | undefined) ?? null,
+    }))
+    .sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
+  return { profiles: pending };
+}
+
 /**
  * Block/unblock: updates profiles.is_blocked (enforced in requireAuth).
  */
@@ -568,6 +608,36 @@ router.delete(
         req.query.unblock === 'true';
       await setUserBlockedState(userId, !unban, req);
       res.json({ success: true, userId, action: unban ? 'unbanned' : 'banned' });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * DELETE /api/admin/users/:userId/account — cascade delete user data (Convex trust mutation).
+ */
+router.delete(
+  '/users/:userId/account',
+  [param('userId').isString().trim().isLength({ min: 1, max: 512 })],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.params.userId as string;
+      await convexMutationTrusted(anyApi.adminTrusted.deleteUserAccountAdmin, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId,
+      });
+      await logAudit({
+        event_type: 'admin_action',
+        actor: 'admin',
+        action: 'user_account_deleted',
+        target_id: userId,
+        details: { summary: `Cascade-deleted account data for ${userId}` },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+      res.json({ ok: true });
     } catch (err) {
       next(err);
     }
@@ -1163,20 +1233,27 @@ router.post('/audit/clear', async (_req: Request, res: Response, next: NextFunct
 
 router.get('/beta-pending', async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const out = await convexQueryTrusted<{
-      profiles: Array<{
-        userId: string;
-        full_name?: string | null;
-        contact_email?: string | null;
-        brand_name?: string | null;
-        account_type: string;
-        created_at?: string | null;
-        beta_requested_at?: string | null;
-      }>;
-    }>(anyApi.adminTrusted.listPendingBetaAccessAdmin, {
-      secret: env.BACKEND_SHARED_SECRET,
-    });
-    res.json(out);
+    try {
+      const out = await convexQueryTrusted<{
+        profiles: Array<{
+          userId: string;
+          full_name?: string | null;
+          contact_email?: string | null;
+          brand_name?: string | null;
+          account_type: string;
+          created_at?: string | null;
+          beta_requested_at?: string | null;
+        }>;
+      }>(anyApi.adminTrusted.listPendingBetaAccessAdmin, {
+        secret: env.BACKEND_SHARED_SECRET,
+      });
+      res.json(out);
+    } catch (err) {
+      if (!convexFunctionMissing(err)) throw err;
+      logger.warn('admin beta-pending: falling back to adminListProfiles (deploy listPendingBetaAccessAdmin)');
+      const out = await betaPendingFallbackFromProfiles();
+      res.json(out);
+    }
   } catch (err) {
     next(err);
   }
@@ -1463,25 +1540,59 @@ router.get('/invites', async (req: Request, res: Response, next: NextFunction): 
     const statusFilter = typeof req.query.status === 'string' ? req.query.status : undefined;
     const accountTypeFilter =
       typeof req.query.accountType === 'string' ? req.query.accountType : undefined;
-    const rows = await convexQueryTrusted<
-      Array<{
-        token: string;
-        email: string;
-        name?: string;
-        accountType: string;
-        companyName?: string;
-        status: string;
-        createdAt: number;
-        sentAt?: number;
-        acceptedAt?: number;
-        createdBy?: string;
-        _creationTime?: number;
-      }>
-    >(anyApi.invites.listInvitesTrusted, {
+    const args = {
       secret: env.BACKEND_SHARED_SECRET,
       ...(statusFilter ? { statusFilter } : {}),
       ...(accountTypeFilter ? { accountTypeFilter } : {}),
-    });
+    };
+    let rows: Array<{
+      token: string;
+      email: string;
+      name?: string;
+      accountType: string;
+      companyName?: string;
+      status: string;
+      createdAt: number;
+      sentAt?: number;
+      acceptedAt?: number;
+      createdBy?: string;
+      _creationTime?: number;
+    }>;
+    try {
+      rows = await convexQueryTrusted<
+        Array<{
+          token: string;
+          email: string;
+          name?: string;
+          accountType: string;
+          companyName?: string;
+          status: string;
+          createdAt: number;
+          sentAt?: number;
+          acceptedAt?: number;
+          createdBy?: string;
+          _creationTime?: number;
+        }>
+      >(anyApi.backendTrusted.listInvitesForAdminTrusted, args);
+    } catch (e1) {
+      if (!convexFunctionMissing(e1)) throw e1;
+      logger.warn('admin invites: falling back to invites.listInvitesTrusted');
+      rows = await convexQueryTrusted<
+        Array<{
+          token: string;
+          email: string;
+          name?: string;
+          accountType: string;
+          companyName?: string;
+          status: string;
+          createdAt: number;
+          sentAt?: number;
+          acceptedAt?: number;
+          createdBy?: string;
+          _creationTime?: number;
+        }>
+      >(anyApi.invites.listInvitesTrusted, args);
+    }
     res.json({ invites: rows });
   } catch (err) {
     next(err);

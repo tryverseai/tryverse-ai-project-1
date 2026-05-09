@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { authSubjectSegments } from "./authSubjectKeys";
 
@@ -770,5 +770,22 @@ export const patchEarlyAccessReviewTrusted = mutation({
     requireBackendSecret(secret);
     await ctx.db.patch(docId, { waitlist_review_status });
     return { ok: true as const };
+  },
+});
+
+/** Same as `invites.listInvitesTrusted` — deployed with backend bridge so admin `/invites` works even if the `invites` module alias is missing on Convex. */
+export const listInvitesForAdminTrusted = query({
+  args: {
+    secret: v.string(),
+    statusFilter: v.optional(v.string()),
+    accountTypeFilter: v.optional(v.string()),
+  },
+  handler: async (ctx, { secret, statusFilter, accountTypeFilter }) => {
+    requireBackendSecret(secret);
+    let rows: Doc<"invites">[] = await ctx.db.query("invites").collect();
+    if (statusFilter) rows = rows.filter((r) => r.status === statusFilter);
+    if (accountTypeFilter) rows = rows.filter((r) => r.accountType === accountTypeFilter);
+    rows.sort((a, b) => b.createdAt - a.createdAt);
+    return rows;
   },
 });

@@ -94,11 +94,9 @@ export function AdminBetaAccessTab({ adminKey }: AdminBetaAccessTabProps) {
             Beta access
           </h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-            Everyone who is not{" "}
-            <Badge variant="outline" className="mx-1">
-              beta_approved
-            </Badge>{" "}
-            yet (including legacy rows with no flag) appears here until you approve or reject.
+            Approve or reject <strong>self-serve signups</strong> who are waiting for closed-beta access (
+            <code className="text-xs rounded bg-muted px-1">beta_approved</code> not true). This is separate from{" "}
+            <strong>Invites</strong>, which are pre-generated email links for known contacts.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => void load()} disabled={loading}>

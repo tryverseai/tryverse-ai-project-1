@@ -251,7 +251,8 @@ export function AdminInvitesTab({ adminKey }: AdminInvitesTabProps) {
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Invite Management</h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-            Review waitlist applications, create invites, then send email manually when ready. Links only work after send.
+            Manage <strong>lifecycle email invites</strong> (token links for specific people). General signups waiting for the app use{" "}
+            <strong>Beta Access</strong>. Review waitlist applications here, create invites, and send when ready.
           </p>
         </div>
       </div>

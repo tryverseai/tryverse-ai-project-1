@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, Ban, Unlock, Loader2, Plus } from "lucide-react";
+import { Search, Ban, Unlock, Loader2, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { getAdminUsers, banAdminUser, adjustUserCredits, patchAdminUserAccountType } from "@/lib/backendApi";
+import { getAdminUsers, banAdminUser, adjustUserCredits, patchAdminUserAccountType, deleteAdminUserAccount } from "@/lib/backendApi";
 import { toast } from "sonner";
 
 interface AdminUsersTabProps {
@@ -45,6 +45,23 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
   const [freeCredits, setFreeCredits] = useState(0);
   const [monthlyCredits, setMonthlyCredits] = useState(0);
   const [saving, setSaving] = useState(false);
+
+  const handleDeleteAccount = async (u: AdminUser) => {
+    const label = u.contact_email || u.brand_name || "this user";
+    if (
+      !confirm(
+        `Permanently delete ${label}? This removes their profile, API keys, try-ons, and related data. This cannot be undone.`
+      )
+    )
+      return;
+    try {
+      await deleteAdminUserAccount(adminKey, u.id);
+      toast.success("Account deleted");
+      await fetchUsers();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Delete failed");
+    }
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -273,6 +290,16 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
                             <span className="hidden sm:inline">Block</span>
                           </Button>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void handleDeleteAccount(u)}
+                          className="h-8 gap-1 text-muted-foreground hover:text-destructive"
+                          title="Permanently delete account"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Delete</span>
+                        </Button>
                       </div>
                     </td>
                   </tr>

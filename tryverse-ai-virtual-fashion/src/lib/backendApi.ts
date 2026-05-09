@@ -1263,6 +1263,15 @@ export async function banAdminUser(adminKey: string, userId: string, unban = fal
   });
 }
 
+/** Cascade-delete profile, keys, try-ons, etc. (Convex trust mutation). */
+export async function deleteAdminUserAccount(adminKey: string, userId: string): Promise<{ ok: boolean }> {
+  return adminFetch<{ ok: boolean }>(
+    `/api/admin/users/${encodeURIComponent(userId)}/account`,
+    adminKey,
+    { method: 'DELETE' }
+  );
+}
+
 export async function adjustUserCredits(
   adminKey: string,
   userId: string,
