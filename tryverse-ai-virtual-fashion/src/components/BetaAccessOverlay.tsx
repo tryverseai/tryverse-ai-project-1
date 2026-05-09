@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api } from "../../convex/_generated/api";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { Button } from "@/components/ui/button";
+import { useAdminOperatorBypass } from "@/hooks/useAdminOperatorBypass";
 
 const INSTAGRAM_URL = "https://instagram.com/tryverseai";
 const X_URL = "https://x.com/tryverseai";
@@ -19,14 +20,15 @@ export function BetaAccessOverlay() {
   const location = useLocation();
   const { signOut, user } = useAuth();
   const profile = useQuery(api.profiles.getMyProfile, user ? {} : "skip");
+  const { bypass: adminPortalBypass, checking: adminPortalChecking } = useAdminOperatorBypass();
 
   if (!user) return null;
 
   /** Admin portal shares Convex session but gates with its own secret — allow without beta approval. */
   if (location.pathname === "/admin") return null;
 
-  /** Query still loading */
-  if (profile === undefined) {
+  const accessStillLoading = profile === undefined || adminPortalChecking;
+  if (accessStillLoading) {
     return (
       <div
         className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/85 backdrop-blur-md"
@@ -39,6 +41,7 @@ export function BetaAccessOverlay() {
       </div>
     );
   }
+  if (adminPortalBypass) return null;
 
   /** Bootstrap not finished yet — block dashboard until profile row exists */
   if (profile === null) {

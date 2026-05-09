@@ -156,6 +156,86 @@ export const rejectBetaAccessBackendTrusted = mutation({
   },
 });
 
+/**
+ * Same cascade as adminTrusted.deleteUserAccountAdmin — kept here so deploys that only ship
+ * backendTrusted still support admin account deletion from the API.
+ */
+export const deleteUserAccountBackendTrusted = mutation({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const keys = authSubjectSegments(userId);
+    if (keys.length === 0) throw new Error("Invalid userId");
+
+    const deletedTryonIds = new Set<string>();
+
+    for (const uid of keys) {
+      const apiRows = await ctx.db
+        .query("api_keys")
+        .withIndex("by_userId", (q) => q.eq("user_id", uid))
+        .collect();
+      for (const k of apiRows) {
+        const kid = String(k.legacy_id ?? k._id);
+        const domains = await ctx.db
+          .query("allowed_domains")
+          .withIndex("by_apiKeyId", (q) => q.eq("api_key_id", kid))
+          .collect();
+        for (const d of domains) await ctx.db.delete(d._id);
+        await ctx.db.delete(k._id);
+      }
+
+      const subs = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_userId", (q) => q.eq("user_id", uid))
+        .collect();
+      for (const s of subs) await ctx.db.delete(s._id);
+
+      const pays = await ctx.db
+        .query("payments")
+        .withIndex("by_userId", (q) => q.eq("user_id", uid))
+        .collect();
+      for (const p of pays) await ctx.db.delete(p._id);
+
+      const prods = await ctx.db
+        .query("products")
+        .withIndex("by_userId", (q) => q.eq("user_id", uid))
+        .collect();
+      for (const p of prods) await ctx.db.delete(p._id);
+
+      const usages = await ctx.db
+        .query("usage_events")
+        .withIndex("by_userId_time", (q) => q.eq("user_id", uid))
+        .collect();
+      for (const e of usages) await ctx.db.delete(e._id);
+
+      const tryonRows = await ctx.db
+        .query("tryons")
+        .withIndex("by_userId", (q) => q.eq("user_id", uid))
+        .collect();
+      for (const t of tryonRows) {
+        const tid = String(t._id);
+        if (deletedTryonIds.has(tid)) continue;
+        deletedTryonIds.add(tid);
+        await ctx.db.delete(t._id);
+      }
+    }
+
+    const prof = await profileRowForBackend(ctx, userId);
+    if (prof) await ctx.db.delete(prof._id);
+
+    for (const seg of keys) {
+      try {
+        const doc = await ctx.db.get(seg as Id<"users">);
+        if (doc) await ctx.db.delete(doc._id);
+      } catch {
+        /* invalid id */
+      }
+    }
+
+    return { ok: true as const };
+  },
+});
+
 export const lookupActiveApiKey = query({
   args: { secret: v.string(), keyValue: v.string() },
   handler: async (ctx, { secret, keyValue }) => {

@@ -1013,6 +1013,11 @@ export async function getSupportedCategories() {
 // session" for UI state restoration. NOT the admin key.
 const ADMIN_SESSION_FLAG = 'tryverse_admin_session_active';
 
+/** Set when checkAdminSession succeeded — skip beta + account-type gates. */
+export const ADMIN_OPERATOR_BYPASS_CACHE_KEY = 'tryverse_admin_operator_bypass';
+/** "bypass" | "no" — result of one admin cookie probe per tab (avoids repeated requests). */
+export const ADMIN_SESSION_PROBE_KEY = 'tryverse_admin_session_probe';
+
 export function getStoredAdminKey(): string | null {
   try {
     return sessionStorage.getItem(ADMIN_SESSION_FLAG) === '1' ? 'session' : null;
@@ -1032,6 +1037,8 @@ export function setStoredAdminKey(_key: string): void {
 export function clearStoredAdminKey(): void {
   try {
     sessionStorage.removeItem(ADMIN_SESSION_FLAG);
+    sessionStorage.removeItem(ADMIN_OPERATOR_BYPASS_CACHE_KEY);
+    sessionStorage.removeItem(ADMIN_SESSION_PROBE_KEY);
   } catch {
     /* ignore */
   }

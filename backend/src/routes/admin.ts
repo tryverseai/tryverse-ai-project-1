@@ -86,6 +86,26 @@ async function betaPendingFallbackFromProfiles(): Promise<{
   return { profiles: merged };
 }
 
+/** When dedicated beta mutations are absent on the Convex deployment, patch via backendTrusted.patchProfileRow (stable). */
+async function betaApproveViaPatchProfile(userId: string): Promise<void> {
+  const now = new Date().toISOString();
+  await cxPatchProfile(userId, {
+    beta_approved: true,
+    beta_approved_at: now,
+    beta_rejected: false,
+    updated_at: now,
+  });
+}
+
+async function betaRejectViaPatchProfile(userId: string): Promise<void> {
+  const now = new Date().toISOString();
+  await cxPatchProfile(userId, {
+    beta_rejected: true,
+    beta_rejected_at: now,
+    updated_at: now,
+  });
+}
+
 /**
  * Block/unblock: updates profiles.is_blocked (enforced in requireAuth).
  */
@@ -650,10 +670,24 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.params.userId as string;
-      await convexMutationTrusted(anyApi.adminTrusted.deleteUserAccountAdmin, {
-        secret: env.BACKEND_SHARED_SECRET,
-        userId,
-      });
+      const runDelete = async () => {
+        await convexMutationTrusted(anyApi.adminTrusted.deleteUserAccountAdmin, {
+          secret: env.BACKEND_SHARED_SECRET,
+          userId,
+        });
+      };
+      try {
+        await runDelete();
+      } catch (err) {
+        if (!convexFunctionMissing(err)) throw err;
+        logger.warn(
+          'admin delete account: falling back to backendTrusted.deleteUserAccountBackendTrusted (missing deleteUserAccountAdmin)'
+        );
+        await convexMutationTrusted(anyApi.backendTrusted.deleteUserAccountBackendTrusted, {
+          secret: env.BACKEND_SHARED_SECRET,
+          userId,
+        });
+      }
       await logAudit({
         event_type: 'admin_action',
         actor: 'admin',
@@ -1309,12 +1343,18 @@ router.post(
       } catch (err) {
         if (!convexFunctionMissing(err)) throw err;
         logger.warn(
-          'admin beta approve: falling back to backendTrusted.approveBetaAccessBackendTrusted (deploy approveBetaAccessAdmin)'
+          'admin beta approve: falling back to backendTrusted.approveBetaAccessBackendTrusted (missing approveBetaAccessAdmin)'
         );
-        await convexMutationTrusted(anyApi.backendTrusted.approveBetaAccessBackendTrusted, {
-          secret: env.BACKEND_SHARED_SECRET,
-          userId,
-        });
+        try {
+          await convexMutationTrusted(anyApi.backendTrusted.approveBetaAccessBackendTrusted, {
+            secret: env.BACKEND_SHARED_SECRET,
+            userId,
+          });
+        } catch (err2) {
+          if (!convexFunctionMissing(err2)) throw err2;
+          logger.warn('admin beta approve: falling back to cxPatchProfile (missing backend beta mutations)');
+          await betaApproveViaPatchProfile(userId);
+        }
       }
       await logAudit({
         event_type: 'admin_action',
@@ -1356,12 +1396,18 @@ router.post(
       } catch (err) {
         if (!convexFunctionMissing(err)) throw err;
         logger.warn(
-          'admin beta reject: falling back to backendTrusted.rejectBetaAccessBackendTrusted (deploy rejectBetaAccessAdmin)'
+          'admin beta reject: falling back to backendTrusted.rejectBetaAccessBackendTrusted (missing rejectBetaAccessAdmin)'
         );
-        await convexMutationTrusted(anyApi.backendTrusted.rejectBetaAccessBackendTrusted, {
-          secret: env.BACKEND_SHARED_SECRET,
-          userId,
-        });
+        try {
+          await convexMutationTrusted(anyApi.backendTrusted.rejectBetaAccessBackendTrusted, {
+            secret: env.BACKEND_SHARED_SECRET,
+            userId,
+          });
+        } catch (err2) {
+          if (!convexFunctionMissing(err2)) throw err2;
+          logger.warn('admin beta reject: falling back to cxPatchProfile (missing backend beta mutations)');
+          await betaRejectViaPatchProfile(userId);
+        }
       }
       await logAudit({
         event_type: 'admin_action',
