@@ -7,9 +7,10 @@ const INSTAGRAM_URL = "https://instagram.com/tryverseai";
 const X_URL = "https://x.com/tryverseai";
 
 /**
- * Closed-beta gate: show until `profiles.beta_approved === true` or legacy rows (undefined) allow access.
- * Uses Convex `getMyProfile` so this matches the DB immediately after signup — the REST `/account/me`
- * hook could lag or return null and accidentally hid this overlay.
+ * Closed-beta gate: block until admin approves (`beta_approved === true`).
+ * Pending: explicit `beta_approved === false`, or signup wrote `beta_requested_at` without approval
+ * — some Convex reads omit explicit `false` on optional booleans, so rely on timestamps too.
+ * Grandfathered: neither flag set meaningfully (`beta_requested_at` absent, `beta_approved` not `false`).
  */
 export function BetaAccessOverlay() {
   const { signOut, user } = useAuth();
@@ -47,11 +48,22 @@ export function BetaAccessOverlay() {
     );
   }
 
-  const betaApproved = profile.beta_approved;
-  /** Legacy profiles: undefined / null treated as grandfathered (see schema comment). */
-  if (betaApproved !== false) return null;
+  /** Fully approved users see the dashboard. */
+  if (profile.beta_approved === true) return null;
 
   const rejected = profile.beta_rejected === true;
+
+  /** Legacy grandfathered rows: no beta request tracked and not explicitly denied. */
+  const requestedAt = profile.beta_requested_at;
+  const isExplicitPending = profile.beta_approved === false;
+  const isImplicitPending =
+    !rejected &&
+    requestedAt != null &&
+    typeof requestedAt === "string" &&
+    requestedAt.length > 0 &&
+    profile.beta_approved !== true;
+
+  if (!rejected && !isExplicitPending && !isImplicitPending) return null;
 
   return (
     <div
