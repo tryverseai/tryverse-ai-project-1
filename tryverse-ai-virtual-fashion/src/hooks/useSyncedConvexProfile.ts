@@ -49,10 +49,10 @@ export function useSyncedConvexProfile() {
     };
   }, [user?.id]);
 
-  /** Poll while waiting for beta approval so the overlay can dismiss without refresh. */
+  /** Poll while beta access is pending so the overlay can dismiss after approval. */
   useEffect(() => {
     const p = profile as Record<string, unknown> | null;
-    if (!user || !p || p.beta_approved !== false) return undefined;
+    if (!user || !p || p.beta_approved === true || p.beta_rejected === true) return undefined;
     const id = window.setInterval(() => {
       void reload();
     }, 12_000);

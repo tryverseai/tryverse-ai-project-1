@@ -47,7 +47,7 @@ export default defineSchema({
     widget_collect_analytics: v.optional(v.boolean()),
     widget_fit_recommendations: v.optional(v.boolean()),
     widget_show_models: v.optional(v.boolean()),
-    /** Closed beta: new signups pending admin approval — undefined/true = grandfathered full access */
+    /** Closed beta: dashboard only when true; false/undefined = pending until admin approves */
     beta_approved: v.optional(v.boolean()),
     beta_requested_at: v.optional(v.string()),
     beta_approved_at: v.optional(v.string()),

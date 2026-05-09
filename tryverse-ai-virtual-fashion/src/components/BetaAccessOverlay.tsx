@@ -1,4 +1,5 @@
 import { Lock, MessageSquareText } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "../../convex/_generated/api";
@@ -7,16 +8,18 @@ const INSTAGRAM_URL = "https://instagram.com/tryverseai";
 const X_URL = "https://x.com/tryverseai";
 
 /**
- * Closed-beta gate: block until admin approves (`beta_approved === true`).
- * Pending: explicit `beta_approved === false`, or signup wrote `beta_requested_at` without approval
- * — some Convex reads omit explicit `false` on optional booleans, so rely on timestamps too.
- * Grandfathered: neither flag set meaningfully (`beta_requested_at` absent, `beta_approved` not `false`).
+ * Closed-beta gate: only `profiles.beta_approved === true` may use authenticated app routes.
+ * Operators reach `/admin` without this overlay so they can approve signups (separate admin key UI).
  */
 export function BetaAccessOverlay() {
+  const location = useLocation();
   const { signOut, user } = useAuth();
   const profile = useQuery(api.profiles.getMyProfile, user ? {} : "skip");
 
   if (!user) return null;
+
+  /** Admin portal shares Convex session but gates with its own secret — allow without beta approval. */
+  if (location.pathname === "/admin") return null;
 
   /** Query still loading */
   if (profile === undefined) {
@@ -48,22 +51,9 @@ export function BetaAccessOverlay() {
     );
   }
 
-  /** Fully approved users see the dashboard. */
   if (profile.beta_approved === true) return null;
 
   const rejected = profile.beta_rejected === true;
-
-  /** Legacy grandfathered rows: no beta request tracked and not explicitly denied. */
-  const requestedAt = profile.beta_requested_at;
-  const isExplicitPending = profile.beta_approved === false;
-  const isImplicitPending =
-    !rejected &&
-    requestedAt != null &&
-    typeof requestedAt === "string" &&
-    requestedAt.length > 0 &&
-    profile.beta_approved !== true;
-
-  if (!rejected && !isExplicitPending && !isImplicitPending) return null;
 
   return (
     <div

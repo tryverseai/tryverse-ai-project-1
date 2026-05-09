@@ -425,14 +425,14 @@ export const clearAuditLogAdmin = mutation({
   },
 });
 
-/** Profiles waiting for beta access (explicit beta_approved === false, not rejected). */
+/** Profiles waiting for beta access (not approved yet: false or missing flag, not rejected). */
 export const listPendingBetaAccessAdmin = query({
   args: { secret: v.string() },
   handler: async (ctx, { secret }) => {
     requireBackendSecret(secret);
     const rows = await ctx.db.query("profiles").collect();
     const pending = rows
-      .filter((r) => r.beta_approved === false && r.beta_rejected !== true)
+      .filter((r) => r.beta_rejected !== true && r.beta_approved !== true)
       .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
     return {
       profiles: pending.map((p) => ({

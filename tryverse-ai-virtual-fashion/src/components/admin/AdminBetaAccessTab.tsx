@@ -94,11 +94,11 @@ export function AdminBetaAccessTab({ adminKey }: AdminBetaAccessTabProps) {
             Beta access
           </h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-            Users with{" "}
+            Everyone who is not{" "}
             <Badge variant="outline" className="mx-1">
-              beta_approved = false
+              beta_approved
             </Badge>{" "}
-            appear here until approved. Legacy profiles without the flag are not listed.
+            yet (including legacy rows with no flag) appears here until you approve or reject.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => void load()} disabled={loading}>
