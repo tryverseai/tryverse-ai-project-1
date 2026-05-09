@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 
 const INSTAGRAM_URL = "https://instagram.com/tryverseai";
 const X_URL = "https://x.com/tryverseai";
+const LINKEDIN_URL = "https://www.linkedin.com/company/tryverse-ai";
 
 /**
  * Closed-beta gate: only `profiles.beta_approved === true` may use authenticated app routes.
@@ -87,7 +88,7 @@ export function BetaAccessOverlay() {
             <p className="mt-3 text-sm sm:text-base leading-relaxed text-muted-foreground">
               {rejected
                 ? "We weren't able to approve access for this account. If you think this is a mistake, contact support."
-                : "We're currently rolling out TryVerse to a select group of teams. We'll be opening access soon!"}
+                : "We're currently rolling out TryVerse to a select group of users. We'll be opening access soon!"}
             </p>
           </div>
 
@@ -99,7 +100,7 @@ export function BetaAccessOverlay() {
                 <p className="mt-1 text-sm text-muted-foreground">
                   {rejected
                     ? "You can sign out and try again later if your situation changes."
-                    : "We'll notify you when we're ready to onboard your team."}
+                    : "We'll notify you when we're ready to onboard you."}
                 </p>
               </div>
             </div>
@@ -118,6 +119,11 @@ export function BetaAccessOverlay() {
               <Button variant="outline" size="sm" className="rounded-full bg-background shadow-none" asChild>
                 <a href={X_URL} target="_blank" rel="noopener noreferrer">
                   X (Twitter)
+                </a>
+              </Button>
+              <Button variant="outline" size="sm" className="rounded-full bg-background shadow-none" asChild>
+                <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer">
+                  LinkedIn
                 </a>
               </Button>
             </div>
