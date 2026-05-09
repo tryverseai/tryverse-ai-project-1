@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { useSignupChooser } from "@/components/signup/SignupChooserContext";
 import { turnstileSiteKey } from "@/lib/turnstileEnv";
+import { saveEmailVerifyPending } from "@/lib/emailVerifyPendingStorage";
 
 const TURNSTILE_SITE_KEY = turnstileSiteKey();
 
@@ -161,7 +162,7 @@ const Auth = () => {
     setLoading(true);
 
     if (showIndividualSignupForm) {
-      const { error } = await signUp(
+      const result = await signUp(
         email,
         password,
         fullName.trim() || "My Try-Ons",
@@ -170,10 +171,22 @@ const Auth = () => {
         "individual",
         turnstilePass
       );
-      if (error) {
-        console.error("Signup error:", error);
-        const t = signUpErrorToast(error);
+      if (result.error) {
+        console.error("Signup error:", result.error);
+        const t = signUpErrorToast(result.error);
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
+      } else if ("needsEmailVerification" in result && result.needsEmailVerification) {
+        saveEmailVerifyPending({
+          email: result.pendingEmail,
+          pendingBootstrap: result.pendingBootstrap,
+        });
+        toast({
+          title: "Check your email",
+          description: "We sent an 8-digit code. Continue on the verification page to activate your account.",
+          duration: 9000,
+        });
+        setPassword("");
+        navigate("/auth/verify-email");
       } else {
         posthogCapture("user_signed_up", { email, account_type: "individual" });
         toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
@@ -182,11 +195,23 @@ const Auth = () => {
       }
     } else if (showBusinessSignupForm) {
       const finalRole = role === "Other" ? customRole : role;
-      const { error } = await signUp(email, password, brandName, fullName, finalRole, "business", turnstilePass);
-      if (error) {
-        console.error("Signup error:", error);
-        const t = signUpErrorToast(error);
+      const result = await signUp(email, password, brandName, fullName, finalRole, "business", turnstilePass);
+      if (result.error) {
+        console.error("Signup error:", result.error);
+        const t = signUpErrorToast(result.error);
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
+      } else if ("needsEmailVerification" in result && result.needsEmailVerification) {
+        saveEmailVerifyPending({
+          email: result.pendingEmail,
+          pendingBootstrap: result.pendingBootstrap,
+        });
+        toast({
+          title: "Check your email",
+          description: "We sent an 8-digit code. Continue on the verification page to activate your account.",
+          duration: 9000,
+        });
+        setPassword("");
+        navigate("/auth/verify-email");
       } else {
         posthogCapture("user_signed_up", { email, account_type: "business" });
         toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
@@ -194,10 +219,19 @@ const Auth = () => {
         goToDashboardAfterAuth();
       }
     } else {
-      const { error } = await signIn(email, password, turnstilePass);
-      if (error) {
-        console.error("Sign in error:", error);
-        toast({ title: "Sign in failed", description: error.message, variant: "destructive", duration: 6000 });
+      const result = await signIn(email, password, turnstilePass);
+      if (result.error) {
+        console.error("Sign in error:", result.error);
+        toast({ title: "Sign in failed", description: result.error.message, variant: "destructive", duration: 6000 });
+      } else if ("needsEmailVerification" in result && result.needsEmailVerification) {
+        saveEmailVerifyPending({ email: result.pendingEmail });
+        toast({
+          title: "Verify your email",
+          description: "We sent an 8-digit code. Enter it on the next step to sign in.",
+          duration: 9000,
+        });
+        setPassword("");
+        navigate("/auth/verify-email");
       } else {
         posthogCapture("user_logged_in", { email });
         goToDashboardAfterAuth();
@@ -307,38 +341,18 @@ const Auth = () => {
                 ? "Create your TryVerse account"
                 : "Sign in or create an account"}
           </h1>
-          {showBusinessSignupForm ? (
-            <p className="text-muted-foreground mb-6">
-              For invited brands only — use the email we approved for your workspace.
-            </p>
-          ) : null}
 
           {showBusinessSignupForm && (
-            <>
-              <p className="text-sm mb-4">
-                <Link
-                  to="/auth"
-                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium"
-                >
-                  <ChevronLeft className="h-4 w-4 shrink-0" />
-                  Choose individual or business instead
-                </Link>
-              </p>
-              <p className="text-sm text-muted-foreground mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 leading-relaxed">
-                <span className="font-medium text-foreground">Not invited yet?</span>{" "}
-                <button
-                  type="button"
-                  className="text-foreground font-medium underline underline-offset-2 hover:no-underline"
-                  onClick={() => openSignupChooser()}
-                >
-                  Sign Up
-                </button>
-                {" "}
-                to choose Business — we enable accounts for invited brands first.
-              </p>
-            </>
+            <p className="text-sm mb-4">
+              <Link
+                to="/auth"
+                className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium"
+              >
+                <ChevronLeft className="h-4 w-4 shrink-0" />
+                Choose individual or business instead
+              </Link>
+            </p>
           )}
-
           {showIndividualSignupForm && (
             <>
               <p className="text-sm mb-4">
@@ -396,7 +410,7 @@ const Auth = () => {
                 <div className="relative">
                   <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Company name"
+                    placeholder="Brand name"
                     value={brandName}
                     onChange={(e) => setBrandName(e.target.value)}
                     className="pl-10 h-12"

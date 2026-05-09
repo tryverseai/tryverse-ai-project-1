@@ -1,7 +1,6 @@
 /**
- * Sign-up / sign-in email OTP (disabled in auth.ts until domain + Resend are ready).
- * To re-enable: `Password({ verify: ResendEmailSignupVerification, ... })` and optional
- * top-level provider entries if client OTP-only verification is used again.
+ * Sign-up / sign-in email OTP — used by `Password({ verify: ... })` so new accounts must
+ * verify before receiving a session. Configure `AUTH_RESEND_KEY` (+ optional `AUTH_EMAIL_FROM`) on Convex.
  */
 import Resend from "@auth/core/providers/resend";
 import { RandomReader, generateRandomString } from "@oslojs/crypto/random";
@@ -70,7 +69,7 @@ export const ResendEmailSignupVerification = {
         to: [email],
         subject: "Verify your TryVerse email",
         text:
-          `Your TryVerse verification code is ${token}. Enter it on the sign-in page to finish creating your account or signing in.\n\n` +
+          `Your TryVerse verification code is ${token}. Open the app’s “Verify email” page (shown after sign-up) and enter this code to finish.\n\n` +
           `This code expires in 24 hours. If you did not request this, ignore this email.`,
       }),
     });

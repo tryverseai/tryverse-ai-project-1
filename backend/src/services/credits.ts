@@ -194,6 +194,16 @@ async function ensureMonthlyCreditReset(
     monthly_credits_total: number;
   }
 ): Promise<void> {
+  const planId = profile.plan_id || 'free';
+
+  // Free tier uses a persistent try-on pool (depleted by usage until upgrade/top-up).
+  // Never refill it here — previous logic treated `plan===free` like a monthly reset and
+  // restored remaining credits to the cap on every Redis miss (e.g. new month key),
+  // wiping real consumption after logout/login or the next try-on.
+  if (planId === 'free') {
+    return;
+  }
+
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const redisKey = `credits:reset:${userId}`;
@@ -209,16 +219,11 @@ async function ensureMonthlyCreditReset(
     return;
   }
 
-  const planId = profile.plan_id || 'free';
   const limit = PLAN_LIMITS[planId] ?? 0;
   const isUnlimited = limit === -1;
-  const freeCap = freePoolCapForAccountType(profile.account_type);
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (planId === 'free') {
-    updates.free_credits_remaining = freeCap;
-    updates.free_credits_total = freeCap;
-  } else if (!isUnlimited) {
+  if (!isUnlimited) {
     updates.monthly_credits_remaining = limit;
     updates.monthly_credits_total = limit;
   }
@@ -231,7 +236,7 @@ async function ensureMonthlyCreditReset(
         await redis.setex(redisKey, 60 * 60 * 24 * 35, currentMonth);
       }
     } catch { /* ignore */ }
-    logger.info('Monthly credit reset', { userId, planId, limit: planId === 'free' ? freeCap : limit });
+    logger.info('Monthly credit reset', { userId, planId, limit });
   }
 }
 

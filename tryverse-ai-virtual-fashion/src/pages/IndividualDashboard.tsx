@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
-import { BetaAccessOverlay } from "@/components/BetaAccessOverlay";
 import TryOnStudio from "@/pages/TryOnStudio";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Images, Compass, UserRound, Trash2, Download, Loader2, Users, BookOpen } from "lucide-react";
@@ -118,17 +117,44 @@ const IndividualDashboard = () => {
   const loadCreations = useCallback(async () => {
     setCreationsLoading(true);
     try {
-      const res = await getTryOnHistory(1);
-      // getTryOnHistory returns TryOnResponse & { id?; tryonId?; createdAt? }
-      // We normalise to HistoryItem without an unsafe cast.
-      const rows: HistoryItem[] = (res.tryons || []).map((raw) => ({
-        id: raw.id ?? raw.tryonId ?? "",
-        status: raw.status,
-        category: raw.category,
-        resultUrl: raw.resultUrl ?? null,
-        createdAt: raw.createdAt,
-      }));
-      setCreations(rows.filter((r) => r.id && r.status === "completed" && r.resultUrl));
+      const aggregated: HistoryItem[] = [];
+      let cursor: string | null = null;
+      let guard = 0;
+      const MAX_PAGES = 40;
+      while (guard < MAX_PAGES) {
+        guard += 1;
+        const res = await getTryOnHistory(1, undefined, cursor);
+        const rows: HistoryItem[] = (res.tryons || []).map((raw) => {
+          const r = raw as typeof raw & {
+            id?: string;
+            tryonId?: string;
+            createdAt?: string;
+            created_at?: string | null;
+          };
+          const created =
+            typeof r.created_at === "string" && r.created_at
+              ? r.created_at
+              : typeof r.createdAt === "string"
+                ? r.createdAt
+                : undefined;
+          return {
+            id: r.id ?? r.tryonId ?? "",
+            status: r.status,
+            category: r.category,
+            resultUrl: r.resultUrl ?? null,
+            createdAt: created,
+          };
+        });
+        aggregated.push(...rows.filter((r) => r.id && r.status === "completed" && r.resultUrl));
+        if (res.isDone || res.nextCursor == null) break;
+        cursor = res.nextCursor;
+      }
+      aggregated.sort((a, b) => {
+        const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
+        const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
+        return tb - ta;
+      });
+      setCreations(aggregated);
     } catch {
       toast.error("Could not load your creations.");
       setCreations([]);
@@ -142,6 +168,15 @@ const IndividualDashboard = () => {
     if (convexOn && cxProfileLoading) return;
     void loadCredits();
   }, [convexOn, cxProfileLoading, loadCredits]);
+
+  /** Reload gallery when the signed-in user changes (login / logout / password reset). */
+  useEffect(() => {
+    if (!user?.id) {
+      setCreations([]);
+      return;
+    }
+    void loadCreations();
+  }, [user?.id, loadCreations]);
 
   useEffect(() => {
     if (activeTab === "creations") void loadCreations();
@@ -164,7 +199,6 @@ const IndividualDashboard = () => {
 
   return (
     <>
-      <BetaAccessOverlay />
       <div className="min-h-screen bg-background pb-24 md:pb-8">
         <Navbar />
         <main className="pt-[var(--navbar-height)]">

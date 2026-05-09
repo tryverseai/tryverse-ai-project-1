@@ -1,7 +1,6 @@
 import { lazy, Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
-import { BetaAccessOverlay } from "@/components/BetaAccessOverlay";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, BarChart3, Settings, Key, Code, LayoutDashboard, CreditCard, BookOpen,
@@ -87,7 +86,6 @@ const Dashboard = () => {
 
   return (
     <>
-      <BetaAccessOverlay />
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="pt-[var(--navbar-height)]">

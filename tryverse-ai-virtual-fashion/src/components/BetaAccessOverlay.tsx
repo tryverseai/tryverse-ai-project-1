@@ -1,69 +1,106 @@
 import { Lock, MessageSquareText } from "lucide-react";
+import { useQuery } from "convex/react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useSyncedConvexProfile } from "@/hooks/useSyncedConvexProfile";
+import { api } from "../../convex/_generated/api";
 
 const INSTAGRAM_URL = "https://instagram.com/tryverseai";
 const X_URL = "https://x.com/tryverseai";
 
-/** Full-screen gated beta UX when Convex profile has beta_approved === false. Legacy rows (undefined) pass through. */
+/**
+ * Closed-beta gate: show until `profiles.beta_approved === true` or legacy rows (undefined) allow access.
+ * Uses Convex `getMyProfile` so this matches the DB immediately after signup — the REST `/account/me`
+ * hook could lag or return null and accidentally hid this overlay.
+ */
 export function BetaAccessOverlay() {
-  const { signOut } = useAuth();
-  const { profile, loading } = useSyncedConvexProfile();
+  const { signOut, user } = useAuth();
+  const profile = useQuery(api.profiles.getMyProfile, user ? {} : "skip");
 
-  if (loading || !profile) return null;
+  if (!user) return null;
+
+  /** Query still loading */
+  if (profile === undefined) {
+    return (
+      <div
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/85 backdrop-blur-md"
+        role="status"
+        aria-live="polite"
+        aria-label="Loading account"
+      >
+        <div className="h-9 w-9 rounded-full border-2 border-muted border-t-foreground animate-spin" />
+        <p className="mt-4 text-sm text-muted-foreground">Checking your access…</p>
+      </div>
+    );
+  }
+
+  /** Bootstrap not finished yet — block dashboard until profile row exists */
+  if (profile === null) {
+    return (
+      <div
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-4 text-center bg-background/90 backdrop-blur-md"
+        role="alert"
+      >
+        <p className="text-sm font-medium text-foreground">Finishing setup…</p>
+        <p className="mt-2 text-sm text-muted-foreground max-w-sm">
+          Creating your workspace. This usually takes a few seconds.
+        </p>
+      </div>
+    );
+  }
 
   const betaApproved = profile.beta_approved;
+  /** Legacy profiles: undefined / null treated as grandfathered (see schema comment). */
   if (betaApproved !== false) return null;
 
   const rejected = profile.beta_rejected === true;
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-4 text-center"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-4 text-center overflow-y-auto"
       style={{
         background:
-          "radial-gradient(ellipse 120% 80% at 50% -20%, rgba(139, 92, 246, 0.15), transparent 55%), #0a1628",
+          "linear-gradient(165deg, #faf5f0 0%, #f4e8e0 45%, #efe2d8 100%)",
       }}
     >
-      <div className="max-w-lg w-full space-y-8">
+      <div className="max-w-lg w-full space-y-8 py-10">
         <div className="flex justify-center">
-          <div className="rounded-full bg-violet-500/15 p-4 ring-1 ring-violet-400/40">
-            <Lock className="h-10 w-10 text-violet-400" aria-hidden />
+          <div className="rounded-full bg-white/90 p-4 shadow-sm ring-1 ring-stone-200/80">
+            <Lock className="h-10 w-10 text-amber-800/90" aria-hidden />
           </div>
         </div>
         <div>
-          <h1 className="font-display text-3xl sm:text-4xl font-bold text-white tracking-tight">
-            {rejected ? "Access not approved" : "You're In."}
+          <p className="text-xs uppercase tracking-wider text-stone-500 mb-2">TryVerse</p>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold text-stone-900 tracking-tight">
+            {rejected ? "Access not approved" : "We're in Closed Beta"}
           </h1>
-          <p className="mt-3 text-slate-300 text-sm sm:text-base leading-relaxed">
+          <p className="mt-3 text-stone-600 text-sm sm:text-base leading-relaxed">
             {rejected
-              ? "We weren't able to approve access for this account. If you think this is a mistake, reply to any TryVerse email or contact support."
-              : "We're currently in closed beta and rolling out access to a select group of users. We'll reach out soon."}
+              ? "We weren't able to approve access for this account. If you think this is a mistake, contact support."
+              : "We're currently rolling out TryVerse to a select group of teams. We'll be opening access soon!"}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-violet-500/30 bg-slate-900/60 backdrop-blur-sm px-5 py-5 text-left shadow-lg shadow-violet-950/40">
+        <div className="rounded-2xl border border-stone-200/80 bg-white/95 backdrop-blur-sm px-5 py-5 text-left shadow-md shadow-stone-300/40">
           <div className="flex gap-3">
-            <MessageSquareText className="h-9 w-9 shrink-0 text-violet-400" aria-hidden />
+            <MessageSquareText className="h-9 w-9 shrink-0 text-amber-700" aria-hidden />
             <div>
-              <p className="font-semibold text-white">Check your email for updates</p>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="font-semibold text-stone-900">Check your email for updates</p>
+              <p className="text-sm text-stone-600 mt-1">
                 {rejected
                   ? "You can sign out and try again later if your situation changes."
-                  : "We'll notify you when your access is approved"}
+                  : "We'll notify you when we're ready to onboard your team."}
               </p>
             </div>
           </div>
         </div>
 
         <div className="space-y-3">
-          <p className="text-xs uppercase tracking-wider text-slate-500">Follow us for updates</p>
+          <p className="text-xs uppercase tracking-wider text-stone-500">Follow us for updates</p>
           <div className="flex flex-wrap justify-center gap-2">
             <a
               href={INSTAGRAM_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white hover:bg-white/10 hover:border-violet-500/40 transition-colors"
+              className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm text-stone-800 hover:bg-stone-50 transition-colors"
             >
               Instagram
             </a>
@@ -71,7 +108,7 @@ export function BetaAccessOverlay() {
               href={X_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white hover:bg-white/10 hover:border-violet-500/40 transition-colors"
+              className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm text-stone-800 hover:bg-stone-50 transition-colors"
             >
               X (Twitter)
             </a>
@@ -82,7 +119,7 @@ export function BetaAccessOverlay() {
           href="https://tryverseai.com"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex rounded-full border border-white/10 bg-white/5 px-5 py-2 text-xs text-slate-300 hover:text-white hover:border-violet-500/40"
+          className="inline-flex rounded-full border border-stone-200 bg-white px-5 py-2 text-xs text-stone-600 hover:text-stone-900"
         >
           tryverseai.com
         </a>
@@ -91,7 +128,7 @@ export function BetaAccessOverlay() {
           <button
             type="button"
             onClick={() => void signOut()}
-            className="text-sm text-violet-300 hover:text-violet-200 underline underline-offset-2"
+            className="text-sm text-amber-900/80 hover:text-amber-950 underline underline-offset-2"
           >
             Sign out
           </button>

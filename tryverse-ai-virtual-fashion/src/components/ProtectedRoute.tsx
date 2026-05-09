@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { RouteFallbackSpinner } from "@/components/RouteFallbackSpinner";
+import { BetaAccessOverlay } from "@/components/BetaAccessOverlay";
 
 /** Requires Convex Auth session and resolved app user (session + users row). */
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -17,5 +18,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <BetaAccessOverlay />
+      {children}
+    </>
+  );
 }

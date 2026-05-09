@@ -5,12 +5,14 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react";
 import { useConvexAuth, useQuery } from "convex/react";
 import { useAuthActions, useAuthToken } from "@convex-dev/auth/react";
 import { api } from "../../convex/_generated/api";
 import { normalizeAccountType, type AccountType, type LegacyUserMetadata } from "@/lib/accountType";
+import type { PendingEmailVerificationBootstrap } from "@/lib/emailVerifyPendingStorage";
 import { complianceDoneSessionKey } from "@/lib/complianceStorage";
 import { bootstrapLocalSession, type AccountBootstrapBody } from "@/lib/backendApi";
 import {
@@ -18,8 +20,10 @@ import {
   waitForBackendAuthBearerHeader,
 } from "@/lib/backendAuthBearer";
 import { convexReactClient } from "@/convexReactClient";
+import { useIdleSessionLogout, DEFAULT_APP_SESSION_IDLE_MS } from "@/hooks/useIdleSessionLogout";
 
 export type { LegacyUserMetadata };
+export type { PendingEmailVerificationBootstrap };
 
 /** Minimal user shape shared across dashboard and API helpers. */
 export type AppUser = {
@@ -41,8 +45,32 @@ interface AuthContextType {
     role?: string,
     accountType?: AccountType,
     turnstileToken?: string
-  ) => Promise<{ error: Error | null; session: null }>;
-  signIn: (email: string, password: string, turnstileToken?: string) => Promise<{ error: Error | null }>;
+  ) => Promise<
+    | { error: Error; session: null }
+    | {
+        error: null;
+        session: null;
+        needsEmailVerification: true;
+        pendingEmail: string;
+        pendingBootstrap: PendingEmailVerificationBootstrap;
+      }
+    | { error: null; session: null }
+  >;
+  signIn: (
+    email: string,
+    password: string,
+    turnstileToken?: string
+  ) => Promise<
+    | { error: Error }
+    | { error: null; needsEmailVerification: true; pendingEmail: string }
+    | { error: null }
+  >;
+  /** Complete password `email-verification` step after Convex sends the OTP (8-digit code). */
+  verifyEmailWithCode: (
+    email: string,
+    code: string,
+    opts?: { turnstileToken?: string; pendingBootstrap?: PendingEmailVerificationBootstrap }
+  ) => Promise<{ error: Error | null }>;
   /**
    * After Convex Auth has already signed the user in (e.g. password reset verification),
    * sync the Node API session / credits profile using the current JWT.
@@ -207,7 +235,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role,
           accountType,
         });
-        await convexPasswordSignIn("password", fd);
+        const result = await convexPasswordSignIn("password", fd);
+        if (!result.signingIn) {
+          return {
+            error: null,
+            session: null,
+            needsEmailVerification: true as const,
+            pendingEmail: trimmed,
+            pendingBootstrap: {
+              accountType,
+              brandName,
+              fullName,
+              role,
+              turnstileToken,
+            },
+          };
+        }
         await bootstrapAfterConvexSignIn({
           accountType,
           brandName,
@@ -235,7 +278,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       try {
         const fd = buildPasswordFormData("signIn", trimmed, password);
-        await convexPasswordSignIn("password", fd);
+        const result = await convexPasswordSignIn("password", fd);
+        if (!result.signingIn) {
+          return { error: null, needsEmailVerification: true as const, pendingEmail: trimmed };
+        }
         const synced = await syncBackendSession({ email: trimmed, turnstileToken });
         if (synced.error) return synced;
       } catch (e) {
@@ -244,6 +290,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null };
     },
     [convexPasswordSignIn, syncBackendSession]
+  );
+
+  const verifyEmailWithCode = useCallback(
+    async (
+      email: string,
+      code: string,
+      opts?: { turnstileToken?: string; pendingBootstrap?: PendingEmailVerificationBootstrap }
+    ) => {
+      const trimmed = email.trim().toLowerCase();
+      const c = code.trim().replace(/\s+/g, "");
+      if (!trimmed) {
+        return { error: new Error("Email is required") };
+      }
+      if (!c) {
+        return { error: new Error("Enter the verification code from your email.") };
+      }
+      try {
+        const fd = new FormData();
+        fd.set("email", trimmed);
+        fd.set("code", c);
+        fd.set("flow", "email-verification");
+        const result = await convexPasswordSignIn("password", fd);
+        if (!result.signingIn) {
+          return {
+            error: new Error(
+              "That code didn’t work or may have expired. Go back and sign in again to receive a new code."
+            ),
+          };
+        }
+        const ts =
+          opts?.turnstileToken?.trim() || opts?.pendingBootstrap?.turnstileToken?.trim() || undefined;
+        if (opts?.pendingBootstrap) {
+          const b = opts.pendingBootstrap;
+          await bootstrapAfterConvexSignIn({
+            accountType: b.accountType,
+            brandName: b.brandName,
+            fullName: b.fullName,
+            role: b.role,
+            email: trimmed,
+            ...(ts ? { turnstileToken: ts } : {}),
+          });
+        } else {
+          const synced = await syncBackendSession({ email: trimmed, turnstileToken: ts });
+          if (synced.error) return synced;
+        }
+      } catch (e) {
+        return { error: normalizeConvexAuthError(e) };
+      }
+      return { error: null };
+    },
+    [convexPasswordSignIn, bootstrapAfterConvexSignIn, syncBackendSession]
   );
 
   const signOut = useCallback(async () => {
@@ -256,6 +353,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [convexSignOut, user?.id]);
 
+  const signOutRef = useRef(signOut);
+  signOutRef.current = signOut;
+
+  useIdleSessionLogout(
+    Boolean(user),
+    DEFAULT_APP_SESSION_IDLE_MS,
+    useCallback(() => void signOutRef.current(), [])
+  );
+
   const value = useMemo(
     () => ({
       user,
@@ -264,10 +370,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       signUp,
       signIn,
+      verifyEmailWithCode,
       syncBackendSession,
       signOut,
     }),
-    [user, isAuthenticated, session, loading, signUp, signIn, syncBackendSession, signOut]
+    [user, isAuthenticated, session, loading, signUp, signIn, verifyEmailWithCode, syncBackendSession, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

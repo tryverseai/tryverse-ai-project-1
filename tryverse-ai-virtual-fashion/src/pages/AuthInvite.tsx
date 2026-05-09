@@ -15,6 +15,7 @@ import { dashboardPathForAccountType, type AccountType } from "@/lib/accountType
 import { Turnstile } from "@marsidev/react-turnstile";
 import { useSignupChooser } from "@/components/signup/SignupChooserContext";
 import { turnstileSiteKey } from "@/lib/turnstileEnv";
+import { saveEmailVerifyPending } from "@/lib/emailVerifyPendingStorage";
 
 const TURNSTILE_SITE_KEY_INVITE = turnstileSiteKey();
 
@@ -169,7 +170,7 @@ const AuthInvite = () => {
 
     setLoading(true);
     try {
-      const { error } =
+      const signResult =
         inviteKind === "personal"
           ? await signUp(
               email,
@@ -182,10 +183,27 @@ const AuthInvite = () => {
             )
           : await signUp(email, password, companyName.trim(), fullName.trim(), undefined, "business", ts);
 
-      if (error) {
-        console.error("Signup error:", error);
-        const t = signUpErrorToast(error);
+      if (signResult.error) {
+        console.error("Signup error:", signResult.error);
+        const t = signUpErrorToast(signResult.error);
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
+        return;
+      }
+
+      if ("needsEmailVerification" in signResult && signResult.needsEmailVerification) {
+        saveEmailVerifyPending({
+          email: signResult.pendingEmail,
+          pendingBootstrap: signResult.pendingBootstrap,
+          inviteToken: token.trim(),
+          accountTypeAfterInvite: acctBootstrap,
+        });
+        toast({
+          title: "Check your email",
+          description: "We sent an 8-digit code. Continue on the verification page to finish setting up.",
+          duration: 9000,
+        });
+        setPassword("");
+        navigate("/auth/verify-email");
         return;
       }
 

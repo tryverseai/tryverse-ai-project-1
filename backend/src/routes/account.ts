@@ -4,6 +4,7 @@ import { cxGetProfile, cxInsertProfile, cxPatchProfile } from '../services/credi
 import { DEFAULT_FREE_CREDITS_BUSINESS, DEFAULT_FREE_CREDITS_INDIVIDUAL } from '../services/credits';
 import { logger } from '../config/logger';
 import { verifyTurnstileToken } from '../services/turnstile';
+import { sendWelcomeEmail } from '../services/email';
 
 const router = Router();
 
@@ -54,6 +55,21 @@ router.post(
         full_name: fullName,
         role,
       });
+
+      /** Welcome mail via backend Resend (same path as `/api/emails/welcome`). */
+      if (email) {
+        void sendWelcomeEmail({
+          email,
+          name: fullName ?? brandName ?? undefined,
+          brandName: brandName ?? undefined,
+        }).catch((e) =>
+          logger.warn('welcome email skipped or failed after profile create', {
+            error: String(e),
+            userId: userId.slice(0, 12),
+          })
+        );
+      }
+
       res.json({ ok: true, created: true });
     } catch (err) {
       logger.error('account bootstrap failed', { error: String(err) });

@@ -25,6 +25,7 @@ import AuthConfirm from "./pages/AuthConfirm";
 import BookDemo from "./pages/BookDemo";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import VerifyEmail from "./pages/VerifyEmail";
 import NotFound from "./pages/NotFound";
 
 // Lazily loaded: heavy pages that are not needed on the first paint
@@ -102,6 +103,7 @@ const App = () => (
             <Route path="/auth/confirm" element={<AuthConfirm />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/auth/verify-email" element={<VerifyEmail />} />
             <Route
               path="/widget-preview"
               element={
