@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   type ReactNode,
 } from "react";
@@ -90,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionIdentity = useQuery(api.authSession.sessionUser, isAuthenticated ? {} : "skip");
   const userRow = useQuery(api.userBootstrap.myUserRow, isAuthenticated ? {} : "skip");
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setBackendAuthBearerToken(token ?? null);
   }, [token]);
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -146,6 +146,7 @@ const Auth = () => {
     );
   };
 
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (TURNSTILE_SITE_KEY && !turnstileToken.trim()) {
       toast({
