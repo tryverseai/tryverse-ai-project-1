@@ -94,6 +94,26 @@ function normalizeConvexAuthError(err: unknown): Error {
   }
 }
 
+/** Noisy Convex Auth / password sign-in errors → one line for the sign-in form. */
+const SIGN_IN_FRIENDLY =
+  /invalidaccountid|invalid\s*account|credentialssignin|invalid\s*credentials?|incorrect\s*password|wrong\s*password|user\s*not\s*found|no\s*user|account\s*not\s*found|email\s*(?:is\s*)?not\s*found|invalid\s*login|authentication\s*failed/i;
+
+export function humanizeSignInPasswordError(err: unknown): Error {
+  const inner = normalizeConvexAuthError(err);
+  const m = inner.message.replace(/\s+/g, " ").trim();
+  if (!m) return new Error("Invalid account or password.");
+  if (SIGN_IN_FRIENDLY.test(m)) {
+    return new Error("Invalid account or password.");
+  }
+  if (
+    /convex|server error|uncaught error|request id:/i.test(m) &&
+    /auth|signin|sign[\s_-]*in|password|account|credential/i.test(m)
+  ) {
+    return new Error("Invalid account or password.");
+  }
+  return inner;
+}
+
 function buildPasswordFormData(
   flow: "signIn" | "signUp",
   email: string,
@@ -285,7 +305,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const synced = await syncBackendSession({ email: trimmed, turnstileToken });
         if (synced.error) return synced;
       } catch (e) {
-        return { error: normalizeConvexAuthError(e) };
+        return { error: humanizeSignInPasswordError(e) };
       }
       return { error: null };
     },

@@ -171,8 +171,9 @@ const VerifyEmail = () => {
         </Link>
         <h1 className="font-display text-2xl font-bold text-foreground mb-2">Verify your email</h1>
         <p className="text-muted-foreground mb-6 text-sm">
-          We sent an 8-digit code to{" "}
-          <span className="text-foreground font-medium break-all">{emailDisplay}</span>. Enter it below.
+          We sent a welcome email with an 8-digit code to{" "}
+          <span className="text-foreground font-medium break-all">{emailDisplay}</span>. Enter it below to verify and
+          continue.
         </p>
         <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
           <div className="space-y-2">

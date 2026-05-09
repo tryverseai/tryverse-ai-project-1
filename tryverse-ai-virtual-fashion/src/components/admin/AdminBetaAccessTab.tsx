@@ -95,8 +95,7 @@ export function AdminBetaAccessTab({ adminKey }: AdminBetaAccessTabProps) {
           </h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-xl">
             Approve or reject <strong>self-serve signups</strong> who are waiting for closed-beta access (
-            <code className="text-xs rounded bg-muted px-1">beta_approved</code> not true). This is separate from{" "}
-            <strong>Invites</strong>, which are pre-generated email links for known contacts.
+            <code className="text-xs rounded bg-muted px-1">beta_approved</code> not true).
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => void load()} disabled={loading}>

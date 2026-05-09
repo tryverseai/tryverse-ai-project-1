@@ -182,7 +182,8 @@ const Auth = () => {
         });
         toast({
           title: "Check your email",
-          description: "We sent an 8-digit code. Continue on the verification page to activate your account.",
+          description:
+            "We sent a welcome email with your 8-digit verification code. Open it, then continue on the verification page to activate your account.",
           duration: 9000,
         });
         setPassword("");
@@ -207,7 +208,8 @@ const Auth = () => {
         });
         toast({
           title: "Check your email",
-          description: "We sent an 8-digit code. Continue on the verification page to activate your account.",
+          description:
+            "We sent a welcome email with your 8-digit verification code. Open it, then continue on the verification page to activate your account.",
           duration: 9000,
         });
         setPassword("");
@@ -227,7 +229,8 @@ const Auth = () => {
         saveEmailVerifyPending({ email: result.pendingEmail });
         toast({
           title: "Verify your email",
-          description: "We sent an 8-digit code. Enter it on the next step to sign in.",
+          description:
+            "We sent a welcome email with your 8-digit code. Enter it on the next step to sign in.",
           duration: 9000,
         });
         setPassword("");
