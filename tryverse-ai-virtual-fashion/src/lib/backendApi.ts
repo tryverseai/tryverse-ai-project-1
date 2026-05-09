@@ -1340,7 +1340,7 @@ export async function clearAdminAudit(adminKey: string): Promise<{ ok: boolean; 
   return adminFetch('/api/admin/audit/clear', adminKey, { method: 'POST' });
 }
 
-/** Pending closed-beta users (explicit beta_approved === false). */
+/** Pending closed-beta users (beta_approved is not true, not rejected). */
 export type AdminPendingBetaRow = {
   userId: string;
   full_name?: string | null;
