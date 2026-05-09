@@ -1,8 +1,11 @@
 import { Lock, MessageSquareText } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
 import { useQuery } from "convex/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "../../convex/_generated/api";
+import { TryVerseLogo } from "@/components/TryVerseLogo";
+import { Button } from "@/components/ui/button";
 
 const INSTAGRAM_URL = "https://instagram.com/tryverseai";
 const X_URL = "https://x.com/tryverseai";
@@ -56,86 +59,88 @@ export function BetaAccessOverlay() {
   const rejected = profile.beta_rejected === true;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-4 text-center overflow-y-auto"
-      style={{
-        background:
-          "linear-gradient(165deg, #faf5f0 0%, #f4e8e0 45%, #efe2d8 100%)",
-      }}
-    >
-      <div className="max-w-lg w-full space-y-8 py-10">
-        <div className="flex justify-center">
-          <div className="rounded-full bg-white/90 p-4 shadow-sm ring-1 ring-stone-200/80">
-            <Lock className="h-10 w-10 text-amber-800/90" aria-hidden />
-          </div>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wider text-stone-500 mb-2">TryVerse</p>
-          <h1 className="font-display text-3xl sm:text-4xl font-bold text-stone-900 tracking-tight">
-            {rejected ? "Access not approved" : "We're in Closed Beta"}
-          </h1>
-          <p className="mt-3 text-stone-600 text-sm sm:text-base leading-relaxed">
-            {rejected
-              ? "We weren't able to approve access for this account. If you think this is a mistake, contact support."
-              : "We're currently rolling out TryVerse to a select group of teams. We'll be opening access soon!"}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-stone-200/80 bg-white/95 backdrop-blur-sm px-5 py-5 text-left shadow-md shadow-stone-300/40">
-          <div className="flex gap-3">
-            <MessageSquareText className="h-9 w-9 shrink-0 text-amber-700" aria-hidden />
-            <div>
-              <p className="font-semibold text-stone-900">Check your email for updates</p>
-              <p className="text-sm text-stone-600 mt-1">
-                {rejected
-                  ? "You can sign out and try again later if your situation changes."
-                  : "We'll notify you when we're ready to onboard your team."}
-              </p>
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-background">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="flex min-h-full flex-col items-center justify-center px-4 py-10 text-center"
+      >
+        <div className="w-full max-w-lg space-y-8">
+          <div className="flex flex-col items-center gap-6">
+            <Link to="/" className="inline-block">
+              <TryVerseLogo height={96} />
+            </Link>
+            <div
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full gradient-primary text-primary-foreground shadow-soft"
+              aria-hidden
+            >
+              <Lock className="h-7 w-7" />
             </div>
           </div>
-        </div>
 
-        <div className="space-y-3">
-          <p className="text-xs uppercase tracking-wider text-stone-500">Follow us for updates</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            <a
-              href={INSTAGRAM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm text-stone-800 hover:bg-stone-50 transition-colors"
+          <div>
+            <p className="font-medium text-xs uppercase tracking-wider text-muted-foreground mb-2">TryVerse</p>
+            <h1 className="font-display text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
+              {rejected ? "Access not approved" : "We're in Closed Beta"}
+            </h1>
+            <p className="mt-3 text-sm sm:text-base leading-relaxed text-muted-foreground">
+              {rejected
+                ? "We weren't able to approve access for this account. If you think this is a mistake, contact support."
+                : "We're currently rolling out TryVerse to a select group of teams. We'll be opening access soon!"}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card px-5 py-5 text-left shadow-card">
+            <div className="flex gap-3">
+              <MessageSquareText className="h-9 w-9 shrink-0 text-foreground opacity-90" aria-hidden />
+              <div>
+                <p className="font-semibold text-foreground">Check your email for updates</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {rejected
+                    ? "You can sign out and try again later if your situation changes."
+                    : "We'll notify you when we're ready to onboard your team."}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+              Follow us for updates
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="outline" size="sm" className="rounded-full bg-background shadow-none" asChild>
+                <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer">
+                  Instagram
+                </a>
+              </Button>
+              <Button variant="outline" size="sm" className="rounded-full bg-background shadow-none" asChild>
+                <a href={X_URL} target="_blank" rel="noopener noreferrer">
+                  X (Twitter)
+                </a>
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-3">
+            <Button variant="outline" size="sm" className="rounded-full bg-background text-muted-foreground shadow-none hover:text-foreground" asChild>
+              <a href="https://tryverseai.com" target="_blank" rel="noopener noreferrer">
+                tryverseai.com
+              </a>
+            </Button>
+
+            <Button
+              type="button"
+              variant="link"
+              className="h-auto p-0 text-sm font-normal text-muted-foreground hover:text-foreground"
+              onClick={() => void signOut()}
             >
-              Instagram
-            </a>
-            <a
-              href={X_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm text-stone-800 hover:bg-stone-50 transition-colors"
-            >
-              X (Twitter)
-            </a>
+              Sign out
+            </Button>
           </div>
         </div>
-
-        <a
-          href="https://tryverseai.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex rounded-full border border-stone-200 bg-white px-5 py-2 text-xs text-stone-600 hover:text-stone-900"
-        >
-          tryverseai.com
-        </a>
-
-        <p>
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            className="text-sm text-amber-900/80 hover:text-amber-950 underline underline-offset-2"
-          >
-            Sign out
-          </button>
-        </p>
-      </div>
+      </motion.div>
     </div>
   );
 }
