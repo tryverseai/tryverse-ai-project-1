@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { useToast } from "@/hooks/use-toast";
+import { convexAuthEmailFlowToast } from "@/lib/convexAuthEmailFlowToast";
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -34,10 +35,14 @@ const ForgotPassword = () => {
       });
       navigate("/reset-password", { state: { email: trimmed } });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Something went wrong. Try again.";
+      const friendly = convexAuthEmailFlowToast(err, "password_reset");
+      if (friendly) {
+        toast({ ...friendly, duration: 12000 });
+        return;
+      }
       toast({
         title: "Could not start reset",
-        description: msg,
+        description: err instanceof Error ? err.message : "Something went wrong. Try again.",
         variant: "destructive",
         duration: 9000,
       });
