@@ -16,6 +16,7 @@ import { Turnstile } from "@marsidev/react-turnstile";
 import { useSignupChooser } from "@/components/signup/SignupChooserContext";
 import { turnstileSiteKey } from "@/lib/turnstileEnv";
 import { saveEmailVerifyPending } from "@/lib/emailVerifyPendingStorage";
+import { convexAuthEmailFlowToast } from "@/lib/convexAuthEmailFlowToast";
 
 const TURNSTILE_SITE_KEY_INVITE = turnstileSiteKey();
 
@@ -24,6 +25,9 @@ function signUpErrorToast(error: Error): {
   description: string;
   variant: "default" | "destructive";
 } {
+  const wrapped = convexAuthEmailFlowToast(error, "signup");
+  if (wrapped) return wrapped;
+
   const raw = error.message || "";
   const msg = raw.toLowerCase();
   const isResendTestModeOnly =

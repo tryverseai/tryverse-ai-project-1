@@ -37,7 +37,7 @@ const MSG_RESEND_TEST_SIMPLE =
   "This address can’t receive our messages yet. Try a different email or contact support.";
 
 function flowTitle(flow: AuthEmailFlow): string {
-  if (flow === "signup") return "Sign up didn’t finish";
+  if (flow === "signup") return "Sign up failed";
   if (flow === "password_reset") return "Couldn’t send reset email";
   if (flow === "reset_verify") return "Couldn’t reset password";
   return "Couldn’t verify email";
@@ -114,6 +114,17 @@ export function convexAuthEmailFlowToast(err: unknown, flow: AuthEmailFlow): nul
     (/\bconvex\b/i.test(low) && (/request\s*id|server\s*error|called\s*by\s*client/i.test(low) || /auth[:\s]/i.test(collapsed)))
   ) {
     if (flow === "email_verify" || flow === "reset_verify") return pickCodeFailure(flow);
+    if (flow === "password_reset") return resetSendSimpleDestructive();
+    return signupSimpleDestructive();
+  }
+
+  /**
+   * Convex Auth / client sometimes surfaces only this line (e.g. email send or auth action failed server-side).
+   */
+  if (
+    (flow === "signup" || flow === "password_reset") &&
+    /\bauthentication\s+service\s+error\b/i.test(low)
+  ) {
     if (flow === "password_reset") return resetSendSimpleDestructive();
     return signupSimpleDestructive();
   }
