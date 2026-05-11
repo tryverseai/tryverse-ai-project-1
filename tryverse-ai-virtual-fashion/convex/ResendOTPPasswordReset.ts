@@ -1,5 +1,6 @@
 import Resend from "@auth/core/providers/resend";
 import { RandomReader, generateRandomString } from "@oslojs/crypto/random";
+import { raiseUnlessResendResponseOk } from "./resendEmailErrors";
 import { trimResendSecret } from "./resendEnv";
 
 const base = Resend({
@@ -62,17 +63,15 @@ export const ResendOTPPasswordReset = {
     });
     if (!res.ok) {
       let detail: string;
+      let parsed: unknown;
       try {
-        detail = JSON.stringify(await res.json());
+        parsed = await res.json();
+        detail = JSON.stringify(parsed);
       } catch {
+        parsed = undefined;
         detail = await res.text();
       }
-      if (/invalid.*api.*key|api key is invalid/i.test(detail)) {
-        throw new Error(
-          "Email could not be sent: Resend API key is invalid. In the Convex dashboard set AUTH_RESEND_KEY to a current key from https://resend.com/api-keys (same key as backend RESEND_API_KEY is fine)."
-        );
-      }
-      throw new Error(`Resend error: ${detail}`);
+      raiseUnlessResendResponseOk(res, detail, parsed);
     }
   },
 };

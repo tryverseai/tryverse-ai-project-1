@@ -4,6 +4,7 @@
  */
 import Resend from "@auth/core/providers/resend";
 import { RandomReader, generateRandomString } from "@oslojs/crypto/random";
+import { raiseUnlessResendResponseOk } from "./resendEmailErrors";
 import { trimResendSecret } from "./resendEnv";
 
 /** Keep this id identical on the Resend() factory and export — Auth.js merge uses the factory id for stored verification rows. */
@@ -87,17 +88,15 @@ export const ResendEmailSignupVerification = {
     });
     if (!res.ok) {
       let detail: string;
+      let parsed: unknown;
       try {
-        detail = JSON.stringify(await res.json());
+        parsed = await res.json();
+        detail = JSON.stringify(parsed);
       } catch {
+        parsed = undefined;
         detail = await res.text();
       }
-      if (/invalid.*api.*key|api key is invalid/i.test(detail)) {
-        throw new Error(
-          "Email could not be sent: Resend API key is invalid. Set AUTH_RESEND_KEY in the Convex dashboard to a current key from https://resend.com/api-keys."
-        );
-      }
-      throw new Error(`Resend error: ${detail}`);
+      raiseUnlessResendResponseOk(res, detail, parsed);
     }
   },
 };
