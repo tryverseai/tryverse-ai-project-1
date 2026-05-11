@@ -1,4 +1,5 @@
 import { env } from '../config/env';
+import { canonicalConvexProfileUserId } from '../lib/convexProfileId';
 import { anyApi, convexQueryTrusted, convexMutationTrusted } from '../config/convexHttp';
 
 const trusted = () => ({ secret: env.BACKEND_SHARED_SECRET });
@@ -54,9 +55,10 @@ export async function cxInsertProfile(
   freeCreditsRemaining: number,
   freeCreditsTotal: number
 ): Promise<void> {
+  const canonicalId = canonicalConvexProfileUserId(userId);
   await convexMutationTrusted(anyApi.backendTrusted.insertProfileRow, {
     ...trusted(),
-    userId,
+    userId: canonicalId,
     accountType,
     freeCreditsRemaining,
     freeCreditsTotal,

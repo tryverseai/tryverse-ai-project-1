@@ -5,6 +5,7 @@ import { DEFAULT_FREE_CREDITS_BUSINESS, DEFAULT_FREE_CREDITS_INDIVIDUAL } from '
 import { logger } from '../config/logger';
 import { verifyTurnstileToken } from '../services/turnstile';
 import { sendWelcomeEmail } from '../services/email';
+import { canonicalConvexProfileUserId } from '../lib/convexProfileId';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = req.user!.id;
+      const userId = canonicalConvexProfileUserId(req.user!.id);
       const email = (req.user!.email || '').trim();
       const body = req.body as Record<string, unknown>;
       const turnstileToken =

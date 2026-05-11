@@ -10,12 +10,37 @@ import { anyApi, convexQueryPublic, convexQueryTrusted } from '../../config/conv
 const SSRF_BLOCKED_HOSTS =
   /^(localhost|127\.|0\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1|\[::\]|0\.0\.0\.0)/i;
 
+function isLocalhostOrigin(url: string): boolean {
+  const u = url.trim();
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(u) || u === '';
+}
+
+/**
+ * Path-only `image_url` values (e.g. `/model-library/diane.png`) need a public site origin.
+ * On Railway many teams set PUBLIC_APP_URL to production while FRONTEND_URL is still localhost
+ * — without this, every model row fails resolution or resolves to unreachable URLs.
+ */
 export function resolveModelImageUrl(stored: string): string {
   const trimmed = stored.trim();
   if (trimmed.startsWith('/')) {
-    const base = env.FRONTEND_URL.replace(/\/$/, '');
+    const fe = env.FRONTEND_URL.replace(/\/$/, '');
+    const pub =
+      typeof env.PUBLIC_APP_URL === 'string' ? env.PUBLIC_APP_URL.replace(/\/$/, '') : '';
+    let base = fe;
+    if (pub && !isLocalhostOrigin(pub)) {
+      if (isLocalhostOrigin(fe) || env.NODE_ENV === 'production') {
+        base = pub;
+      }
+    }
+    if (!base || isLocalhostOrigin(base)) {
+      if (pub && !isLocalhostOrigin(pub)) {
+        base = pub;
+      }
+    }
     if (!base) {
-      throw new Error('FRONTEND_URL must be set when model library uses path-only image_url values');
+      throw new Error(
+        'FRONTEND_URL or PUBLIC_APP_URL must be set when model library uses path-only image_url values'
+      );
     }
     return `${base}${trimmed}`;
   }
@@ -45,13 +70,21 @@ export function freeTierEligibleFromRow(row: {
 
 function hostnameAllowedForModelImageFetch(hostname: string): boolean {
   const h = hostname.toLowerCase();
-  try {
-    const fe = new URL(env.FRONTEND_URL);
-    const feHost = fe.hostname.toLowerCase();
-    if (h === feHost || h.endsWith(`.${feHost}`)) return true;
-  } catch {
-    /* ignore */
-  }
+  const tryAllowedOrigin = (raw: string): boolean => {
+    const u = raw.trim();
+    if (!u) return false;
+    try {
+      const parsed = new URL(u.includes('://') ? u : `https://${u}`);
+      const ho = parsed.hostname.toLowerCase();
+      if (h === ho || h.endsWith(`.${ho}`)) return true;
+    } catch {
+      /* ignore */
+    }
+    return false;
+  };
+
+  if (tryAllowedOrigin(env.FRONTEND_URL)) return true;
+  if (tryAllowedOrigin(env.PUBLIC_APP_URL)) return true;
 
   if (env.CLOUDFLARE_CDN_DOMAIN) {
     const raw = env.CLOUDFLARE_CDN_DOMAIN.trim();
