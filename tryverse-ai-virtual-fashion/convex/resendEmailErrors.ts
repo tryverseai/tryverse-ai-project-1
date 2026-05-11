@@ -51,7 +51,7 @@ function stringifyFromDomainIssues(rawLow: string, parsed: unknown): Error | nul
   return null;
 }
 
-export function raiseUnlessResendResponseOk(res: Response, rawDetail: string, parsedJson: unknown): asserts res.ok {
+export function raiseUnlessResendResponseOk(res: Response, rawDetail: string, parsedJson: unknown): void {
   if (res.ok) return;
 
   const detail = rawDetail.replace(/\s+/g, " ").trim();
