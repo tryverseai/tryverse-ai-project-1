@@ -19,6 +19,7 @@ import { postLoginRedirectPath } from "@/lib/safeUrl";
 import { completeInviteAfterSignup } from "@/lib/backendApi";
 import { dashboardPathForAccountType, type AccountType } from "@/lib/accountType";
 import { posthogCapture } from "@/lib/posthog";
+import { convexAuthEmailFlowToast } from "@/lib/convexAuthEmailFlowToast";
 
 const TURNSTILE_SITE_KEY = turnstileSiteKey();
 
@@ -84,8 +85,6 @@ const VerifyEmail = () => {
     return null;
   }
 
-  const emailDisplay = payload.email;
-
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const c = code.trim().replace(/\s+/g, "");
@@ -113,11 +112,12 @@ const VerifyEmail = () => {
         pendingBootstrap: payload.pendingBootstrap,
       });
       if (verified.error) {
+        const friendly = convexAuthEmailFlowToast(verified.error, "email_verify");
         toast({
-          title: "Could not verify email",
-          description: verified.error.message,
-          variant: "destructive",
-          duration: 9000,
+          title: friendly?.title ?? "Could not verify email",
+          description: friendly?.description ?? verified.error.message,
+          variant: friendly?.variant ?? "destructive",
+          duration: friendly ? 14000 : 9000,
         });
         return;
       }
@@ -170,11 +170,7 @@ const VerifyEmail = () => {
           Back to sign in
         </Link>
         <h1 className="font-display text-2xl font-bold text-foreground mb-2">Verify your email</h1>
-        <p className="text-muted-foreground mb-6 text-sm">
-          We sent a welcome email with an 8-digit code to{" "}
-          <span className="text-foreground font-medium break-all">{emailDisplay}</span>. Enter it below to verify and
-          continue.
-        </p>
+        <p className="text-muted-foreground mb-6 text-sm">Enter the 8-digit verification code.</p>
         <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email-verify-code">Verification code</Label>
