@@ -25,6 +25,7 @@ import type * as plans from "../plans.js";
 import type * as products from "../products.js";
 import type * as profileLookup from "../profileLookup.js";
 import type * as profiles from "../profiles.js";
+import type * as resendEmailErrors from "../resendEmailErrors.js";
 import type * as resendEnv from "../resendEnv.js";
 import type * as seed from "../seed.js";
 import type * as trustedStorage from "../trustedStorage.js";
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   products: typeof products;
   profileLookup: typeof profileLookup;
   profiles: typeof profiles;
+  resendEmailErrors: typeof resendEmailErrors;
   resendEnv: typeof resendEnv;
   seed: typeof seed;
   trustedStorage: typeof trustedStorage;
