@@ -117,7 +117,7 @@ const VerifyEmail = () => {
           title: friendly?.title ?? "Could not verify email",
           description: friendly?.description ?? verified.error.message,
           variant: friendly?.variant ?? "destructive",
-          duration: friendly ? 14000 : 9000,
+          duration: 9000,
         });
         return;
       }

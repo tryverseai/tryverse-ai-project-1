@@ -335,7 +335,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!result.signingIn) {
           return {
             error: new Error(
-              "That code didn’t work or may have expired. Go back and sign in again to receive a new code."
+              "That code didn’t work or may have expired. Go back, sign up or sign in again, and use the newest code from your email."
             ),
           };
         }

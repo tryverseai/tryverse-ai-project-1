@@ -11,6 +11,7 @@ import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { turnstileSiteKey } from "@/lib/turnstileEnv";
+import { convexAuthEmailFlowToast } from "@/lib/convexAuthEmailFlowToast";
 
 const TURNSTILE_SITE_KEY_RESET = turnstileSiteKey();
 
@@ -92,8 +93,13 @@ const ResetPassword = () => {
       });
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Something went wrong. Try again.";
-      toast({ title: "Could not reset password", description: msg, variant: "destructive", duration: 9000 });
+      const friendly = convexAuthEmailFlowToast(err, "reset_verify");
+      toast({
+        title: friendly?.title ?? "Could not reset password",
+        description: friendly?.description ?? "Something went wrong. Try again.",
+        variant: friendly?.variant ?? "destructive",
+        duration: 9000,
+      });
     } finally {
       setLoading(false);
     }
