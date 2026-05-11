@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx } from "./_generated/server";
-import { authSubjectSegments } from "./authSubjectKeys";
+import { authSubjectSegments, subjectsOverlap } from "./authSubjectKeys";
 
 function requireBackendSecret(secret: string) {
   const expected = (process.env.BACKEND_SHARED_SECRET ?? "").trim();
@@ -60,10 +60,12 @@ export const insertProfileRow = mutation({
     accountType: v.string(),
     freeCreditsRemaining: v.number(),
     freeCreditsTotal: v.number(),
+    contactEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     requireBackendSecret(args.secret);
     const now = new Date().toISOString();
+    const trimmedEmail = typeof args.contactEmail === "string" ? args.contactEmail.trim() : "";
     return await ctx.db.insert("profiles", {
       id: args.userId,
       plan_id: "free",
@@ -78,6 +80,7 @@ export const insertProfileRow = mutation({
       beta_requested_at: now,
       created_at: now,
       updated_at: now,
+      ...(trimmedEmail ? { contact_email: trimmedEmail } : {}),
     });
   },
 });
@@ -309,6 +312,37 @@ export const insertTryon = mutation({
   },
 });
 
+/**
+ * Migrates dashboard try-on rows from legacy Bearer subject variants (`accountId|user`,
+ * compound string, bare segment) onto the canonical user doc id so history survives
+ * new sessions and password-reset flows that change JWT shape slightly.
+ */
+export const consolidateTryonsToCanonicalUserId = mutation({
+  args: {
+    secret: v.string(),
+    aliases: v.array(v.string()),
+    canonicalUserId: v.string(),
+  },
+  handler: async (ctx, { secret, aliases, canonicalUserId }) => {
+    requireBackendSecret(secret);
+    const uniq = [...new Set(aliases.map((s) => String(s).trim()).filter(Boolean))].filter(
+      (a) => a !== canonicalUserId
+    );
+    let updated = 0;
+    for (const alias of uniq) {
+      const rows = await ctx.db
+        .query("tryons")
+        .withIndex("by_user_created", (q) => q.eq("user_id", alias))
+        .collect();
+      for (const row of rows) {
+        await ctx.db.patch(row._id, { user_id: canonicalUserId } as never);
+        updated++;
+      }
+    }
+    return { updated };
+  },
+});
+
 export const patchTryonByLegacyId = mutation({
   args: {
     secret: v.string(),
@@ -345,7 +379,7 @@ export const getTryonByLegacyIdForUser = query({
       .query("tryons")
       .withIndex("by_legacyId", (q) => q.eq("legacy_id", legacyId))
       .unique();
-    if (!row || row.user_id !== userId) return null;
+    if (!row || !subjectsOverlap(userId, row.user_id ?? "")) return null;
     return {
       id: row.legacy_id ?? legacyId,
       status: row.status,
@@ -366,7 +400,8 @@ export const deleteTryonByLegacyIdForUser = mutation({
       .query("tryons")
       .withIndex("by_legacyId", (q) => q.eq("legacy_id", legacyId))
       .unique();
-    if (!row || row.user_id !== userId) return { deleted: false as const };
+    if (!row || !subjectsOverlap(userId, row.user_id ?? ""))
+      return { deleted: false as const };
     await ctx.db.delete(row._id);
     return { deleted: true as const };
   },
@@ -799,10 +834,7 @@ export const reserveCredit = mutation({
   args: { secret: v.string(), userId: v.string() },
   handler: async (ctx, { secret, userId }) => {
     requireBackendSecret(secret);
-    const row = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", userId))
-      .unique();
+    const row = await profileRowForBackend(ctx, userId);
     if (!row) return { ok: false as const, reason: "Profile not found" };
 
     // Enterprise / unlimited plan — no decrement needed

@@ -152,6 +152,8 @@ declare global {
         id: string;
         email: string;
       };
+      /** Bearer / Local-auth subject before canonicalization — used for Convex profile lookups. */
+      convexAuthSubjectRaw?: string;
       apiKey?: ApiKeyPayload;
       widgetUserId?: string;
     }

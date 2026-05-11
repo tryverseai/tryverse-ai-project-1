@@ -939,7 +939,7 @@ const TryOnStudio = ({
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-3 max-w-sm mx-auto">
-                    Most runs finish in about one to three minutes (Replicate cold starts can be slower). Leave this tab open—closing it can cancel the request.
+                    Most runs finish in about one to three minutes. Leave this tab open—closing it can cancel the request.
                   </p>
                 </motion.div>
               )}

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { normalizeAdminKeyInput } from '../lib/adminKey';
+import { canonicalConvexProfileUserId } from '../lib/convexProfileId';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { logAudit } from '../services/audit';
@@ -41,7 +42,12 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   if (env.ALLOW_LOCAL_SESSION_AUTH) {
     const local = parseLocalAuthorizationHeader(authHeader);
     if (local) {
-      req.user = { id: local.id, email: local.email };
+      const raw = local.id.trim();
+      req.convexAuthSubjectRaw = raw;
+      req.user = {
+        id: canonicalConvexProfileUserId(raw),
+        email: local.email,
+      };
       next();
       return;
     }
@@ -87,6 +93,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       res.status(401).json({ error: 'Invalid or expired token' });
       return;
     }
+    const rawSubject = String(session.id ?? '').trim();
+    req.convexAuthSubjectRaw = rawSubject;
+
     if (session.is_blocked) {
       logAudit({
         event_type: 'failed_login',
@@ -99,7 +108,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       res.status(403).json({ error: 'Account suspended', code: 'ACCOUNT_SUSPENDED' });
       return;
     }
-    req.user = { id: session.id, email: session.email || '' };
+    req.user = {
+      id: canonicalConvexProfileUserId(rawSubject),
+      email: session.email || '',
+    };
     next();
   } catch (err) {
     const errObj = err instanceof Error ? err : new Error(String(err));
@@ -133,7 +145,12 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
   if (env.ALLOW_LOCAL_SESSION_AUTH) {
     const local = parseLocalAuthorizationHeader(authHeader);
     if (local) {
-      req.user = { id: local.id, email: local.email };
+      const raw = local.id.trim();
+      req.convexAuthSubjectRaw = raw;
+      req.user = {
+        id: canonicalConvexProfileUserId(raw),
+        email: local.email,
+      };
       return next();
     }
   }
@@ -150,7 +167,12 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
     client.setAuth(token);
     const session = await client.query(anyApi.authSession.verifyBearerSession, {});
     if (session && !session.is_blocked) {
-      req.user = { id: session.id, email: session.email || '' };
+      const rawSubject = String(session.id ?? '').trim();
+      req.convexAuthSubjectRaw = rawSubject;
+      req.user = {
+        id: canonicalConvexProfileUserId(rawSubject),
+        email: session.email || '',
+      };
     } else if (session?.is_blocked) {
       res.status(403).json({ error: 'Account suspended', code: 'ACCOUNT_SUSPENDED' });
       return;
@@ -168,6 +190,15 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
     }
   }
   next();
+}
+
+/**
+ * Convex profile + credit mutations may still be keyed by a compound Bearer subject.
+ * Widget traffic identifies users only via {@link Request.widgetUserId}.
+ */
+export function convexProfileCreditLookupKey(req: Request): string {
+  if (req.widgetUserId) return req.widgetUserId;
+  return req.convexAuthSubjectRaw ?? req.user?.id ?? '';
 }
 
 /**

@@ -4,6 +4,7 @@ import { anyApi, convexQueryTrusted } from '../../config/convexHttp';
 import {
   welcomeEmail,
   apiKeyDeliveryEmail,
+  accountVerifiedEmail,
   paymentConfirmationEmail,
   creditsAddedEmail,
   lowCreditsWarningEmail,
@@ -13,6 +14,8 @@ import {
 } from './templates';
 
 const appUrl = env.FRONTEND_URL || 'https://tryverseai.com';
+
+const verifiedAccountSignInUrl = `${appUrl.replace(/\/$/, '')}/auth`;
 
 async function getUserEmailAndName(userId: string): Promise<{ email: string | null; name: string }> {
   // Use getProfileRow (indexed by auth subject) — getUserRowById uses db.get() which
@@ -40,6 +43,17 @@ export async function sendWelcomeEmail(params: {
     name: params.name || '',
     brandName: params.brandName || '',
     appUrl,
+  });
+  return sendEmail({ to: params.email, subject: t.subject, html: t.html });
+}
+
+export async function sendAccountVerifiedEmail(params: {
+  email: string;
+  firstName?: string;
+}): Promise<boolean> {
+  const t = accountVerifiedEmail({
+    firstName: params.firstName,
+    signInUrl: verifiedAccountSignInUrl,
   });
   return sendEmail({ to: params.email, subject: t.subject, html: t.html });
 }

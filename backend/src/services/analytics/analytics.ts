@@ -38,14 +38,15 @@ export interface BrandAnalytics {
  * Gets full analytics for a brand (user).
  */
 export async function getBrandAnalytics(
-  userId: string,
+  profileLookupKey: string,
+  tryonsUserId: string,
   days = 30
 ): Promise<BrandAnalytics> {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   const [{ tryons: tryonRows, events: eventRows }, profile] = await Promise.all([
-    userAnalyticsSince(userId, since),
-    cxGetProfile(userId),
+    userAnalyticsSince(tryonsUserId, since),
+    cxGetProfile(profileLookupKey),
   ]);
 
   const allTryons = tryonRows.map((t) => ({

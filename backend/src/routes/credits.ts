@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, convexProfileCreditLookupKey } from '../middleware/auth';
 import { getCreditSummary } from '../services/credits';
 import { logger } from '../config/logger';
 
@@ -14,7 +14,7 @@ router.get(
   requireAuth,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const summary = await getCreditSummary(req.user!.id);
+      const summary = await getCreditSummary(convexProfileCreditLookupKey(req));
       if (!summary) {
         logger.warn('credits: user profile not found', { userId: req.user!.id });
         res.status(404).json({ error: 'User profile not found' });

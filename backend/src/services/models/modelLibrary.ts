@@ -179,7 +179,11 @@ export async function listAllModelsForAdmin(): Promise<
 export const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export async function resolveModelToPersonPath(modelIdOrSlug: string, userId: string): Promise<string> {
+export async function resolveModelToPersonPath(
+  modelIdOrSlug: string,
+  storageUserId: string,
+  profileCreditUserId: string
+): Promise<string> {
   const raw = modelIdOrSlug.trim();
   const row = await convexQueryTrusted<{
     id: string;
@@ -196,12 +200,12 @@ export async function resolveModelToPersonPath(modelIdOrSlug: string, userId: st
     throw new Error('Model not found or inactive');
   }
 
-  const creditCheck = await checkCredits(userId);
+  const creditCheck = await checkCredits(profileCreditUserId);
   if (!creditCheck.allowed) {
     throw new AppError(SHOPPER_TRYON_UNAVAILABLE_MESSAGE, 402, 'CREDITS_EXHAUSTED');
   }
 
-  const profile = await cxGetProfile(userId);
+  const profile = await cxGetProfile(profileCreditUserId);
   const planId = profile?.plan_id ?? 'free';
   const eligible = freeTierEligibleFromRow(row);
   if (isFreeTierPlanId(planId) && !eligible) {
@@ -214,7 +218,7 @@ export async function resolveModelToPersonPath(modelIdOrSlug: string, userId: st
 
   const absoluteUrl = resolveModelImageUrl(row.image_url);
   const { buffer, mime } = await fetchBinaryFromAllowlistedModelImageUrl(absoluteUrl);
-  return uploadImageBuffer(buffer, mime, 'person', userId);
+  return uploadImageBuffer(buffer, mime, 'person', storageUserId);
 }
 
 async function fetchBinaryFromAllowlistedModelImageUrl(

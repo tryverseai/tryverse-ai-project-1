@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { body, matchedData } from 'express-validator';
-import { optionalAuth } from '../middleware/auth';
+import { optionalAuth, convexProfileCreditLookupKey } from '../middleware/auth';
 import { optionalApiKey } from '../middleware/apiKey';
 import { handleValidationErrors } from '../middleware/validate';
 import { listActiveModels, resolveModelToPersonPath } from '../services/models/modelLibrary';
@@ -42,14 +42,15 @@ router.post(
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = req.user?.id || req.widgetUserId;
-      if (!userId) {
+      const storageUserId = req.user?.id || req.widgetUserId;
+      if (!storageUserId) {
         res.status(401).json({ error: 'Sign in or provide a valid API key' });
         return;
       }
       const validated = matchedData(req) as { modelId: string };
       const modelId = validated.modelId;
-      const filePath = await resolveModelToPersonPath(modelId, userId);
+      const profileKey = convexProfileCreditLookupKey(req);
+      const filePath = await resolveModelToPersonPath(modelId, storageUserId, profileKey);
       res.status(201).json({ success: true, filePath });
     } catch (err) {
       if (err instanceof AppError) {

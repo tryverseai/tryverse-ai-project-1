@@ -53,7 +53,8 @@ export async function cxInsertProfile(
   userId: string,
   accountType: 'individual' | 'business',
   freeCreditsRemaining: number,
-  freeCreditsTotal: number
+  freeCreditsTotal: number,
+  opts?: { contactEmail?: string }
 ): Promise<void> {
   const canonicalId = canonicalConvexProfileUserId(userId);
   await convexMutationTrusted(anyApi.backendTrusted.insertProfileRow, {
@@ -62,6 +63,9 @@ export async function cxInsertProfile(
     accountType,
     freeCreditsRemaining,
     freeCreditsTotal,
+    ...(opts?.contactEmail?.trim()
+      ? { contactEmail: opts.contactEmail.trim() }
+      : {}),
   });
 }
 

@@ -1,11 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, convexProfileCreditLookupKey } from '../middleware/auth';
 import { cxGetProfile, cxInsertProfile, cxPatchProfile } from '../services/creditsConvexBridge';
 import { DEFAULT_FREE_CREDITS_BUSINESS, DEFAULT_FREE_CREDITS_INDIVIDUAL } from '../services/credits';
 import { logger } from '../config/logger';
 import { verifyTurnstileToken } from '../services/turnstile';
-import { sendWelcomeEmail } from '../services/email';
-import { canonicalConvexProfileUserId } from '../lib/convexProfileId';
+import { sendAccountVerifiedEmail } from '../services/email';
+import { cxConsolidateTryonsToCanonicalUserId } from '../services/tryonConvexBridge';
 
 const router = Router();
 
@@ -18,15 +18,28 @@ router.post(
   requireAuth,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = canonicalConvexProfileUserId(req.user!.id);
-      const email = (req.user!.email || '').trim();
+      const canonicalId = req.user!.id;
+      const profileKey = convexProfileCreditLookupKey(req);
       const body = req.body as Record<string, unknown>;
+      const emailFromJwt = (req.user!.email || '').trim();
+      const emailFromBody =
+        typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+      const email = emailFromJwt || emailFromBody;
       const turnstileToken =
         typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined;
       const ip = typeof req.ip === 'string' ? req.ip : undefined;
       if (!(await verifyTurnstileToken(turnstileToken, ip))) {
         res.status(403).json({ error: 'Security verification failed. Please try again.' });
         return;
+      }
+
+      try {
+        await cxConsolidateTryonsToCanonicalUserId(req.convexAuthSubjectRaw ?? canonicalId);
+      } catch (e) {
+        logger.warn('try-on subject consolidation skipped or failed during bootstrap', {
+          error: String(e),
+          userSlice: canonicalId.slice(0, 12),
+        });
       }
 
       const accountTypeRaw = body.accountType;
@@ -36,9 +49,9 @@ router.post(
       const fullName = typeof body.fullName === 'string' ? body.fullName : undefined;
       const role = typeof body.role === 'string' ? body.role : undefined;
 
-      const existing = await cxGetProfile(userId);
+      const existing = await cxGetProfile(profileKey);
       if (existing) {
-        await cxPatchProfile(userId, {
+        await cxPatchProfile(profileKey, {
           contact_email: email || existing.contact_email,
           ...(brandName !== undefined ? { brand_name: brandName } : {}),
           ...(fullName !== undefined ? { full_name: fullName } : {}),
@@ -49,24 +62,25 @@ router.post(
         return;
       }
 
-      await cxInsertProfile(userId, at, cap, cap);
-      await cxPatchProfile(userId, {
-        contact_email: email || undefined,
-        brand_name: brandName,
-        full_name: fullName,
-        role,
+      await cxInsertProfile(canonicalId, at, cap, cap, {
+        ...(email ? { contactEmail: email } : {}),
+      });
+      await cxPatchProfile(profileKey, {
+        ...(brandName !== undefined ? { brand_name: brandName } : {}),
+        ...(fullName !== undefined ? { full_name: fullName } : {}),
+        ...(role !== undefined ? { role } : {}),
       });
 
-      /** Welcome mail via backend Resend (same path as `/api/emails/welcome`). */
       if (email) {
-        void sendWelcomeEmail({
+        const firstToken =
+          fullName?.trim()?.split(/\s+/)[0] ?? brandName?.trim()?.split(/\s+/)[0];
+        void sendAccountVerifiedEmail({
           email,
-          name: fullName ?? brandName ?? undefined,
-          brandName: brandName ?? undefined,
+          ...(firstToken ? { firstName: firstToken } : {}),
         }).catch((e) =>
-          logger.warn('welcome email skipped or failed after profile create', {
+          logger.warn('account verified email skipped or failed after profile create', {
             error: String(e),
-            userId: userId.slice(0, 12),
+            userId: canonicalId.slice(0, 12),
           })
         );
       }
@@ -84,7 +98,7 @@ router.post(
  */
 router.get('/me', requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const profile = await cxGetProfile(req.user!.id);
+    const profile = await cxGetProfile(convexProfileCreditLookupKey(req));
     res.json({
       user: { id: req.user!.id, email: req.user!.email || '' },
       profile,
@@ -120,7 +134,7 @@ router.patch(
         res.status(400).json({ error: 'No valid settings fields' });
         return;
       }
-      await cxPatchProfile(req.user!.id, patch);
+      await cxPatchProfile(convexProfileCreditLookupKey(req), patch);
       res.json({ ok: true });
     } catch (err) {
       next(err);
@@ -145,7 +159,7 @@ router.patch(
         return;
       }
       const goals = onboarding_goals.filter((g): g is string => typeof g === 'string');
-      await cxPatchProfile(req.user!.id, {
+      await cxPatchProfile(convexProfileCreditLookupKey(req), {
         compliance_onboarding_completed_at: completed_at,
         onboarding_goals: goals,
         updated_at: completed_at,

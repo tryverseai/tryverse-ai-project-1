@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { body, param } from 'express-validator';
-import { requireAuth, optionalAuth, requireAuthenticatedActor } from '../middleware/auth';
+import { requireAuth, optionalAuth, requireAuthenticatedActor, convexProfileCreditLookupKey } from '../middleware/auth';
 import { optionalApiKey } from '../middleware/apiKey';
 import { tryonRateLimit } from '../middleware/rateLimiter';
 import { planAwareTryonRateLimit } from '../middleware/planRateLimit';
@@ -101,7 +101,7 @@ router.post(
         return;
       }
 
-      const creditCheck = await checkCredits(userId);
+      const creditCheck = await checkCredits(convexProfileCreditLookupKey(req));
       if (!creditCheck.allowed) {
         logger.info('Credits exhausted', {
           userId,

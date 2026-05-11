@@ -51,6 +51,35 @@ export function welcomeEmail(params: { name: string; brandName: string; appUrl?:
   };
 }
 
+export function accountVerifiedEmail(params: { firstName?: string; signInUrl?: string }) {
+  const displayFirst = escapeHtml(((params.firstName || 'there').trim() || 'there'));
+  const signInUrlRaw = params.signInUrl ?? `${DEFAULT_APP_URL.replace(/\/$/, '')}/auth`;
+  const signInHref = escapeHtml(signInUrlRaw);
+
+  return {
+    subject: 'Your TryVerse account has been verified',
+    html: `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="${STYLES}">
+  <div style="padding: 32px 24px;">
+    <p>Hi ${displayFirst},</p>
+    <p>Your TryVerse account has been successfully verified and is now active.</p>
+    <p>You can now sign in and access your TryVerse experience — including virtual try-ons, AI-powered fashion visualization, and early access features currently available on the platform.</p>
+    <p>We're excited to have you as part of the early TryVerse community.</p>
+    <p>Sign in below to get started:</p>
+    <a href="${signInHref}" style="${BUTTON_STYLES}">Sign In to TryVerse</a>
+    <p style="margin-top: 24px;"><a href="${signInHref}" style="color: #444; word-break: break-all;">${signInHref}</a></p>
+    <p style="margin-top: 24px;">If you did not create this account, you can safely ignore this email.</p>
+    <p>Welcome to the future of fashion commerce.</p>
+    <p style="margin-top: 32px; font-size: 14px; color: #666;">— The TryVerse Team<br/><a href="https://tryverseai.com" style="color:#666;">https://tryverseai.com</a></p>
+  </div>
+</body>
+</html>`,
+  };
+}
+
 export function apiKeyDeliveryEmail(params: { name: string; keyName: string; keyPreview: string; appUrl?: string }) {
   const { name, keyName, keyPreview, appUrl = DEFAULT_APP_URL } = params;
   return {

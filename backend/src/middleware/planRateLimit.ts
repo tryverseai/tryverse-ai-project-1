@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getRedisClient } from '../config/redis';
 import { getPlanId } from '../services/credits';
+import { convexProfileCreditLookupKey } from './auth';
 import { logger } from '../config/logger';
 
 /**
@@ -52,7 +53,7 @@ export async function planAwareTryonRateLimit(
   next: NextFunction
 ): Promise<void> {
   const identifier = req.user?.id || req.apiKey?.userId || req.ip || 'anon';
-  const planId = req.user?.id ? await getPlanId(req.user.id) : 'free';
+  const planId = req.user?.id ? await getPlanId(convexProfileCreditLookupKey(req)) : 'free';
   const config = PLAN_LIMITS[planId] ?? PLAN_LIMITS.free;
   const key = `tryon:rate:${identifier}`;
 

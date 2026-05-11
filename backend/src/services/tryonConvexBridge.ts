@@ -1,3 +1,4 @@
+import { authSubjectSegments, canonicalConvexProfileUserId } from '../lib/convexProfileId';
 import { env } from '../config/env';
 import { anyApi, convexMutationTrusted, convexQueryTrusted } from '../config/convexHttp';
 import type { ProductCategory, TryOnStatus, UsageEventType } from '../types';
@@ -31,6 +32,15 @@ export interface TryOnRecord extends TryOnRow {
 }
 
 // ─── Bridge functions ─────────────────────────────────────────────────────────
+
+/** Move legacy non-canonical try-on rows to profiles’ canonical Convex user doc id after login. */
+export async function cxConsolidateTryonsToCanonicalUserId(rawSubject: string): Promise<void> {
+  await convexMutationTrusted(anyApi.backendTrusted.consolidateTryonsToCanonicalUserId, {
+    ...secretArg(),
+    aliases: authSubjectSegments(rawSubject),
+    canonicalUserId: canonicalConvexProfileUserId(rawSubject),
+  });
+}
 
 export async function cxInsertTryon(args: {
   legacyId: string;

@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { body } from 'express-validator';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, convexProfileCreditLookupKey } from '../middleware/auth';
 import { paymentRateLimit } from '../middleware/rateLimiter';
 import { handleValidationErrors } from '../middleware/validate';
 import { AppError } from '../middleware/errorHandler';
@@ -146,7 +146,7 @@ router.post(
         throw new AppError('This plan is not available for self-checkout in this currency', 400);
       }
 
-      const profile = await cxGetProfile(req.user!.id);
+      const profile = await cxGetProfile(convexProfileCreditLookupKey(req));
 
       const result = await initializeFlutterwavePayment({
         email: req.user!.email,

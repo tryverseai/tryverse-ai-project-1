@@ -1,6 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { requireAuth } from '../middleware/auth';
-import { requireAdmin } from '../middleware/auth';
+import { requireAuth, requireAdmin, convexProfileCreditLookupKey } from '../middleware/auth';
 import { getBrandAnalytics } from '../services/analytics/analytics';
 import { getCacheStats } from '../services/cache/tryonCache';
 import { env } from '../config/env';
@@ -19,7 +18,11 @@ router.get(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const days = Math.min(parseInt(String(req.query.days || '30'), 10), 365);
-      const analytics = await getBrandAnalytics(req.user!.id, days);
+      const analytics = await getBrandAnalytics(
+        convexProfileCreditLookupKey(req),
+        req.user!.id,
+        days
+      );
       res.json({ ...analytics, period: { days } });
     } catch (err) {
       next(err);
