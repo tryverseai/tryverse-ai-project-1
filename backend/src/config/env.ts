@@ -41,6 +41,18 @@ function sanitizeEnvLine(raw: string | undefined, defaultValue = ''): string {
   return raw.replace(/^\uFEFF/, '').trim();
 }
 
+/**
+ * ConvexHttpClient + JWT verification require a stable URL (trailing slash differences break auth).
+ */
+function normalizeConvexDeploymentUrl(raw: string): string {
+  let u = sanitizeEnvLine(raw, '').replace(/\/+$/, '');
+  if (!u) return u;
+  if (!/^https?:\/\//i.test(u)) {
+    u = `https://${u}`;
+  }
+  return u;
+}
+
 function optionalBool(key: string, defaultValue = false): boolean {
   const val = process.env[key];
   if (!val) return defaultValue;
@@ -69,7 +81,8 @@ export const env = {
   PORT: parseInt(optionalEnv('PORT', '3001'), 10),
 
   // ── Convex (primary DB + auth validation) ─────────────────────────────────
-  CONVEX_URL: requireEnv('CONVEX_URL'),
+  /** Must match `VITE_CONVEX_URL` in the web app (same deployment = same JWT issuer). */
+  CONVEX_URL: normalizeConvexDeploymentUrl(requireEnvTrimmed('CONVEX_URL')),
   /** Shared secret for Node → Convex `backendTrusted.*` (set same value in Convex env). */
   BACKEND_SHARED_SECRET: requireEnvTrimmed('BACKEND_SHARED_SECRET'),
 

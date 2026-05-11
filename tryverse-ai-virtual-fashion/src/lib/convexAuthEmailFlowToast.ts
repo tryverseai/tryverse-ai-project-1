@@ -4,6 +4,8 @@
  * can see the real cause in the browser console.
  */
 
+import { ApiError } from "@/lib/backendApi";
+
 export type AuthEmailFlow = "signup" | "password_reset" | "email_verify" | "reset_verify";
 
 function rawMessage(err: unknown): string {
@@ -118,6 +120,38 @@ export function convexAuthEmailFlowToast(err: unknown, flow: AuthEmailFlow): nul
     console.warn(`[TryVerse auth:${flow}]`, collapsed.length > 1200 ? `${collapsed.slice(0, 1200)}…` : collapsed);
   }
 
+  /** Railway `/api/account/session/bootstrap` — JWT verified via ConvexHttpClient(CONVEX_URL). */
+  if (err instanceof ApiError && err.code === "BEARER_VERIFICATION_FAILED") {
+    return {
+      title: "Couldn’t finish sign-up",
+      description: collapsed || err.message,
+      variant: "destructive",
+    };
+  }
+
+  /** Older API response before `BEARER_VERIFICATION_FAILED` (plain 500). */
+  if (
+    err instanceof ApiError &&
+    err.status === 500 &&
+    /^authentication service error$/i.test(collapsed.trim())
+  ) {
+    return {
+      title: "Couldn’t finish sign-up",
+      description:
+        "The API (Railway) could not verify your Convex session. On Railway → Variables, set CONVEX_URL to exactly the same deployment URL as your web app’s VITE_CONVEX_URL (Convex → Settings → Deployment URL, no trailing slash). Redeploy Railway.",
+      variant: "destructive",
+    };
+  }
+
+  if (flow === "signup" && /^authentication service error$/i.test(collapsed.trim())) {
+    return {
+      title: "Couldn’t finish sign-up",
+      description:
+        "The API (Railway) could not verify your Convex session. Set Railway CONVEX_URL = your frontend’s VITE_CONVEX_URL (same Convex deployment URL). Redeploy Railway.",
+      variant: "destructive",
+    };
+  }
+
   const nested = extractNestedAuthFailure(collapsed);
 
   const signupSimpleDestructive = (): { title: string; description: string; variant: "destructive" } => {
@@ -219,21 +253,13 @@ export function convexAuthEmailFlowToast(err: unknown, flow: AuthEmailFlow): nul
     return signupSimpleDestructive();
   }
 
-  /**
-   * Convex Auth / client sometimes surfaces only this line (e.g. email send or auth action failed server-side).
-   */
-  if (
-    (flow === "signup" || flow === "password_reset") &&
-    /\bauthentication\s+service\s+error\b/i.test(low)
-  ) {
-    if (flow === "password_reset") {
-      return {
-        title: flowTitle("password_reset"),
-        description: MSG_PASSWORD_RESET_EMAIL_INFRA,
-        variant: "destructive",
-      };
-    }
-    return signupSimpleDestructive();
+  /** Rare: only for password reset email path surfacing this string. */
+  if (flow === "password_reset" && /\bauthentication\s+service\s+error\b/i.test(low)) {
+    return {
+      title: flowTitle("password_reset"),
+      description: MSG_PASSWORD_RESET_EMAIL_INFRA,
+      variant: "destructive",
+    };
   }
 
   return null;

@@ -264,6 +264,10 @@ async function bootstrap(): Promise<void> {
       logger.info(
         'JWT verification uses CONVEX_URL above — it must match VITE_CONVEX_URL in the web app or Bearer auth will fail.'
       );
+    } else {
+      logger.warn(
+        'Production: verify Railway CONVEX_URL matches the web app VITE_CONVEX_URL (same Convex deployment URL).'
+      );
     }
     logger.info('Clothing try-on routing (effective)', {
       clothingUseFashn: env.TRYON_CLOTHING_USE_FASHN,

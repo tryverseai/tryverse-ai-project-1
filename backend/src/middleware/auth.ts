@@ -110,7 +110,16 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       });
     }
     logger.error('Auth middleware error', { error: String(err), path: req.path });
-    res.status(500).json({ error: 'Authentication service error' });
+    /**
+     * Convex JWT verification runs via CONVEX_URL. Mismatch with the app's VITE_CONVEX_URL
+     * causes failures here — returning a generic "Authentication service error" made teams
+     * chase Resend instead of Railway env.
+     */
+    res.status(500).json({
+      error:
+        'Could not verify session with Convex. On Railway (this API), set CONVEX_URL to exactly the same deployment URL as your web app (VITE_CONVEX_URL). Convex → Settings → Deployment URL — no trailing slash. Redeploy the API after changing env.',
+      code: 'BEARER_VERIFICATION_FAILED',
+    });
   }
 }
 
