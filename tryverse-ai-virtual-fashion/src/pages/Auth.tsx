@@ -178,7 +178,7 @@ const Auth = () => {
       if (result.error) {
         console.error("Signup error:", result.error);
         const t = signUpErrorToast(result.error);
-        toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
+        toast({ title: t.title, description: t.description, variant: t.variant, duration: 15000 });
       } else if ("needsEmailVerification" in result && result.needsEmailVerification) {
         saveEmailVerifyPending({
           email: result.pendingEmail,
@@ -204,7 +204,7 @@ const Auth = () => {
       if (result.error) {
         console.error("Signup error:", result.error);
         const t = signUpErrorToast(result.error);
-        toast({ title: t.title, description: t.description, variant: t.variant, duration: 9000 });
+        toast({ title: t.title, description: t.description, variant: t.variant, duration: 15000 });
       } else if ("needsEmailVerification" in result && result.needsEmailVerification) {
         saveEmailVerifyPending({
           email: result.pendingEmail,

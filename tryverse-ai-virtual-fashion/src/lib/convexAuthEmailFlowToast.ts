@@ -24,6 +24,16 @@ function looksLikeConvexAuthSignInWrapper(collapsed: string): boolean {
 }
 
 const MAX_DETAIL_CHARS = 720;
+const MAX_TOAST_TECHNICAL = 520;
+
+function truncateForToast(text: string, max: number): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  const slice = t.slice(0, max - 1);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cut = lastSpace > max * 0.55 ? slice.slice(0, lastSpace) : slice;
+  return `${cut}…`;
+}
 
 /**
  * Convex client often wraps the real failure as `[CONVEX A(auth:signIn)] … Uncaught Error: Resend error: {...}`.
@@ -33,7 +43,7 @@ function extractNestedAuthFailure(collapsed: string): string | null {
   const t = collapsed.trim();
   if (!t) return null;
 
-  const resendIdx = t.search(/\bResend error:\s*/i);
+  const resendIdx = t.search(/\bresend\s+error:\s*/i);
   if (resendIdx >= 0) {
     const rest = t.slice(resendIdx).trim();
     if (rest.length > 0) return rest.length > MAX_DETAIL_CHARS ? `${rest.slice(0, MAX_DETAIL_CHARS - 1)}…` : rest;
@@ -60,9 +70,10 @@ const MSG_EMAIL_VERIFY_CODE =
 const MSG_RESET_CODE =
   "That code didn’t work or may have expired. Use Forgot password to get a new code.";
 
-/** Shown when Convex strips details but the failure is almost always email / Resend config. */
 const MSG_SIGNUP_EMAIL_INFRA =
-  "We couldn’t send your verification email. Set AUTH_RESEND_KEY on the same Convex deployment as your app’s VITE_CONVEX_URL (dashboard → correct project + Production). Use the active API key from resend.com (often the same as backend RESEND_API_KEY). If the key is already set, Resend may be rejecting the send—see the technical line below or DevTools “[TryVerse auth:signup]”.";
+  "On the Convex Production deployment that matches your app’s VITE_CONVEX_URL, set AUTH_RESEND_KEY to your active Resend API key (same as backend RESEND_API_KEY). If it’s already set, Resend may block the recipient (sandbox / test mode) or the sender in AUTH_EMAIL_FROM.";
+
+const SIGNUP_CONSOLE_HINT = "Open DevTools (F12) → Console; the full error is logged as a line containing TryVerse auth signup.";
 
 const MSG_PASSWORD_RESET_EMAIL_INFRA =
   "We couldn’t send the reset-code email. Set AUTH_RESEND_KEY on Convex to your active Resend key (same as backend RESEND_API_KEY). Check DevTools Console for “[TryVerse auth:password_reset]…”.";
@@ -110,13 +121,15 @@ export function convexAuthEmailFlowToast(err: unknown, flow: AuthEmailFlow): nul
   const nested = extractNestedAuthFailure(collapsed);
 
   const signupSimpleDestructive = (): { title: string; description: string; variant: "destructive" } => {
-    const technical = nested ?? (/\[CONVEX A\(auth/i.test(collapsed) ? collapsed.slice(0, 420) : null);
-    const description = technical
-      ? `${MSG_SIGNUP_EMAIL_INFRA} — ${technical}${technical.length >= 420 ? "…" : ""}`
-      : MSG_SIGNUP_EMAIL_INFRA;
+    const rawTechnical =
+      nested ??
+      (/\[CONVEX A\(auth/i.test(collapsed) ? truncateForToast(collapsed, MAX_TOAST_TECHNICAL) : null);
+    const description = rawTechnical
+      ? `Couldn’t send verification email. ${truncateForToast(rawTechnical, 480)} — ${MSG_SIGNUP_EMAIL_INFRA} ${SIGNUP_CONSOLE_HINT}`
+      : `Couldn’t send verification email. ${MSG_SIGNUP_EMAIL_INFRA} ${SIGNUP_CONSOLE_HINT}`;
     return {
       title: flowTitle("signup"),
-      description: description.length > 900 ? `${description.slice(0, 897)}…` : description,
+      description: truncateForToast(description, 1450),
       variant: "destructive",
     };
   };
