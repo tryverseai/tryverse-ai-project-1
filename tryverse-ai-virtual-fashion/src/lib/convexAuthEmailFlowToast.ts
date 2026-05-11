@@ -23,6 +23,37 @@ function looksLikeConvexAuthSignInWrapper(collapsed: string): boolean {
   );
 }
 
+const MAX_DETAIL_CHARS = 720;
+
+/**
+ * Convex client often wraps the real failure as `[CONVEX A(auth:signIn)] … Uncaught Error: Resend error: {...}`.
+ * Pull out the inner part so toasts show the actionable message, not only generic infra copy.
+ */
+function extractNestedAuthFailure(collapsed: string): string | null {
+  const t = collapsed.trim();
+  if (!t) return null;
+
+  const resendIdx = t.search(/\bResend error:\s*/i);
+  if (resendIdx >= 0) {
+    const rest = t.slice(resendIdx).trim();
+    if (rest.length > 0) return rest.length > MAX_DETAIL_CHARS ? `${rest.slice(0, MAX_DETAIL_CHARS - 1)}…` : rest;
+  }
+
+  const unc = /\bUncaught Error:\s*/i.exec(t);
+  if (unc && unc.index !== undefined) {
+    let rest = t.slice(unc.index + unc[0].length).trim();
+    const atSplit = rest.split(/\s+at\s+\w/);
+    rest = (atSplit[0] ?? rest).trim();
+    // Drop trailing "Called by client"
+    rest = rest.replace(/\s+Called by client\s*$/i, "").trim();
+    if (rest.length > 8 && rest.length < MAX_DETAIL_CHARS + 80) {
+      return rest.length > MAX_DETAIL_CHARS ? `${rest.slice(0, MAX_DETAIL_CHARS - 1)}…` : rest;
+    }
+  }
+
+  return null;
+}
+
 const MSG_EMAIL_VERIFY_CODE =
   "That code didn’t work or may have expired. Go back, sign up or sign in again, and use the newest 8-digit code from your inbox.";
 
@@ -31,7 +62,7 @@ const MSG_RESET_CODE =
 
 /** Shown when Convex strips details but the failure is almost always email / Resend config. */
 const MSG_SIGNUP_EMAIL_INFRA =
-  "We couldn’t send your verification email. Set AUTH_RESEND_KEY on your Convex deployment to the active API key from resend.com (the same RESEND_API_KEY you use on the backend). For a custom “from” address, verify your domain at Resend and set AUTH_EMAIL_FROM. Open DevTools Console for “[TryVerse auth:signup]…” with the technical message.";
+  "We couldn’t send your verification email. Set AUTH_RESEND_KEY on the same Convex deployment as your app’s VITE_CONVEX_URL (dashboard → correct project + Production). Use the active API key from resend.com (often the same as backend RESEND_API_KEY). If the key is already set, Resend may be rejecting the send—see the technical line below or DevTools “[TryVerse auth:signup]”.";
 
 const MSG_PASSWORD_RESET_EMAIL_INFRA =
   "We couldn’t send the reset-code email. Set AUTH_RESEND_KEY on Convex to your active Resend key (same as backend RESEND_API_KEY). Check DevTools Console for “[TryVerse auth:password_reset]…”.";
@@ -76,17 +107,31 @@ export function convexAuthEmailFlowToast(err: unknown, flow: AuthEmailFlow): nul
     console.warn(`[TryVerse auth:${flow}]`, collapsed.length > 1200 ? `${collapsed.slice(0, 1200)}…` : collapsed);
   }
 
-  const signupSimpleDestructive = (): { title: string; description: string; variant: "destructive" } => ({
-    title: flowTitle("signup"),
-    description: MSG_SIGNUP_EMAIL_INFRA,
-    variant: "destructive",
-  });
+  const nested = extractNestedAuthFailure(collapsed);
 
-  const resetSendSimpleDestructive = (): { title: string; description: string; variant: "destructive" } => ({
-    title: flowTitle("password_reset"),
-    description: MSG_PASSWORD_RESET_EMAIL_INFRA,
-    variant: "destructive",
-  });
+  const signupSimpleDestructive = (): { title: string; description: string; variant: "destructive" } => {
+    const technical = nested ?? (/\[CONVEX A\(auth/i.test(collapsed) ? collapsed.slice(0, 420) : null);
+    const description = technical
+      ? `${MSG_SIGNUP_EMAIL_INFRA} — ${technical}${technical.length >= 420 ? "…" : ""}`
+      : MSG_SIGNUP_EMAIL_INFRA;
+    return {
+      title: flowTitle("signup"),
+      description: description.length > 900 ? `${description.slice(0, 897)}…` : description,
+      variant: "destructive",
+    };
+  };
+
+  const resetSendSimpleDestructive = (): { title: string; description: string; variant: "destructive" } => {
+    const technical = nested;
+    const description = technical
+      ? `${MSG_PASSWORD_RESET_EMAIL_INFRA} — ${technical}`
+      : MSG_PASSWORD_RESET_EMAIL_INFRA;
+    return {
+      title: flowTitle("password_reset"),
+      description: description.length > 900 ? `${description.slice(0, 897)}…` : description,
+      variant: "destructive",
+    };
+  };
 
   const isResendTestModeOnly =
     low.includes("only send testing emails") ||
@@ -108,12 +153,13 @@ export function convexAuthEmailFlowToast(err: unknown, flow: AuthEmailFlow): nul
 
   /** Server surfaced a full Resend / config explanation — prefer it verbatim in the toast */
   const useRawDescription =
-    /email could not be sent|resend is in testing mode|sending domain for auth_email_from|resend rate or quota rejected/i.test(
+    /email could not be sent|resend is in testing mode|sending domain for auth_email_from|resend rate or quota rejected|\bresend error:/i.test(
       low,
     );
   if (useRawDescription) {
     const desc =
-      collapsed.length > 560 ? `${collapsed.slice(0, 557)}…` : collapsed || MSG_SIGNUP_EMAIL_INFRA;
+      nested ??
+      (collapsed.length > 560 ? `${collapsed.slice(0, 557)}…` : collapsed || MSG_SIGNUP_EMAIL_INFRA);
     if (flow === "password_reset") {
       return { title: flowTitle("password_reset"), description: desc, variant: "destructive" };
     }
