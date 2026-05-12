@@ -19,23 +19,40 @@ async function sendAccountVerifiedEmailOnce(params: {
   const { profileKey, email, fullName, brandName, logUserSlice } = params;
   const row = await cxGetProfile(profileKey);
   if (!row || !email.trim()) return;
-  if (typeof row.verification_email_sent_at === 'string' && row.verification_email_sent_at) {
-    return;
-  }
+
+  const already =
+    typeof row.verification_email_sent_at === 'string'
+      ? row.verification_email_sent_at.trim().length > 0
+      : Boolean((row as { verification_email_sent_at?: unknown }).verification_email_sent_at);
+  if (already) return;
+
   const firstToken =
     fullName?.trim()?.split(/\s+/)[0] ?? brandName?.trim()?.split(/\s+/)[0];
+
+  /** Lock immediately so repeated bootstraps (sign-in from email link) cannot resend in a tight loop even if Resend errors. */
+  const lockIso = new Date().toISOString();
+  try {
+    await cxPatchProfile(profileKey, { verification_email_sent_at: lockIso });
+  } catch (e) {
+    logger.warn('could not lock verification_email_sent_at before send', {
+      error: String(e),
+      userId: logUserSlice,
+    });
+    return;
+  }
+
   try {
     const ok = await sendAccountVerifiedEmail({
       email,
       ...(firstToken ? { firstName: firstToken } : {}),
     });
-    if (ok) {
-      await cxPatchProfile(profileKey, {
-        verification_email_sent_at: new Date().toISOString(),
+    if (!ok) {
+      logger.warn('account verified email was not confirmed by provider (Resend); not retrying from bootstrap', {
+        userId: logUserSlice,
       });
     }
   } catch (e) {
-    logger.warn('account verified email skipped or failed', {
+    logger.warn('account verified email send threw', {
       error: String(e),
       userId: logUserSlice,
     });

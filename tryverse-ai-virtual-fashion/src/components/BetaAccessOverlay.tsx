@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api } from "../../convex/_generated/api";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { TermsPostBetaGate } from "@/components/TermsPostBetaGate";
+import { Button } from "@/components/ui/button";
 import { useAdminOperatorBypass } from "@/hooks/useAdminOperatorBypass";
 
 const INSTAGRAM_URL = "https://instagram.com/tryverseai";
