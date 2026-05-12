@@ -114,6 +114,148 @@ export const patchProfileRow = mutation({
   },
 });
 
+export const countTrustedDevicesForProfile = query({
+  args: { secret: v.string(), userProfileId: v.string() },
+  handler: async (ctx, { secret, userProfileId }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db
+      .query("trusted_devices")
+      .withIndex("by_user", (q) => q.eq("user_profile_id", userProfileId))
+      .collect();
+    return rows.length;
+  },
+});
+
+export const isDeviceFingerprintTrusted = query({
+  args: { secret: v.string(), userProfileId: v.string(), fingerprint: v.string() },
+  handler: async (ctx, { secret, userProfileId, fingerprint }) => {
+    requireBackendSecret(secret);
+    const fp = fingerprint.trim();
+    if (!fp) return false;
+    const row = await ctx.db
+      .query("trusted_devices")
+      .withIndex("by_user_fingerprint", (q) =>
+        q.eq("user_profile_id", userProfileId).eq("fingerprint", fp),
+      )
+      .unique();
+    return row !== null;
+  },
+});
+
+export const registerTrustedDevice = mutation({
+  args: { secret: v.string(), userProfileId: v.string(), fingerprint: v.string() },
+  handler: async (ctx, args) => {
+    requireBackendSecret(args.secret);
+    const fp = args.fingerprint.trim();
+    if (!fp) throw new Error("Missing fingerprint");
+    const existing = await ctx.db
+      .query("trusted_devices")
+      .withIndex("by_user_fingerprint", (q) =>
+        q.eq("user_profile_id", args.userProfileId).eq("fingerprint", fp),
+      )
+      .unique();
+    if (existing) return { ok: true as const, created: false as const };
+    const now = new Date().toISOString();
+    await ctx.db.insert("trusted_devices", {
+      user_profile_id: args.userProfileId,
+      fingerprint: fp,
+      created_at: now,
+    });
+    return { ok: true as const, created: true as const };
+  },
+});
+
+export const replaceDeviceApprovalChallenge = mutation({
+  args: {
+    secret: v.string(),
+    userProfileId: v.string(),
+    fingerprint: v.string(),
+    codeHash: v.string(),
+    expiresAtMs: v.number(),
+  },
+  handler: async (ctx, args) => {
+    requireBackendSecret(args.secret);
+    const fp = args.fingerprint.trim();
+    if (!fp) throw new Error("Missing fingerprint");
+    const prev = await ctx.db
+      .query("device_approval_challenges")
+      .withIndex("by_user_profile_fingerprint", (q) =>
+        q.eq("user_profile_id", args.userProfileId).eq("fingerprint", fp),
+      )
+      .collect();
+    for (const row of prev) await ctx.db.delete(row._id);
+    const now = new Date().toISOString();
+    await ctx.db.insert("device_approval_challenges", {
+      user_profile_id: args.userProfileId,
+      fingerprint: fp,
+      code_hash: args.codeHash,
+      expires_at: args.expiresAtMs,
+      used: false,
+      created_at: now,
+    });
+    return { ok: true as const };
+  },
+});
+
+export const verifyDeviceApprovalChallenge = mutation({
+  args: {
+    secret: v.string(),
+    userProfileId: v.string(),
+    fingerprint: v.string(),
+    codeHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    requireBackendSecret(args.secret);
+    const fp = args.fingerprint.trim();
+    if (!fp) throw new Error("Missing fingerprint");
+    const rows = await ctx.db
+      .query("device_approval_challenges")
+      .withIndex("by_user_profile_fingerprint", (q) =>
+        q.eq("user_profile_id", args.userProfileId).eq("fingerprint", fp),
+      )
+      .collect();
+    const nowMs = Date.now();
+    let matched: Doc<"device_approval_challenges"> | null = null;
+    for (const row of rows) {
+      if (row.used) continue;
+      if (row.expires_at <= nowMs) continue;
+      if (row.code_hash !== args.codeHash) continue;
+      matched = row;
+      break;
+    }
+    if (!matched) throw new Error("INVALID_DEVICE_CODE");
+
+    await ctx.db.patch(matched._id, { used: true } as never);
+
+    const trustExists = await ctx.db
+      .query("trusted_devices")
+      .withIndex("by_user_fingerprint", (q) =>
+        q.eq("user_profile_id", args.userProfileId).eq("fingerprint", fp),
+      )
+      .unique();
+    if (!trustExists) {
+      const ts = new Date().toISOString();
+      await ctx.db.insert("trusted_devices", {
+        user_profile_id: args.userProfileId,
+        fingerprint: fp,
+        created_at: ts,
+      });
+    }
+
+    const stale = await ctx.db
+      .query("device_approval_challenges")
+      .withIndex("by_user_profile_fingerprint", (q) =>
+        q.eq("user_profile_id", args.userProfileId).eq("fingerprint", fp),
+      )
+      .collect();
+    for (const row of stale) {
+      if (row._id !== matched._id && !row.used) await ctx.db.delete(row._id);
+    }
+
+    return { ok: true as const };
+  },
+});
+
 async function profileRowForBackend(ctx: MutationCtx, userId: string) {
   for (const key of authSubjectSegments(userId)) {
     const row = await ctx.db
@@ -225,7 +367,20 @@ export const deleteUserAccountBackendTrusted = mutation({
     }
 
     const prof = await profileRowForBackend(ctx, userId);
-    if (prof) await ctx.db.delete(prof._id);
+    if (prof) {
+      const pid = prof.id;
+      const trusts = await ctx.db
+        .query("trusted_devices")
+        .withIndex("by_user", (q) => q.eq("user_profile_id", pid))
+        .collect();
+      for (const t of trusts) await ctx.db.delete(t._id);
+      const chals = await ctx.db
+        .query("device_approval_challenges")
+        .withIndex("by_user_profile", (q) => q.eq("user_profile_id", pid))
+        .collect();
+      for (const c of chals) await ctx.db.delete(c._id);
+      await ctx.db.delete(prof._id);
+    }
 
     for (const seg of keys) {
       try {

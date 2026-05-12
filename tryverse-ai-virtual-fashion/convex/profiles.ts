@@ -32,6 +32,7 @@ const profilePatch = v.object({
   beta_rejected_at: v.optional(v.string()),
   terms_of_service_accepted_at: v.optional(v.string()),
   verification_email_sent_at: v.optional(v.string()),
+  welcome_email_sent_at: v.optional(v.string()),
 });
 
 /** Current user's profile (Convex Auth JWT). */

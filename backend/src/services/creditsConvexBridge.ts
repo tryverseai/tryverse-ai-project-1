@@ -25,6 +25,7 @@ export interface ConvexProfileRow {
   beta_rejected?: boolean;
   beta_rejected_at?: string | null;
   verification_email_sent_at?: string | null;
+  welcome_email_sent_at?: string | null;
   terms_of_service_accepted_at?: string | null;
   [key: string]: unknown;
 }
@@ -68,6 +69,52 @@ export async function cxInsertProfile(
     ...(opts?.contactEmail?.trim()
       ? { contactEmail: opts.contactEmail.trim() }
       : {}),
+  });
+}
+
+export async function cxCountTrustedDevices(userProfileId: string): Promise<number> {
+  return convexQueryTrusted<number>(anyApi.backendTrusted.countTrustedDevicesForProfile, {
+    ...trusted(),
+    userProfileId,
+  });
+}
+
+export async function cxIsFingerprintTrusted(userProfileId: string, fingerprint: string): Promise<boolean> {
+  return convexQueryTrusted<boolean>(anyApi.backendTrusted.isDeviceFingerprintTrusted, {
+    ...trusted(),
+    userProfileId,
+    fingerprint,
+  });
+}
+
+export async function cxRegisterTrustedDevice(userProfileId: string, fingerprint: string): Promise<void> {
+  await convexMutationTrusted(anyApi.backendTrusted.registerTrustedDevice, {
+    ...trusted(),
+    userProfileId,
+    fingerprint,
+  });
+}
+
+export async function cxReplaceDeviceApprovalChallenge(params: {
+  userProfileId: string;
+  fingerprint: string;
+  codeHash: string;
+  expiresAtMs: number;
+}): Promise<void> {
+  await convexMutationTrusted(anyApi.backendTrusted.replaceDeviceApprovalChallenge, {
+    ...trusted(),
+    ...params,
+  });
+}
+
+export async function cxVerifyDeviceApprovalChallenge(params: {
+  userProfileId: string;
+  fingerprint: string;
+  codeHash: string;
+}): Promise<void> {
+  await convexMutationTrusted(anyApi.backendTrusted.verifyDeviceApprovalChallenge, {
+    ...trusted(),
+    ...params,
   });
 }
 

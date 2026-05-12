@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { body } from 'express-validator';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, convexProfileCreditLookupKey } from '../middleware/auth';
 import { handleValidationErrors } from '../middleware/validate';
 import { sendWelcomeEmail, sendApiKeyDeliveryEmail } from '../services/email';
+import { cxGetProfile } from '../services/creditsConvexBridge';
 
 const router = Router();
 
@@ -23,6 +24,18 @@ router.post(
       const email = req.user!.email;
       if (!email) {
         res.status(400).json({ error: 'Account has no email address' });
+        return;
+      }
+      const profileKey = convexProfileCreditLookupKey(req);
+      const profile = await cxGetProfile(profileKey);
+      const welcomeIso =
+        typeof profile?.welcome_email_sent_at === 'string' ? profile.welcome_email_sent_at.trim() : '';
+      const legacyIso =
+        typeof profile?.verification_email_sent_at === 'string'
+          ? profile.verification_email_sent_at.trim()
+          : '';
+      if (welcomeIso.length > 0 || legacyIso.length > 0) {
+        res.status(204).end();
         return;
       }
       const { name, brandName } = req.body;

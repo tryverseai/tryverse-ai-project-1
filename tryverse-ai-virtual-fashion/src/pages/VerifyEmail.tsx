@@ -121,6 +121,17 @@ const VerifyEmail = () => {
         });
         return;
       }
+      if (verified.deviceApprovalRequired) {
+        saveEmailVerifyPending({ email: payload.email });
+        toast({
+          title: "Approve this browser next",
+          description:
+            "You’re verified. On the next screen, tap “Email me a code” and enter the 6-digit approval email for this browser.",
+          duration: 10000,
+        });
+        navigate("/auth/approve-device", { replace: true });
+        return;
+      }
       clearEmailVerifyPending();
       posthogCapture("email_verification_completed", { email: payload.email });
 

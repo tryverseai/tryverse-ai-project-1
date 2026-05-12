@@ -53,7 +53,7 @@ export function welcomeEmail(params: { name: string; brandName: string; appUrl?:
 
 export function accountVerifiedEmail(params: { firstName?: string; signInUrl?: string }) {
   const displayFirst = escapeHtml(((params.firstName || 'there').trim() || 'there'));
-  const signInUrlRaw = params.signInUrl ?? `${DEFAULT_APP_URL.replace(/\/$/, '')}/auth`;
+  const signInUrlRaw = params.signInUrl ?? `${DEFAULT_APP_URL.replace(/\/$/, '')}/dashboard`;
   const signInHref = escapeHtml(signInUrlRaw);
 
   return {
@@ -68,11 +68,35 @@ export function accountVerifiedEmail(params: { firstName?: string; signInUrl?: s
     <p>Your TryVerse account has been successfully verified and is now active.</p>
     <p>You can now sign in and access your TryVerse experience — including virtual try-ons, AI-powered fashion visualization, and early access features currently available on the platform.</p>
     <p>We&apos;re excited to have you as part of the early TryVerse community.</p>
-    <p>Sign in below to get started:</p>
-    <a href="${signInHref}" style="${BUTTON_STYLES}">Sign In to TryVerse</a>
+    <p>Open your dashboard below to get started:</p>
+    <a href="${signInHref}" style="${BUTTON_STYLES}">Open TryVerse Dashboard</a>
     <p style="margin-top: 24px;">If you did not create this account, you can safely ignore this email.</p>
     <p>Welcome to the future of fashion commerce.</p>
     <p style="margin-top: 32px; font-size: 14px; color: #666;">— The TryVerse Team<br/><a href="https://tryverseai.com" style="color:#666;">https://tryverseai.com</a></p>
+  </div>
+</body>
+</html>`,
+  };
+}
+
+export function deviceApprovalEmail(params: { firstName?: string; code: string; appUrl?: string }) {
+  const displayFirst = escapeHtml(((params.firstName || 'there').trim() || 'there'));
+  const { code, appUrl = DEFAULT_APP_URL } = params;
+  const safeCode = escapeHtml(code.trim());
+  return {
+    subject: 'Approve this device for TryVerse',
+    html: `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="${STYLES}">
+  <div style="padding: 32px 24px;">
+    <p>Hi ${displayFirst},</p>
+    <p>We noticed a sign-in attempt on a new browser or device. Use this code to approve it:</p>
+    <p style="font-size:28px;letter-spacing:0.22em;font-weight:700;margin:20px 0">${safeCode}</p>
+    <p style="margin:0;font-size:14px;color:#555">This code expires in 10 minutes. If this wasn&apos;t you, you can ignore this email and your other sessions stay active.</p>
+    <a href="${escapeHtml(appUrl.replace(/\/$/, ''))}/auth/approve-device" style="${BUTTON_STYLES}">Enter code in TryVerse</a>
+    <p style="margin-top: 32px; font-size: 14px; color: #666;">— The TryVerse Team</p>
   </div>
 </body>
 </html>`,

@@ -14,7 +14,12 @@ import { api } from "../../convex/_generated/api";
 import { normalizeAccountType, type AccountType, type LegacyUserMetadata } from "@/lib/accountType";
 import type { PendingEmailVerificationBootstrap } from "@/lib/emailVerifyPendingStorage";
 import { complianceDoneSessionKey } from "@/lib/complianceStorage";
-import { bootstrapLocalSession, type AccountBootstrapBody } from "@/lib/backendApi";
+import {
+  bootstrapLocalSession,
+  BootstrapDeviceApprovalRequiredError,
+  type AccountBootstrapBody,
+} from "@/lib/backendApi";
+import { getOrCreateDeviceFingerprint } from "@/lib/deviceFingerprint";
 import {
   setBackendAuthBearerToken,
   waitForBackendAuthBearerHeader,
@@ -54,6 +59,7 @@ interface AuthContextType {
         pendingEmail: string;
         pendingBootstrap: PendingEmailVerificationBootstrap;
       }
+    | { error: null; session: null; deviceApprovalRequired: true; pendingEmail: string }
     | { error: null; session: null }
   >;
   signIn: (
@@ -62,7 +68,13 @@ interface AuthContextType {
     turnstileToken?: string
   ) => Promise<
     | { error: Error }
-    | { error: null; needsEmailVerification: true; pendingEmail: string }
+    | {
+        error: null;
+        needsEmailVerification: true;
+        pendingEmail: string;
+        reuseVerificationCodeHint?: true;
+      }
+    | { error: null; deviceApprovalRequired: true; pendingEmail: string }
     | { error: null }
   >;
   /** Complete password `email-verification` step after Convex sends the OTP (8-digit code). */
@@ -70,7 +82,7 @@ interface AuthContextType {
     email: string,
     code: string,
     opts?: { turnstileToken?: string; pendingBootstrap?: PendingEmailVerificationBootstrap }
-  ) => Promise<{ error: Error | null }>;
+  ) => Promise<{ error: Error | null; deviceApprovalRequired?: true }>;
   /**
    * After Convex Auth has already signed the user in (e.g. password reset verification),
    * sync the Node API session / credits profile using the current JWT.
@@ -78,7 +90,7 @@ interface AuthContextType {
   syncBackendSession: (opts?: {
     email?: string;
     turnstileToken?: string;
-  }) => Promise<{ error: Error | null }>;
+  }) => Promise<{ error: Error | null; deviceApprovalRequired?: true }>;
   signOut: () => Promise<void>;
 }
 
@@ -129,6 +141,14 @@ function buildPasswordFormData(
   if (extra?.fullName != null) fd.set("fullName", extra.fullName);
   if (extra?.role != null) fd.set("role", extra.role);
   return fd;
+}
+
+function requireDeviceFingerprint(): string {
+  const fp = getOrCreateDeviceFingerprint();
+  if (fp.length < 8) {
+    throw new Error("Could not identify this browser. Enable local storage and reload the page.");
+  }
+  return fp;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -186,12 +206,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { access_token: token };
   }, [token]);
 
-  const bootstrapAfterConvexSignIn = useCallback(async (body: AccountBootstrapBody) => {
+  const bootstrapAfterConvexSignIn = useCallback(async (body: Omit<AccountBootstrapBody, "deviceFingerprint">) => {
     const header = await waitForBackendAuthBearerHeader();
     if (!header) {
       throw new Error("Could not obtain session token — try again or refresh the page.");
     }
-    await bootstrapLocalSession(body);
+    const deviceFingerprint = requireDeviceFingerprint();
+    await bootstrapLocalSession({ ...body, deviceFingerprint });
   }, []);
 
   const syncBackendSession = useCallback(async (opts?: { email?: string; turnstileToken?: string }) => {
@@ -217,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const email =
         emailNorm ||
         (typeof row?.email === "string" ? row.email.trim().toLowerCase() : undefined);
+      const deviceFingerprint = requireDeviceFingerprint();
       await bootstrapLocalSession({
         accountType: at,
         email,
@@ -224,8 +246,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fullName: typeof row?.full_name === "string" ? row.full_name : undefined,
         role: typeof row?.role === "string" ? row.role : undefined,
         ...(opts?.turnstileToken ? { turnstileToken: opts.turnstileToken } : {}),
+        deviceFingerprint,
       });
     } catch (e) {
+      if (e instanceof BootstrapDeviceApprovalRequiredError) {
+        return { error: null, deviceApprovalRequired: true as const };
+      }
       return { error: normalizeConvexAuthError(e) };
     }
     return { error: null };
@@ -280,6 +306,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ...(turnstileToken ? { turnstileToken } : {}),
         });
       } catch (e) {
+        if (e instanceof BootstrapDeviceApprovalRequiredError) {
+          return { error: null, session: null, deviceApprovalRequired: true as const, pendingEmail: trimmed };
+        }
         return { error: normalizeConvexAuthError(e), session: null };
       }
       return { error: null, session: null };
@@ -304,8 +333,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const synced = await syncBackendSession({ email: trimmed, turnstileToken });
         if (synced.error) return synced;
+        if (synced.deviceApprovalRequired) {
+          return { error: null, deviceApprovalRequired: true as const, pendingEmail: trimmed };
+        }
       } catch (e) {
-        return { error: humanizeSignInPasswordError(e) };
+        const raw = normalizeConvexAuthError(e);
+        if (raw.message.includes("[TRYVERSE_EMAIL_UNVERIFIED_SIGNIN]")) {
+          return {
+            error: null,
+            needsEmailVerification: true as const,
+            pendingEmail: trimmed,
+            reuseVerificationCodeHint: true as const,
+          };
+        }
+        return { error: humanizeSignInPasswordError(raw) };
       }
       return { error: null };
     },
@@ -343,17 +384,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           opts?.turnstileToken?.trim() || opts?.pendingBootstrap?.turnstileToken?.trim() || undefined;
         if (opts?.pendingBootstrap) {
           const b = opts.pendingBootstrap;
-          await bootstrapAfterConvexSignIn({
-            accountType: b.accountType,
-            brandName: b.brandName,
-            fullName: b.fullName,
-            role: b.role,
-            email: trimmed,
-            ...(ts ? { turnstileToken: ts } : {}),
-          });
+          try {
+            await bootstrapAfterConvexSignIn({
+              accountType: b.accountType,
+              brandName: b.brandName,
+              fullName: b.fullName,
+              role: b.role,
+              email: trimmed,
+              ...(ts ? { turnstileToken: ts } : {}),
+            });
+          } catch (e) {
+            if (e instanceof BootstrapDeviceApprovalRequiredError) {
+              return { error: null, deviceApprovalRequired: true };
+            }
+            return { error: normalizeConvexAuthError(e) };
+          }
         } else {
           const synced = await syncBackendSession({ email: trimmed, turnstileToken: ts });
           if (synced.error) return synced;
+          if (synced.deviceApprovalRequired) return { error: null, deviceApprovalRequired: true };
         }
       } catch (e) {
         return { error: normalizeConvexAuthError(e) };

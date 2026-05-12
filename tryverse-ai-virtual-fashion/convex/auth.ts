@@ -1,14 +1,14 @@
 import { convexAuth } from "@convex-dev/auth/server";
-import { Password } from "@convex-dev/auth/providers/Password";
 import {
   ResendEmailSignupVerification,
   ResendEmailSignupVerificationLegacy,
 } from "./ResendEmailSignupVerification";
 import { ResendOTPPasswordReset } from "./ResendOTPPasswordReset";
+import { TryVersePassword } from "./tryVersePassword";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
-    Password({
+    TryVersePassword({
       reset: ResendOTPPasswordReset,
       verify: ResendEmailSignupVerification,
       validatePasswordRequirements(password: string) {

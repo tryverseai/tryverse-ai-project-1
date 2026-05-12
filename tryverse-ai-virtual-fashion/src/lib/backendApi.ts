@@ -117,6 +117,15 @@ export class ApiError extends Error {
   }
 }
 
+export class BootstrapDeviceApprovalRequiredError extends Error {
+  readonly code = 'DEVICE_APPROVAL_REQUIRED';
+
+  constructor(message = 'Approve this device before continuing.') {
+    super(message);
+    this.name = 'BootstrapDeviceApprovalRequiredError';
+  }
+}
+
 // ─── Admin response shapes ────────────────────────────────────────────────────
 
 /** Platform-level metrics returned by GET /api/admin/metrics */
@@ -280,6 +289,8 @@ export type AccountBootstrapBody = {
   role?: string;
   /** Cloudflare Turnstile token — required in production when CLOUDFLARE_TURNSTILE_SECRET_KEY is set. */
   turnstileToken?: string;
+  /** Stable per-browser id (UUID in localStorage) — server enforces trusted device rules. */
+  deviceFingerprint: string;
 };
 
 export type InviteValidationResult =
@@ -331,9 +342,50 @@ export async function bootstrapLocalSession(body: AccountBootstrapBody): Promise
       role: body.role,
       email: body.email,
       turnstileToken: body.turnstileToken,
+      deviceFingerprint: body.deviceFingerprint,
     }),
   });
+  if (!res.ok && res.status === 403) {
+    try {
+      const cloned = await res.clone().json();
+      const code = typeof cloned.code === 'string' ? cloned.code : undefined;
+      if (code === 'DEVICE_APPROVAL_REQUIRED') {
+        throw new BootstrapDeviceApprovalRequiredError(
+          typeof cloned.error === 'string' ? cloned.error : undefined,
+        );
+      }
+    } catch (err) {
+      if (err instanceof BootstrapDeviceApprovalRequiredError) throw err;
+    }
+  }
   await handleResponse(res);
+}
+
+export async function requestAccountDeviceApprovalCode(body: {
+  deviceFingerprint: string;
+  turnstileToken?: string;
+}): Promise<{ ok: boolean }> {
+  const headers = await getAuthHeaders();
+  const res = await fetchWithConnectivityHint(composeApiUrl('/api/account/device/request-code'), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  return handleResponse(res);
+}
+
+export async function verifyAccountDeviceApproval(body: {
+  deviceFingerprint: string;
+  code: string;
+  turnstileToken?: string;
+}): Promise<{ ok: boolean }> {
+  const headers = await getAuthHeaders();
+  const res = await fetchWithConnectivityHint(composeApiUrl('/api/account/device/verify'), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  return handleResponse(res);
 }
 
 export async function getMyAccount(): Promise<{

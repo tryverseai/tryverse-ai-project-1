@@ -19,6 +19,7 @@ import type * as backendTrusted from "../backendTrusted.js";
 import type * as billing from "../billing.js";
 import type * as http from "../http.js";
 import type * as invites from "../invites.js";
+import type * as migrations from "../migrations.js";
 import type * as modelLibrary from "../modelLibrary.js";
 import type * as modelLibrarySeedRows from "../modelLibrarySeedRows.js";
 import type * as overview from "../overview.js";
@@ -30,6 +31,7 @@ import type * as resendEmailErrors from "../resendEmailErrors.js";
 import type * as resendEnv from "../resendEnv.js";
 import type * as seed from "../seed.js";
 import type * as trustedStorage from "../trustedStorage.js";
+import type * as tryVersePassword from "../tryVersePassword.js";
 import type * as userBootstrap from "../userBootstrap.js";
 
 import type {
@@ -50,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   billing: typeof billing;
   http: typeof http;
   invites: typeof invites;
+  migrations: typeof migrations;
   modelLibrary: typeof modelLibrary;
   modelLibrarySeedRows: typeof modelLibrarySeedRows;
   overview: typeof overview;
@@ -61,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   resendEnv: typeof resendEnv;
   seed: typeof seed;
   trustedStorage: typeof trustedStorage;
+  tryVersePassword: typeof tryVersePassword;
   userBootstrap: typeof userBootstrap;
 }>;
 

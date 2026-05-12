@@ -54,8 +54,32 @@ export default defineSchema({
     beta_rejected: v.optional(v.boolean()),
     beta_rejected_at: v.optional(v.string()),
     terms_of_service_accepted_at: v.optional(v.string()),
+    /** Legacy: was used to dedupe post-verify “welcome” sends; prefer `welcome_email_sent_at`. */
     verification_email_sent_at: v.optional(v.string()),
+    /** Set once after first successful email verification + bootstrap welcome email. */
+    welcome_email_sent_at: v.optional(v.string()),
   }).index("by_userId", ["id"]),
+
+  /** Browser / client fingerprints approved after email OTP + optional device code (new device). */
+  trusted_devices: defineTable({
+    user_profile_id: v.string(),
+    fingerprint: v.string(),
+    created_at: v.string(),
+  })
+    .index("by_user", ["user_profile_id"])
+    .index("by_user_fingerprint", ["user_profile_id", "fingerprint"]),
+
+  /** Short-lived 6-digit device approval challenges (10 min). */
+  device_approval_challenges: defineTable({
+    user_profile_id: v.string(),
+    fingerprint: v.string(),
+    code_hash: v.string(),
+    expires_at: v.number(),
+    used: v.boolean(),
+    created_at: v.string(),
+  })
+    .index("by_user_profile_fingerprint", ["user_profile_id", "fingerprint"])
+    .index("by_user_profile", ["user_profile_id"]),
 
   plans: defineTable({
     id: v.string(),

@@ -179,6 +179,16 @@ const Auth = () => {
         console.error("Signup error:", result.error);
         const t = signUpErrorToast(result.error);
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 15000 });
+      } else if ("deviceApprovalRequired" in result && result.deviceApprovalRequired) {
+        saveEmailVerifyPending({ email: result.pendingEmail });
+        toast({
+          title: "Approve this browser next",
+          description:
+            "You’re signed in. On the next screen, tap “Email me a code” and enter the 6-digit approval we send to your inbox.",
+          duration: 10000,
+        });
+        setPassword("");
+        navigate("/auth/approve-device");
       } else if ("needsEmailVerification" in result && result.needsEmailVerification) {
         saveEmailVerifyPending({
           email: result.pendingEmail,
@@ -205,6 +215,16 @@ const Auth = () => {
         console.error("Signup error:", result.error);
         const t = signUpErrorToast(result.error);
         toast({ title: t.title, description: t.description, variant: t.variant, duration: 15000 });
+      } else if ("deviceApprovalRequired" in result && result.deviceApprovalRequired) {
+        saveEmailVerifyPending({ email: result.pendingEmail });
+        toast({
+          title: "Approve this browser next",
+          description:
+            "You’re signed in. On the next screen, tap “Email me a code” and enter the 6-digit approval we send to your inbox.",
+          duration: 10000,
+        });
+        setPassword("");
+        navigate("/auth/approve-device");
       } else if ("needsEmailVerification" in result && result.needsEmailVerification) {
         saveEmailVerifyPending({
           email: result.pendingEmail,
@@ -229,12 +249,25 @@ const Auth = () => {
       if (result.error) {
         console.error("Sign in error:", result.error);
         toast({ title: "Sign in failed", description: result.error.message, variant: "destructive", duration: 6000 });
-      } else if ("needsEmailVerification" in result && result.needsEmailVerification) {
+      } else if ("deviceApprovalRequired" in result && result.deviceApprovalRequired) {
         saveEmailVerifyPending({ email: result.pendingEmail });
         toast({
-          title: "Verify your email",
+          title: "Approve this browser next",
           description:
-            "We sent a welcome email with your 8-digit code. Enter it on the next step to sign in.",
+            "You’re signed in. On the next screen, tap “Email me a code” and enter the 6-digit approval we send to your inbox.",
+          duration: 10000,
+        });
+        setPassword("");
+        navigate("/auth/approve-device");
+      } else if ("needsEmailVerification" in result && result.needsEmailVerification) {
+        saveEmailVerifyPending({ email: result.pendingEmail });
+        const reuseHint =
+          "reuseVerificationCodeHint" in result && result.reuseVerificationCodeHint === true;
+        toast({
+          title: reuseHint ? "Use your existing verification code" : "Verify your email",
+          description: reuseHint
+            ? "We didn’t send a new email. Use the verification code from your original sign-up message and enter it on the next screen."
+            : "We emailed an 8-digit code — enter it on the next screen to finish signing in.",
           duration: 9000,
         });
         setPassword("");

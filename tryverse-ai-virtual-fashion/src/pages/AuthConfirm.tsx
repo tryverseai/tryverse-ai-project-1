@@ -1,38 +1,21 @@
-import { useEffect, useState, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { useAuth } from "@/contexts/AuthContext";
-import { sendWelcomeEmail } from "@/lib/backendApi";
 
-/** Legacy route kept for bookmarks; Convex Auth confirms in-app. */
+/** Legacy route kept for bookmarks; Convex Auth confirms in-app. Welcome email is handled by server bootstrap. */
 export default function AuthConfirm() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [status, setStatus] = useState<"confirming" | "success" | "invalid">("confirming");
-  const welcomeSentRef = useRef(false);
 
   useEffect(() => {
     if (loading) return;
-    // M-6: A valid session may not carry an email field (e.g. OAuth or custom providers).
-    // Gate on user existence, not on user.email, to avoid showing an error for valid sessions.
     setStatus(user ? "success" : "invalid");
   }, [loading, user]);
-
-  useEffect(() => {
-    if (status === "success" && user && !welcomeSentRef.current) {
-      welcomeSentRef.current = true;
-      const meta = user.user_metadata;
-      sendWelcomeEmail({
-        name: meta?.full_name,
-        brandName: meta?.brand_name,
-      }).catch((err) => {
-        console.warn("Failed to send welcome email:", err);
-      });
-    }
-  }, [status, user]);
 
   useEffect(() => {
     if (status === "success" && user) {
@@ -76,9 +59,7 @@ export default function AuthConfirm() {
       >
         <CheckCircle2 className="h-14 w-14 text-foreground mx-auto mb-4" aria-hidden />
         <h1 className="font-display text-2xl font-bold text-foreground mb-2">You&apos;re in</h1>
-        <p className="text-sm text-muted-foreground mb-8">
-          Redirecting to your dashboard…
-        </p>
+        <p className="text-sm text-muted-foreground mb-8">Redirecting to your dashboard…</p>
         <Button asChild className="gap-2">
           <Link to="/dashboard">
             Continue <ArrowRight className="h-4 w-4" />
