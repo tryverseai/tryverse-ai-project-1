@@ -1,4 +1,5 @@
 import { query } from "./_generated/server";
+import { findProfileBySubjectKeys } from "./profileLookup";
 
 export const getMyBillingSnapshot = query({
   args: {},
@@ -23,10 +24,7 @@ export const getMyBillingSnapshot = query({
     const plans = (await ctx.db.query("plans").collect()).filter((p) => p.is_active);
     plans.sort((a, b) => a.tryons_per_month - b.tryons_per_month);
 
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", userId))
-      .unique();
+    const profile = await findProfileBySubjectKeys(ctx, identity.subject);
 
     return {
       subscription,

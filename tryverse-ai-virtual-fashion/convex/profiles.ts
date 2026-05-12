@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { authSubjectSegments, subjectsOverlap } from "./authSubjectKeys";
-import type { Doc } from "./_generated/dataModel";
+import { canonicalAuthSubjectProfileId, subjectsOverlap } from "./authSubjectKeys";
 import { findProfileBySubjectKeys } from "./profileLookup";
 
 const profilePatch = v.object({
@@ -56,19 +55,14 @@ export const upsertProfileForUser = mutation({
       throw new Error("Not authorized");
     }
 
-    const keySet = new Set([...authSubjectSegments(userId), ...authSubjectSegments(identity.subject)]);
-    let existing: Doc<"profiles"> | null = null;
-    for (const key of keySet) {
-      existing = await ctx.db
-        .query("profiles")
-        .withIndex("by_userId", (q) => q.eq("id", key))
-        .unique();
-      if (existing) break;
-    }
+    const stableId = canonicalAuthSubjectProfileId(userId);
+    const existing =
+      (await findProfileBySubjectKeys(ctx, identity.subject)) ??
+      (await findProfileBySubjectKeys(ctx, userId));
 
     const now = new Date().toISOString();
     const defaults = {
-      id: userId,
+      id: stableId,
       plan_id: patch.plan_id ?? "free",
       account_type: patch.account_type ?? "business",
       brand_name: patch.brand_name,

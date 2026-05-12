@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { authSubjectSegments } from "./authSubjectKeys";
+import { collectProfileDocsForSubjectKeys, findProfileBySubjectKeys } from "./profileLookup";
 
 function requireBackendSecret(secret: string) {
   const expected = process.env.BACKEND_SHARED_SECRET;
@@ -225,10 +226,7 @@ export const patchUserAccountType = mutation({
     const user = await ctx.db.get(userId as Id<"users">);
     if (!user) throw new Error("User not found");
     await ctx.db.patch(user._id, { account_type } as never);
-    const prof = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", userId))
-      .unique();
+    const prof = await findProfileBySubjectKeys(ctx, userId);
     if (prof) {
       await ctx.db.patch(prof._id, {
         account_type,
@@ -260,10 +258,7 @@ export const getProfileForAdminBlock = query({
   args: { secret: v.string(), userId: v.string() },
   handler: async (ctx, { secret, userId }) => {
     requireBackendSecret(secret);
-    const row = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", userId))
-      .unique();
+    const row = await findProfileBySubjectKeys(ctx, userId);
     if (!row) return null;
     return {
       id: row.id,
@@ -429,14 +424,7 @@ export const clearAuditLogAdmin = mutation({
 });
 
 async function profileRowForAdmin(ctx: MutationCtx, userId: string) {
-  for (const key of authSubjectSegments(userId)) {
-    const row = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", key))
-      .unique();
-    if (row) return row;
-  }
-  return null;
+  return await findProfileBySubjectKeys(ctx, userId);
 }
 
 /** Prefer profile.contact_email; if missing, read Convex Auth `users` doc (subject segments may contain users _id). */
@@ -486,17 +474,7 @@ export const batchResolveAuthEmailsAdmin = query({
     requireBackendSecret(secret);
     const out: Record<string, string | null> = {};
     for (const pid of profileIds) {
-      let profile: Doc<"profiles"> | null = null;
-      for (const key of authSubjectSegments(pid)) {
-        const row = await ctx.db
-          .query("profiles")
-          .withIndex("by_userId", (q) => q.eq("id", key))
-          .unique();
-        if (row) {
-          profile = row;
-          break;
-        }
-      }
+      const profile = await findProfileBySubjectKeys(ctx, pid);
       out[pid] = profile ? await resolvedContactEmail(ctx, profile) : null;
     }
     return out;
@@ -601,8 +579,10 @@ export const deleteUserAccountAdmin = mutation({
       }
     }
 
-    const prof = await profileRowForAdmin(ctx, userId);
-    if (prof) await ctx.db.delete(prof._id);
+    const profRows = await collectProfileDocsForSubjectKeys(ctx, userId);
+    for (const p of profRows) {
+      await ctx.db.delete(p._id);
+    }
 
     for (const seg of keys) {
       try {

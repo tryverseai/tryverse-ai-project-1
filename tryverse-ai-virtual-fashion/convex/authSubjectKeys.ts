@@ -1,4 +1,19 @@
 /**
+ * Convex Auth `identity.subject` may be plain `userDocId` or compound `accountId|userDocId`.
+ * `profiles.id` and trusted-device rows should always resolve to **one** id: the Convex `users` doc id
+ * (`userDocId` — last pipe segment).
+ */
+export function canonicalAuthSubjectProfileId(subject: string): string {
+  const trimmed = subject.trim();
+  if (!trimmed) return trimmed;
+  const parts = trimmed
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length > 1 ? (parts[parts.length - 1] ?? trimmed) : trimmed;
+}
+
+/**
  * Convex Auth `identity.subject` may be a plain user id or a compound string
  * (e.g. `accountId|userDocId`). Profile and try-on rows may use any segment as `id` / `user_id`.
  */

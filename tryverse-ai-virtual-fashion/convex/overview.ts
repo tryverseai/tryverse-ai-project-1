@@ -1,4 +1,5 @@
 import { query } from "./_generated/server";
+import { findProfileBySubjectKeys } from "./profileLookup";
 
 export const getMyUsageEvents = query({
   args: {},
@@ -23,10 +24,7 @@ export const getWidgetActivated = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", identity.subject))
-      .unique();
+    const profile = await findProfileBySubjectKeys(ctx, identity.subject);
     return profile?.widget_activated ?? null;
   },
 });

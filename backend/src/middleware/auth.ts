@@ -193,12 +193,13 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
 }
 
 /**
- * Convex profile + credit mutations may still be keyed by a compound Bearer subject.
- * Widget traffic identifies users only via {@link Request.widgetUserId}.
+ * Subject string for Convex profile + credit resolution via `findProfileBySubjectKeys` / `insertProfileRow`.
+ * Prefer the raw Bearer subject (`accountId|userDocId`) when present so legacy `profiles.id` variants match.
+ * Widget traffic uses {@link Request.widgetUserId} only.
  */
 export function convexProfileCreditLookupKey(req: Request): string {
-  if (req.widgetUserId) return req.widgetUserId;
-  return req.convexAuthSubjectRaw ?? req.user?.id ?? '';
+  if (req.widgetUserId) return req.widgetUserId.trim();
+  return (req.convexAuthSubjectRaw ?? req.user?.id ?? '').trim();
 }
 
 /**

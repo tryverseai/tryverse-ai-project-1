@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx } from "./_generated/server";
-import { authSubjectSegments, subjectsOverlap } from "./authSubjectKeys";
+import { authSubjectSegments, canonicalAuthSubjectProfileId, subjectsOverlap } from "./authSubjectKeys";
+import { collectProfileDocsForSubjectKeys, findProfileBySubjectKeys } from "./profileLookup";
 import { defaultModelLibraryRows } from "./modelLibrarySeedRows";
 
 function requireBackendSecret(secret: string) {
@@ -32,14 +33,7 @@ export const getProfileRow = query({
   args: { secret: v.string(), userId: v.string() },
   handler: async (ctx, { secret, userId }) => {
     requireBackendSecret(secret);
-    for (const key of authSubjectSegments(userId)) {
-      const row = await ctx.db
-        .query("profiles")
-        .withIndex("by_userId", (q) => q.eq("id", key))
-        .unique();
-      if (row) return row;
-    }
-    return null;
+    return await findProfileBySubjectKeys(ctx, userId);
   },
 });
 
@@ -67,8 +61,87 @@ export const insertProfileRow = mutation({
     requireBackendSecret(args.secret);
     const now = new Date().toISOString();
     const trimmedEmail = typeof args.contactEmail === "string" ? args.contactEmail.trim() : "";
-    return await ctx.db.insert("profiles", {
-      id: args.userId,
+    const raw = String(args.userId).trim();
+    const canon = canonicalAuthSubjectProfileId(raw);
+
+    /** All profile docs already tied to this auth user (any segment / legacy id shape). */
+    const hits = await collectProfileDocsForSubjectKeys(ctx, raw);
+
+    if (hits.length > 0) {
+      hits.sort((a, b) => a._creationTime - b._creationTime);
+      const keeper = hits.find((h) => h.id === canon) ?? hits[0]!;
+      const duplicates = hits.filter((h) => String(h._id) !== String(keeper._id));
+
+      let welcomeAt = keeper.welcome_email_sent_at;
+      let verifyAt = keeper.verification_email_sent_at;
+      let termsAt = keeper.terms_of_service_accepted_at;
+      let maxFreeRem = keeper.free_credits_remaining;
+      let maxFreeTot = keeper.free_credits_total;
+      let maxMRem = keeper.monthly_credits_remaining;
+      let maxMTot = keeper.monthly_credits_total;
+      let betaOk = keeper.beta_approved === true;
+      let betaApAt = keeper.beta_approved_at;
+      let betaReqAt = keeper.beta_requested_at;
+      let betaRej = keeper.beta_rejected === true;
+      let betaRejAt = keeper.beta_rejected_at;
+
+      for (const h of hits) {
+        if (typeof h.welcome_email_sent_at === "string" && h.welcome_email_sent_at.trim()) {
+          if (!welcomeAt || !String(welcomeAt).trim()) welcomeAt = h.welcome_email_sent_at;
+        }
+        if (typeof h.verification_email_sent_at === "string" && h.verification_email_sent_at.trim()) {
+          if (!verifyAt || !String(verifyAt).trim()) verifyAt = h.verification_email_sent_at;
+        }
+        if (typeof h.terms_of_service_accepted_at === "string" && h.terms_of_service_accepted_at.trim()) {
+          if (!termsAt || !String(termsAt).trim()) termsAt = h.terms_of_service_accepted_at;
+        }
+        maxFreeRem = Math.max(maxFreeRem, h.free_credits_remaining);
+        maxFreeTot = Math.max(maxFreeTot, h.free_credits_total);
+        maxMRem = Math.max(maxMRem, h.monthly_credits_remaining);
+        maxMTot = Math.max(maxMTot, h.monthly_credits_total);
+        if (h.beta_approved === true) betaOk = true;
+        if (typeof h.beta_approved_at === "string" && h.beta_approved_at.trim()) {
+          if (!betaApAt || !String(betaApAt).trim()) betaApAt = h.beta_approved_at;
+        }
+        if (typeof h.beta_requested_at === "string" && h.beta_requested_at.trim()) {
+          if (!betaReqAt || !String(betaReqAt).trim()) betaReqAt = h.beta_requested_at;
+        }
+        if (h.beta_rejected === true) betaRej = true;
+        if (typeof h.beta_rejected_at === "string" && h.beta_rejected_at.trim()) {
+          if (!betaRejAt || !String(betaRejAt).trim()) betaRejAt = h.beta_rejected_at;
+        }
+      }
+
+      for (const d of duplicates) {
+        await ctx.db.delete(d._id);
+      }
+
+      const patch: Record<string, unknown> = {
+        updated_at: now,
+        id: canon,
+        welcome_email_sent_at: welcomeAt,
+        verification_email_sent_at: verifyAt,
+        terms_of_service_accepted_at: termsAt,
+        free_credits_remaining: maxFreeRem,
+        free_credits_total: maxFreeTot,
+        monthly_credits_remaining: maxMRem,
+        monthly_credits_total: maxMTot,
+        beta_approved: betaOk,
+        beta_approved_at: betaApAt,
+        beta_requested_at: betaReqAt,
+        beta_rejected: betaRej,
+        beta_rejected_at: betaRejAt,
+      };
+      if (trimmedEmail && !(typeof keeper.contact_email === "string" && keeper.contact_email.trim())) {
+        patch.contact_email = trimmedEmail;
+      }
+
+      await ctx.db.patch(keeper._id, patch as never);
+      return { inserted: false as const, mergedDuplicates: duplicates.length };
+    }
+
+    await ctx.db.insert("profiles", {
+      id: canon,
       plan_id: "free",
       account_type: args.accountType,
       free_credits_remaining: args.freeCreditsRemaining,
@@ -83,6 +156,7 @@ export const insertProfileRow = mutation({
       updated_at: now,
       ...(trimmedEmail ? { contact_email: trimmedEmail } : {}),
     });
+    return { inserted: true as const, mergedDuplicates: 0 };
   },
 });
 
@@ -94,21 +168,13 @@ export const patchProfileRow = mutation({
   },
   handler: async (ctx, { secret, userId, patch }) => {
     requireBackendSecret(secret);
-    let row = null;
-    for (const key of authSubjectSegments(userId)) {
-      row = await ctx.db
-        .query("profiles")
-        .withIndex("by_userId", (q) => q.eq("id", key))
-        .unique();
-      if (row) break;
-    }
+    const row = await findProfileBySubjectKeys(ctx, userId);
     if (!row) throw new Error("Profile not found");
     const p = patch as Record<string, unknown>;
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of Object.keys(p)) {
       if (p[key] !== undefined) updates[key] = p[key];
     }
-    // Trusted server-only patch payload from Node credits service.
     await ctx.db.patch(row._id, updates as never);
     return { ok: true as const };
   },
@@ -257,14 +323,7 @@ export const verifyDeviceApprovalChallenge = mutation({
 });
 
 async function profileRowForBackend(ctx: MutationCtx, userId: string) {
-  for (const key of authSubjectSegments(userId)) {
-    const row = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", key))
-      .unique();
-    if (row) return row;
-  }
-  return null;
+  return await findProfileBySubjectKeys(ctx, userId);
 }
 
 /** Mirrors adminTrusted.approveBetaAccessAdmin when that export is missing on the linked deployment. */
@@ -684,10 +743,7 @@ export const getWidgetProfileRow = query({
   args: { secret: v.string(), userId: v.string() },
   handler: async (ctx, { secret, userId }) => {
     requireBackendSecret(secret);
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_userId", (q) => q.eq("id", userId))
-      .unique();
+    const profile = await findProfileBySubjectKeys(ctx, userId);
     if (!profile) return null;
     return {
       brand_name: profile.brand_name ?? null,

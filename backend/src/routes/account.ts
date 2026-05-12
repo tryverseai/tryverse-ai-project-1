@@ -184,7 +184,7 @@ router.post(
         });
         createdFlag = false;
       } else {
-        await cxInsertProfile(canonicalId, at, cap, cap, {
+        await cxInsertProfile(profileKey, at, cap, cap, {
           ...(email ? { contactEmail: email } : {}),
         });
         await cxPatchProfile(profileKey, {
