@@ -14,7 +14,7 @@ import {
   PersonalDataNoticeContent,
   type PolicyAudience,
 } from "@/content/policyContent";
-import { TermlyPrivacyPolicyContent } from "@/content/TermlyPrivacyPolicyContent";
+import { TryVersePrivacyPolicy } from "@/content/TryVersePrivacyPolicy";
 import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
 import { dashboardPathForAccountType, type AccountType } from "@/lib/accountType";
@@ -77,9 +77,9 @@ function buildSteps(accountType: PolicyAudience): StepDef[] {
     {
       id: "privacy",
       title: "Privacy Policy",
-      subtitle: "Last updated: April 6, 2026",
+      subtitle: "Last updated: May 2026",
       icon: Shield,
-      content: TermlyPrivacyPolicyContent,
+      content: TryVersePrivacyPolicy,
       isLegal: true,
     },
     dataStep,

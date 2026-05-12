@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import { authSubjectSegments, subjectsOverlap } from "./authSubjectKeys";
+import { defaultModelLibraryRows } from "./modelLibrarySeedRows";
 
 function requireBackendSecret(secret: string) {
   const expected = (process.env.BACKEND_SHARED_SECRET ?? "").trim();
@@ -538,6 +539,23 @@ export const getWidgetProfileRow = query({
       widget_activated: profile.widget_activated,
       widget_show_models: profile.widget_show_models,
     };
+  },
+});
+
+/** Idempotent: fills `tryverse_model_library` when empty (called from Railway GET /api/models). */
+export const ensureModelLibrarySeeded = mutation({
+  args: { secret: v.string() },
+  handler: async (ctx, { secret }) => {
+    requireBackendSecret(secret);
+    const existing = await ctx.db.query("tryverse_model_library").take(1);
+    if (existing.length > 0) return { seeded: false as const };
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const row of defaultModelLibraryRows(now)) {
+      await ctx.db.insert("tryverse_model_library", row);
+      count++;
+    }
+    return { seeded: true as const, count };
   },
 });
 

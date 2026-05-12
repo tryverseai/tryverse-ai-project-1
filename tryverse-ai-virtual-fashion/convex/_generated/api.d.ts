@@ -20,6 +20,7 @@ import type * as billing from "../billing.js";
 import type * as http from "../http.js";
 import type * as invites from "../invites.js";
 import type * as modelLibrary from "../modelLibrary.js";
+import type * as modelLibrarySeedRows from "../modelLibrarySeedRows.js";
 import type * as overview from "../overview.js";
 import type * as plans from "../plans.js";
 import type * as products from "../products.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   invites: typeof invites;
   modelLibrary: typeof modelLibrary;
+  modelLibrarySeedRows: typeof modelLibrarySeedRows;
   overview: typeof overview;
   plans: typeof plans;
   products: typeof products;

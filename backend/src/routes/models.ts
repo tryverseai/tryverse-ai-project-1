@@ -6,6 +6,8 @@ import { handleValidationErrors } from '../middleware/validate';
 import { listActiveModels, resolveModelToPersonPath } from '../services/models/modelLibrary';
 import { logger } from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
+import { env } from '../config/env';
+import { anyApi, convexMutationTrusted } from '../config/convexHttp';
 
 const router = Router();
 
@@ -16,6 +18,15 @@ const router = Router();
 router.get('/', async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    try {
+      await convexMutationTrusted(anyApi.backendTrusted.ensureModelLibrarySeeded, {
+        secret: env.BACKEND_SHARED_SECRET,
+      });
+    } catch (e) {
+      logger.warn('ensureModelLibrarySeeded skipped or failed — model list may be empty until Convex is seeded', {
+        error: String(e),
+      });
+    }
     const models = await listActiveModels();
     res.json({ models });
   } catch (err) {

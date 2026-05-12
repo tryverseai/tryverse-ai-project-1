@@ -1,7 +1,7 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { motion } from "framer-motion";
-import { TermlyPrivacyPolicyContent } from "@/content/TermlyPrivacyPolicyContent";
+import { TryVersePrivacyPolicy } from "@/content/TryVersePrivacyPolicy";
 
 const PrivacyPolicy = () => (
   <div className="min-h-screen bg-background">
@@ -13,7 +13,7 @@ const PrivacyPolicy = () => (
           animate={{ opacity: 1, y: 0 }}
           className="text-foreground"
         >
-          <TermlyPrivacyPolicyContent audience="business" />
+          <TryVersePrivacyPolicy />
         </motion.div>
       </div>
     </main>

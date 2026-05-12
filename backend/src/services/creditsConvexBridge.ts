@@ -24,6 +24,8 @@ export interface ConvexProfileRow {
   beta_approved_at?: string | null;
   beta_rejected?: boolean;
   beta_rejected_at?: string | null;
+  verification_email_sent_at?: string | null;
+  terms_of_service_accepted_at?: string | null;
   [key: string]: unknown;
 }
 

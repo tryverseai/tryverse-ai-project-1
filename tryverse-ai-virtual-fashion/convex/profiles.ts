@@ -30,6 +30,8 @@ const profilePatch = v.object({
   beta_approved_at: v.optional(v.string()),
   beta_rejected: v.optional(v.boolean()),
   beta_rejected_at: v.optional(v.string()),
+  terms_of_service_accepted_at: v.optional(v.string()),
+  verification_email_sent_at: v.optional(v.string()),
 });
 
 /** Current user's profile (Convex Auth JWT). */
@@ -126,6 +128,22 @@ export const updateSettings = mutation({
       if (v !== undefined) updates[k] = v;
     }
     await ctx.db.patch(existing._id, updates);
+  },
+});
+
+export const acceptTermsOfService = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const existing = await findProfileBySubjectKeys(ctx, identity.subject);
+    if (!existing) throw new Error("Profile not found");
+    const now = new Date().toISOString();
+    await ctx.db.patch(existing._id, {
+      terms_of_service_accepted_at: now,
+      updated_at: now,
+    });
+    return { ok: true as const };
   },
 });
 

@@ -350,27 +350,31 @@ const Auth = () => {
           </h1>
 
           {showBusinessSignupForm && (
-            <p className="text-sm mb-4">
-              <Link
-                to="/auth"
-                className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium"
-              >
-                <ChevronLeft className="h-4 w-4 shrink-0" />
-                Choose individual or business instead
-              </Link>
-            </p>
-          )}
-          {showIndividualSignupForm && (
-            <>
-              <p className="text-sm mb-4">
-                <Link
-                  to="/auth"
-                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium"
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium text-sm mb-4"
+                  onClick={() => {
+                    navigate("/auth", { replace: true });
+                    queueMicrotask(() => openSignupChooser());
+                  }}
                 >
                   <ChevronLeft className="h-4 w-4 shrink-0" />
                   Choose individual or business instead
-                </Link>
-              </p>
+                </button>
+          )}
+          {showIndividualSignupForm && (
+            <>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium text-sm mb-4"
+                onClick={() => {
+                  navigate("/auth", { replace: true });
+                  queueMicrotask(() => openSignupChooser());
+                }}
+              >
+                <ChevronLeft className="h-4 w-4 shrink-0" />
+                Choose individual or business instead
+              </button>
             </>
           )}
 

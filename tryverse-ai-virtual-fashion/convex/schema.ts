@@ -53,6 +53,8 @@ export default defineSchema({
     beta_approved_at: v.optional(v.string()),
     beta_rejected: v.optional(v.boolean()),
     beta_rejected_at: v.optional(v.string()),
+    terms_of_service_accepted_at: v.optional(v.string()),
+    verification_email_sent_at: v.optional(v.string()),
   }).index("by_userId", ["id"]),
 
   plans: defineTable({

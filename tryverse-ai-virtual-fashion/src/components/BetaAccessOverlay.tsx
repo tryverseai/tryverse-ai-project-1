@@ -5,7 +5,7 @@ import { useQuery } from "convex/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "../../convex/_generated/api";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
-import { Button } from "@/components/ui/button";
+import { TermsPostBetaGate } from "@/components/TermsPostBetaGate";
 import { useAdminOperatorBypass } from "@/hooks/useAdminOperatorBypass";
 
 const INSTAGRAM_URL = "https://instagram.com/tryverseai";
@@ -58,7 +58,13 @@ export function BetaAccessOverlay() {
     );
   }
 
-  if (profile.beta_approved === true) return null;
+  if (profile.beta_approved === true) {
+    const termsOk = Boolean(profile.terms_of_service_accepted_at);
+    if (!termsOk) {
+      return <TermsPostBetaGate />;
+    }
+    return null;
+  }
 
   const rejected = profile.beta_rejected === true;
 

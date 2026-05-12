@@ -9,6 +9,39 @@ import { cxConsolidateTryonsToCanonicalUserId } from '../services/tryonConvexBri
 
 const router = Router();
 
+async function sendAccountVerifiedEmailOnce(params: {
+  profileKey: string;
+  email: string;
+  fullName?: string;
+  brandName?: string;
+  logUserSlice: string;
+}): Promise<void> {
+  const { profileKey, email, fullName, brandName, logUserSlice } = params;
+  const row = await cxGetProfile(profileKey);
+  if (!row || !email.trim()) return;
+  if (typeof row.verification_email_sent_at === 'string' && row.verification_email_sent_at) {
+    return;
+  }
+  const firstToken =
+    fullName?.trim()?.split(/\s+/)[0] ?? brandName?.trim()?.split(/\s+/)[0];
+  try {
+    const ok = await sendAccountVerifiedEmail({
+      email,
+      ...(firstToken ? { firstName: firstToken } : {}),
+    });
+    if (ok) {
+      await cxPatchProfile(profileKey, {
+        verification_email_sent_at: new Date().toISOString(),
+      });
+    }
+  } catch (e) {
+    logger.warn('account verified email skipped or failed', {
+      error: String(e),
+      userId: logUserSlice,
+    });
+  }
+}
+
 /**
  * POST /api/account/session/bootstrap
  * Ensures a Convex `profiles` row exists for the authenticated local-session user.
@@ -58,6 +91,13 @@ router.post(
           ...(role !== undefined ? { role } : {}),
           account_type: at,
         });
+        await sendAccountVerifiedEmailOnce({
+          profileKey,
+          email,
+          fullName,
+          brandName,
+          logUserSlice: canonicalId.slice(0, 12),
+        });
         res.json({ ok: true, created: false });
         return;
       }
@@ -71,20 +111,13 @@ router.post(
         ...(role !== undefined ? { role } : {}),
       });
 
-      if (email) {
-        const firstToken =
-          fullName?.trim()?.split(/\s+/)[0] ?? brandName?.trim()?.split(/\s+/)[0];
-        void sendAccountVerifiedEmail({
-          email,
-          ...(firstToken ? { firstName: firstToken } : {}),
-        }).catch((e) =>
-          logger.warn('account verified email skipped or failed after profile create', {
-            error: String(e),
-            userId: canonicalId.slice(0, 12),
-          })
-        );
-      }
-
+      await sendAccountVerifiedEmailOnce({
+        profileKey,
+        email,
+        fullName,
+        brandName,
+        logUserSlice: canonicalId.slice(0, 12),
+      });
       res.json({ ok: true, created: true });
     } catch (err) {
       logger.error('account bootstrap failed', { error: String(err) });
