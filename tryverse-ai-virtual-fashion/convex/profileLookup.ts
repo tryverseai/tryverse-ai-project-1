@@ -2,14 +2,20 @@ import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { authSubjectSegments, canonicalAuthSubjectProfileId } from "./authSubjectKeys";
 
-/** All `profiles` rows whose `id` matches any lookup key derived from Convex Auth subject. */
+/**
+ * All `profiles` rows whose `id` matches any lookup key derived from Convex Auth subject.
+ * Pass `contactEmail` to also include rows with the same contact_email (email-based fallback
+ * that catches duplicate profiles created when subject shapes differed between sessions).
+ */
 export async function collectProfileDocsForSubjectKeys(
   ctx: QueryCtx | MutationCtx,
   subject: string,
+  contactEmail?: string,
 ): Promise<Doc<"profiles">[]> {
   const raw = subject.trim();
   const seen = new Set<string>();
   const hits: Doc<"profiles">[] = [];
+
   for (const key of authSubjectSegments(raw)) {
     const rows = await ctx.db
       .query("profiles")
@@ -23,6 +29,23 @@ export async function collectProfileDocsForSubjectKeys(
       }
     }
   }
+
+  // Email-based fallback: catches the case where subject shape differed across sessions
+  const normEmail = (contactEmail ?? "").trim().toLowerCase();
+  if (normEmail) {
+    const emailRows = await ctx.db
+      .query("profiles")
+      .withIndex("by_contact_email", (q) => q.eq("contact_email", normEmail))
+      .collect();
+    for (const row of emailRows) {
+      const sid = String(row._id);
+      if (!seen.has(sid)) {
+        seen.add(sid);
+        hits.push(row);
+      }
+    }
+  }
+
   return hits;
 }
 

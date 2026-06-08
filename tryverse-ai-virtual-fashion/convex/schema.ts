@@ -58,7 +58,9 @@ export default defineSchema({
     verification_email_sent_at: v.optional(v.string()),
     /** Set once after first successful email verification + bootstrap welcome email. */
     welcome_email_sent_at: v.optional(v.string()),
-  }).index("by_userId", ["id"]),
+  })
+    .index("by_userId", ["id"])
+    .index("by_contact_email", ["contact_email"]),
 
   /** Browser / client fingerprints approved after email OTP + optional device code (new device). */
   trusted_devices: defineTable({

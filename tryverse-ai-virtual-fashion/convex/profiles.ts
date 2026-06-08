@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { canonicalAuthSubjectProfileId, subjectsOverlap } from "./authSubjectKeys";
-import { findProfileBySubjectKeys } from "./profileLookup";
+import { collectProfileDocsForSubjectKeys, findProfileBySubjectKeys } from "./profileLookup";
 
 const profilePatch = v.object({
   plan_id: v.optional(v.string()),
@@ -56,8 +56,16 @@ export const upsertProfileForUser = mutation({
     }
 
     const stableId = canonicalAuthSubjectProfileId(userId);
+    // Always normalise contact_email to lowercase to keep the by_contact_email index consistent.
+    const normEmail =
+      typeof patch.contact_email === "string" ? patch.contact_email.trim().toLowerCase() : undefined;
+
+    // Subject-based lookup first, then email-based fallback to prevent cross-session duplicates.
+    const hits = await collectProfileDocsForSubjectKeys(ctx, identity.subject, normEmail);
     const existing =
-      (await findProfileBySubjectKeys(ctx, identity.subject)) ??
+      hits.find((h) => h.id === stableId) ??
+      hits.find((h) => h.id === canonicalAuthSubjectProfileId(userId)) ??
+      hits[0] ??
       (await findProfileBySubjectKeys(ctx, userId));
 
     const now = new Date().toISOString();
@@ -69,7 +77,7 @@ export const upsertProfileForUser = mutation({
       full_name: patch.full_name,
       role: patch.role,
       website_url: patch.website_url,
-      contact_email: patch.contact_email,
+      contact_email: normEmail,
       current_plan_id: patch.current_plan_id,
       free_credits_remaining: patch.free_credits_remaining ?? 20,
       free_credits_total: patch.free_credits_total ?? 20,
@@ -90,9 +98,13 @@ export const upsertProfileForUser = mutation({
     };
 
     if (existing) {
-      const updates: Record<string, unknown> = { updated_at: now };
+      const updates: Record<string, unknown> = { updated_at: now, id: stableId };
       for (const [key, val] of Object.entries(patch) as [string, unknown][]) {
-        if (val !== undefined) updates[key] = val;
+        if (val !== undefined) {
+          updates[key] = key === "contact_email" && typeof val === "string"
+            ? val.trim().toLowerCase()
+            : val;
+        }
       }
       await ctx.db.patch(existing._id, updates);
       return existing._id;
@@ -120,7 +132,11 @@ export const updateSettings = mutation({
     const now = new Date().toISOString();
     const updates: Record<string, unknown> = { updated_at: now };
     for (const [k, v] of Object.entries(args)) {
-      if (v !== undefined) updates[k] = v;
+      if (v !== undefined) {
+        updates[k] = k === "contact_email" && typeof v === "string"
+          ? v.trim().toLowerCase()
+          : v;
+      }
     }
     await ctx.db.patch(existing._id, updates);
   },

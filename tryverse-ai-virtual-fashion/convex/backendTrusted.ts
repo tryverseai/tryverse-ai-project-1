@@ -60,12 +60,17 @@ export const insertProfileRow = mutation({
   handler: async (ctx, args) => {
     requireBackendSecret(args.secret);
     const now = new Date().toISOString();
-    const trimmedEmail = typeof args.contactEmail === "string" ? args.contactEmail.trim() : "";
+    /** Always store / compare contact_email in lowercase to prevent case-mismatch duplicates. */
+    const normEmail =
+      typeof args.contactEmail === "string" ? args.contactEmail.trim().toLowerCase() : "";
     const raw = String(args.userId).trim();
     const canon = canonicalAuthSubjectProfileId(raw);
 
-    /** All profile docs already tied to this auth user (any segment / legacy id shape). */
-    const hits = await collectProfileDocsForSubjectKeys(ctx, raw);
+    /**
+     * All profile docs tied to this auth user — first by subject segments, then by email.
+     * The email fallback prevents duplicates when the JWT subject shape changed between sessions.
+     */
+    const hits = await collectProfileDocsForSubjectKeys(ctx, raw, normEmail);
 
     if (hits.length > 0) {
       hits.sort((a, b) => a._creationTime - b._creationTime);
@@ -132,8 +137,9 @@ export const insertProfileRow = mutation({
         beta_rejected: betaRej,
         beta_rejected_at: betaRejAt,
       };
-      if (trimmedEmail && !(typeof keeper.contact_email === "string" && keeper.contact_email.trim())) {
-        patch.contact_email = trimmedEmail;
+      // Always write the normalised email onto the keeper (fills in blanks and fixes case).
+      if (normEmail) {
+        patch.contact_email = normEmail;
       }
 
       await ctx.db.patch(keeper._id, patch as never);
@@ -154,7 +160,7 @@ export const insertProfileRow = mutation({
       beta_requested_at: now,
       created_at: now,
       updated_at: now,
-      ...(trimmedEmail ? { contact_email: trimmedEmail } : {}),
+      ...(normEmail ? { contact_email: normEmail } : {}),
     });
     return { inserted: true as const, mergedDuplicates: 0 };
   },
@@ -173,7 +179,14 @@ export const patchProfileRow = mutation({
     const p = patch as Record<string, unknown>;
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of Object.keys(p)) {
-      if (p[key] !== undefined) updates[key] = p[key];
+      if (p[key] !== undefined) {
+        // Always store contact_email in lowercase so the by_contact_email index stays consistent.
+        if (key === "contact_email" && typeof p[key] === "string") {
+          updates[key] = (p[key] as string).trim().toLowerCase();
+        } else {
+          updates[key] = p[key];
+        }
+      }
     }
     await ctx.db.patch(row._id, updates as never);
     return { ok: true as const };
