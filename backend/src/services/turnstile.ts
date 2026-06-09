@@ -26,12 +26,19 @@ export async function verifyTurnstileToken(token: string | undefined, remoteip?:
   const raw = typeof token === 'string' ? token.trim() : '';
 
   if (!isProd) {
-    // In dev/staging accept any non-empty token — the widget was rendered and completed.
-    if (!raw) {
-      logger.warn('Turnstile dev: no token provided — check TurnstileWidget is rendered');
-      return false;
+    // In development / staging: skip server-side verification entirely.
+    // The Cloudflare widget is still rendered in the browser (bot friction is present), but the
+    // server-side API round-trip is intentionally skipped for two reasons:
+    //   1. The dev frontend uses the always-passes test site key (1x00000000000000000000AA)
+    //      whose tokens are rejected by a real production secret key.
+    //   2. The Cloudflare script may fail to load on localhost (CSP, network, offline) causing
+    //      the widget to fire onError → no token is ever generated. Blocking on a missing token
+    //      would prevent all local signups even when the account itself is created successfully.
+    if (raw) {
+      logger.debug('Turnstile dev: token present — skipping remote verification');
+    } else {
+      logger.warn('Turnstile dev: no token (widget likely failed to load on localhost) — passing through');
     }
-    logger.debug('Turnstile dev: skipping remote verification, token present');
     return true;
   }
 
