@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Package, BarChart3, Settings, Key, Code, LayoutDashboard, CreditCard, BookOpen, FlaskConical,
+  Package, BarChart3, Settings, Key, Code, LayoutDashboard, CreditCard, BookOpen, FlaskConical, Sparkles,
 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -18,7 +18,8 @@ const ApiKeysTab   = lazy(() => import("@/components/dashboard/ApiKeysTab").then
 const WidgetTab    = lazy(() => import("@/components/dashboard/WidgetTab").then((m) => ({ default: m.WidgetTab })));
 const BillingTab   = lazy(() => import("@/components/dashboard/BillingTab").then((m) => ({ default: m.BillingTab })));
 const SettingsTab  = lazy(() => import("@/components/dashboard/SettingsTab").then((m) => ({ default: m.SettingsTab })));
-const StudioTab    = lazy(() => import("@/components/dashboard/StudioTab").then((m) => ({ default: m.StudioTab })));
+const StudioTab       = lazy(() => import("@/components/dashboard/StudioTab").then((m) => ({ default: m.StudioTab })));
+const PersonalizeTab  = lazy(() => import("@/components/dashboard/PersonalizeTab").then((m) => ({ default: m.PersonalizeTab })));
 
 const DEFAULT_TAB = "Try-On guide";
 
@@ -28,6 +29,7 @@ const sidebarItems = [
   { icon: BarChart3, label: "Analytics" },
   { icon: Package, label: "Products" },
   { icon: FlaskConical, label: "Personal Studio" },
+  { icon: Sparkles, label: "Personalization" },
   { icon: Key, label: "API Keys" },
   { icon: Code, label: "Widget" },
   { icon: CreditCard, label: "Billing" },
@@ -40,6 +42,7 @@ const tabComponents: Record<string, React.ComponentType> = {
   Analytics: AnalyticsTab,
   Products: ProductsTab,
   "Personal Studio": StudioTab,
+  Personalization: PersonalizeTab,
   "API Keys": ApiKeysTab,
   Widget: WidgetTab,
   Billing: BillingTab,

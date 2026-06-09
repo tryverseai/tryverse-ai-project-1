@@ -1043,6 +1043,21 @@ export async function getBrandAnalytics(days = 30): Promise<BrandAnalytics> {
   return handleResponse<BrandAnalytics>(res);
 }
 
+// ─── AI Model Personalization ─────────────────────────────────────────────────
+
+export interface PersonalizeAnalytics {
+  totalGenerations: number;
+  days: number;
+  enabled: boolean;
+  dailyBreakdown: { date: string; generations: number }[];
+}
+
+export async function getPersonalizeAnalytics(days = 30): Promise<PersonalizeAnalytics> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/personalize/analytics?days=${days}`, { headers });
+  return handleResponse<PersonalizeAnalytics>(res);
+}
+
 // ─── Widget domains ───────────────────────────────────────────────────────────
 
 export async function addWidgetDomain(domain: string) {

@@ -29,6 +29,7 @@ import supportRouter from './routes/support';
 import demoRouter from './routes/demo';
 import inviteRouter from './routes/invite';
 import authInviteRouter from './routes/authInvite';
+import personalizeRouter from './routes/personalize';
 
 // ─── Sentry (must init before everything else) ────────────────────────────────
 initSentry();
@@ -225,7 +226,8 @@ app.use('/api/products',  productsRouter);
 app.use('/api/admin',     adminRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/emails',    emailsRouter);
-app.use('/api/account',   accountRouter);
+app.use('/api/account',     accountRouter);
+app.use('/api/personalize', personalizeRouter);
 
 // ─── Sentry error handler ────────────────────────────────────────────────────
 try {
