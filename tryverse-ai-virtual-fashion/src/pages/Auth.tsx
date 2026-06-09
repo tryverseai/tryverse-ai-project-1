@@ -18,12 +18,8 @@ import {
 import { posthogCapture } from "@/lib/posthog";
 import { inviteSignupEnabled } from "@/lib/featureFlags";
 import { postLoginRedirectPath, safeInAppRedirectPath } from "@/lib/safeUrl";
-import { TurnstileWidget } from "@/components/TurnstileWidget";
-import { turnstileSiteKey } from "@/lib/turnstileEnv";
 import { saveEmailVerifyPending } from "@/lib/emailVerifyPendingStorage";
 import { convexAuthEmailFlowToast } from "@/lib/convexAuthEmailFlowToast";
-
-const TURNSTILE_SITE_KEY = turnstileSiteKey();
 
 const roles = [
   "Founder",
@@ -89,8 +85,6 @@ const Auth = () => {
   const [customRole, setCustomRole] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const [turnstileRequired, setTurnstileRequired] = useState(Boolean(TURNSTILE_SITE_KEY));
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -150,21 +144,11 @@ const Auth = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (turnstileRequired && !turnstileToken.trim()) {
-      toast({
-        title: "Security verification required",
-        description: "Complete the security check below, then try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const turnstilePass = turnstileToken.trim() || undefined;
-
     setLoading(true);
 
     if (showSignupForm) {
       const finalRole = role === "Other" ? customRole : role;
-      const result = await signUp(email, password, brandName, fullName, finalRole, "business", turnstilePass);
+      const result = await signUp(email, password, brandName, fullName, finalRole, "business");
       if (result.error) {
         console.error("Signup error:", result.error);
         const t = signUpErrorToast(result.error);
@@ -199,7 +183,7 @@ const Auth = () => {
         goToDashboardAfterAuth();
       }
     } else {
-      const result = await signIn(email, password, turnstilePass);
+      const result = await signIn(email, password);
       if (result.error) {
         console.error("Sign in error:", result.error);
         toast({ title: "Sign in failed", description: result.error.message, variant: "destructive", duration: 6000 });
@@ -391,12 +375,6 @@ const Auth = () => {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-
-            <TurnstileWidget
-              onSuccess={(t) => setTurnstileToken(t)}
-              onExpire={() => setTurnstileToken("")}
-              onUnavailable={() => setTurnstileRequired(false)}
-            />
 
             <Button type="submit" className="w-full gradient-primary text-primary-foreground h-12 shadow-soft" disabled={loading}>
               {loading ? "Please wait..." : showSignupForm ? "Sign Up" : "Sign In"}

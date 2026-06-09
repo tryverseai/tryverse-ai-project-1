@@ -13,7 +13,6 @@ import {
 } from '../services/creditsConvexBridge';
 import { DEFAULT_FREE_CREDITS_BUSINESS, DEFAULT_FREE_CREDITS_INDIVIDUAL } from '../services/credits';
 import { logger } from '../config/logger';
-import { verifyTurnstileToken } from '../services/turnstile';
 import { sendWelcomeEmail, sendDeviceApprovalEmail } from '../services/email';
 import { cxConsolidateTryonsToCanonicalUserId } from '../services/tryonConvexBridge';
 import { env } from '../config/env';
@@ -121,16 +120,8 @@ router.post(
       const emailFromBody =
         typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
       const email = emailFromJwt || emailFromBody;
-      const turnstileToken =
-        typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined;
       const deviceFingerprintRaw =
         typeof body.deviceFingerprint === 'string' ? body.deviceFingerprint.trim() : '';
-
-      const ip = typeof req.ip === 'string' ? req.ip : undefined;
-      if (!(await verifyTurnstileToken(turnstileToken, ip))) {
-        res.status(403).json({ error: 'Security verification failed. Please try again.' });
-        return;
-      }
 
       if (deviceFingerprintRaw.length < 8) {
         res.status(400).json({
@@ -224,13 +215,6 @@ router.post(
       const profileKey = convexProfileCreditLookupKey(req);
       const body = req.body as Record<string, unknown>;
       const fpRaw = typeof body.deviceFingerprint === 'string' ? body.deviceFingerprint.trim() : '';
-      const turnstileToken =
-        typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined;
-      const ip = typeof req.ip === 'string' ? req.ip : undefined;
-      if (!(await verifyTurnstileToken(turnstileToken, ip))) {
-        res.status(403).json({ error: 'Security verification failed. Please try again.' });
-        return;
-      }
       if (fpRaw.length < 8) {
         res.status(400).json({ error: 'Reload the page and try again (missing device fingerprint).' });
         return;
@@ -303,13 +287,6 @@ router.post(
       const codeDigits =
         typeof body.code === 'string' ? body.code.trim().replace(/\s+/g, '') : '';
 
-      const turnstileToken =
-        typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined;
-      const ip = typeof req.ip === 'string' ? req.ip : undefined;
-      if (!(await verifyTurnstileToken(turnstileToken, ip))) {
-        res.status(403).json({ error: 'Security verification failed. Please try again.' });
-        return;
-      }
       if (fpRaw.length < 8) {
         res.status(400).json({ error: 'Reload the page and try again (missing device fingerprint).' });
         return;

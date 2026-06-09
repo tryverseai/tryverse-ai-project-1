@@ -2,14 +2,12 @@ import { useState, useMemo, type FormEvent, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
-import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { turnstileSiteKey } from "@/lib/turnstileEnv";
 import {
   clearEmailVerifyPending,
   readEmailVerifyPending,
@@ -21,8 +19,6 @@ import { completeInviteAfterSignup } from "@/lib/backendApi";
 import { dashboardPathForAccountType, type AccountType } from "@/lib/accountType";
 import { posthogCapture } from "@/lib/posthog";
 import { convexAuthEmailFlowToast } from "@/lib/convexAuthEmailFlowToast";
-
-const TURNSTILE_SITE_KEY = turnstileSiteKey();
 
 /** After verification: same routing rules as `Auth.tsx` dashboard redirect */
 function navigateAfterAuthenticated(
@@ -73,8 +69,6 @@ const VerifyEmail = () => {
   }, [payloadFromStorage, emailFromQuery]);
 
   const [code, setCode] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const [turnstileRequired, setTurnstileRequired] = useState(Boolean(TURNSTILE_SITE_KEY));
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -98,19 +92,9 @@ const VerifyEmail = () => {
       });
       return;
     }
-    if (turnstileRequired && !turnstileToken.trim()) {
-      toast({
-        title: "Security verification required",
-        description: "Complete the security check below, then try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const ts = turnstileToken.trim() || undefined;
     setLoading(true);
     try {
       const verified = await verifyEmailWithCode(payload.email, c, {
-        turnstileToken: ts,
         pendingBootstrap: payload.pendingBootstrap,
       });
       if (verified.error) {
@@ -198,11 +182,6 @@ const VerifyEmail = () => {
               required
             />
           </div>
-          <TurnstileWidget
-            onSuccess={(t) => setTurnstileToken(t)}
-            onExpire={() => setTurnstileToken("")}
-            onUnavailable={() => setTurnstileRequired(false)}
-          />
           <Button
             type="submit"
             className="w-full gradient-primary text-primary-foreground h-12 shadow-soft"
