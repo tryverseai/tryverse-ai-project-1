@@ -399,7 +399,7 @@ const Auth = () => {
             />
 
             <Button type="submit" className="w-full gradient-primary text-primary-foreground h-12 shadow-soft" disabled={loading}>
-              {loading ? "Please wait..." : showSignupForm ? "Create brand account" : "Sign In"}
+              {loading ? "Please wait..." : showSignupForm ? "Sign Up" : "Sign In"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </form>
@@ -413,7 +413,7 @@ const Auth = () => {
               </p>
               <p className="text-sm text-muted-foreground text-center mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 items-center">
                 <Link to="/auth?signup=business" className="text-foreground/80 font-medium hover:underline">
-                  Create brand account →
+                  Sign up →
                 </Link>
                 <span className="text-border hidden sm:inline" aria-hidden>
                   |

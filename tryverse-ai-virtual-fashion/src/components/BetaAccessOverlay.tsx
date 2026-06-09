@@ -49,11 +49,14 @@ export function BetaAccessOverlay() {
     return (
       <div
         className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-4 text-center bg-background/90 backdrop-blur-md"
-        role="alert"
+        role="status"
+        aria-live="polite"
+        aria-label="Creating your workspace"
       >
-        <p className="text-sm font-medium text-foreground">Finishing setup…</p>
+        <div className="h-10 w-10 rounded-full border-2 border-muted border-t-foreground animate-spin mb-5" />
+        <p className="text-sm font-medium text-foreground">Creating your workspace…</p>
         <p className="mt-2 text-sm text-muted-foreground max-w-sm">
-          Creating your workspace. This usually takes a few seconds.
+          This usually takes a few seconds.
         </p>
       </div>
     );
