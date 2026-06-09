@@ -4,6 +4,7 @@ import { TrustedBy } from "@/components/TrustedBy";
 import { HowItWorks } from "@/components/HowItWorks";
 import { FeaturesSection } from "@/components/FeaturesSection";
 import { TechnologySection } from "@/components/TechnologySection";
+import { JewelryShowcase } from "@/components/JewelryShowcase";
 import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
 import { Helmet } from "react-helmet-async";
@@ -25,6 +26,7 @@ const Index = () => {
       <HowItWorks />
       <FeaturesSection />
       <TechnologySection />
+      <JewelryShowcase />
       <CTASection />
       <Footer />
     </div>

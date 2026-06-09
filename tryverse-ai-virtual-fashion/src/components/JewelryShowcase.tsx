@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { AutoPlayVideo } from "@/components/AutoPlayVideo";
 import jewelryNecklace from "@/assets/jewelry-necklace.jpg";
 import jewelrySunglasses from "@/assets/jewelry-sunglasses.jpg";
@@ -16,47 +16,54 @@ const photos = [
   { video: jewelryEarringsVideo, poster: jewelryEarrings, alt: "Model wearing gold hoop earrings" },
 ];
 
+/** Floating durations staggered per card so each drifts independently. */
+const FLOAT_DURATIONS = [60, 63, 57, 65];
+/** Vertical travel (px) — subtle so there is no layout shift. */
+const FLOAT_AMPLITUDE = 10;
+
 export function JewelryShowcase() {
+  const shouldReduceMotion = useReducedMotion();
+
   return (
     <section className="py-20 md:py-28">
       <div className="max-w-7xl mx-auto px-6">
-        <div className="text-center mb-12 max-w-2xl mx-auto">
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-xs font-medium text-muted-foreground uppercase tracking-[0.2em]"
-          >
-            Accessories &amp; jewelry try-on
-          </motion.p>
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.04 }}
-            className="mt-2 text-sm italic text-muted-foreground"
-          >
-            Coming Soon
-          </motion.p>
-        </div>
-
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {photos.map((photo, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: i * 0.12, ease: "easeOut" }}
-              whileHover={{ scale: 1.03 }}
+              transition={{ duration: 0.7, delay: i * 0.1, ease: "easeOut" }}
               className="relative rounded-2xl overflow-hidden shadow-elevated border border-border/30 aspect-[3/4]"
             >
-              <AutoPlayVideo
-                src={photo.video}
-                poster={photo.poster}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-foreground/10 to-transparent" />
+              {/* Continuous float layer — separate from the entry animation */}
+              <motion.div
+                className="w-full h-full"
+                animate={
+                  shouldReduceMotion
+                    ? {}
+                    : { y: [0, -FLOAT_AMPLITUDE, 0] }
+                }
+                transition={
+                  shouldReduceMotion
+                    ? {}
+                    : {
+                        duration: FLOAT_DURATIONS[i],
+                        repeat: Infinity,
+                        repeatType: "loop",
+                        ease: "easeInOut",
+                        delay: i * 4,
+                      }
+                }
+              >
+                <AutoPlayVideo
+                  src={photo.video}
+                  poster={photo.poster}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-foreground/10 to-transparent" />
+              </motion.div>
             </motion.div>
           ))}
         </div>
