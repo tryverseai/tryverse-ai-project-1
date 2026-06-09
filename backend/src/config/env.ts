@@ -290,7 +290,7 @@ export const env = {
   RESEND_API_KEY: sanitizeEnvLine(process.env['RESEND_API_KEY'], ''),
   EMAIL_FROM: sanitizeEnvLine(
     process.env['EMAIL_FROM'],
-    'TryVerse <onboarding@resend.dev>'
+    'TryVerse AI <info@tryverseai.com>'
   ),
 
   // ── Storage ───────────────────────────────────────────────────────────────
