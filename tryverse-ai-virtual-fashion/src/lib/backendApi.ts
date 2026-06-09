@@ -96,7 +96,7 @@ export function widgetBackendPublicUrl(): string {
   return 'http://localhost:3001';
 }
 
-export type TryOnCategory = 'clothing' | 'bags' | 'glasses';
+export type TryOnCategory = 'clothing' | 'tops' | 'bottoms' | 'dresses' | 'one-pieces';
 
 // ─── Typed API error (replaces `Error & { status?; code?; retryAfter? }`) ────
 
@@ -883,6 +883,22 @@ export async function submitIndividualEarlyAccessRequest(payload: {
     body: JSON.stringify(payload),
   });
   return handleResponse(res, { feature: 'early_access' });
+}
+
+export async function submitDemoBooking(payload: {
+  full_name: string;
+  email: string;
+  brand_name: string;
+  store_platform: string;
+  monthly_visitors: string;
+  message?: string;
+}): Promise<{ ok: boolean }> {
+  const res = await fetchWithConnectivityHint(composeApiUrl('/api/demo/book'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res, { feature: 'demo_booking' });
 }
 
 /** Contact / Support form — saved via backend to avoid PostgREST schema issues. */

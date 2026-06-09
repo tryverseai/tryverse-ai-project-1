@@ -1,11 +1,12 @@
 /**
- * Active product categories for V1 launch.
- * Future: shoes | jewelry | hats | accessories
+ * Active product categories — clothing only (B2B fashion brands).
  */
 export type ProductCategory =
-  | 'clothing'   // Tops, bottoms, dresses, jackets, outerwear — IDM-VTON
-  | 'bags'       // Handbags, backpacks, clutches, totes — FASHN
-  | 'glasses';   // Sunglasses, prescription eyewear, goggles — FASHN
+  | 'clothing'
+  | 'tops'
+  | 'bottoms'
+  | 'dresses'
+  | 'one-pieces';
 
 /** Lifecycle states a try-on record can be in (mirrors Convex schema). */
 export type TryOnStatus = 'queued' | 'processing' | 'completed' | 'failed';

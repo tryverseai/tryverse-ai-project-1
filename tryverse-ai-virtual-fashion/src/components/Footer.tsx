@@ -12,7 +12,8 @@ export function Footer() {
               <TryVerseLogo height={40} />
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed mt-3 max-w-xs">
-              Virtual try-on for fashion brands — and a personal studio for anyone who wants to try before they buy.
+              Virtual try-on infrastructure for fashion brands — embed AI try-on on your product pages and reduce
+              returns.
             </p>
           </div>
           {[

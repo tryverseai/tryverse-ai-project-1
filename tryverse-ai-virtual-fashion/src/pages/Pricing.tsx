@@ -241,7 +241,7 @@ function isFreePlanId(id: string): boolean {
 
 const Pricing = () => {
   const navigate = useNavigate();
-  const [audience, setAudience] = useState<PricingAudience>("individual");
+  const [audience] = useState<PricingAudience>("business");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [plansLoading, setPlansLoading] = useState(true);
   const [dbPlans, setDbPlans] = useState<PlanRow[]>([]);
@@ -475,43 +475,11 @@ const Pricing = () => {
           >
             <p className="text-xs font-medium text-muted-foreground mb-3 tracking-[0.2em] uppercase">Pricing</p>
             <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">
-              Plans for people and for brands
+              Plans for fashion brands
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
-              Whether you&apos;re trying outfits for yourself (B2C) or scaling virtual try-on for shoppers (B2B), pick the
-              lane that fits — then pay securely by card or bank when you&apos;re ready.
+              Scale virtual try-on for your storefront — start with 20 free try-ons, then upgrade when you&apos;re ready.
             </p>
-
-            <div
-              className="inline-flex rounded-full border border-border/80 bg-muted/40 p-1.5 gap-1 mx-auto mb-8"
-              role="tablist"
-              aria-label="Pricing audience"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={audience === "individual"}
-                className={cn(
-                  "px-5 py-2.5 rounded-full text-sm font-semibold transition-colors",
-                  audience === "individual" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
-                onClick={() => setAudience("individual")}
-              >
-                For individuals
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={audience === "business"}
-                className={cn(
-                  "px-5 py-2.5 rounded-full text-sm font-semibold transition-colors",
-                  audience === "business" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
-                onClick={() => setAudience("business")}
-              >
-                For brands
-              </button>
-            </div>
 
             {(providers.flutterwave || providers.paystack) && (
               <div className="flex flex-col items-center gap-2 max-w-md mx-auto mb-2">

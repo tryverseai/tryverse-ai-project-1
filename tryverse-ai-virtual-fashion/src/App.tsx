@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { HelmetProvider } from "react-helmet-async";
@@ -31,15 +31,12 @@ import NotFound from "./pages/NotFound";
 
 // Lazily loaded: heavy pages that are not needed on the first paint
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const IndividualDashboard = lazy(() => import("./pages/IndividualDashboard"));
-const TryOnStudio = lazy(() => import("./pages/TryOnStudio"));
 const Admin = lazy(() => import("./pages/Admin"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs"));
 const WidgetPreview = lazy(() => import("./pages/WidgetPreview"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const About = lazy(() => import("./pages/About"));
 const PartnerWithUs = lazy(() => import("./pages/PartnerWithUs"));
-const EarlyAccess = lazy(() => import("./pages/EarlyAccess"));
 const WidgetGuide = lazy(() => import("./pages/WidgetGuide"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -77,27 +74,16 @@ const App = () => (
               path="/dashboard/business"
               element={
                 <ProtectedRoute>
-                  <AccountTypeGate allowed={["business"]}>
-                    <Dashboard />
-                  </AccountTypeGate>
+                  <Dashboard />
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/dashboard/individual"
-              element={
-                <ProtectedRoute>
-                  <AccountTypeGate allowed={["individual"]}>
-                    <IndividualDashboard />
-                  </AccountTypeGate>
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/dashboard/individual" element={<Navigate to="/dashboard/business" replace />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/about" element={<About />} />
             <Route path="/partner" element={<PartnerWithUs />} />
-            <Route path="/early-access" element={<EarlyAccess />} />
-            <Route path="/waitlist" element={<EarlyAccess />} />
+            <Route path="/early-access" element={<Navigate to="/book-demo" replace />} />
+            <Route path="/waitlist" element={<Navigate to="/book-demo" replace />} />
             <Route path="/book-demo" element={<BookDemo />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/invite/:token" element={<AuthInvite />} />
@@ -131,10 +117,9 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route path="/studio" element={<ProtectedRoute><TryOnStudio clothingOnly /></ProtectedRoute>} />
-            {/* Admin unlocks via backend admin key + HttpOnly cookie — not Convex user session */}
+            <Route path="/studio" element={<Navigate to="/dashboard/business" replace />} />
+            <Route path="/try-on-studio" element={<Navigate to="/dashboard/business" replace />} />
             <Route path="/admin" element={<Admin />} />
-            <Route path="/try-on-studio" element={<ProtectedRoute><TryOnStudio clothingOnly /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </Suspense>

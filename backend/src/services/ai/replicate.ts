@@ -4,12 +4,11 @@ import { logger } from '../../config/logger';
 import { buildTryOnPrompt } from './promptBuilder';
 import {
   buildIdmGarmentDescription,
-  buildFashnBagDescription,
-  buildFashnGlassesDescription,
   buildFashnClothingDescription,
   inferIdmVtonGarmentCategory,
   inferFashnGarmentCategory,
   inferIsLongGarment,
+  type IdmVtonGarmentCategory,
 } from './garmentDescriptor';
 import { isFashnDirectEnabled, runFashnDirect } from './fashn';
 
@@ -48,22 +47,43 @@ function clothingModelInputKind(modelRef: string): 'idm_vton' | 'oot_style' {
   return 'idm_vton';
 }
 
-// ─── Category → Model routing ────────────────────────────────────────────────
+/** All active categories use the clothing try-on pipeline. */
+function isClothingCategory(category: ProductCategory): boolean {
+  return (
+    category === 'clothing' ||
+    category === 'tops' ||
+    category === 'bottoms' ||
+    category === 'dresses' ||
+    category === 'one-pieces'
+  );
+}
 
 function getModelConfig(category: ProductCategory): {
   model: string;
   buildInput: (input: VtonInput) => Record<string, unknown>;
 } {
+  // All clothing subcategories route through the same IDM-VTON / FASHN clothing pipeline.
   switch (category) {
     case 'clothing':
+    case 'tops':
+    case 'bottoms':
+    case 'dresses':
+    case 'one-pieces':
       return {
         model: env.REPLICATE_MODEL_CLOTHING,
         buildInput: (input) => {
           const modelRef = env.REPLICATE_MODEL_CLOTHING;
-          const idmSlot = inferIdmVtonGarmentCategory(
-            input.productHeightOverWidth,
-            input.productDescription
-          );
+          const idmSlot: IdmVtonGarmentCategory =
+            category === 'dresses' || category === 'one-pieces'
+              ? 'dresses'
+              : category === 'bottoms'
+                ? 'upper_body'
+                : category === 'tops'
+                  ? 'upper_body'
+                  : inferIdmVtonGarmentCategory(
+                      input.productHeightOverWidth,
+                      input.productDescription
+                    );
           const isDresses = idmSlot === 'dresses';
 
           if (clothingModelInputKind(modelRef) === 'oot_style') {
@@ -92,36 +112,6 @@ function getModelConfig(category: ProductCategory): {
             seed: randomSeed(),
           };
         },
-      };
-
-    case 'bags':
-      return {
-        model: env.REPLICATE_MODEL_ACCESSORIES,
-        buildInput: (input) => ({
-          model_image: input.personImageUrl,
-          garment_image: input.productImageUrl,
-          category: 'tops',
-          adjust_hands: false,
-          restore_background: true,
-          restore_clothes: true,
-          garment_description: buildFashnBagDescription(input.productDescription),
-          long_top: false,
-        }),
-      };
-
-    case 'glasses':
-      return {
-        model: env.REPLICATE_MODEL_ACCESSORIES,
-        buildInput: (input) => ({
-          model_image: input.personImageUrl,
-          garment_image: input.productImageUrl,
-          category: 'tops',
-          adjust_hands: false,
-          restore_background: true,
-          restore_clothes: true,
-          garment_description: buildFashnGlassesDescription(input.productDescription),
-          long_top: false,
-        }),
       };
   }
 }
@@ -345,7 +335,7 @@ export async function runVtonInference(
     return runFluxKontextInference(input);
   }
 
-  if (input.category === 'clothing') {
+  if (isClothingCategory(input.category)) {
     const engine =
       opts?.clothingEngine ?? (env.TRYON_CLOTHING_USE_FASHN ? 'fashn' : 'idm_vton');
     if (engine === 'fashn') {
@@ -377,14 +367,6 @@ export async function runVtonInference(
     return runIdmClothing(input);
   }
 
-  // ── Bags / Glasses: route through direct FASHN API when key is set ──────────
-  if ((input.category === 'bags' || input.category === 'glasses') && isFashnDirectEnabled()) {
-    const { buildInput } = getModelConfig(input.category);
-    const label = input.category === 'bags' ? 'fashn-bags' : 'fashn-glasses';
-    logger.info(`Starting ${label} (direct API)`, { category: input.category });
-    return runFashnDirect(input, buildInput, label);
-  }
-
   const { model, buildInput } = getModelConfig(input.category);
   const modelShortName = model.split('/')[1]?.split(':')[0] || model;
   logger.info('Starting inference (Replicate)', { category: input.category, model: modelShortName });
@@ -409,12 +391,14 @@ export function getSupportedCategories(): Array<{
     {
       id: 'clothing',
       label: 'Clothing',
-      description: 'Tops, bottoms, dresses, jackets, outerwear',
+      description: 'General apparel — tops, bottoms, dresses, one-pieces',
       modelFamily: env.TRYON_CLOTHING_USE_FASHN ? 'FASHN' : 'IDM-VTON',
       active: true,
     },
-    { id: 'bags', label: 'Bags', description: 'Handbags, backpacks, clutches, totes', modelFamily: 'FASHN', active: true },
-    { id: 'glasses', label: 'Eyewear', description: 'Sunglasses, prescription glasses, goggles', modelFamily: 'FASHN', active: true },
+    { id: 'tops', label: 'Tops', description: 'Shirts, blouses, t-shirts, jackets', modelFamily: env.TRYON_CLOTHING_USE_FASHN ? 'FASHN' : 'IDM-VTON', active: true },
+    { id: 'bottoms', label: 'Bottoms', description: 'Pants, skirts, shorts', modelFamily: env.TRYON_CLOTHING_USE_FASHN ? 'FASHN' : 'IDM-VTON', active: true },
+    { id: 'dresses', label: 'Dresses', description: 'Dresses and gowns', modelFamily: env.TRYON_CLOTHING_USE_FASHN ? 'FASHN' : 'IDM-VTON', active: true },
+    { id: 'one-pieces', label: 'One-pieces', description: 'Jumpsuits, rompers, overalls', modelFamily: env.TRYON_CLOTHING_USE_FASHN ? 'FASHN' : 'IDM-VTON', active: true },
   ];
 }
 

@@ -2,7 +2,6 @@ import { Navbar } from "@/components/Navbar";
 import { HeroSection } from "@/components/HeroSection";
 import { TrustedBy } from "@/components/TrustedBy";
 import { HowItWorks } from "@/components/HowItWorks";
-import { JewelryShowcase } from "@/components/JewelryShowcase";
 import { FeaturesSection } from "@/components/FeaturesSection";
 import { TechnologySection } from "@/components/TechnologySection";
 import { CTASection } from "@/components/CTASection";
@@ -13,10 +12,10 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <Helmet>
-        <title>TryVerse AI — Virtual Try-On for Brands & Shoppers</title>
+        <title>TryVerse AI — Virtual Try-On for Fashion Brands</title>
         <meta
           name="description"
-          content="AI virtual try-on and fit intelligence for fashion brands (widget, API, dashboard) and for people who want a personal try-on studio. Reduce returns, lift conversions, try outfits at home."
+          content="B2B AI virtual try-on for fashion brands and e-commerce retailers. Embed try-on on your product pages, reduce returns, and increase conversions."
         />
         <link rel="canonical" href="https://tryverseai.com/" />
       </Helmet>
@@ -24,7 +23,6 @@ const Index = () => {
       <HeroSection />
       <TrustedBy />
       <HowItWorks />
-      <JewelryShowcase />
       <FeaturesSection />
       <TechnologySection />
       <CTASection />

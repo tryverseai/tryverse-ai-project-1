@@ -26,6 +26,7 @@ import emailsRouter from './routes/emails';
 import accountRouter from './routes/account';
 import earlyAccessRouter from './routes/earlyAccess';
 import supportRouter from './routes/support';
+import demoRouter from './routes/demo';
 import inviteRouter from './routes/invite';
 import authInviteRouter from './routes/authInvite';
 
@@ -210,6 +211,7 @@ async function mountBullBoard(): Promise<void> {
 // ─── API Routes ───────────────────────────────────────────────────────────────
 app.use('/api/early-access', earlyAccessRouter);
 app.use('/api/support', supportRouter);
+app.use('/api/demo', demoRouter);
 app.use('/api/invite', inviteRouter);
 app.use('/api/auth/invite', authInviteRouter);
 app.use('/api/upload',    uploadRouter);

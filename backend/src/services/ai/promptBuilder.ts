@@ -13,7 +13,6 @@ export interface PromptContext {
   bodyDetected: boolean;
   /** Inferred from image aspect ratio / dimensions: 'full_body' | 'half_body' | 'face_only' */
   poseType?: 'full_body' | 'half_body' | 'face_only';
-  /** Optional: specific garment type (shirt, dress, glasses, etc.) from productDescription or category */
   garmentHint?: string;
   /** Product image height/width for gown/dress prompts (flux-kontext). */
   productHeightOverWidth?: number;
@@ -32,20 +31,12 @@ export function buildTryOnPrompt(ctx: PromptContext): string {
       'Do not treat the person’s current outfit or accessories as the product unless they are the item being replaced.'
   );
 
-  // Core instruction
-  if (ctx.category === 'glasses') {
-    parts.push('Place the eyewear from the second image accurately on the person\'s face.');
-    parts.push('Align the glasses with the eyes and facial perspective.');
-  } else if (ctx.category === 'bags') {
-    parts.push('Replace or add the bag/accessory from the second image onto the person.');
-    parts.push('Ensure the bag sits naturally with the body pose and fits the context.');
-  } else {
-    parts.push('Replace the person\'s clothing with the garment from the second image.');
-  }
+  parts.push('Replace the person\'s clothing with the garment from the second image.');
 
   // Context layer — product type
   const garmentHint = (ctx.productDescription || ctx.garmentHint || '').toLowerCase();
-  if (ctx.category === 'clothing') {
+  const isDressCategory = ctx.category === 'dresses' || ctx.category === 'one-pieces';
+  if (ctx.category === 'clothing' || isDressCategory || ctx.category === 'tops' || ctx.category === 'bottoms') {
     if (inferIsLongGarment(ctx.productHeightOverWidth, ctx.productDescription)) {
       parts.push(
         'The product is a full-length garment (dress or gown): cover the body from shoulders to feet like the second image—' +

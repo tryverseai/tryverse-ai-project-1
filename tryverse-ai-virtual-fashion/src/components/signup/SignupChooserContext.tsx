@@ -1,11 +1,5 @@
-import {
-  createContext,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
-import { SignupAccountTypeModal } from "./SignupAccountTypeModal";
+import { useNavigate } from "react-router-dom";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 type SignupChooserCtx = {
   openSignupChooser: () => void;
@@ -13,17 +7,15 @@ type SignupChooserCtx = {
 
 const SignupChooserContext = createContext<SignupChooserCtx | null>(null);
 
-/** Wraps marketing routes so “Sign Up” CTAs share one account-type modal. */
+/** B2B-only: “Sign Up” CTAs go straight to brand account creation. */
 export function SignupChooserProvider({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const value = useMemo(() => ({ openSignupChooser: () => setOpen(true) }), []);
-
-  return (
-    <SignupChooserContext.Provider value={value}>
-      {children}
-      <SignupAccountTypeModal open={open} onOpenChange={setOpen} />
-    </SignupChooserContext.Provider>
+  const navigate = useNavigate();
+  const value = useMemo(
+    () => ({ openSignupChooser: () => navigate("/auth?signup=business") }),
+    [navigate]
   );
+
+  return <SignupChooserContext.Provider value={value}>{children}</SignupChooserContext.Provider>;
 }
 
 export function useSignupChooser() {

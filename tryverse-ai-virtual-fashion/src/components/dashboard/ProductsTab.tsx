@@ -42,13 +42,21 @@ import { openExternalHttpUrlInNewTab, safeImageSrcForDom, safeHttpHrefForDom } f
 
 const CATEGORIES: { id: TryOnCategory; label: string }[] = [
   { id: "clothing", label: "Clothing" },
-  { id: "bags", label: "Bags" },
-  { id: "glasses", label: "Eyewear" },
+  { id: "tops", label: "Tops" },
+  { id: "bottoms", label: "Bottoms" },
+  { id: "dresses", label: "Dresses" },
+  { id: "one-pieces", label: "One-pieces" },
 ];
 
 /** Type guard — narrows an unknown string to TryOnCategory. */
 function isTryOnCategory(value: unknown): value is TryOnCategory {
-  return value === "clothing" || value === "bags" || value === "glasses";
+  return (
+    value === "clothing" ||
+    value === "tops" ||
+    value === "bottoms" ||
+    value === "dresses" ||
+    value === "one-pieces"
+  );
 }
 
 /** Coerce an API-returned string to TryOnCategory, falling back to 'clothing'. */

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Eye, Ruler, Camera, BarChart3, Code2, Video, ShoppingBag, Glasses } from "lucide-react";
+import { Eye, Ruler, Camera, BarChart3, Code2, Video } from "lucide-react";
 import { AutoPlayVideo } from "@/components/AutoPlayVideo";
 import featuresModelVideo from "@/assets/features-model-video.mp4";
 import featuresSofaPoster from "@/assets/features-model-sofa.jpg";
@@ -11,19 +11,7 @@ const features = [
     icon: Eye,
     title: "Virtual Try-On",
     description:
-      "Photorealistic previews on your storefront — clothing and more — so shoppers see how items look before they buy.",
-  },
-  {
-    icon: ShoppingBag,
-    title: "Bags & accessories",
-    description:
-      "Handbags, totes, and accessories on your models or customers' photos — same pipeline as apparel, via widget or API.",
-  },
-  {
-    icon: Glasses,
-    title: "Eyewear",
-    description:
-      "Sunglasses and optical frames with realistic scale on the face — higher confidence on PDPs and in your embed.",
+      "Photorealistic clothing previews on your storefront — shoppers see how garments look before they buy.",
   },
   {
     icon: Ruler,
@@ -51,9 +39,9 @@ const features = [
   },
   {
     icon: BarChart3,
-    title: "Dashboards & analytics",
+    title: "Analytics & Insights",
     description:
-      "Manage catalogs, API keys, domains, and try-on performance from one place — credits, usage, and rollouts under control.",
+      "Track try-on engagement, conversion lift, and return-rate impact from your brand dashboard.",
   },
 ];
 
@@ -70,68 +58,54 @@ export function FeaturesSection() {
           className="text-center mb-10 sm:mb-14 md:mb-16 max-w-3xl mx-auto"
         >
           <p className="text-xs font-medium text-muted-foreground mb-2 sm:mb-3 tracking-[0.2em] uppercase">
-            Platform
+            Platform Features
           </p>
-          <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4 leading-tight px-1">
-            Built for Brands — Loved by Shoppers
+          <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4 leading-tight">
+            Built for Fashion Brands
           </h2>
-          <p className="text-center text-xs font-medium text-muted-foreground uppercase tracking-[0.2em] px-1">
-            Works with the stacks brands use
+          <p className="text-muted-foreground text-base sm:text-lg leading-relaxed">
+            Everything you need to embed AI virtual try-on on your store — widget, API, dashboard, and analytics in one
+            platform.
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 md:gap-8">
           {features.map((feature, i) => (
             <motion.div
               key={feature.title}
-              initial={{ opacity: 0, y: 22 }}
+              initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
-              transition={{ delay: Math.min(i * 0.06, 0.36), duration: 0.75, ease: GLASS_EASE }}
-              whileHover={{
-                y: -6,
-                transition: { duration: 0.7, ease: GLASS_EASE },
-              }}
+              transition={{ delay: Math.min(i * 0.08, 0.32), duration: 0.8, ease: GLASS_EASE }}
               className={glassOuter}
             >
-              <div className={glassInnerCard}>
-                <div
-                  className="relative z-[2] mb-4 sm:mb-5 flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl gradient-primary shadow-soft transition-transform duration-[900ms] ease-out group-hover:scale-[1.04]"
-                >
+              <div className={cn(glassInnerCard, "gap-4")}>
+                <div className="relative z-[2] flex h-12 w-12 shrink-0 items-center justify-center rounded-xl gradient-primary shadow-soft">
                   <feature.icon className="h-5 w-5 text-primary-foreground" strokeWidth={2} />
                 </div>
-                <h3 className="relative z-[2] font-display text-base sm:text-lg font-semibold text-foreground mb-2 leading-snug">
-                  {feature.title}
-                </h3>
-                <p className="relative z-[2] text-muted-foreground text-sm leading-relaxed flex-1">
-                  {feature.description}
-                </p>
+                <h3 className="relative z-[2] font-display text-lg font-semibold text-foreground">{feature.title}</h3>
+                <p className="relative z-[2] text-sm leading-relaxed text-muted-foreground">{feature.description}</p>
               </div>
             </motion.div>
           ))}
         </div>
 
-        {/* Video — same glass rim; video sits above shine layer */}
         <motion.div
-          initial={{ opacity: 0, y: 28 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.75, ease: GLASS_EASE }}
-          whileHover={{ y: -4, transition: { duration: 0.65, ease: GLASS_EASE } }}
-          className={`${glassOuter} mt-12 sm:mt-16 max-w-4xl mx-auto`}
+          className={cn(glassOuter, "mt-12 sm:mt-16 max-w-4xl mx-auto")}
         >
-          <div
-            className={cn(
-              glassInner,
-              "!p-0 overflow-hidden bg-white/50 supports-[backdrop-filter]:backdrop-blur-[24px]"
-            )}
-          >
-            <div className="relative z-[2] aspect-video w-full overflow-hidden rounded-[14px] sm:rounded-[26px] bg-muted/30">
-              <AutoPlayVideo
-                src={featuresModelVideo}
-                poster={featuresSofaPoster}
-                className="w-full h-full object-cover"
-              />
+          <div className={cn(glassInner, "flex flex-col md:flex-row items-center gap-6 p-6 sm:p-8")}>
+            <div className="relative w-full md:w-1/2 aspect-[4/3] rounded-xl overflow-hidden shrink-0">
+              <AutoPlayVideo src={featuresModelVideo} poster={featuresSofaPoster} className="w-full h-full object-cover" />
+            </div>
+            <div className="flex-1 text-center md:text-left">
+              <h3 className="font-display text-xl font-bold text-foreground mb-2">Embed in minutes</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Add the TryVerse widget to your product pages with a single script tag. Works with Shopify, WooCommerce,
+                and custom storefronts.
+              </p>
             </div>
           </div>
         </motion.div>

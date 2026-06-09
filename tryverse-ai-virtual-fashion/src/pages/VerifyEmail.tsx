@@ -2,7 +2,7 @@ import { useState, useMemo, type FormEvent, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
-import { Turnstile } from "@marsidev/react-turnstile";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,6 +74,7 @@ const VerifyEmail = () => {
 
   const [code, setCode] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileRequired, setTurnstileRequired] = useState(Boolean(TURNSTILE_SITE_KEY));
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -97,7 +98,7 @@ const VerifyEmail = () => {
       });
       return;
     }
-    if (TURNSTILE_SITE_KEY && !turnstileToken.trim()) {
+    if (turnstileRequired && !turnstileToken.trim()) {
       toast({
         title: "Security verification required",
         description: "Complete the security check below, then try again.",
@@ -197,22 +198,11 @@ const VerifyEmail = () => {
               required
             />
           </div>
-          {TURNSTILE_SITE_KEY ? (
-            <div className="flex min-h-[72px] w-full justify-center py-2">
-              <Turnstile
-                siteKey={TURNSTILE_SITE_KEY}
-                options={{ appearance: "always", size: "normal" }}
-                onSuccess={(t) => setTurnstileToken(t)}
-                onExpire={() => setTurnstileToken("")}
-                onError={() => setTurnstileToken("")}
-              />
-            </div>
-          ) : import.meta.env.DEV ? (
-            <p className="text-xs text-amber-600 dark:text-amber-500 text-center">
-              Turnstile: set <code className="rounded bg-muted px-1">VITE_CLOUDFLARE_TURNSTILE_SITE_KEY</code> in .env for
-              production parity.
-            </p>
-          ) : null}
+          <TurnstileWidget
+            onSuccess={(t) => setTurnstileToken(t)}
+            onExpire={() => setTurnstileToken("")}
+            onUnavailable={() => setTurnstileRequired(false)}
+          />
           <Button
             type="submit"
             className="w-full gradient-primary text-primary-foreground h-12 shadow-soft"

@@ -1,58 +1,55 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { submitSupportContact } from "@/lib/backendApi";
+import { submitDemoBooking } from "@/lib/backendApi";
 
-const CALENDLY_URL = import.meta.env.VITE_CALENDLY_URL?.trim();
-
-function splitName(full: string): { first_name: string; last_name: string } {
-  const t = full.trim();
-  if (!t) return { first_name: "-", last_name: "-" };
-  const parts = t.split(/\s+/);
-  if (parts.length === 1) return { first_name: parts[0], last_name: "-" };
-  return { first_name: parts[0], last_name: parts.slice(1).join(" ") };
-}
+const PLATFORMS = ["Shopify", "WooCommerce", "Wix", "Squarespace", "Other"] as const;
+const VISITOR_RANGES = ["Under 10k", "10k-50k", "50k-100k", "100k+"] as const;
 
 const BookDemo = () => {
   const { toast } = useToast();
-  const [name, setName] = useState("");
-  const [company, setCompany] = useState("");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [lookingFor, setLookingFor] = useState("");
+  const [brandName, setBrandName] = useState("");
+  const [storePlatform, setStorePlatform] = useState<string>("");
+  const [monthlyVisitors, setMonthlyVisitors] = useState<string>("");
+  const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  const handleFallbackSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !lookingFor.trim()) {
-      toast({ title: "Missing fields", description: "Please fill in name, email, and what you’re looking to solve.", variant: "destructive" });
+    if (!fullName.trim() || !email.trim() || !brandName.trim() || !storePlatform || !monthlyVisitors) {
+      toast({ title: "Missing fields", description: "Please fill in all required fields.", variant: "destructive" });
       return;
     }
     setSubmitting(true);
     try {
-      const { first_name, last_name } = splitName(name);
-      await submitSupportContact({
-        first_name,
-        last_name,
-        company_name: company.trim() || null,
+      await submitDemoBooking({
+        full_name: fullName.trim(),
         email: email.trim().toLowerCase(),
-        category: "demo_request",
-        subject: "Book a demo — TryVerse",
-        message: lookingFor.trim(),
+        brand_name: brandName.trim(),
+        store_platform: storePlatform,
+        monthly_visitors: monthlyVisitors,
+        message: message.trim() || undefined,
       });
-      toast({ title: "Request sent", description: "We’ll follow up shortly." });
-      setName("");
-      setCompany("");
-      setEmail("");
-      setLookingFor("");
+      setSubmitted(true);
     } catch (err) {
       toast({
-        title: "Could not send",
-        description: err instanceof Error ? err.message : "Please try again or email support.",
+        title: "Could not submit",
+        description: err instanceof Error ? err.message : "Please try again or email info@tryverseai.com.",
         variant: "destructive",
       });
     } finally {
@@ -60,58 +57,116 @@ const BookDemo = () => {
     }
   };
 
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="max-w-md text-center">
+          <CheckCircle2 className="h-14 w-14 text-foreground mx-auto mb-4" aria-hidden />
+          <h1 className="font-display text-2xl font-bold text-foreground mb-3">Request received</h1>
+          <p className="text-muted-foreground leading-relaxed mb-8">
+            Thank you! A member of the TryVerse team will reach out within 24 hours to schedule your private
+            walkthrough.
+          </p>
+          <Button asChild variant="outline">
+            <Link to="/">Back to home</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl px-6 py-12">
+      <div className="mx-auto max-w-xl px-6 py-12">
         <Link
           to="/"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground mb-8"
         >
-          <ChevronLeft className="h-4 w-4" aria-hidden />
+          <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
           Back to home
         </Link>
-        <h1 className="font-display text-3xl font-bold text-foreground mb-3">See TryVerse in Action</h1>
+        <h1 className="font-display text-3xl font-bold text-foreground mb-3">Book a Demo</h1>
         <p className="text-muted-foreground text-lg mb-10 leading-relaxed">
-          Request a private walkthrough for your brand or team.
+          See exactly how TryVerse works for your store. We&apos;ll walk you through the widget, dashboard, and
+          integration options.
         </p>
 
-        {CALENDLY_URL ? (
-          <div className="rounded-xl border border-border overflow-hidden bg-card min-h-[700px]">
-            <iframe
-              title="Schedule a demo"
-              src={CALENDLY_URL}
-              className="w-full min-h-[700px] border-0"
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="demo-full-name">Full Name</Label>
+            <Input
+              id="demo-full-name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              autoComplete="name"
+              required
             />
           </div>
-        ) : (
-          <form onSubmit={handleFallbackSubmit} className="space-y-6 max-w-md">
-            <div className="space-y-2">
-              <Label htmlFor="demo-name">Name</Label>
-              <Input id="demo-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="demo-company">Company</Label>
-              <Input id="demo-company" value={company} onChange={(e) => setCompany(e.target.value)} autoComplete="organization" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="demo-email">Email</Label>
-              <Input id="demo-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="demo-looking">What are you looking to solve?</Label>
-              <Textarea
-                id="demo-looking"
-                value={lookingFor}
-                onChange={(e) => setLookingFor(e.target.value)}
-                className="min-h-[120px]"
-                required
-              />
-            </div>
-            <Button type="submit" className="gradient-primary text-primary-foreground" disabled={submitting}>
-              {submitting ? "Sending…" : "Submit request"}
-            </Button>
-          </form>
-        )}
+          <div className="space-y-2">
+            <Label htmlFor="demo-email">Work Email</Label>
+            <Input
+              id="demo-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="demo-brand">Brand / Company Name</Label>
+            <Input
+              id="demo-brand"
+              value={brandName}
+              onChange={(e) => setBrandName(e.target.value)}
+              autoComplete="organization"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="demo-platform">Store Platform</Label>
+            <Select value={storePlatform || undefined} onValueChange={setStorePlatform} required>
+              <SelectTrigger id="demo-platform">
+                <SelectValue placeholder="Select platform…" />
+              </SelectTrigger>
+              <SelectContent>
+                {PLATFORMS.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="demo-visitors">Monthly Website Visitors</Label>
+            <Select value={monthlyVisitors || undefined} onValueChange={setMonthlyVisitors} required>
+              <SelectTrigger id="demo-visitors">
+                <SelectValue placeholder="Select range…" />
+              </SelectTrigger>
+              <SelectContent>
+                {VISITOR_RANGES.map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="demo-message">Message (optional)</Label>
+            <Textarea
+              id="demo-message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="min-h-[100px]"
+              placeholder="Tell us about your store or what you'd like to see in the demo…"
+            />
+          </div>
+          <Button type="submit" className="w-full gradient-primary text-primary-foreground h-12" disabled={submitting}>
+            {submitting ? "Submitting…" : "Book My Demo"}
+          </Button>
+        </form>
       </div>
     </div>
   );

@@ -6,22 +6,23 @@ const steps = [
   {
     icon: ShoppingBag,
     step: "01",
-    title: "Pick Your Style",
+    title: "Shopper Selects a Product",
     description:
-      "Shoppers select what they love on the product page — no extra steps, no friction. Trying on at home? Pick or upload a product image in your personal TryVerse studio.",
+      "On your product page, shoppers tap Try On — no extra steps, no friction. The widget opens right on your PDP.",
   },
   {
     icon: Upload,
     step: "02",
-    title: "Snap or Upload a Photo",
+    title: "Upload or Snap a Photo",
     description:
-      "Choose how to try it on — snap a quick photo, upload one you already have, or pick from a selection of models.",
+      "Shoppers upload a photo or choose from your model library. TryVerse handles pose detection and garment alignment automatically.",
   },
   {
     icon: Zap,
     step: "03",
-    title: "See It on You Instantly",
-    description: "See it styled on you in seconds — effortless, exciting, and true to fit.",
+    title: "See It Styled Instantly",
+    description:
+      "Photorealistic try-on results in under a second — shoppers buy with confidence, and your return rate drops.",
   },
 ];
 
@@ -41,10 +42,11 @@ export function HowItWorks() {
             How It Works
           </p>
           <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4 leading-tight px-1">
-            Try Before You Buy — In Three Simple Steps
+            Try Before You Buy — On Your Store
           </h2>
           <p className="text-muted-foreground text-base sm:text-lg leading-relaxed px-1">
-            From browsing on a store&apos;s site to opening your own studio — it all happens in one smooth flow, powered by the same AI.
+            Three steps from product page to photorealistic try-on — embedded directly in your storefront, powered by
+            the same AI your brand controls from the dashboard.
           </p>
         </motion.div>
 
@@ -63,7 +65,6 @@ export function HowItWorks() {
               className={glassOuter}
             >
               <div className={`${glassInnerCard} gap-4`}>
-                {/* Step index — visible, not a floating ghost number */}
                 <div className="relative z-[2] flex items-center justify-between gap-3">
                   <span
                     className="inline-flex items-center rounded-full border border-border/50 bg-background/70 px-3 py-1 text-[11px] font-semibold tabular-nums tracking-wide text-foreground/80 shadow-sm"
@@ -73,9 +74,7 @@ export function HowItWorks() {
                   </span>
                 </div>
 
-                <div
-                  className="relative z-[2] flex h-12 w-12 shrink-0 items-center justify-center rounded-xl gradient-primary shadow-soft transition-transform duration-[900ms] ease-out group-hover:scale-[1.04]"
-                >
+                <div className="relative z-[2] flex h-12 w-12 shrink-0 items-center justify-center rounded-xl gradient-primary shadow-soft transition-transform duration-[900ms] ease-out group-hover:scale-[1.04]">
                   <step.icon className="h-5 w-5 text-primary-foreground" strokeWidth={2} />
                 </div>
 

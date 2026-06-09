@@ -12,9 +12,12 @@ export type LegacyUserMetadata = {
 const DASHBOARD_BUSINESS = "/dashboard/business";
 const DASHBOARD_INDIVIDUAL = "/dashboard/individual";
 
-export function dashboardPathForAccountType(type: AccountType | null | undefined): string {
-  if (type === "individual") return DASHBOARD_INDIVIDUAL;
+export function dashboardPathForAccountType(_type: AccountType | null | undefined): string {
   return DASHBOARD_BUSINESS;
+}
+
+export function defaultDashboardTabValue(_type: AccountType): string {
+  return "Try-On guide";
 }
 
 /**
@@ -29,9 +32,4 @@ export function normalizeAccountType(raw: string | null | undefined): AccountTyp
   if (s === "individual") return "individual";
   if (s === "business" || s === "brand") return "business";
   return null;
-}
-
-/** First dashboard tab id/label after sign-in when URL has no `tab` param. */
-export function defaultDashboardTabValue(type: AccountType): string {
-  return type === "individual" ? "guide" : "Try-On guide";
 }

@@ -854,7 +854,7 @@ router.post(
         apiKeyId: null,
         personImageUrl: personImage,
         productImageUrl: productImage,
-        category: (tryon.category || 'clothing') as 'clothing' | 'bags' | 'glasses',
+        category: (tryon.category || 'clothing') as import('../types').ProductCategory,
         productDescription: undefined,
         tryonDbId: tryonId,
         widgetMode: false,

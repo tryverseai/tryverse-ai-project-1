@@ -6,8 +6,6 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
-import { useSignupChooser } from "@/components/signup/SignupChooserContext";
 
 const publicLinks = [
   { label: "Product", href: "/#features" },
@@ -19,7 +17,6 @@ const SPRING_TRANSITION = { type: "spring" as const, stiffness: 260, damping: 22
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
-  const { openSignupChooser } = useSignupChooser();
   const [isCompact, setIsCompact] = useState(false);
   /** Narrow “focus” layout only on md+ — on mobile full width avoids broken menu / tap targets */
   const [isDesktop, setIsDesktop] = useState(
@@ -155,11 +152,6 @@ export function Navbar() {
         >
           {isAuthenticated ? (
             <>
-              <Link to="/studio">
-                <Button variant="ghost" size="sm" className="text-sm">
-                  Try-On Studio
-                </Button>
-              </Link>
               <Link to="/dashboard">
                 <Button variant="ghost" size="sm" className="text-sm">
                   Dashboard
@@ -169,22 +161,6 @@ export function Navbar() {
                 <LogOut className="h-3.5 w-3.5" /> Sign Out
               </Button>
             </>
-          ) : FEATURE_FLAGS.INVITE_ONLY_MODE ? (
-            <>
-              <Link to="/auth">
-                <Button variant="ghost" size="sm" className="text-sm">
-                  Log In
-                </Button>
-              </Link>
-              <Button type="button" variant="outline" size="sm" className="text-sm" onClick={() => openSignupChooser()}>
-                Sign Up
-              </Button>
-              <Link to="/book-demo">
-                <Button size="sm" className="gradient-primary text-primary-foreground text-sm shadow-soft">
-                  Book a Demo
-                </Button>
-              </Link>
-            </>
           ) : (
             <>
               <Link to="/auth">
@@ -192,9 +168,11 @@ export function Navbar() {
                   Log In
                 </Button>
               </Link>
-              <Button type="button" size="sm" className="gradient-primary text-primary-foreground text-sm shadow-soft" onClick={() => openSignupChooser()}>
-                Sign Up
-              </Button>
+              <Link to="/book-demo">
+                <Button size="sm" className="gradient-primary text-primary-foreground text-sm shadow-soft">
+                  Book a Demo
+                </Button>
+              </Link>
             </>
           )}
         </motion.div>
@@ -241,13 +219,8 @@ export function Navbar() {
           )}
           {isAuthenticated ? (
             <>
-              <Link to="/studio" onClick={() => setOpen(false)}>
-                <Button variant="outline" className="w-full mt-2">
-                  Try-On Studio
-                </Button>
-              </Link>
               <Link to="/dashboard" onClick={() => setOpen(false)}>
-                <Button className="gradient-primary text-primary-foreground w-full">
+                <Button className="gradient-primary text-primary-foreground w-full mt-2">
                   Dashboard
                 </Button>
               </Link>
@@ -262,22 +235,6 @@ export function Navbar() {
                 <LogOut className="h-3.5 w-3.5" /> Sign Out
               </Button>
             </>
-          ) : FEATURE_FLAGS.INVITE_ONLY_MODE ? (
-            <>
-              <Link to="/auth" onClick={() => setOpen(false)}>
-                <Button variant="outline" className="w-full mt-2">
-                  Log In
-                </Button>
-              </Link>
-              <Button type="button" variant="outline" className="w-full" onClick={() => { setOpen(false); openSignupChooser(); }}>
-                Sign Up
-              </Button>
-              <Link to="/book-demo" onClick={() => setOpen(false)}>
-                <Button className="gradient-primary text-primary-foreground w-full">
-                  Book a Demo
-                </Button>
-              </Link>
-            </>
           ) : (
             <>
               <Link to="/auth" onClick={() => setOpen(false)}>
@@ -285,9 +242,11 @@ export function Navbar() {
                   Log In
                 </Button>
               </Link>
-              <Button type="button" className="gradient-primary text-primary-foreground w-full" onClick={() => { setOpen(false); openSignupChooser(); }}>
-                Sign Up
-              </Button>
+              <Link to="/book-demo" onClick={() => setOpen(false)}>
+                <Button className="gradient-primary text-primary-foreground w-full">
+                  Book a Demo
+                </Button>
+              </Link>
             </>
           )}
         </div>

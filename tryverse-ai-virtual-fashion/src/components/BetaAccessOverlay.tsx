@@ -92,13 +92,13 @@ export function BetaAccessOverlay() {
 
           <div>
             <p className="font-medium text-xs uppercase tracking-wider text-muted-foreground mb-2">TryVerse</p>
-            <h1 className="font-display text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-              {rejected ? "Access not approved" : "We're in Closed Beta"}
+            <h1 className="font-display text-2xl font-bold text-foreground mb-2">
+              {rejected ? "Access not approved" : "Your brand account has been created"}
             </h1>
             <p className="mt-3 text-sm sm:text-base leading-relaxed text-muted-foreground">
               {rejected
                 ? "We weren't able to approve access for this account. If you think this is a mistake, contact support."
-                : "We're currently rolling out TryVerse to a select group of users. We'll be opening access soon!"}
+                : "We're currently onboarding founding brands by invitation. Our team will reach out within 48 hours to schedule your onboarding walkthrough."}
             </p>
           </div>
 
