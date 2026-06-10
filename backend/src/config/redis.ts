@@ -70,10 +70,24 @@ export async function connectRedis(): Promise<void> {
   const client = getRedisClient();
   const target = redisTargetForLog(env.REDIS_URL);
   try {
-    await client.connect();
-    applicationRedisReady = true;
+    if (client.status === 'ready') {
+      applicationRedisReady = true;
+      logger.info('Redis bootstrap connect finished (already ready)', { target });
+      return;
+    }
+    await Promise.race([
+      client.connect(),
+      new Promise<void>((_, reject) => {
+        setTimeout(() => reject(new Error('Redis connect timed out after 8s')), 8000);
+      }),
+    ]);
+    applicationRedisReady = client.status === 'ready' || client.status === 'connect';
     (client as Redis & { _errorLogged?: boolean })._errorLogged = false;
-    logger.info('Redis bootstrap connect finished', { target, note: 'shared client; Bull uses same REDIS_URL' });
+    logger.info('Redis bootstrap connect finished', {
+      target,
+      status: client.status,
+      note: 'shared client; Bull uses same REDIS_URL',
+    });
   } catch (err) {
     applicationRedisReady = false;
     logger.warn(
