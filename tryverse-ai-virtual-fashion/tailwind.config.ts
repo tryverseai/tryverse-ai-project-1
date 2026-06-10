@@ -14,7 +14,9 @@ export default {
     },
     fontFamily: {
       display: ['Space Grotesk', 'sans-serif'],
+      editorial: ['Playfair Display', 'Space Grotesk', 'serif'],
       body: ['Inter', 'sans-serif'],
+      mono: ['JetBrains Mono', 'Space Grotesk', 'monospace'],
     },
     extend: {
       colors: {

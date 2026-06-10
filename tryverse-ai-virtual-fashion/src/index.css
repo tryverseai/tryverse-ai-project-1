@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -42,9 +42,11 @@
     --shadow-card: 0 1px 3px hsl(220 20% 10% / 0.06), 0 8px 24px hsl(220 20% 10% / 0.04);
     --shadow-elevated: 0 12px 40px -8px hsl(220 20% 10% / 0.15);
 
-    --font-display: 'Space Grotesk', sans-serif;
+    --font-display: 'Playfair Display', 'Space Grotesk', serif;
     --font-body: 'Inter', sans-serif;
-    --navbar-height: 10rem; /* desktop: logo 105px + padding */
+    --font-mono: 'JetBrains Mono', 'Space Grotesk', monospace;
+    --navbar-height: 4.5rem; /* 72px — compact editorial nav */
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -54,9 +56,9 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 220 20% 10%;
   }
-  @media (max-width: 1023px) {
+  @media (max-width: 767px) {
     :root {
-      --navbar-height: 8.5rem; /* ~136px - mobile: logo 105px + padding */
+      --navbar-height: 4rem; /* 64px — mobile nav */
     }
   }
 
@@ -167,4 +169,30 @@
   max-width: none !important;
   flex-shrink: 0 !important;
   object-fit: contain !important;
+}
+
+/* Editorial typography helpers — used on landing page */
+.font-editorial {
+  font-family: 'Playfair Display', 'Space Grotesk', serif;
+}
+.font-mono-editorial {
+  font-family: var(--font-mono);
+}
+
+@keyframes editorial-reveal {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-editorial-reveal {
+  animation: editorial-reveal 1.2s var(--ease-out-expo) both;
+}
+
+/* Alias for Lovable design compatibility */
+.animate-reveal {
+  animation: editorial-reveal 1.2s var(--ease-out-expo) both;
+}
+
+/* Landing hero: full-screen overflow safety */
+body:has(.hero-experience-section) {
+  overflow-x: hidden;
 }
