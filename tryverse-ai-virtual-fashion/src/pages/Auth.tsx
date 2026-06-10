@@ -19,13 +19,9 @@ import { posthogCapture } from "@/lib/posthog";
 import { inviteSignupEnabled, b2cSignupEnabled, FEATURE_FLAGS } from "@/lib/featureFlags";
 import { postLoginRedirectPath, safeInAppRedirectPath } from "@/lib/safeUrl";
 import { Label } from "@/components/ui/label";
-import { Turnstile } from "@marsidev/react-turnstile";
 import { useSignupChooser } from "@/components/signup/SignupChooserContext";
-import { turnstileSiteKey } from "@/lib/turnstileEnv";
 import { saveEmailVerifyPending } from "@/lib/emailVerifyPendingStorage";
 import { convexAuthEmailFlowToast } from "@/lib/convexAuthEmailFlowToast";
-
-const TURNSTILE_SITE_KEY = turnstileSiteKey();
 
 const roles = [
   "Founder",
@@ -98,7 +94,6 @@ const Auth = () => {
   const [customRole, setCustomRole] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState("");
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -153,16 +148,6 @@ const Auth = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (TURNSTILE_SITE_KEY && !turnstileToken.trim()) {
-      toast({
-        title: "Security verification required",
-        description: "Complete the security check below, then try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const turnstilePass = turnstileToken.trim() || undefined;
-
     setLoading(true);
 
     if (showIndividualSignupForm) {
@@ -172,8 +157,7 @@ const Auth = () => {
         fullName.trim() || "My Try-Ons",
         fullName,
         undefined,
-        "individual",
-        turnstilePass
+        "individual"
       );
       if (result.error) {
         console.error("Signup error:", result.error);
@@ -210,7 +194,7 @@ const Auth = () => {
       }
     } else if (showBusinessSignupForm) {
       const finalRole = role === "Other" ? customRole : role;
-      const result = await signUp(email, password, brandName, fullName, finalRole, "business", turnstilePass);
+      const result = await signUp(email, password, brandName, fullName, finalRole, "business");
       if (result.error) {
         console.error("Signup error:", result.error);
         const t = signUpErrorToast(result.error);
@@ -245,7 +229,7 @@ const Auth = () => {
         goToDashboardAfterAuth();
       }
     } else {
-      const result = await signIn(email, password, turnstilePass);
+      const result = await signIn(email, password);
       if (result.error) {
         console.error("Sign in error:", result.error);
         toast({ title: "Sign in failed", description: result.error.message, variant: "destructive", duration: 6000 });
@@ -519,24 +503,6 @@ const Auth = () => {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-
-            {TURNSTILE_SITE_KEY ? (
-              <div className="flex min-h-[72px] w-full justify-center py-2">
-                <Turnstile
-                  siteKey={TURNSTILE_SITE_KEY}
-                  options={{ appearance: "always", size: "normal" }}
-                  onSuccess={(t) => setTurnstileToken(t)}
-                  onExpire={() => setTurnstileToken("")}
-                  onError={() => setTurnstileToken("")}
-                />
-              </div>
-            ) : import.meta.env.DEV ? (
-              <p className="text-xs text-amber-600 dark:text-amber-500 text-center">
-                Turnstile: set{" "}
-                <code className="rounded bg-muted px-1">VITE_CLOUDFLARE_TURNSTILE_SITE_KEY</code> in .env — restart{" "}
-                <code className="rounded bg-muted px-1">npm run dev</code>.
-              </p>
-            ) : null}
 
             <Button type="submit" className="w-full gradient-primary text-primary-foreground h-12 shadow-soft" disabled={loading}>
               {loading

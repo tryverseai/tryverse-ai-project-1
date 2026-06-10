@@ -2,14 +2,12 @@ import { useState, useMemo, type FormEvent, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
-import { Turnstile } from "@marsidev/react-turnstile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { turnstileSiteKey } from "@/lib/turnstileEnv";
 import {
   clearEmailVerifyPending,
   readEmailVerifyPending,
@@ -21,8 +19,6 @@ import { completeInviteAfterSignup } from "@/lib/backendApi";
 import { dashboardPathForAccountType, type AccountType } from "@/lib/accountType";
 import { posthogCapture } from "@/lib/posthog";
 import { convexAuthEmailFlowToast } from "@/lib/convexAuthEmailFlowToast";
-
-const TURNSTILE_SITE_KEY = turnstileSiteKey();
 
 /** After verification: same routing rules as `Auth.tsx` dashboard redirect */
 function navigateAfterAuthenticated(
@@ -73,7 +69,6 @@ const VerifyEmail = () => {
   }, [payloadFromStorage, emailFromQuery]);
 
   const [code, setCode] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -97,19 +92,9 @@ const VerifyEmail = () => {
       });
       return;
     }
-    if (TURNSTILE_SITE_KEY && !turnstileToken.trim()) {
-      toast({
-        title: "Security verification required",
-        description: "Complete the security check below, then try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const ts = turnstileToken.trim() || undefined;
     setLoading(true);
     try {
       const verified = await verifyEmailWithCode(payload.email, c, {
-        turnstileToken: ts,
         pendingBootstrap: payload.pendingBootstrap,
       });
       if (verified.error) {
@@ -197,22 +182,6 @@ const VerifyEmail = () => {
               required
             />
           </div>
-          {TURNSTILE_SITE_KEY ? (
-            <div className="flex min-h-[72px] w-full justify-center py-2">
-              <Turnstile
-                siteKey={TURNSTILE_SITE_KEY}
-                options={{ appearance: "always", size: "normal" }}
-                onSuccess={(t) => setTurnstileToken(t)}
-                onExpire={() => setTurnstileToken("")}
-                onError={() => setTurnstileToken("")}
-              />
-            </div>
-          ) : import.meta.env.DEV ? (
-            <p className="text-xs text-amber-600 dark:text-amber-500 text-center">
-              Turnstile: set <code className="rounded bg-muted px-1">VITE_CLOUDFLARE_TURNSTILE_SITE_KEY</code> in .env for
-              production parity.
-            </p>
-          ) : null}
           <Button
             type="submit"
             className="w-full gradient-primary text-primary-foreground h-12 shadow-soft"

@@ -12,13 +12,9 @@ import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { safeInAppRedirectPath } from "@/lib/safeUrl";
 import { completeInviteAfterSignup, validateInviteToken } from "@/lib/backendApi";
 import { dashboardPathForAccountType, type AccountType } from "@/lib/accountType";
-import { Turnstile } from "@marsidev/react-turnstile";
 import { useSignupChooser } from "@/components/signup/SignupChooserContext";
-import { turnstileSiteKey } from "@/lib/turnstileEnv";
 import { saveEmailVerifyPending } from "@/lib/emailVerifyPendingStorage";
 import { convexAuthEmailFlowToast } from "@/lib/convexAuthEmailFlowToast";
-
-const TURNSTILE_SITE_KEY_INVITE = turnstileSiteKey();
 
 function signUpErrorToast(error: Error): {
   title: string;
@@ -73,7 +69,6 @@ const AuthInvite = () => {
   const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState("");
   const { signUp } = useAuth();
   const { toast } = useToast();
   const { openSignupChooser } = useSignupChooser();
@@ -151,16 +146,6 @@ const AuthInvite = () => {
     e.preventDefault();
     if (!gateValid || !inviteKind || !token?.trim()) return;
 
-    if (TURNSTILE_SITE_KEY_INVITE && !turnstileToken.trim()) {
-      toast({
-        title: "Security verification required",
-        description: "Complete the security check below, then try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const ts = turnstileToken.trim() || undefined;
-
     const acctBootstrap = inviteKindToBootstrapType(inviteKind);
 
     if (inviteKind === "business" && !companyName.trim()) {
@@ -182,10 +167,9 @@ const AuthInvite = () => {
               fullName.trim() || "My Try-Ons",
               fullName.trim(),
               undefined,
-              "individual",
-              ts
+              "individual"
             )
-          : await signUp(email, password, companyName.trim(), fullName.trim(), undefined, "business", ts);
+          : await signUp(email, password, companyName.trim(), fullName.trim(), undefined, "business");
 
       if (signResult.error) {
         console.error("Signup error:", signResult.error);
@@ -363,23 +347,6 @@ const AuthInvite = () => {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-
-                {TURNSTILE_SITE_KEY_INVITE ? (
-                  <div className="flex min-h-[72px] w-full justify-center py-2">
-                    <Turnstile
-                      siteKey={TURNSTILE_SITE_KEY_INVITE}
-                      options={{ appearance: "always", size: "normal" }}
-                      onSuccess={(t) => setTurnstileToken(t)}
-                      onExpire={() => setTurnstileToken("")}
-                      onError={() => setTurnstileToken("")}
-                    />
-                  </div>
-                ) : import.meta.env.DEV ? (
-                  <p className="text-xs text-amber-600 dark:text-amber-500 text-center">
-                    Turnstile: set <code className="rounded bg-muted px-1">VITE_CLOUDFLARE_TURNSTILE_SITE_KEY</code> in .env and
-                    restart the dev server.
-                  </p>
-                ) : null}
 
                 <Button
                   type="submit"

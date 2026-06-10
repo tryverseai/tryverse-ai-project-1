@@ -135,11 +135,11 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
 /** Large verification code block for OTP emails */
 export function renderVerificationCodeBlock(code: string): string {
   const safe = escapeHtml(code.trim());
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0;">
     <tr>
-      <td align="center" style="background-color:#f8f8f9;border:1px solid #e8e8ea;border-radius:10px;padding:28px 20px;">
-        <p style="margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#888888;">Verification code</p>
-        <p style="margin:0;font-size:36px;font-weight:700;letter-spacing:0.28em;color:#000000;font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;">${safe}</p>
+      <td align="center" style="background-color:#f8f8f9;border:1px solid #e8e8ea;border-radius:12px;padding:32px 24px;">
+        <p style="margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#888888;">Verification code</p>
+        <p style="margin:0;font-size:40px;font-weight:700;letter-spacing:0.32em;color:#000000;font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;line-height:1.2;">${safe}</p>
       </td>
     </tr>
   </table>`;

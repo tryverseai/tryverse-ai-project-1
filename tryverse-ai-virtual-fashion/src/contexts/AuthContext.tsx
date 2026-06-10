@@ -48,8 +48,7 @@ interface AuthContextType {
     brandName: string,
     fullName?: string,
     role?: string,
-    accountType?: AccountType,
-    turnstileToken?: string
+    accountType?: AccountType
   ) => Promise<
     | { error: Error; session: null }
     | {
@@ -64,8 +63,7 @@ interface AuthContextType {
   >;
   signIn: (
     email: string,
-    password: string,
-    turnstileToken?: string
+    password: string
   ) => Promise<
     | { error: Error }
     | {
@@ -81,7 +79,7 @@ interface AuthContextType {
   verifyEmailWithCode: (
     email: string,
     code: string,
-    opts?: { turnstileToken?: string; pendingBootstrap?: PendingEmailVerificationBootstrap }
+    opts?: { pendingBootstrap?: PendingEmailVerificationBootstrap }
   ) => Promise<{ error: Error | null; deviceApprovalRequired?: true }>;
   /**
    * After Convex Auth has already signed the user in (e.g. password reset verification),
@@ -89,7 +87,6 @@ interface AuthContextType {
    */
   syncBackendSession: (opts?: {
     email?: string;
-    turnstileToken?: string;
   }) => Promise<{ error: Error | null; deviceApprovalRequired?: true }>;
   signOut: () => Promise<void>;
 }
@@ -215,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await bootstrapLocalSession({ ...body, deviceFingerprint });
   }, []);
 
-  const syncBackendSession = useCallback(async (opts?: { email?: string; turnstileToken?: string }) => {
+  const syncBackendSession = useCallback(async (opts?: { email?: string }) => {
     try {
       const header = await waitForBackendAuthBearerHeader();
       if (!header) {
@@ -245,7 +242,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         brandName: typeof row?.brand_name === "string" ? row.brand_name : undefined,
         fullName: typeof row?.full_name === "string" ? row.full_name : undefined,
         role: typeof row?.role === "string" ? row.role : undefined,
-        ...(opts?.turnstileToken ? { turnstileToken: opts.turnstileToken } : {}),
         deviceFingerprint,
       });
     } catch (e) {
@@ -264,8 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       brandName: string,
       fullName?: string,
       role?: string,
-      accountType: AccountType = "business",
-      turnstileToken?: string
+      accountType: AccountType = "business"
     ) => {
       const trimmed = email.trim().toLowerCase();
       if (!trimmed) {
@@ -293,7 +288,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               brandName,
               fullName,
               role,
-              turnstileToken,
             },
           };
         }
@@ -303,7 +297,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           fullName,
           role,
           email: trimmed,
-          ...(turnstileToken ? { turnstileToken } : {}),
         });
       } catch (e) {
         if (e instanceof BootstrapDeviceApprovalRequiredError) {
@@ -317,7 +310,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signIn = useCallback(
-    async (email: string, password: string, turnstileToken?: string) => {
+    async (email: string, password: string) => {
       const trimmed = email.trim().toLowerCase();
       if (!trimmed) {
         return { error: new Error("Email is required") };
@@ -331,7 +324,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!result.signingIn) {
           return { error: null, needsEmailVerification: true as const, pendingEmail: trimmed };
         }
-        const synced = await syncBackendSession({ email: trimmed, turnstileToken });
+        const synced = await syncBackendSession({ email: trimmed });
         if (synced.error) return synced;
         if (synced.deviceApprovalRequired) {
           return { error: null, deviceApprovalRequired: true as const, pendingEmail: trimmed };
@@ -357,7 +350,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (
       email: string,
       code: string,
-      opts?: { turnstileToken?: string; pendingBootstrap?: PendingEmailVerificationBootstrap }
+      opts?: { pendingBootstrap?: PendingEmailVerificationBootstrap }
     ) => {
       const trimmed = email.trim().toLowerCase();
       const c = code.trim().replace(/\s+/g, "");
@@ -380,8 +373,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             ),
           };
         }
-        const ts =
-          opts?.turnstileToken?.trim() || opts?.pendingBootstrap?.turnstileToken?.trim() || undefined;
         if (opts?.pendingBootstrap) {
           const b = opts.pendingBootstrap;
           try {
@@ -391,7 +382,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               fullName: b.fullName,
               role: b.role,
               email: trimmed,
-              ...(ts ? { turnstileToken: ts } : {}),
             });
           } catch (e) {
             if (e instanceof BootstrapDeviceApprovalRequiredError) {
@@ -400,7 +390,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return { error: normalizeConvexAuthError(e) };
           }
         } else {
-          const synced = await syncBackendSession({ email: trimmed, turnstileToken: ts });
+          const synced = await syncBackendSession({ email: trimmed });
           if (synced.error) return synced;
           if (synced.deviceApprovalRequired) return { error: null, deviceApprovalRequired: true };
         }

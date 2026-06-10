@@ -43,7 +43,7 @@ export async function sendWelcomeEmail(params: {
     brandName: params.brandName || '',
     appUrl,
   });
-  return sendEmail({ to: params.email, subject: t.subject, html: t.html });
+  return sendEmail({ to: params.email, subject: t.subject, html: t.html, text: t.text });
 }
 
 export async function sendAccountVerifiedEmail(params: {
@@ -53,7 +53,7 @@ export async function sendAccountVerifiedEmail(params: {
   const t = accountVerifiedEmail({
     firstName: params.firstName,
   });
-  return sendEmail({ to: params.email, subject: t.subject, html: t.html });
+  return sendEmail({ to: params.email, subject: t.subject, html: t.html, text: t.text });
 }
 
 export async function sendDeviceApprovalEmail(params: {

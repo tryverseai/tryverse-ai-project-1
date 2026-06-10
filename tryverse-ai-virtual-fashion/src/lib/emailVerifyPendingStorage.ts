@@ -7,7 +7,6 @@ export type PendingEmailVerificationBootstrap = {
   brandName?: string;
   fullName?: string;
   role?: string;
-  turnstileToken?: string;
 };
 
 export type EmailVerifyPendingPayload = {
@@ -45,7 +44,6 @@ export function readEmailVerifyPending(): EmailVerifyPendingPayload | null {
         ...(typeof x.brandName === "string" ? { brandName: x.brandName } : {}),
         ...(typeof x.fullName === "string" ? { fullName: x.fullName } : {}),
         ...(typeof x.role === "string" ? { role: x.role } : {}),
-        ...(typeof x.turnstileToken === "string" ? { turnstileToken: x.turnstileToken } : {}),
       };
     }
     return {

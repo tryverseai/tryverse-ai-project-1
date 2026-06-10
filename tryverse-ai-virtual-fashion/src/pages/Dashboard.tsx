@@ -19,7 +19,23 @@ const WidgetTab    = lazy(() => import("@/components/dashboard/WidgetTab").then(
 const BillingTab   = lazy(() => import("@/components/dashboard/BillingTab").then((m) => ({ default: m.BillingTab })));
 const SettingsTab  = lazy(() => import("@/components/dashboard/SettingsTab").then((m) => ({ default: m.SettingsTab })));
 const StudioTab       = lazy(() => import("@/components/dashboard/StudioTab").then((m) => ({ default: m.StudioTab })));
-const PersonalizeTab  = lazy(() => import("@/components/dashboard/PersonalizeTab").then((m) => ({ default: m.PersonalizeTab })));
+
+function PersonalizeTabUnavailable() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <p className="text-sm font-medium text-foreground mb-1">Personalization unavailable</p>
+      <p className="text-xs text-muted-foreground max-w-md text-center">
+        This section could not be loaded. Refresh the page or try again in a moment.
+      </p>
+    </div>
+  );
+}
+
+const PersonalizeTab = lazy(() =>
+  import("@/components/dashboard/PersonalizeTab")
+    .then((m) => ({ default: m.PersonalizeTab }))
+    .catch(() => ({ default: PersonalizeTabUnavailable }))
+);
 
 const DEFAULT_TAB = "Try-On guide";
 

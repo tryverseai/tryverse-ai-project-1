@@ -3,17 +3,13 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { Turnstile } from "@marsidev/react-turnstile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { turnstileSiteKey } from "@/lib/turnstileEnv";
 import { convexAuthEmailFlowToast } from "@/lib/convexAuthEmailFlowToast";
-
-const TURNSTILE_SITE_KEY_RESET = turnstileSiteKey();
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -25,7 +21,6 @@ const ResetPassword = () => {
   const { toast } = useToast();
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -50,15 +45,6 @@ const ResetPassword = () => {
       });
       return;
     }
-    if (TURNSTILE_SITE_KEY_RESET && !turnstileToken.trim()) {
-      toast({
-        title: "Security verification required",
-        description: "Complete the security check below, then try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const ts = turnstileToken.trim() || undefined;
     setLoading(true);
     try {
       const fd = new FormData();
@@ -76,7 +62,7 @@ const ResetPassword = () => {
         });
         return;
       }
-      const synced = await syncBackendSession({ email, turnstileToken: ts });
+      const synced = await syncBackendSession({ email });
       if (synced.error) {
         toast({
           title: "Signed in, but setup didn’t finish",
@@ -158,23 +144,6 @@ const ResetPassword = () => {
               className="h-12"
             />
           </div>
-          {TURNSTILE_SITE_KEY_RESET ? (
-            <div className="flex min-h-[72px] w-full justify-center py-2">
-              <Turnstile
-                siteKey={TURNSTILE_SITE_KEY_RESET}
-                options={{ appearance: "always", size: "normal" }}
-                onSuccess={(t) => setTurnstileToken(t)}
-                onExpire={() => setTurnstileToken("")}
-                onError={() => setTurnstileToken("")}
-              />
-            </div>
-          ) : import.meta.env.DEV ? (
-            <p className="text-xs text-amber-600 dark:text-amber-500 text-center">
-              Turnstile: set <code className="rounded bg-muted px-1">VITE_CLOUDFLARE_TURNSTILE_SITE_KEY</code> in .env
-              for production parity (required when the API has{" "}
-              <code className="rounded bg-muted px-1">CLOUDFLARE_TURNSTILE_SECRET_KEY</code> set).
-            </p>
-          ) : null}
           <Button
             type="submit"
             className="w-full gradient-primary text-primary-foreground h-12 shadow-soft"

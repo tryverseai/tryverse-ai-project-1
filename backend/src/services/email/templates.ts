@@ -8,6 +8,7 @@ import {
   renderVerificationCodeBlock,
   renderBulletList,
   escapeHtml,
+  TRYVERSE_CONTACT_EMAIL,
 } from './layout';
 
 const DEFAULT_APP_URL = 'https://tryverseai.com';
@@ -37,24 +38,52 @@ export function welcomeEmail(params: { name: string; brandName: string; appUrl?:
     ])}
     <p style="margin:16px 0 0;font-weight:600;color:#1a1a1a;">Access your workspace</p>`;
 
+  const closingLine =
+    "As we continue expanding the platform, you'll receive updates on new features, integrations, and capabilities designed to help brands improve customer confidence and reduce purchase uncertainty. We're excited to have you with us.";
+
   return {
     subject: 'Your TryVerse account is ready',
     html: renderBrandedEmail({
       headline: 'Your account is ready',
       bodyHtml,
       cta: { label: 'Open Dashboard', href: dashboardUrl },
-      closingLine:
-        "As we continue expanding the platform, you'll receive updates on new features, integrations, and capabilities designed to help brands improve customer confidence and reduce purchase uncertainty. We're excited to have you with us.",
+      closingLine,
     }),
+    text: [
+      `Hi ${first},`,
+      '',
+      'Welcome to TryVerse.',
+      '',
+      'Your account has been successfully verified and your workspace is now active.',
+      '',
+      'You can now access the platform and begin exploring AI-powered virtual try-on experiences designed for modern fashion brands and e-commerce retailers.',
+      '',
+      "What's available now:",
+      '• Your TryVerse dashboard is ready',
+      '• 20 complimentary AI try-ons have been added to your account',
+      '• Upload products and generate virtual try-on experiences',
+      '• Explore integration options for your storefront',
+      '',
+      `Open Dashboard: ${dashboardUrl}`,
+      '',
+      closingLine,
+      '',
+      '— The TryVerse Team',
+      'TryVerse AI',
+      'AI-Powered Virtual Try-On Infrastructure',
+      `${TRYVERSE_CONTACT_EMAIL}`,
+      DEFAULT_APP_URL,
+    ].join('\n'),
   };
 }
 
 export function accountVerifiedEmail(params: { firstName?: string; signInUrl?: string }) {
-  const first = escapeHtml(((params.firstName || 'there').trim() || 'there'));
+  const first = ((params.firstName || 'there').trim() || 'there');
+  const firstEsc = escapeHtml(first);
   const signInUrlRaw = params.signInUrl ?? `${DEFAULT_APP_URL.replace(/\/$/, '')}/dashboard`;
 
   const bodyHtml = `
-    <p style="margin:0 0 16px;">Hi ${first},</p>
+    <p style="margin:0 0 16px;">Hi ${firstEsc},</p>
     <p style="margin:0 0 16px;">Welcome to TryVerse.</p>
     <p style="margin:0 0 16px;">Your account has been successfully verified and your workspace is now active.</p>
     <p style="margin:0 0 16px;">You can now access the platform and begin exploring AI-powered virtual try-on experiences designed for modern fashion brands and e-commerce retailers.</p>
@@ -67,15 +96,33 @@ export function accountVerifiedEmail(params: { firstName?: string; signInUrl?: s
     ])}
     <p style="margin:16px 0 0;font-weight:600;color:#1a1a1a;">Access your workspace</p>`;
 
+  const closingLine =
+    "As we continue expanding the platform, you'll receive updates on new features, integrations, and capabilities designed to help brands improve customer confidence and reduce purchase uncertainty. We're excited to have you with us.";
+
   return {
     subject: 'Your TryVerse account is ready',
     html: renderBrandedEmail({
       headline: 'Your account is ready',
       bodyHtml,
       cta: { label: 'Open Dashboard', href: signInUrlRaw },
-      closingLine:
-        "As we continue expanding the platform, you'll receive updates on new features, integrations, and capabilities designed to help brands improve customer confidence and reduce purchase uncertainty. We're excited to have you with us.",
+      closingLine,
     }),
+    text: [
+      `Hi ${first},`,
+      '',
+      'Welcome to TryVerse.',
+      '',
+      'Your account has been successfully verified and your workspace is now active.',
+      '',
+      `Open Dashboard: ${signInUrlRaw}`,
+      '',
+      closingLine,
+      '',
+      '— The TryVerse Team',
+      'TryVerse AI',
+      TRYVERSE_CONTACT_EMAIL,
+      DEFAULT_APP_URL,
+    ].join('\n'),
   };
 }
 

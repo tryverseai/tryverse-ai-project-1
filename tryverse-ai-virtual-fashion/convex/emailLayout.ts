@@ -10,6 +10,10 @@ export const TRYVERSE_CONTACT_EMAIL = "info@tryverseai.com";
 /** Branded sender — display name "TryVerse AI" */
 export const TRYVERSE_AUTH_EMAIL_FROM = "TryVerse AI <info@tryverseai.com>";
 
+/** Sign-up verification OTP TTL — must match maxAge on ResendEmailSignupVerification. */
+export const SIGNUP_VERIFICATION_MAX_AGE_SECONDS = 60 * 15;
+export const SIGNUP_VERIFICATION_EXPIRY_MINUTES = SIGNUP_VERIFICATION_MAX_AGE_SECONDS / 60;
+
 export function escapeHtml(s: string): string {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -21,14 +25,24 @@ export function escapeHtml(s: string): string {
 
 export function renderVerificationCodeBlock(code: string): string {
   const safe = escapeHtml(code.trim());
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0;">
     <tr>
-      <td align="center" style="background-color:#f8f8f9;border:1px solid #e8e8ea;border-radius:10px;padding:28px 20px;">
-        <p style="margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#888888;">Verification code</p>
-        <p style="margin:0;font-size:36px;font-weight:700;letter-spacing:0.28em;color:#000000;font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;">${safe}</p>
+      <td align="center" style="background-color:#f8f8f9;border:1px solid #e8e8ea;border-radius:12px;padding:32px 24px;">
+        <p style="margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#888888;">Verification code</p>
+        <p style="margin:0;font-size:40px;font-weight:700;letter-spacing:0.32em;color:#000000;font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;line-height:1.2;">${safe}</p>
       </td>
     </tr>
   </table>`;
+}
+
+export function renderBulletList(items: string[]): string {
+  const lis = items
+    .map(
+      (item) =>
+        `<tr><td style="padding:4px 0;vertical-align:top;width:20px;color:#888888;">&bull;</td><td style="padding:4px 0 4px 8px;color:#3d3d3d;">${escapeHtml(item)}</td></tr>`,
+    )
+    .join("");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 8px;width:100%;">${lis}</table>`;
 }
 
 export function renderBrandedEmail(params: {
@@ -43,8 +57,10 @@ export function renderBrandedEmail(params: {
     ? `<tr>
         <td align="center" style="padding:8px 32px 32px;">
           <a href="${escapeHtml(cta.href)}" target="_blank" rel="noopener noreferrer"
-             style="display:inline-block;padding:14px 32px;background-color:#000000;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;letter-spacing:0.01em;">
+             style="display:inline-block;padding:14px 32px;background-color:#000000;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;letter-spacing:0.01em;mso-padding-alt:0;">
+            <!--[if mso]><i style="letter-spacing:25px;mso-font-width:-100%;mso-text-raise:30pt">&nbsp;</i><![endif]-->
             <span style="color:#ffffff;">${escapeHtml(cta.label)}</span>
+            <!--[if mso]><i style="letter-spacing:25px;mso-font-width:-100%">&nbsp;</i><![endif]-->
           </a>
         </td>
       </tr>`
@@ -58,13 +74,16 @@ export function renderBrandedEmail(params: {
     : "";
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="x-apple-disable-message-reformatting">
   <title>${safeHeadline}</title>
+  <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
 </head>
-<body style="margin:0;padding:0;background-color:#f4f4f5;">
+<body style="margin:0;padding:0;background-color:#f4f4f5;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f5;">
     <tr>
       <td align="center" style="padding:40px 16px;">
@@ -73,7 +92,7 @@ export function renderBrandedEmail(params: {
             <td align="center" style="padding:36px 32px 24px;">
               <a href="${TRYVERSE_APP_URL}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
                 <img src="${TRYVERSE_LOGO_URL}" alt="TryVerse AI" width="140" height="auto"
-                     style="display:block;border:0;outline:none;max-width:140px;height:auto;margin:0 auto;" />
+                     style="display:block;border:0;outline:none;text-decoration:none;max-width:140px;height:auto;margin:0 auto;" />
               </a>
             </td>
           </tr>
@@ -116,12 +135,13 @@ export function renderBrandedEmail(params: {
 </html>`;
 }
 
+/** Sign-up email verification OTP — premium fashion-tech tone. */
 export function signupVerificationEmailHtml(token: string): string {
   const bodyHtml = `
     <p style="margin:0 0 16px;">Welcome to TryVerse.</p>
-    <p style="margin:0 0 16px;">Enter the verification code below on the verify-email screen to confirm your address and activate your account.</p>
+    <p style="margin:0 0 16px;">You&rsquo;re one step away from activating your workspace. Enter the verification code below on the verify-email screen to confirm your address and unlock your account.</p>
     ${renderVerificationCodeBlock(token)}
-    <p style="margin:0;font-size:14px;color:#888888;">This code expires in 24 hours. If you did not create an account, you can safely ignore this email.</p>`;
+    <p style="margin:0;font-size:14px;color:#888888;line-height:1.6;">This verification code expires in ${SIGNUP_VERIFICATION_EXPIRY_MINUTES} minutes. If you did not create an account, you can safely ignore this email.</p>`;
   return renderBrandedEmail({
     headline: "Verify your email",
     bodyHtml,
@@ -132,12 +152,14 @@ export function signupVerificationEmailText(token: string): string {
   return [
     "Welcome to TryVerse.",
     "",
+    "You're one step away from activating your workspace.",
+    "",
     "Your verification code is:",
     token,
     "",
-    "Enter this code on the verify-email screen after sign-up to confirm your address and activate your account.",
+    "Enter this code on the verify-email screen after sign-up to confirm your address and unlock your account.",
     "",
-    "This code expires in 24 hours. If you did not create an account, you can ignore this email.",
+    `This verification code expires in ${SIGNUP_VERIFICATION_EXPIRY_MINUTES} minutes. If you did not create an account, you can ignore this email.`,
     "",
     "— The TryVerse Team",
     "TryVerse AI",

@@ -325,9 +325,6 @@ export const env = {
    * Does not replace Convex Auth; Express account bootstrap still runs after signup.
    */
   INVITE_TOKEN_MAP_JSON: optionalEnv('INVITE_TOKEN_MAP_JSON', '{}'),
-
-  /** Cloudflare Turnstile (server verification). Empty = skip verification in dev. */
-  CLOUDFLARE_TURNSTILE_SECRET_KEY: optionalEnv('CLOUDFLARE_TURNSTILE_SECRET_KEY', ''),
 };
 
 /**

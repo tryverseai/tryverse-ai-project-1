@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Turnstile } from "@marsidev/react-turnstile";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,12 +7,9 @@ import { Label } from "@/components/ui/label";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { turnstileSiteKey } from "@/lib/turnstileEnv";
 import { getOrCreateDeviceFingerprint } from "@/lib/deviceFingerprint";
 import { requestAccountDeviceApprovalCode, verifyAccountDeviceApproval } from "@/lib/backendApi";
 import { postLoginRedirectPath } from "@/lib/safeUrl";
-
-const TURNSTILE_SITE_KEY = turnstileSiteKey();
 
 /**
  * Returning users signing in from a browser that Convex / the API has never marked as trusted
@@ -25,7 +21,6 @@ export default function ApproveDevice() {
   const { user, signOut, syncBackendSession } = useAuth();
 
   const [code, setCode] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
   const [busy, setBusy] = useState<"idle" | "send" | "verify">("idle");
 
   const email = user?.email?.trim().toLowerCase() ?? "";
@@ -37,14 +32,6 @@ export default function ApproveDevice() {
 
   const onRequestCode = async () => {
     if (!email) return;
-    if (TURNSTILE_SITE_KEY && !turnstileToken.trim()) {
-      toast({
-        title: "Security verification required",
-        description: "Complete the security check below.",
-        variant: "destructive",
-      });
-      return;
-    }
     const fp = getOrCreateDeviceFingerprint();
     if (fp.length < 8) {
       toast({
@@ -58,7 +45,6 @@ export default function ApproveDevice() {
     try {
       await requestAccountDeviceApprovalCode({
         deviceFingerprint: fp,
-        turnstileToken: turnstileToken.trim() || undefined,
       });
       toast({
         title: "Check your inbox",
@@ -84,14 +70,6 @@ export default function ApproveDevice() {
       return;
     }
     if (!email) return;
-    if (TURNSTILE_SITE_KEY && !turnstileToken.trim()) {
-      toast({
-        title: "Security verification required",
-        description: "Complete the security check below.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     const fp = getOrCreateDeviceFingerprint();
     if (fp.length < 8) {
@@ -104,12 +82,8 @@ export default function ApproveDevice() {
       await verifyAccountDeviceApproval({
         deviceFingerprint: fp,
         code: trimmed,
-        turnstileToken: turnstileToken.trim() || undefined,
       });
-      const synced = await syncBackendSession({
-        email,
-        turnstileToken: turnstileToken.trim() || undefined,
-      });
+      const synced = await syncBackendSession({ email });
       if (synced.deviceApprovalRequired) {
         toast({
           title: "Still pending approval",
@@ -198,18 +172,6 @@ export default function ApproveDevice() {
                   className="h-12 tracking-widest font-mono"
                 />
               </div>
-
-              {TURNSTILE_SITE_KEY ? (
-                <div className="flex min-h-[72px] w-full justify-center py-2">
-                  <Turnstile
-                    siteKey={TURNSTILE_SITE_KEY}
-                    options={{ appearance: "always", size: "normal" }}
-                    onSuccess={(t) => setTurnstileToken(t)}
-                    onExpire={() => setTurnstileToken("")}
-                    onError={() => setTurnstileToken("")}
-                  />
-                </div>
-              ) : null}
 
               <Button
                 type="submit"
