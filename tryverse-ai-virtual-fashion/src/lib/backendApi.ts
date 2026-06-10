@@ -96,7 +96,7 @@ export function widgetBackendPublicUrl(): string {
   return 'http://localhost:3001';
 }
 
-export type TryOnCategory = 'clothing' | 'tops' | 'bottoms' | 'dresses' | 'one-pieces';
+export type TryOnCategory = 'clothing' | 'bags' | 'glasses';
 
 // ─── Typed API error (replaces `Error & { status?; code?; retryAfter? }`) ────
 
@@ -885,22 +885,6 @@ export async function submitIndividualEarlyAccessRequest(payload: {
   return handleResponse(res, { feature: 'early_access' });
 }
 
-export async function submitDemoBooking(payload: {
-  full_name: string;
-  email: string;
-  brand_name: string;
-  store_platform: string;
-  monthly_visitors: string;
-  message?: string;
-}): Promise<{ ok: boolean }> {
-  const res = await fetchWithConnectivityHint(composeApiUrl('/api/demo/book'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  return handleResponse(res, { feature: 'demo_booking' });
-}
-
 /** Contact / Support form — saved via backend to avoid PostgREST schema issues. */
 export interface SupportContactPayload {
   first_name: string;
@@ -1041,21 +1025,6 @@ export async function getBrandAnalytics(days = 30): Promise<BrandAnalytics> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${BACKEND_URL}/api/analytics?days=${days}`, { headers });
   return handleResponse<BrandAnalytics>(res);
-}
-
-// ─── AI Model Personalization ─────────────────────────────────────────────────
-
-export interface PersonalizeAnalytics {
-  totalGenerations: number;
-  days: number;
-  enabled: boolean;
-  dailyBreakdown: { date: string; generations: number }[];
-}
-
-export async function getPersonalizeAnalytics(days = 30): Promise<PersonalizeAnalytics> {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`${BACKEND_URL}/api/personalize/analytics?days=${days}`, { headers });
-  return handleResponse<PersonalizeAnalytics>(res);
 }
 
 // ─── Widget domains ───────────────────────────────────────────────────────────

@@ -4,11 +4,6 @@
  */
 import Resend from "@auth/core/providers/resend";
 import { RandomReader, generateRandomString } from "@oslojs/crypto/random";
-import {
-  TRYVERSE_AUTH_EMAIL_FROM,
-  signupVerificationEmailHtml,
-  signupVerificationEmailText,
-} from "./emailLayout";
 import { raiseUnlessResendResponseOk } from "./resendEmailErrors";
 import { trimResendSecret } from "./resendEnv";
 
@@ -19,7 +14,7 @@ const base = Resend({
   id: VERIFY_PROVIDER_ID,
   apiKey: trimResendSecret(process.env.AUTH_RESEND_KEY),
   from:
-    trimResendSecret(process.env.AUTH_EMAIL_FROM) || TRYVERSE_AUTH_EMAIL_FROM,
+    trimResendSecret(process.env.AUTH_EMAIL_FROM) || "TryVerse <onboarding@resend.dev>",
 });
 
 const baseOpts =
@@ -62,8 +57,21 @@ export const ResendEmailSignupVerification = {
     const from =
       typeof params.provider.from === "string" && trimResendSecret(params.provider.from).length > 0
         ? trimResendSecret(params.provider.from)
-        : TRYVERSE_AUTH_EMAIL_FROM;
+        : "TryVerse <onboarding@resend.dev>";
     const token = params.token;
+    const textBody =
+      `Welcome to TryVerse.\n\n` +
+      `Your verification code is ${token}. Open the app, go to the “Verify email” step after sign-up, and enter this code to finish setting up your account.\n\n` +
+      `This code expires in 24 hours. If you did not create an account, you can ignore this email.`;
+    const htmlBody = `<!DOCTYPE html>
+<html>
+<body style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.6;color:#111;max-width:520px">
+  <h1 style="font-size:22px;margin:0 0 12px">Welcome to TryVerse</h1>
+  <p style="margin:0 0 16px">Thanks for signing up. Enter this code on the verify-email screen to confirm your address and continue:</p>
+  <p style="font-size:28px;letter-spacing:0.25em;font-weight:700;margin:20px 0">${token}</p>
+  <p style="margin:0;font-size:14px;color:#555">This code expires in 24 hours. If you didn’t create an account, you can ignore this message.</p>
+</body>
+</html>`;
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -73,9 +81,9 @@ export const ResendEmailSignupVerification = {
       body: JSON.stringify({
         from,
         to: [email],
-        subject: "Verify your email to activate TryVerse",
-        text: signupVerificationEmailText(token),
-        html: signupVerificationEmailHtml(token),
+        subject: "Welcome to TryVerse — verify your email",
+        text: textBody,
+        html: htmlBody,
       }),
     });
     if (!res.ok) {

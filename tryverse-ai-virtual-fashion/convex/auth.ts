@@ -1,5 +1,8 @@
 import { convexAuth } from "@convex-dev/auth/server";
-import { ResendEmailSignupVerification } from "./ResendEmailSignupVerification";
+import {
+  ResendEmailSignupVerification,
+  ResendEmailSignupVerificationLegacy,
+} from "./ResendEmailSignupVerification";
 import { ResendOTPPasswordReset } from "./ResendOTPPasswordReset";
 import { TryVersePassword } from "./tryVersePassword";
 
@@ -40,5 +43,6 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         return base;
       },
     }),
+    ResendEmailSignupVerificationLegacy,
   ],
 });

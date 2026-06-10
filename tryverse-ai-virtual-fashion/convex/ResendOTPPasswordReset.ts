@@ -1,10 +1,5 @@
 import Resend from "@auth/core/providers/resend";
 import { RandomReader, generateRandomString } from "@oslojs/crypto/random";
-import {
-  TRYVERSE_AUTH_EMAIL_FROM,
-  passwordResetEmailHtml,
-  passwordResetEmailText,
-} from "./emailLayout";
 import { raiseUnlessResendResponseOk } from "./resendEmailErrors";
 import { trimResendSecret } from "./resendEnv";
 
@@ -12,7 +7,7 @@ const base = Resend({
   id: "resend-otp-reset",
   apiKey: trimResendSecret(process.env.AUTH_RESEND_KEY),
   from:
-    trimResendSecret(process.env.AUTH_EMAIL_FROM) || TRYVERSE_AUTH_EMAIL_FROM,
+    trimResendSecret(process.env.AUTH_EMAIL_FROM) || "TryVerse <onboarding@resend.dev>",
 });
 
 /**
@@ -49,7 +44,7 @@ export const ResendOTPPasswordReset = {
     const from =
       typeof params.provider.from === "string" && trimResendSecret(params.provider.from).length > 0
         ? trimResendSecret(params.provider.from)
-        : TRYVERSE_AUTH_EMAIL_FROM;
+        : "TryVerse <onboarding@resend.dev>";
     const token = params.token;
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -61,8 +56,9 @@ export const ResendOTPPasswordReset = {
         from,
         to: [email],
         subject: "Reset your TryVerse password",
-        text: passwordResetEmailText(token),
-        html: passwordResetEmailHtml(token),
+        text:
+          `Your password reset code is ${token}. Enter it on the TryVerse reset password page along with your new password.\n\n` +
+          `This code expires in 24 hours. If you did not request a reset, ignore this email.`,
       }),
     });
     if (!res.ok) {
