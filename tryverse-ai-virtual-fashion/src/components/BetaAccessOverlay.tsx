@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from "react";
 import { Lock, MessageSquareText } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useQuery } from "convex/react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,9 +20,43 @@ const LINKEDIN_URL = "https://www.linkedin.com/company/tryverse-ai";
  */
 export function BetaAccessOverlay() {
   const location = useLocation();
-  const { signOut, user } = useAuth();
+  const navigate = useNavigate();
+  const { signOut, user, syncBackendSession } = useAuth();
   const profile = useQuery(api.profiles.getMyProfile, user ? {} : "skip");
   const { bypass: adminPortalBypass, checking: adminPortalChecking } = useAdminOperatorBypass();
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [bootstrapBusy, setBootstrapBusy] = useState(false);
+  const bootstrapRunId = useRef(0);
+
+  const runWorkspaceBootstrap = async () => {
+    if (!user?.email) return;
+    const runId = ++bootstrapRunId.current;
+    setBootstrapBusy(true);
+    setBootstrapError(null);
+    try {
+      for (let attempt = 0; attempt < 6; attempt++) {
+        if (runId !== bootstrapRunId.current) return;
+        const result = await syncBackendSession({ email: user.email });
+        if (result.deviceApprovalRequired) {
+          navigate("/auth/approve-device", { replace: true });
+          return;
+        }
+        if (!result.error) return;
+        await new Promise<void>((r) => setTimeout(r, 600 + attempt * 400));
+      }
+      if (runId === bootstrapRunId.current) {
+        setBootstrapError("We couldn't finish setting up your workspace. Try again or refresh the page.");
+      }
+    } finally {
+      if (runId === bootstrapRunId.current) setBootstrapBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (profile !== null || !user?.email) return;
+    void runWorkspaceBootstrap();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when profile/user identity changes
+  }, [profile, user?.email]);
 
   if (!user) return null;
 
@@ -56,8 +91,29 @@ export function BetaAccessOverlay() {
         <div className="h-10 w-10 rounded-full border-2 border-muted border-t-foreground animate-spin mb-5" />
         <p className="text-sm font-medium text-foreground">Creating your workspace…</p>
         <p className="mt-2 text-sm text-muted-foreground max-w-sm">
-          This usually takes a few seconds.
+          {bootstrapBusy
+            ? "Setting up your brand profile and credits…"
+            : "This usually takes a few seconds."}
         </p>
+        {bootstrapError ? (
+          <div className="mt-6 space-y-3 max-w-sm">
+            <p className="text-sm text-destructive">{bootstrapError}</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={bootstrapBusy}
+                onClick={() => void runWorkspaceBootstrap()}
+              >
+                Try again
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => window.location.reload()}>
+                Refresh page
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   }

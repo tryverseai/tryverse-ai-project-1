@@ -17,6 +17,7 @@ import type * as authSession from "../authSession.js";
 import type * as authSubjectKeys from "../authSubjectKeys.js";
 import type * as backendTrusted from "../backendTrusted.js";
 import type * as billing from "../billing.js";
+import type * as emailLayout from "../emailLayout.js";
 import type * as http from "../http.js";
 import type * as invites from "../invites.js";
 import type * as migrations from "../migrations.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   authSubjectKeys: typeof authSubjectKeys;
   backendTrusted: typeof backendTrusted;
   billing: typeof billing;
+  emailLayout: typeof emailLayout;
   http: typeof http;
   invites: typeof invites;
   migrations: typeof migrations;

@@ -151,6 +151,17 @@ function requireDeviceFingerprint(): string {
   return fp;
 }
 
+/** Wait for Convex Auth users row to reflect verified email before workspace bootstrap. */
+async function waitForVerifiedEmail(maxAttempts = 40, intervalMs = 100): Promise<boolean> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const row = await convexReactClient.query(api.userBootstrap.myUserRow, {});
+    if (row?.emailVerificationTime != null) return true;
+    await new Promise<void>((r) => setTimeout(r, intervalMs));
+  }
+  const row = await convexReactClient.query(api.userBootstrap.myUserRow, {});
+  return row?.emailVerificationTime != null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { isLoading: convexAuthLoading, isAuthenticated } = useConvexAuth();
   const { signIn: convexPasswordSignIn, signOut: convexSignOut } = useAuthActions();
@@ -297,6 +308,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             },
           };
         }
+
+        const emailVerified = await waitForVerifiedEmail();
+        if (!emailVerified) {
+          return {
+            error: null,
+            session: null,
+            needsEmailVerification: true as const,
+            pendingEmail: trimmed,
+            pendingBootstrap: {
+              accountType,
+              brandName,
+              fullName,
+              role,
+              turnstileToken,
+            },
+          };
+        }
+
         await bootstrapAfterConvexSignIn({
           accountType,
           brandName,
