@@ -8,19 +8,23 @@ import {
 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { listApiKeys, listWidgetDomains } from "@/lib/backendApi";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
 // Eagerly load the default tab — zero extra latency on first visit
 import { TryOnGuideTab } from "@/components/dashboard/TryOnGuideTab";
 
-// Lazy-load all other tabs: each is a separate chunk fetched only when opened
-const OverviewTab  = lazy(() => import("@/components/dashboard/OverviewTab").then((m) => ({ default: m.OverviewTab })));
-const AnalyticsTab = lazy(() => import("@/components/dashboard/AnalyticsTab").then((m) => ({ default: m.AnalyticsTab })));
-const ProductsTab  = lazy(() => import("@/components/dashboard/ProductsTab").then((m) => ({ default: m.ProductsTab })));
-const ApiKeysTab   = lazy(() => import("@/components/dashboard/ApiKeysTab").then((m) => ({ default: m.ApiKeysTab })));
-const WidgetTab    = lazy(() => import("@/components/dashboard/WidgetTab").then((m) => ({ default: m.WidgetTab })));
-const BillingTab   = lazy(() => import("@/components/dashboard/BillingTab").then((m) => ({ default: m.BillingTab })));
-const SettingsTab  = lazy(() => import("@/components/dashboard/SettingsTab").then((m) => ({ default: m.SettingsTab })));
-const StudioTab       = lazy(() => import("@/components/dashboard/StudioTab").then((m) => ({ default: m.StudioTab })));
+// Lazy-load all other tabs: each is a separate chunk fetched only when opened. Wrapped in
+// lazyWithRetry so a stale chunk reference (e.g. right after a new deploy replaces the hashed
+// filenames) triggers one automatic page reload instead of spinning in the Suspense fallback
+// forever — this was the "tap a section and it just keeps turning" bug.
+const OverviewTab  = lazyWithRetry(() => import("@/components/dashboard/OverviewTab").then((m) => ({ default: m.OverviewTab })), "overview");
+const AnalyticsTab = lazyWithRetry(() => import("@/components/dashboard/AnalyticsTab").then((m) => ({ default: m.AnalyticsTab })), "analytics");
+const ProductsTab  = lazyWithRetry(() => import("@/components/dashboard/ProductsTab").then((m) => ({ default: m.ProductsTab })), "products");
+const ApiKeysTab   = lazyWithRetry(() => import("@/components/dashboard/ApiKeysTab").then((m) => ({ default: m.ApiKeysTab })), "api-keys");
+const WidgetTab    = lazyWithRetry(() => import("@/components/dashboard/WidgetTab").then((m) => ({ default: m.WidgetTab })), "widget");
+const BillingTab   = lazyWithRetry(() => import("@/components/dashboard/BillingTab").then((m) => ({ default: m.BillingTab })), "billing");
+const SettingsTab  = lazyWithRetry(() => import("@/components/dashboard/SettingsTab").then((m) => ({ default: m.SettingsTab })), "settings");
+const StudioTab    = lazyWithRetry(() => import("@/components/dashboard/StudioTab").then((m) => ({ default: m.StudioTab })), "studio");
 
 function PersonalizeTabUnavailable() {
   return (
@@ -74,8 +78,9 @@ const AiPhotoshootTab = lazy(() =>
     .catch(() => ({ default: AiPhotoshootTabUnavailable }))
 );
 
-const DeveloperDocsTab = lazy(() =>
-  import("@/components/dashboard/DeveloperDocsTab").then((m) => ({ default: m.DeveloperDocsTab }))
+const DeveloperDocsTab = lazyWithRetry(
+  () => import("@/components/dashboard/DeveloperDocsTab").then((m) => ({ default: m.DeveloperDocsTab })),
+  "developer-docs"
 );
 
 const GUIDE_TAB = "Try-On guide";

@@ -366,35 +366,6 @@ const Auth = () => {
                 : "Sign in or create an account"}
           </h1>
 
-          {showBusinessSignupForm && (
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium text-sm mb-4"
-                  onClick={() => {
-                    navigate("/auth", { replace: true });
-                    queueMicrotask(() => openSignupChooser());
-                  }}
-                >
-                  <ChevronLeft className="h-4 w-4 shrink-0" />
-                  Choose individual or business instead
-                </button>
-          )}
-          {showIndividualSignupForm && (
-            <>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium text-sm mb-4"
-                onClick={() => {
-                  navigate("/auth", { replace: true });
-                  queueMicrotask(() => openSignupChooser());
-                }}
-              >
-                <ChevronLeft className="h-4 w-4 shrink-0" />
-                Choose individual or business instead
-              </button>
-            </>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-4">
             {(showIndividualSignupForm || showBusinessSignupForm) && (
               <div className="space-y-2">

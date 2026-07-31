@@ -131,17 +131,19 @@ router.post(
         return;
       }
 
-      try {
-        await cxConsolidateTryonsToCanonicalUserId(req.convexAuthSubjectRaw ?? canonicalId);
-      } catch (e) {
-        logger.warn('try-on subject consolidation skipped or failed during bootstrap', {
-          error: String(e),
-          userSlice: canonicalId.slice(0, 12),
-        });
-      }
-
-      const trustedCount = await cxCountTrustedDevices(profileKey);
-      const fpTrusted = await cxIsFingerprintTrusted(profileKey, deviceFingerprintRaw);
+      // Three independent Convex round-trips — run together instead of one-after-another.
+      // This is the main latency win in bootstrap: was ~8 sequential round-trips, several
+      // of them redundant (see the fire-and-forget welcome email below).
+      const [, trustedCount, fpTrusted] = await Promise.all([
+        cxConsolidateTryonsToCanonicalUserId(req.convexAuthSubjectRaw ?? canonicalId).catch((e) => {
+          logger.warn('try-on subject consolidation skipped or failed during bootstrap', {
+            error: String(e),
+            userSlice: canonicalId.slice(0, 12),
+          });
+        }),
+        cxCountTrustedDevices(profileKey),
+        cxIsFingerprintTrusted(profileKey, deviceFingerprintRaw),
+      ]);
       if (trustedCount > 0 && !fpTrusted) {
         res.status(403).json({
           error: 'Approve this device with the emailed code before continuing.',
@@ -167,13 +169,16 @@ router.post(
           ...(role !== undefined ? { role } : {}),
           account_type: at,
         });
-        await sendWelcomeEmailOnce({
+        // Fire-and-forget: this already no-ops for already-welcomed accounts (a redundant
+        // Convex lookup on every single sign-in otherwise), and the caller shouldn't wait
+        // on a Resend API call to open their dashboard.
+        void sendWelcomeEmailOnce({
           profileKey,
           email,
           fullName,
           brandName,
           logUserSlice: canonicalId.slice(0, 12),
-        });
+        }).catch((e) => logger.warn('welcome email send failed (non-fatal)', { error: String(e) }));
         createdFlag = false;
       } else {
         await cxInsertProfile(profileKey, at, cap, cap, {
@@ -185,13 +190,13 @@ router.post(
           ...(role !== undefined ? { role } : {}),
         });
 
-        await sendWelcomeEmailOnce({
+        void sendWelcomeEmailOnce({
           profileKey,
           email,
           fullName,
           brandName,
           logUserSlice: canonicalId.slice(0, 12),
-        });
+        }).catch((e) => logger.warn('welcome email send failed (non-fatal)', { error: String(e) }));
         createdFlag = true;
       }
 

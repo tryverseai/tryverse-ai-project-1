@@ -1,4 +1,5 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { convexReactClient } from "@/convexReactClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -30,18 +31,20 @@ import ApproveDevice from "./pages/ApproveDevice";
 import NotFound from "./pages/NotFound";
 
 // Lazily loaded: heavy pages that are not needed on the first paint
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Admin = lazy(() => import("./pages/Admin"));
-const WidgetPreview = lazy(() => import("./pages/WidgetPreview"));
-const Pricing = lazy(() => import("./pages/Pricing"));
-const About = lazy(() => import("./pages/About"));
-const PartnerWithUs = lazy(() => import("./pages/PartnerWithUs"));
-const TermsOfService = lazy(() => import("./pages/TermsOfService"));
-const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
-const DataProcessing = lazy(() => import("./pages/DataProcessing"));
-const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
-const AcceptableUsePolicy = lazy(() => import("./pages/AcceptableUsePolicy"));
-const Support = lazy(() => import("./pages/Support"));
+// lazyWithRetry: a stale chunk reference after a new deploy triggers one automatic reload
+// instead of leaving the route stuck on its Suspense fallback.
+const Dashboard = lazyWithRetry(() => import("./pages/Dashboard"), "dashboard");
+const Admin = lazyWithRetry(() => import("./pages/Admin"), "admin");
+const WidgetPreview = lazyWithRetry(() => import("./pages/WidgetPreview"), "widget-preview");
+const Pricing = lazyWithRetry(() => import("./pages/Pricing"), "pricing");
+const About = lazyWithRetry(() => import("./pages/About"), "about");
+const PartnerWithUs = lazyWithRetry(() => import("./pages/PartnerWithUs"), "partner");
+const TermsOfService = lazyWithRetry(() => import("./pages/TermsOfService"), "terms");
+const PrivacyPolicy = lazyWithRetry(() => import("./pages/PrivacyPolicy"), "privacy");
+const DataProcessing = lazyWithRetry(() => import("./pages/DataProcessing"), "data-processing");
+const CookiePolicy = lazyWithRetry(() => import("./pages/CookiePolicy"), "cookie-policy");
+const AcceptableUsePolicy = lazyWithRetry(() => import("./pages/AcceptableUsePolicy"), "acceptable-use");
+const Support = lazyWithRetry(() => import("./pages/Support"), "support");
 
 /** Minimal spinner shown while a lazy route chunk is loading. */
 const RouteLoader = () => (
