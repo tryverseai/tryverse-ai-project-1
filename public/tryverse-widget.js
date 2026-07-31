@@ -66,6 +66,48 @@
     });
   }
 
+  /** Hosts the TryVerse API cannot fetch (SSRF block) — browser uploads the bytes instead. */
+  function isLocalOrPrivateImageUrl(url) {
+    try {
+      var u = new URL(url);
+      var h = u.hostname.toLowerCase();
+      if (h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '::1') return true;
+      if (/^10\./.test(h) || /^192\.168\./.test(h)) return true;
+      if (/^172\.(1[6-9]|2[0-9]|3[01])\./.test(h)) return true;
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function uploadProductImage(backendUrl, apiKey, productImageUrl) {
+    if (!productImageUrl || typeof productImageUrl !== 'string') {
+      return Promise.reject(new Error('Product image required'));
+    }
+    if (!productImageUrl.startsWith('http')) {
+      return Promise.resolve(productImageUrl);
+    }
+    if (isLocalOrPrivateImageUrl(productImageUrl)) {
+      return fetch(productImageUrl)
+        .then(function (r) {
+          if (!r.ok) throw new Error('Could not load product image from your site');
+          return r.blob();
+        })
+        .then(function (blob) {
+          var mime = blob.type || 'image/jpeg';
+          var ext = mime.indexOf('png') >= 0 ? 'png' : mime.indexOf('webp') >= 0 ? 'webp' : 'jpg';
+          var file = new File([blob], 'product.' + ext, { type: mime });
+          return uploadImage(backendUrl, apiKey, file, 'product');
+        })
+        .then(function (d) {
+          return d.filePath;
+        });
+    }
+    return uploadFromUrl(backendUrl, apiKey, productImageUrl).then(function (d) {
+      return d.filePath;
+    });
+  }
+
   function fetchWidgetConfig(backendUrl, apiKey) {
     return fetch(backendUrl + '/api/widget/config', {
       headers: { 'x-api-key': apiKey },
@@ -388,11 +430,7 @@
       statusEl.textContent = 'Uploading...';
       statusEl.style.color = '#6b7280';
 
-      var productPathPromise = productImageUrl.startsWith('http')
-        ? uploadFromUrl(backendUrl, apiKey, productImageUrl).then(function (d) {
-            return d.filePath;
-          })
-        : Promise.resolve(productImageUrl);
+      var productPathPromise = uploadProductImage(backendUrl, apiKey, productImageUrl);
 
       var personPathPromise;
       if (selectedModelId) {

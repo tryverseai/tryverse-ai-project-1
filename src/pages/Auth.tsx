@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
-import { ArrowRight, ChevronLeft, Eye, EyeOff, Building2, Mail, Lock, User, Briefcase } from "lucide-react";
+import { ArrowRight, ChevronLeft, Eye, EyeOff, Building2, Mail, Lock, User, Briefcase, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
@@ -504,13 +504,23 @@ const Auth = () => {
               </button>
             </div>
 
-            <Button type="submit" className="w-full gradient-primary text-primary-foreground h-12 shadow-soft" disabled={loading}>
-              {loading
-                ? "Please wait..."
-                : showBusinessSignupForm || showIndividualSignupForm
-                  ? "Create account"
-                  : "Sign In"}
-              <ArrowRight className="ml-2 h-4 w-4" />
+            <Button
+              type="submit"
+              className="w-full gradient-primary text-primary-foreground h-12 shadow-soft"
+              disabled={loading}
+              aria-busy={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  Please wait…
+                </>
+              ) : (
+                <>
+                  {showBusinessSignupForm || showIndividualSignupForm ? "Create account" : "Sign In"}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
             </Button>
           </form>
 

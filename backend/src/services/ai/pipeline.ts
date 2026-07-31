@@ -55,7 +55,6 @@ import type { TryOnJob, TryOnResult } from '../../types';
  *        ↓
  *  AI model inference (Replicate)
  *    • Clothing → FASHN Try-On (default) / IDM-VTON / Flux Kontext + optional human-parse hook
- *    • Bags / Glasses → FASHN
  *        ↓
  *  Face + neck lock (clothing, IDM/Flux only): paste identity from input — skipped for FASHN
  *        ↓

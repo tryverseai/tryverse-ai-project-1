@@ -9,12 +9,12 @@ import type { TryOnJob, TryOnResult } from '../../types';
  * Starts the Bull worker that processes try-on jobs from the queue.
  * Run this as a separate process in production: `npm run worker`
  */
-export function startWorker(): void {
+export function startWorker(): boolean {
   const queue = getTryOnQueue();
 
   if (!queue) {
-    logger.error('Cannot start worker — queue not available');
-    process.exit(1);
+    logger.warn('Try-on worker not started — queue not available (sync fallback only)');
+    return false;
   }
 
   logger.info('Worker starting', { concurrency: env.JOB_CONCURRENCY });
@@ -66,9 +66,10 @@ export function startWorker(): void {
   });
 
   logger.info('Worker ready and listening for jobs');
+  return true;
 }
 
 // When run directly
 if (require.main === module) {
-  startWorker();
+  if (!startWorker()) process.exit(1);
 }

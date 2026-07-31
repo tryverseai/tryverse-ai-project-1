@@ -23,13 +23,14 @@ export function TryVersePrivacyPolicy({
     >
       <header className="space-y-2">
         <h1 className="font-display text-3xl font-bold tracking-tight">Privacy Policy</h1>
-        <p className="text-sm text-muted-foreground">Last Updated: May 2026</p>
+        <p className="text-sm text-muted-foreground">Last Updated: July 2026</p>
       </header>
 
       <p>
         Welcome to TryVerse. This Privacy Policy explains how TryVerse AI (&quot;TryVerse,&quot; &quot;we,&quot;
         &quot;our,&quot; or &quot;us&quot;) collects, uses, stores, and protects your information when you use our
-        website, applications, AI virtual try-on tools, and related services (collectively, the &quot;Services&quot;).
+        website, applications, AI virtual try-on tools, embeddable storefront widget, and related services
+        (collectively, the &quot;Services&quot;).
       </p>
       <p>By accessing or using TryVerse, you agree to the practices described in this Privacy Policy.</p>
 
@@ -38,68 +39,57 @@ export function TryVersePrivacyPolicy({
       <section>
         <h2>1. Who We Are</h2>
         <p>
-          TryVerse is an AI-powered virtual fashion platform that enables users and brands to visualize clothing on
-          realistic human models through artificial intelligence and image generation technologies.
+          TryVerse is an AI-powered virtual try-on platform. Brands connect their product catalogue and embed our
+          widget or call our API so shoppers can see clothing, bags, and eyewear rendered onto a photo of themselves
+          (or a preset model) before buying. Individuals can also use TryVerse directly through our web app to try on
+          outfits for themselves.
         </p>
-        <p>Our Services may include:</p>
+        <p>Our Services include:</p>
         <ul>
-          <li>AI virtual try-on experiences</li>
-          <li>Product-to-model visualization</li>
-          <li>AI-generated fashion imagery</li>
-          <li>Brand and creator tools</li>
-          <li>Waitlist and early-access programs</li>
-          <li>Fashion commerce integrations</li>
+          <li>AI virtual try-on generation (clothing, bags, and eyeglasses)</li>
+          <li>An embeddable storefront widget and personalization script for e-commerce sites</li>
+          <li>A developer API and API keys for programmatic try-on requests</li>
+          <li>A merchant dashboard with product management, analytics, and billing</li>
+          <li>Waitlist, early-access, and invite-based onboarding</li>
         </ul>
       </section>
 
       <section>
         <h2>2. Information We Collect</h2>
         <p>
-          We collect information you provide directly to us, information generated through your use of our Services,
+          We collect information you provide directly to us, information generated through your use of the Services,
           and limited technical information collected automatically.
         </p>
-        <h3>Information You Provide</h3>
-        <p>Depending on how you use TryVerse, we may collect:</p>
         <h3>Account Information</h3>
         <ul>
-          <li>Name</li>
-          <li>Email address</li>
-          <li>Username</li>
-          <li>Password</li>
-          <li>Account type (individual or business)</li>
-          <li>Company or brand name</li>
-          <li>Role or job title</li>
+          <li>Name and email address</li>
+          <li>Password (stored as a salted hash — we never store or can read your plaintext password)</li>
+          <li>Account type (individual or business), brand or company name, and role/job title</li>
         </ul>
-        <h3>Uploaded Content</h3>
+        <h3>Photos and Product Images</h3>
+        <p>Depending on how you use TryVerse, we process:</p>
         <ul>
-          <li>Photos you upload</li>
-          <li>Clothing images</li>
-          <li>Product assets</li>
-          <li>AI generation inputs</li>
-          <li>Reference images</li>
+          <li>
+            <strong>Shopper / user photos</strong> — the photo you (or a shopper interacting with a brand&apos;s
+            widget) upload as the &quot;person&quot; image for a try-on
+          </li>
+          <li>
+            <strong>Brand product images</strong> — clothing, bag, or eyewear photos that brands upload to their
+            product catalogue to generate try-on results against
+          </li>
+          <li>The AI-generated try-on images produced from the above</li>
         </ul>
-        <h3>Body &amp; Fit Information</h3>
-        <p>To improve virtual try-on accuracy, users may optionally provide:</p>
-        <ul>
-          <li>Clothing sizes</li>
-          <li>Body measurements</li>
-          <li>Fit preferences</li>
-        </ul>
-        <p>We treat this information as sensitive personal information where required by law.</p>
-        <h3>Payment Information</h3>
-        <p>Payments are processed securely through third-party payment providers such as:</p>
-        <ul>
-          <li>Paystack</li>
-          <li>Flutterwave</li>
-        </ul>
-        <p>TryVerse does not store full card numbers or complete payment credentials on our servers.</p>
+        <h3>Account &amp; Billing Information</h3>
+        <p>
+          For paid plans, our payment processors (see &quot;Payments&quot; below) collect and process your billing
+          details directly. TryVerse does not store full card numbers or complete payment credentials on our own
+          servers — we retain only plan, transaction, and invoice metadata needed for billing and support.
+        </p>
         <h3>Communications</h3>
-        <p>If you contact us, join our waitlist, book a demo, or respond to surveys, we may collect:</p>
+        <p>If you contact support, join our waitlist, book a demo, or respond to a survey, we may collect:</p>
         <ul>
-          <li>Messages</li>
-          <li>Feedback</li>
-          <li>Support requests</li>
-          <li>Business inquiry information</li>
+          <li>Messages, feedback, and support requests</li>
+          <li>Business inquiry information (company name, website, monthly volume, etc.)</li>
         </ul>
       </section>
 
@@ -107,220 +97,227 @@ export function TryVersePrivacyPolicy({
         <h2>3. Information Collected Automatically</h2>
         <p>When you use TryVerse, we may automatically collect limited technical information including:</p>
         <ul>
-          <li>IP address</li>
-          <li>Browser type</li>
-          <li>Device information</li>
-          <li>Operating system</li>
-          <li>Usage activity</li>
-          <li>Error logs</li>
-          <li>Session information</li>
-          <li>Analytics data</li>
+          <li>IP address, browser type, device information, and operating system</li>
+          <li>Usage activity within the dashboard and widget (e.g. try-on counts, feature usage)</li>
+          <li>Error logs and crash reports</li>
+          <li>Session and authentication information</li>
         </ul>
-        <p>This information helps us:</p>
-        <ul>
-          <li>maintain platform security</li>
-          <li>improve performance</li>
-          <li>detect abuse or fraud</li>
-          <li>understand product usage</li>
-        </ul>
+        <p>
+          Where enabled, product-analytics and error-monitoring tools (see &quot;Analytics &amp; Error Monitoring&quot;
+          below) collect a subset of this information to help us keep the Services secure and reliable.
+        </p>
       </section>
 
       <section>
         <h2>4. How We Use Your Information</h2>
-        <p>We use your information to operate, improve, and secure TryVerse.</p>
-        <p>This may include:</p>
+        <p>We use your information to operate, improve, and secure TryVerse. This includes:</p>
         <ul>
-          <li>creating and managing accounts</li>
-          <li>providing AI virtual try-on services</li>
-          <li>processing uploaded images</li>
-          <li>generating AI fashion outputs</li>
-          <li>processing payments</li>
-          <li>sending account or security notifications</li>
+          <li>creating and managing accounts and API keys</li>
+          <li>generating AI virtual try-on results from the photos and product images you or a shopper submit</li>
+          <li>processing payments and managing subscriptions</li>
+          <li>sending account, security, and transactional emails (verification codes, receipts, device-approval codes)</li>
           <li>providing customer support</li>
-          <li>improving AI performance</li>
-          <li>analyzing platform usage</li>
-          <li>preventing fraud or abuse</li>
+          <li>monitoring platform performance, debugging errors, and preventing abuse</li>
           <li>complying with legal obligations</li>
         </ul>
-        <p>We may also use anonymized or aggregated data to improve our AI systems and platform performance.</p>
+        <p>
+          We do not use uploaded photos to train foundation AI models, and we do not use your try-on photos for our
+          own marketing without your permission.
+        </p>
       </section>
 
       <section>
         <h2>5. AI &amp; Image Processing</h2>
-        <p>TryVerse uses artificial intelligence and machine learning systems to generate virtual try-on results and fashion visualizations.</p>
-        <p>When you upload photos or images:</p>
-        <ul>
-          <li>the images may be processed by AI systems</li>
-          <li>outputs may be generated automatically</li>
-          <li>uploaded images may be temporarily stored for processing</li>
-          <li>AI-generated results may vary in accuracy</li>
-        </ul>
         <p>
-          We aim to preserve identity consistency and visual realism, but AI-generated outputs are not guaranteed to be
-          perfectly accurate representations.
+          When you or a shopper submit a photo and a product image, TryVerse routes them through an AI try-on
+          pipeline that composites the garment or accessory onto the person image. Depending on the category and
+          configuration, this may include automated pre-processing (e.g. framing, background handling) and
+          post-processing of the generated result.
         </p>
-        <p>We do not use uploaded user photos for public marketing without permission.</p>
+        <p>
+          AI-generated results are produced automatically and are not reviewed by a human before being returned. We
+          aim to preserve the shopper&apos;s likeness and the product&apos;s appearance, but outputs are not
+          guaranteed to be a perfectly accurate representation of how a garment will look or fit in real life.
+        </p>
       </section>
 
       <section>
         <h2>6. Third-Party AI Providers</h2>
-        <p>Some AI processing may be powered by trusted third-party infrastructure providers or APIs.</p>
-        <p>These providers may temporarily process image inputs solely for the purpose of generating requested outputs.</p>
-        <p>Examples may include:</p>
+        <p>
+          Try-on generation is powered by third-party AI infrastructure providers who process image inputs solely to
+          return the requested output. We currently use:
+        </p>
         <ul>
-          <li>Replicate</li>
-          <li>FASHN AI</li>
-          <li>cloud infrastructure and GPU providers</li>
+          <li>
+            <strong>Replicate</strong> — hosts the clothing try-on models we use, including <strong>IDM-VTON</strong>{" "}
+            and <strong>FASHN</strong>, and the multi-image compositing model <strong>Flux Kontext</strong> used for
+            certain full-body and dress try-ons
+          </li>
+          <li>
+            <strong>OpenAI</strong> — <strong>GPT Image</strong> is used for the optional AI model-personalization
+            feature (replacing the model in a brand&apos;s existing product photo with a shopper&apos;s likeness)
+          </li>
         </ul>
-        <p>We work to ensure partners maintain appropriate security and confidentiality standards.</p>
+        <p>
+          These providers receive only the image data required to generate a specific result and process it under
+          their own data-processing terms; we do not permit them to use TryVerse image submissions to train their
+          general-purpose models. We may add, remove, or change AI providers as our technology evolves; material
+          changes will be reflected in this policy.
+        </p>
       </section>
 
       <section>
-        <h2>7. Cookies &amp; Analytics</h2>
-        <p>We may use cookies and similar technologies to:</p>
-        <ul>
-          <li>keep users signed in</li>
-          <li>remember preferences</li>
-          <li>analyze traffic and usage</li>
-          <li>improve platform functionality</li>
-          <li>measure marketing performance</li>
-        </ul>
-        <p>You may disable cookies in your browser settings, though parts of the Services may not function properly.</p>
+        <h2>7. Where We Store Your Data</h2>
+        <p>
+          TryVerse stores account records, product catalogue data, try-on history, and uploaded/generated images
+          using <strong>Convex</strong> as our primary database and file-storage provider. Convex encrypts data in
+          transit (HTTPS/TLS) and provides access-controlled, managed cloud storage for uploaded and generated
+          images.
+        </p>
+        <h3>Reference Photo Retention (Widget Personalization)</h3>
+        <p>
+          For the storefront personalization widget (<code>tryverse-personalize.js</code>), shopper reference photos
+          are stored server-side for AI processing and automatically deleted after <strong>7 days</strong>. Widget
+          sessions are anonymous — no shopper account is required, and we do not link the reference photo to a
+          persistent shopper identity beyond that session window.
+        </p>
+        <p>
+          For dashboard-based try-ons (signed-in individual or business accounts), person and product images and the
+          resulting try-on outputs are retained as part of your try-on history until you delete them or close your
+          account, so you can revisit past results.
+        </p>
       </section>
 
       <section>
-        <h2>8. How We Share Information</h2>
-        <p>We do not sell personal information.</p>
-        <p>We may share limited information with:</p>
-        <ul>
-          <li>payment processors</li>
-          <li>infrastructure providers</li>
-          <li>analytics providers</li>
-          <li>customer support tools</li>
-          <li>legal authorities when required by law</li>
-        </ul>
-        <p>We may also disclose information:</p>
-        <ul>
-          <li>to protect platform security</li>
-          <li>prevent fraud or abuse</li>
-          <li>enforce our Terms</li>
-          <li>comply with legal obligations</li>
-        </ul>
-        <p>If TryVerse undergoes a merger, acquisition, or sale, user information may be transferred as part of that transaction.</p>
+        <h2>8. Cookies, Local Storage &amp; Analytics</h2>
+        <p>
+          We use essential cookies and browser local storage to keep you signed in, remember your cookie-consent
+          choice, and support core functionality like the signup and try-on flows. Where you consent, we also use
+          analytics cookies. Full detail on what we set and why is in our{" "}
+          <a className="text-primary underline underline-offset-2 font-medium" href="/cookie-policy">
+            Cookie Policy
+          </a>
+          .
+        </p>
+        <h3>Analytics &amp; Error Monitoring</h3>
+        <p>
+          Where configured, we use <strong>PostHog</strong> for product analytics (e.g. sign-ups, try-on completions)
+          and <strong>Sentry</strong> for error monitoring. Both are optional and only active when the corresponding
+          environment configuration is set for a given deployment. We do not enable session-replay recording, and our
+          error reports strip authorization/auth-token headers before they are sent. You can opt out of non-essential
+          analytics cookies via the cookie banner or your cookie preferences.
+        </p>
       </section>
 
       <section>
-        <h2>9. Data Storage &amp; Security</h2>
-        <p>We use reasonable technical and organizational safeguards designed to protect your information.</p>
-        <p>These may include:</p>
+        <h2>9. How We Share Information</h2>
+        <p>We do not sell personal information. We share limited information only as needed to run the Services:</p>
         <ul>
-          <li>encrypted connections (HTTPS)</li>
-          <li>access controls</li>
-          <li>authentication systems</li>
-          <li>infrastructure monitoring</li>
-          <li>secure cloud storage</li>
-          <li>restricted administrative access</li>
+          <li>
+            <strong>Payment processors</strong> — Paystack and Flutterwave, to process subscription payments in NGN
+            and USD
+          </li>
+          <li>
+            <strong>AI infrastructure providers</strong> — Replicate and OpenAI, to generate try-on and
+            personalization results (see &quot;Third-Party AI Providers&quot; above)
+          </li>
+          <li>
+            <strong>Hosting &amp; storage</strong> — Convex (database and file storage) and our application hosting
+            providers
+          </li>
+          <li>
+            <strong>Email delivery</strong> — Resend, to send transactional email (verification codes, password
+            resets, receipts, welcome and device-approval emails)
+          </li>
+          <li>
+            <strong>Analytics &amp; monitoring</strong> — PostHog and Sentry, where enabled (see above)
+          </li>
+          <li>Legal authorities, where required by law or to protect the rights, safety, or property of TryVerse or others</li>
         </ul>
-        <p>However, no online service can guarantee absolute security.</p>
-        <p>Users are responsible for maintaining the confidentiality of their login credentials.</p>
+        <p>
+          For business (brand) accounts, shopper photos submitted through your widget or API integration are
+          processed on your behalf as described in our{" "}
+          <a className="text-primary underline underline-offset-2 font-medium" href="/data-processing">
+            Data Processing Agreement
+          </a>
+          .
+        </p>
+        <p>If TryVerse undergoes a merger, acquisition, or sale, user information may be transferred as part of that transaction, subject to this Privacy Policy.</p>
       </section>
 
       <section>
-        <h2>10. Data Retention</h2>
-        <p>We retain information only for as long as reasonably necessary to:</p>
+        <h2>10. Data Storage &amp; Security</h2>
+        <p>We use reasonable technical and organizational safeguards designed to protect your information, including:</p>
         <ul>
-          <li>provide our Services</li>
-          <li>comply with legal obligations</li>
-          <li>resolve disputes</li>
-          <li>enforce agreements</li>
-          <li>improve platform operations</li>
+          <li>encrypted connections (HTTPS/TLS) for all data in transit</li>
+          <li>hashed passwords and hashed/scoped API keys — plaintext secrets are never stored</li>
+          <li>role-based access controls and authenticated sessions</li>
+          <li>managed, access-controlled cloud storage (Convex) for uploaded and generated images</li>
         </ul>
-        <p>Uploaded images and AI outputs may be deleted periodically based on operational and storage requirements.</p>
-        <p>We may retain certain records where legally required.</p>
+        <p>However, no online service can guarantee absolute security. You are responsible for keeping your login credentials and API keys confidential.</p>
       </section>
 
       <section>
-        <h2>11. Your Rights</h2>
+        <h2>11. Data Retention</h2>
+        <p>We retain information only for as long as reasonably necessary to provide the Services, comply with legal obligations, resolve disputes, and enforce our agreements. In particular:</p>
+        <ul>
+          <li>Widget/personalization reference photos are auto-deleted after 7 days (see &quot;Where We Store Your Data&quot;).</li>
+          <li>Dashboard try-on history (person images, product images, and generated outputs) is retained until you delete individual try-ons or close your account.</li>
+          <li>Account and billing records are retained while your account is active and for a limited period afterward as required for accounting, tax, and legal purposes.</li>
+        </ul>
+        <p>You may request deletion of your account and associated data at any time (see &quot;Your Rights&quot; below).</p>
+      </section>
+
+      <section>
+        <h2>12. Your Rights</h2>
         <p>Depending on your location, you may have rights including:</p>
         <ul>
           <li>access to your data</li>
           <li>correction of inaccurate information</li>
-          <li>deletion requests</li>
-          <li>restriction of processing</li>
-          <li>withdrawal of consent</li>
+          <li>deletion of your account and associated data</li>
+          <li>restriction of, or objection to, certain processing</li>
+          <li>withdrawal of consent (e.g. for analytics cookies)</li>
           <li>data portability</li>
-          <li>objection to certain processing activities</li>
         </ul>
         <p>
           You may request account deletion or data access by contacting:{" "}
           <a className="text-primary underline underline-offset-2 font-medium" href="mailto:info@tryverseai.com">
             info@tryverseai.com
           </a>
-          .
+          . We will respond in accordance with applicable laws.
         </p>
-        <p>We will respond in accordance with applicable laws.</p>
       </section>
 
       <section>
-        <h2>12. Children&apos;s Privacy</h2>
+        <h2>13. Children&apos;s Privacy</h2>
         <p>TryVerse is not intended for children under the age of 13.</p>
         <p>Users under 18 should use the Services only with appropriate parental or guardian permission where required by local law.</p>
         <p>We do not knowingly collect personal information from children in violation of applicable laws.</p>
       </section>
 
       <section>
-        <h2>13. International Users</h2>
-        <p>TryVerse may process and store information in multiple countries depending on our infrastructure providers and operations.</p>
+        <h2>14. International Users</h2>
+        <p>TryVerse may process and store information in multiple countries depending on our infrastructure providers and operations, including the providers named in this policy (Convex, Replicate, OpenAI, Resend, Paystack, Flutterwave, PostHog, and Sentry).</p>
         <p>By using our Services, you understand that your information may be transferred to countries outside your place of residence.</p>
       </section>
 
       <section>
-        <h2>14. Waitlist &amp; Early Access</h2>
-        <p>TryVerse may operate invite-only, beta, or waitlist-based access programs.</p>
-        <p>Information submitted through:</p>
-        <ul>
-          <li>waitlists</li>
-          <li>demo requests</li>
-          <li>partnership forms</li>
-          <li>onboarding applications</li>
-        </ul>
-        <p>may be used to:</p>
-        <ul>
-          <li>evaluate eligibility</li>
-          <li>contact applicants</li>
-          <li>prioritize onboarding</li>
-          <li>improve launch planning</li>
-        </ul>
-        <p>Submitting a waitlist application does not guarantee access.</p>
+        <h2>15. Waitlist &amp; Early Access</h2>
+        <p>TryVerse may operate invite-only, beta, or waitlist-based access programs. Information submitted through waitlists, demo requests, partnership forms, and onboarding applications may be used to evaluate eligibility, contact applicants, prioritize onboarding, and improve launch planning. Submitting a waitlist application does not guarantee access.</p>
       </section>
 
       <section>
-        <h2>15. Marketing Communications</h2>
-        <p>We may send:</p>
-        <ul>
-          <li>product updates</li>
-          <li>onboarding emails</li>
-          <li>platform announcements</li>
-          <li>promotional communications</li>
-        </ul>
-        <p>You may unsubscribe from marketing emails at any time using the unsubscribe link provided in the email.</p>
-        <p>Service-related emails may still be sent when necessary.</p>
+        <h2>16. Marketing Communications</h2>
+        <p>We may send product updates, onboarding emails, platform announcements, and promotional communications. You may unsubscribe from marketing emails at any time using the unsubscribe link provided in the email. Service-related transactional emails (verification codes, receipts, security notices) may still be sent when necessary.</p>
       </section>
 
       <section>
-        <h2>16. Changes to This Policy</h2>
-        <p>We may update this Privacy Policy periodically.</p>
-        <p>If material changes are made, we may notify users through:</p>
-        <ul>
-          <li>email</li>
-          <li>platform notifications</li>
-          <li>updates on our website</li>
-        </ul>
-        <p>Continued use of the Services after updates means you accept the revised policy.</p>
+        <h2>17. Changes to This Policy</h2>
+        <p>We may update this Privacy Policy periodically. If material changes are made, we may notify users through email, platform notifications, or updates on our website. Continued use of the Services after updates means you accept the revised policy.</p>
       </section>
 
       <section>
-        <h2>17. Contact Us</h2>
+        <h2>18. Contact Us</h2>
         <p>If you have questions about this Privacy Policy or your data, contact us at:</p>
         <p>
           Email:{" "}

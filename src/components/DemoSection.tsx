@@ -42,6 +42,7 @@ export function DemoSection() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           className="text-center mb-16"
         >
           <p className="text-sm font-medium text-primary mb-3 tracking-wide uppercase">Live Demo</p>

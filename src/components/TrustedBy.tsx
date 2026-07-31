@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 // Brand colors from official guidelines. Magento/Amazon: CDN + local fallback. Wix, Canva, Figma, etc.: assets in /public/logos.
 const integrations = [
@@ -14,8 +15,6 @@ const integrations = [
   { name: "Framer", logo: "https://cdn.simpleicons.org/framer/0055FF" },
   { name: "Canva", logo: "/logos/canva.png" },
   { name: "Figma", logo: "/logos/figma.png" },
-  { name: "Lovable", logo: "/logos/lovable.png" },
-  { name: "Base44", logo: "/logos/base44.png" },
   { name: "WordPress", logo: "/logos/wordpress.png" },
   { name: "Hostinger", logo: "/logos/hostinger.png" },
   { name: "Amazon", logo: "https://static.cdnlogo.com/logos/a/83/amazon-com.svg", fallback: "/logos/amazon.svg" },
@@ -38,11 +37,14 @@ function bandTransform(cx: number, viewportCenterX: number, halfViewportW: numbe
 }
 
 export function TrustedBy() {
-  const duplicated = [...integrations, ...integrations];
+  const [reducedMotion, setReducedMotion] = useState(false);
   const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(reduce.matches);
+    const onChange = () => setReducedMotion(reduce.matches);
+    reduce.addEventListener("change", onChange);
     let raf = 0;
 
     const tick = () => {
@@ -66,8 +68,14 @@ export function TrustedBy() {
     };
 
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      reduce.removeEventListener("change", onChange);
+    };
   }, []);
+
+  // Reduced motion: show one static, wrapped row instead of the duplicated infinite-scroll strip.
+  const items = reducedMotion ? integrations : [...integrations, ...integrations];
 
   return (
     <section className="py-16 border-y border-border/40 overflow-hidden">
@@ -76,6 +84,7 @@ export function TrustedBy() {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
         >
           <p className="text-center text-xs font-medium text-muted-foreground uppercase tracking-[0.2em] mb-10">
             Works with the stacks brands use
@@ -83,8 +92,13 @@ export function TrustedBy() {
 
           {/* Extra vertical padding so translateZ doesn’t clip against overflow */}
           <div className="trusted-by-stage relative w-full overflow-hidden py-7 sm:py-8">
-            <div className="trusted-by-track flex w-max animate-marquee will-change-transform">
-              {duplicated.map((item, i) => (
+            <div
+              className={cn(
+                "trusted-by-track flex will-change-transform",
+                reducedMotion ? "w-full flex-wrap justify-center" : "w-max animate-marquee"
+              )}
+            >
+              {items.map((item, i) => (
                 <div
                   key={`${item.name}-${i}`}
                   ref={(el) => {

@@ -1,6 +1,8 @@
 import Bull from 'bull';
+import Redis from 'ioredis';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
+import { REDIS_CONNECT_OPTIONS } from '../../config/redis';
 import type { TryOnJob, TryOnResult, BullJobStatus } from '../../types';
 
 let tryOnQueue: Bull.Queue<TryOnJob> | null = null;
@@ -9,7 +11,15 @@ export function getTryOnQueue(): Bull.Queue<TryOnJob> | null {
   if (!tryOnQueue) {
     try {
       tryOnQueue = new Bull<TryOnJob>('tryon-jobs', {
-        redis: env.REDIS_URL,
+        /**
+         * Bull needs up to 3 separate ioredis connections (client / subscriber / blocking
+         * "bclient" — the last can't be shared with the others). Build each from the same
+         * REDIS_URL + REDIS_CONNECT_OPTIONS as the shared app client (config/redis.ts) so Bull's
+         * reconnect backoff, connect timeout, and TLS handling (from the REDIS_URL scheme) match
+         * the rest of the app instead of relying on ioredis's untuned defaults — previously Bull
+         * only received a bare `redis: env.REDIS_URL` string here.
+         */
+        createClient: () => new Redis(env.REDIS_URL, { ...REDIS_CONNECT_OPTIONS, lazyConnect: false }),
         defaultJobOptions: {
           attempts: env.JOB_MAX_RETRIES,
           backoff: { type: 'exponential', delay: 5000 },

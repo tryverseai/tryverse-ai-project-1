@@ -16,6 +16,7 @@ import { logger } from '../config/logger';
 import { sendWelcomeEmail, sendDeviceApprovalEmail } from '../services/email';
 import { cxConsolidateTryonsToCanonicalUserId } from '../services/tryonConvexBridge';
 import { env } from '../config/env';
+import { anyApi, convexMutationTrusted, convexQueryTrusted } from '../config/convexHttp';
 
 const router = Router();
 
@@ -330,6 +331,80 @@ router.get('/me', requireAuth, async (req: Request, res: Response, next: NextFun
     next(err);
   }
 });
+
+/**
+ * GET /api/account/api-keys
+ * The caller's own active API keys.
+ */
+router.get('/api-keys', requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const keys = await convexQueryTrusted<Array<{ id: string; key_value: string; name: string; created_at: string }>>(
+      anyApi.backendTrusted.listApiKeysForUser,
+      { secret: env.BACKEND_SHARED_SECRET, userId: req.user!.id }
+    );
+    res.json({ keys });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/account/api-keys
+ * Idempotent: returns the caller's existing key if one already exists, otherwise creates one.
+ * This is what makes key generation "automatic" — the dashboard calls this once on first load
+ * of the Connect Store screen and never shows a manual "Generate" button.
+ */
+router.post('/api-keys', requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const existing = await convexQueryTrusted<Array<{ id: string; key_value: string; name: string; created_at: string }>>(
+      anyApi.backendTrusted.listApiKeysForUser,
+      { secret: env.BACKEND_SHARED_SECRET, userId: req.user!.id }
+    );
+    if (existing.length > 0) {
+      res.json({ key: existing[0], created: false });
+      return;
+    }
+    const created = (await convexMutationTrusted(anyApi.adminTrusted.createApiKeyAdmin, {
+      secret: env.BACKEND_SHARED_SECRET,
+      userId: req.user!.id,
+      name: 'Production',
+    })) as { id: string; user_id: string; key_value: string; name: string; created_at: string; status: 'active' };
+    res.json({ key: created, created: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/account/api-keys/regenerate
+ * Revokes the caller's existing key(s) and issues a fresh one. Old key stops working immediately.
+ */
+router.post(
+  '/api-keys/regenerate',
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const existing = await convexQueryTrusted<Array<{ id: string }>>(anyApi.backendTrusted.listApiKeysForUser, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId: req.user!.id,
+      });
+      for (const key of existing) {
+        await convexMutationTrusted(anyApi.adminTrusted.revokeApiKeyAdmin, {
+          secret: env.BACKEND_SHARED_SECRET,
+          legacyId: key.id,
+        });
+      }
+      const created = (await convexMutationTrusted(anyApi.adminTrusted.createApiKeyAdmin, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId: req.user!.id,
+        name: 'Production',
+      })) as { id: string; user_id: string; key_value: string; name: string; created_at: string; status: 'active' };
+      res.json({ key: created });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 /**
  * PATCH /api/account/settings

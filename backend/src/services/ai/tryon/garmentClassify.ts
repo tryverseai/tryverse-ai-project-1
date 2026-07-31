@@ -6,7 +6,7 @@ export type GarmentTopology = 'upper' | 'lower' | 'full_body' | 'unspecified';
 
 /**
  * Classify garment layout from copy + product aspect ratio.
- * Used for routing; does not replace the API `category` (clothing | bags | glasses).
+ * Used for routing; does not replace the API `category` (clothing | tops | bottoms | dresses | one-pieces).
  */
 export function classifyGarmentTopology(
   category: ProductCategory,

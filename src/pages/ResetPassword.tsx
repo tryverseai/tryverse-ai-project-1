@@ -1,7 +1,7 @@
 import { useState, type FormEvent, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,13 +34,13 @@ const ResetPassword = () => {
     if (!email) return;
     const c = code.trim().replace(/\s+/g, "");
     if (!c) {
-      toast({ title: "Code required", description: "Enter the code from your email.", variant: "destructive" });
+      toast({ title: "Code required", description: "Enter the 8-digit code from your email.", variant: "destructive" });
       return;
     }
     if (newPassword.length < 6) {
       toast({
         title: "Password too short",
-        description: "Use at least 6 characters.",
+        description: "Your new password needs at least 6 characters.",
         variant: "destructive",
       });
       return;
@@ -55,8 +55,8 @@ const ResetPassword = () => {
       const result = await signIn("password", fd);
       if (!result.signingIn) {
         toast({
-          title: "Reset incomplete",
-          description: "The code may be incorrect or expired. Request a new code from the forgot password page.",
+          title: "That code didn’t work",
+          description: "It may be incorrect or expired. Request a new code from the forgot password page.",
           variant: "destructive",
           duration: 9000,
         });
@@ -82,7 +82,9 @@ const ResetPassword = () => {
       const friendly = convexAuthEmailFlowToast(err, "reset_verify");
       toast({
         title: friendly?.title ?? "Could not reset password",
-        description: friendly?.description ?? "Something went wrong. Try again.",
+        description:
+          friendly?.description ??
+          "That code didn’t work — it may be incorrect or expired. Request a new one and try again.",
         variant: friendly?.variant ?? "destructive",
         duration: 9000,
       });
@@ -148,8 +150,16 @@ const ResetPassword = () => {
             type="submit"
             className="w-full gradient-primary text-primary-foreground h-12 shadow-soft"
             disabled={loading}
+            aria-busy={loading}
           >
-            {loading ? "Updating…" : "Update password and sign in"}
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                Updating…
+              </>
+            ) : (
+              "Update password and sign in"
+            )}
           </Button>
         </form>
       </motion.div>

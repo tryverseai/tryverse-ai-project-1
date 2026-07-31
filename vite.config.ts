@@ -12,7 +12,10 @@ export default defineConfig(() => ({
     proxy: {
       // Dev: browser calls same origin (see BACKEND_URL in backendApi); Vite forwards to the API.
       // Long timeouts: sync try-on holds the POST open until the model finishes (can exceed 2–3 minutes).
-      "/api": {
+      // Path-boundary regex, not a bare "/api" prefix — a naive prefix match also swallows
+      // client routes like /api-docs, proxying them to the backend and 404ing instead of
+      // letting React Router serve the page.
+      "^/api(/|$)": {
         target: "http://127.0.0.1:3001",
         changeOrigin: true,
         timeout: 600_000,
@@ -30,7 +33,6 @@ export default defineConfig(() => ({
       "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     },
   },
-  // `lovable-tagger` replaces `react/jsx-dev-runtime` globally; that has caused blank pages in local dev.
   plugins: [react()],
   resolve: {
     alias: {

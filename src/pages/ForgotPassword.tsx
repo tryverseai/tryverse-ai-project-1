@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,9 +40,11 @@ const ForgotPassword = () => {
         toast({ ...friendly, duration: 12000 });
         return;
       }
+      // Fall back to safe, human copy instead of surfacing a raw Convex/network error —
+      // the real error is already logged to the console by convexAuthEmailFlowToast above.
       toast({
-        title: "Could not start reset",
-        description: err instanceof Error ? err.message : "Something went wrong. Try again.",
+        title: "Could not send reset code",
+        description: "We couldn't send a reset code right now. Please try again in a moment.",
         variant: "destructive",
         duration: 9000,
       });
@@ -91,8 +93,16 @@ const ForgotPassword = () => {
             type="submit"
             className="w-full gradient-primary text-primary-foreground h-12 shadow-soft"
             disabled={loading}
+            aria-busy={loading}
           >
-            {loading ? "Sending…" : "Send verification code"}
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                Sending…
+              </>
+            ) : (
+              "Send verification code"
+            )}
           </Button>
         </form>
         <p className="text-xs text-muted-foreground mt-6 text-center">

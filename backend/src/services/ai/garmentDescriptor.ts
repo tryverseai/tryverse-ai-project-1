@@ -20,15 +20,7 @@ const GOWN_LENGTH_HINT =
   'floor- or ankle-length, no cut-off at waist or mid-thigh; never a crop top, bodysuit, or two-piece band. ' +
   'Keep the hem as long as in the product: do not shorten to mini, micro, or upper-thigh length unless the product is that short.';
 
-const FIDELITY_BAG =
-  'Use exactly the bag or accessory from the product image: match shape, straps, hardware, color, material and size. ' +
-  'Do not invent a different bag or blend in unrelated items from the person’s original photo.';
-
-const FIDELITY_GLASSES =
-  'Use exactly the eyewear from the product image: match frame shape, color, lens style and size. ' +
-  'Do not keep unrelated glasses from the original photo unless they are the same product.';
-
-/** Studio / clients that never send a real product caption. */
+/** Studio / clients that never send a real product caption. `bags|glasses` kept for legacy stored captions from before TryVerse went apparel-only. */
 const GENERIC_TRYVERSE = /^(clothing|bags|glasses)\s+item for virtual try-on\s*$/i;
 
 function isBlankOrGeneric(raw: string): boolean {
@@ -203,7 +195,7 @@ export function buildIdmGarmentDescription(
   return buildWithDetails(core, productDescription, MAX_LEN);
 }
 
-/** `garment_description` for FASHN clothing try-on (same family as bags/glasses). */
+/** `garment_description` for FASHN clothing try-on. */
 export function buildFashnClothingDescription(
   productDescription?: string | null,
   opts?: { productHeightOverWidth?: number; fashnCategory?: FashnGarmentSlot }
@@ -217,14 +209,4 @@ export function buildFashnClothingDescription(
     core += GOWN_LENGTH_HINT;
   }
   return buildWithDetails(core, productDescription, MAX_FASHN_LEN);
-}
-
-/** `garment_description` for FASHN try-on (bags). */
-export function buildFashnBagDescription(productDescription?: string | null): string {
-  return buildWithDetails(FIDELITY_BAG, productDescription, MAX_FASHN_LEN);
-}
-
-/** `garment_description` for FASHN try-on (glasses). */
-export function buildFashnGlassesDescription(productDescription?: string | null): string {
-  return buildWithDetails(FIDELITY_GLASSES, productDescription, MAX_FASHN_LEN);
 }

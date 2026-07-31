@@ -36,6 +36,7 @@ export function HowItWorks() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
+          transition={{ duration: 0.7, ease: GLASS_EASE }}
           className="text-center mb-10 sm:mb-14 md:mb-16 max-w-3xl mx-auto"
         >
           <p className="text-xs font-medium text-muted-foreground mb-2 sm:mb-3 tracking-[0.2em] uppercase">

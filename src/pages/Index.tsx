@@ -4,10 +4,10 @@ import { TrustedBy } from "@/components/TrustedBy";
 import { HowItWorks } from "@/components/HowItWorks";
 import { FeaturesSection } from "@/components/FeaturesSection";
 import { TechnologySection } from "@/components/TechnologySection";
-import { JewelryShowcase } from "@/components/JewelryShowcase";
 import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
 import { Helmet } from "react-helmet-async";
+import { MotionConfig } from "framer-motion";
 
 const Index = () => {
   return (
@@ -20,15 +20,18 @@ const Index = () => {
         />
         <link rel="canonical" href="https://tryverseai.com/" />
       </Helmet>
-      <Navbar />
-      <HeroSection />
-      <TrustedBy />
-      <HowItWorks />
-      <FeaturesSection />
-      <TechnologySection />
-      <JewelryShowcase />
-      <CTASection />
-      <Footer />
+      {/* Global reduced-motion guard: shrinks every framer-motion animation in this subtree to
+          near-instant when the OS/browser "prefers-reduced-motion" setting is on. */}
+      <MotionConfig reducedMotion="user">
+        <Navbar />
+        <HeroSection />
+        <TrustedBy />
+        <HowItWorks />
+        <FeaturesSection />
+        <TechnologySection />
+        <CTASection />
+        <Footer />
+      </MotionConfig>
     </div>
   );
 };

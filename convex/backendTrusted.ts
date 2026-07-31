@@ -156,8 +156,10 @@ export const insertProfileRow = mutation({
       monthly_credits_total: 0,
       is_blocked: false,
       widget_activated: false,
-      beta_approved: false,
-      beta_requested_at: now,
+      // Self-serve now — no closed-beta approval step. Kept `true` (not omitted) so any code
+      // still reading this field for display purposes sees an accurate, non-"pending" state.
+      beta_approved: true,
+      beta_approved_at: now,
       created_at: now,
       updated_at: now,
       ...(normEmail ? { contact_email: normEmail } : {}),
@@ -766,6 +768,115 @@ export const getWidgetProfileRow = query({
   },
 });
 
+/**
+ * Cheap plan-tier check for `backend/src/middleware/requirePlan.ts`. Reuses the existing
+ * `profiles.plan_id` tier-name convention (`"free" | "starter" | "growth" | "enterprise"`,
+ * see `convex/seed.ts` and `backend/src/services/credits.ts` PLAN_LIMITS) rather than adding a
+ * separate `is_enterprise` boolean — `plan_id` is already the single source of truth for tier
+ * everywhere else in this codebase (credit allocation, rate limiting), so a boolean would just be
+ * a second field that can drift out of sync with it.
+ */
+export const getUserPlanTier = query({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const profile = await findProfileBySubjectKeys(ctx, userId);
+    if (!profile) return null;
+    const planId = typeof profile.plan_id === "string" && profile.plan_id ? profile.plan_id : "free";
+    return {
+      planId,
+      isEnterprise: planId === "enterprise",
+    };
+  },
+});
+
+/**
+ * Usage/history log for the Enterprise-gated AI generation features (AI Model Generation, AI
+ * Video Generation via Higgsfield). Insert-only primitive — not yet called by any route; the
+ * workstream that ships `/generate`-style endpoints for those features calls this after a
+ * successful generation.
+ */
+export const logAiGenerationUsage = mutation({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    feature: v.union(v.literal("ai_model"), v.literal("ai_photoshoot")),
+  },
+  handler: async (ctx, { secret, userId, feature }) => {
+    requireBackendSecret(secret);
+    await ctx.db.insert("ai_generation_usage", {
+      user_id: userId,
+      feature,
+      created_at: new Date().toISOString(),
+    });
+    return { ok: true as const };
+  },
+});
+
+const aiModelParamsValidator = v.object({
+  gender: v.string(),
+  skinTone: v.string(),
+  pose: v.string(),
+  age: v.string(),
+  hair: v.string(),
+  background: v.string(),
+  fashionStyle: v.string(),
+});
+
+/** Saves a generated AI fashion model (Enterprise "Generate AI Model" library) after a successful Replicate run. */
+export const saveGeneratedAiModel = mutation({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    storagePath: v.string(),
+    params: aiModelParamsValidator,
+  },
+  handler: async (ctx, { secret, userId, storagePath, params }) => {
+    requireBackendSecret(secret);
+    const id = await ctx.db.insert("ai_generated_models", {
+      user_id: userId,
+      storage_path: storagePath,
+      params,
+      status: "active",
+      created_at: new Date().toISOString(),
+    });
+    return { id };
+  },
+});
+
+/** Lists a user's saved AI-generated models (active only), newest first. */
+export const listGeneratedAiModels = query({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db
+      .query("ai_generated_models")
+      .withIndex("by_userId", (q) => q.eq("user_id", userId))
+      .collect();
+    return rows
+      .filter((r) => r.status === "active")
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .map((r) => ({
+        id: r._id,
+        storagePath: r.storage_path,
+        params: r.params,
+        createdAt: r.created_at,
+      }));
+  },
+});
+
+/** Archives (soft-deletes) a saved AI-generated model — owner-checked. */
+export const archiveGeneratedAiModel = mutation({
+  args: { secret: v.string(), userId: v.string(), modelId: v.id("ai_generated_models") },
+  handler: async (ctx, { secret, userId, modelId }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db.get(modelId);
+    if (!row || row.user_id !== userId) throw new Error("not_found");
+    await ctx.db.patch(modelId, { status: "archived" });
+    return { ok: true as const };
+  },
+});
+
 /** Idempotent: fills `tryverse_model_library` when empty (called from Railway GET /api/models). */
 export const ensureModelLibrarySeeded = mutation({
   args: { secret: v.string() },
@@ -780,6 +891,79 @@ export const ensureModelLibrarySeeded = mutation({
       count++;
     }
     return { seeded: true as const, count };
+  },
+});
+
+/** Idempotent: fills `plans` when empty, including the `enterprise` tier `requirePlan()` checks against. Mirrors `seed.ts`'s `seedPlansIfEmpty` for callers without Convex CLI auth (the Express backend). */
+export const ensurePlansSeeded = mutation({
+  args: { secret: v.string() },
+  handler: async (ctx, { secret }) => {
+    requireBackendSecret(secret);
+    const existing = await ctx.db.query("plans").take(1);
+    if (existing.length > 0) return { seeded: false as const };
+    const now = new Date().toISOString();
+    const rows = [
+      {
+        id: "free", name: "Free", is_active: true, max_products: 0, price_ngn: 0, price_usd: 0, tryons_per_month: 5,
+        features: ["Free try-on pool (individuals: 5 · brands: 20 on signup)", "Watermark on free tier", "Basic quality", "Upgrade anytime"],
+        created_at: now,
+      },
+      {
+        id: "pro", name: "Pro", is_active: true, max_products: 0, price_ngn: 7500, price_usd: 8, tryons_per_month: 75,
+        features: ["50–100 try-ons / month (quota)", "HD images", "No watermark", "Download images"],
+        created_at: now,
+      },
+      {
+        id: "creator", name: "Creator", is_active: true, max_products: 0, price_ngn: 15000, price_usd: 15, tryons_per_month: 250,
+        features: ["200–300 try-ons / month (quota)", "HD + stronger realism", "Generate marketing images", "Priority processing"],
+        created_at: now,
+      },
+      {
+        id: "starter", name: "Starter", is_active: true, max_products: 100, price_ngn: 65000, price_usd: 45, tryons_per_month: 150,
+        features: ["100–200 try-ons / month (quota)", "50–100 products", "Basic fit prediction", "Download images"],
+        created_at: now,
+      },
+      {
+        id: "growth", name: "Growth", is_active: true, max_products: 750, price_ngn: 200000, price_usd: 140, tryons_per_month: 750,
+        features: ["500–1000 try-ons / month (quota)", "100–500 products", "Analytics", "API access", "Marketing content"],
+        created_at: now,
+      },
+      {
+        id: "enterprise", name: "Enterprise", is_active: true, max_products: 0, price_ngn: 0, price_usd: 0, tryons_per_month: -1,
+        features: [
+          "AI Model Generation — build a reusable fashion-model library",
+          "AI Product Photoshoot — generate ecommerce photography from your catalog",
+          "Custom models",
+          "SLA",
+          "Dedicated infrastructure",
+          "Custom pricing — contact sales",
+        ],
+        created_at: now,
+      },
+    ];
+    for (const row of rows) await ctx.db.insert("plans", row);
+    return { seeded: true as const, count: rows.length };
+  },
+});
+
+/** A user's own API keys — unlike `adminTrusted.listApiKeysAdmin`, this is scoped to one account. */
+export const listApiKeysForUser = query({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db
+      .query("api_keys")
+      .withIndex("by_userId", (q) => q.eq("user_id", userId))
+      .collect();
+    return rows
+      .filter((k) => k.status === "active")
+      .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")))
+      .map((k) => ({
+        id: k.legacy_id ?? String(k._id),
+        key_value: k.key_value,
+        name: k.name,
+        created_at: k.created_at ?? "",
+      }));
   },
 });
 
@@ -1107,6 +1291,31 @@ export const reserveCredit = mutation({
     }
 
     return { ok: false as const, reason: "No credits remaining" };
+  },
+});
+
+export const listAllowedDomainsForUser = query({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const keys = await ctx.db
+      .query("api_keys")
+      .withIndex("by_userId", (q) => q.eq("user_id", userId))
+      .collect();
+    const domains: { domain: string; apiKeyId: string; apiKeyName: string }[] = [];
+    for (const k of keys) {
+      if (k.status !== "active") continue;
+      const apiKeyId = String(k.legacy_id ?? k._id);
+      const rows = await ctx.db
+        .query("allowed_domains")
+        .withIndex("by_apiKeyId", (q) => q.eq("api_key_id", apiKeyId))
+        .collect();
+      for (const r of rows) {
+        domains.push({ domain: r.domain, apiKeyId, apiKeyName: k.name });
+      }
+    }
+    domains.sort((a, b) => a.domain.localeCompare(b.domain));
+    return domains;
   },
 });
 

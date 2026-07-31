@@ -348,6 +348,39 @@ export const listApiKeysAdmin = query({
   },
 });
 
+function randomApiKeySecret(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `tv_live_${hex}`;
+}
+
+/** Create an API key for a user (admin / backend tooling). */
+export const createApiKeyAdmin = mutation({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    name: v.optional(v.string()),
+  },
+  handler: async (ctx, { secret, userId, name }) => {
+    requireBackendSecret(secret);
+    const profile = await findProfileBySubjectKeys(ctx, userId);
+    if (!profile) throw new Error("profile_not_found");
+    const now = new Date().toISOString();
+    const key_value = randomApiKeySecret();
+    const legacy_id = crypto.randomUUID();
+    await ctx.db.insert("api_keys", {
+      legacy_id,
+      user_id: profile.id,
+      key_value,
+      name: name?.trim() || "Production",
+      status: "active",
+      created_at: now,
+    });
+    return { id: legacy_id, user_id: profile.id, key_value, name: name?.trim() || "Production", created_at: now, status: "active" as const };
+  },
+});
+
 export const revokeApiKeyAdmin = mutation({
   args: { secret: v.string(), legacyId: v.string() },
   handler: async (ctx, { secret, legacyId }) => {

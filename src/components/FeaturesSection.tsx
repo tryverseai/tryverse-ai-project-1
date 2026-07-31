@@ -55,6 +55,7 @@ export function FeaturesSection() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
+          transition={{ duration: 0.7, ease: GLASS_EASE }}
           className="text-center mb-10 sm:mb-14 md:mb-16 max-w-3xl mx-auto"
         >
           <p className="text-xs font-medium text-muted-foreground mb-2 sm:mb-3 tracking-[0.2em] uppercase">
@@ -77,10 +78,14 @@ export function FeaturesSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
               transition={{ delay: Math.min(i * 0.08, 0.32), duration: 0.8, ease: GLASS_EASE }}
+              whileHover={{
+                y: -6,
+                transition: { duration: 0.7, ease: GLASS_EASE },
+              }}
               className={glassOuter}
             >
               <div className={cn(glassInnerCard, "gap-4")}>
-                <div className="relative z-[2] flex h-12 w-12 shrink-0 items-center justify-center rounded-xl gradient-primary shadow-soft">
+                <div className="relative z-[2] flex h-12 w-12 shrink-0 items-center justify-center rounded-xl gradient-primary shadow-soft transition-transform duration-[900ms] ease-out group-hover:scale-[1.04]">
                   <feature.icon className="h-5 w-5 text-primary-foreground" strokeWidth={2} />
                 </div>
                 <h3 className="relative z-[2] font-display text-lg font-semibold text-foreground">{feature.title}</h3>
@@ -94,6 +99,7 @@ export function FeaturesSection() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
+          transition={{ duration: 0.7, ease: GLASS_EASE }}
           className={cn(glassOuter, "mt-12 sm:mt-16 max-w-4xl mx-auto")}
         >
           <div className={cn(glassInner, "flex flex-col md:flex-row items-center gap-6 p-6 sm:p-8")}>

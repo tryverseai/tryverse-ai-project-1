@@ -36,11 +36,12 @@ export function Footer() {
             {
               title: "Resources",
               links: [
-                { label: "Widget Guide", href: "/widget-guide" },
                 { label: "Support", href: "/support" },
                 { label: "Privacy", href: "/privacy" },
                 { label: "Terms", href: "/terms" },
                 { label: "Data Processing", href: "/data-processing" },
+                { label: "Cookie Policy", href: "/cookie-policy" },
+                { label: "Acceptable Use", href: "/acceptable-use" },
                 { label: "Cookie Settings", href: "#", cookieSettings: true },
               ],
             },

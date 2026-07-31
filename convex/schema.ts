@@ -276,4 +276,34 @@ export default defineSchema({
     user_agent: v.optional(v.string()),
     created_at: v.optional(v.string()),
   }).index("by_created", ["created_at"]),
+
+  /**
+   * Usage/history log for Enterprise-gated AI generation features (AI Model Generation, AI Video
+   * Generation via Higgsfield). Written by `backendTrusted.logAiGenerationUsage`; plan-tier
+   * enforcement itself lives in `backend/src/middleware/requirePlan.ts` (reads `profiles.plan_id`,
+   * not this table). Not yet wired to any route — primitive only, callers land with the workstream
+   * that ships the actual generation endpoints.
+   */
+  ai_generation_usage: defineTable({
+    user_id: v.string(),
+    feature: v.union(v.literal("ai_model"), v.literal("ai_photoshoot")),
+    created_at: v.optional(v.string()),
+  }).index("by_userId", ["user_id"]),
+
+  /** Enterprise "Generate AI Model" library — saved/reusable generated fashion models. */
+  ai_generated_models: defineTable({
+    user_id: v.string(),
+    storage_path: v.string(),
+    params: v.object({
+      gender: v.string(),
+      skinTone: v.string(),
+      pose: v.string(),
+      age: v.string(),
+      hair: v.string(),
+      background: v.string(),
+      fashionStyle: v.string(),
+    }),
+    status: v.union(v.literal("active"), v.literal("archived")),
+    created_at: v.string(),
+  }).index("by_userId", ["user_id"]),
 });

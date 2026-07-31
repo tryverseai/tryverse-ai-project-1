@@ -27,6 +27,7 @@ import {
   pollTryOnStatus,
   type TryOnCategory,
 } from "@/lib/backendApi";
+import { TryOnGuidelinesModal, hasSeenTryOnGuidelines } from "@/components/TryOnGuidelinesModal";
 
 const CATEGORIES: { id: TryOnCategory; label: string }[] = [
   { id: "clothing", label: "Full outfit" },
@@ -143,6 +144,7 @@ export function StudioTab() {
   const [status, setStatus] = useState<Status>("idle");
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [guidelinesOpen, setGuidelinesOpen] = useState(false);
 
   const handleFile = useCallback((
     slot: "model" | "garment",
@@ -227,6 +229,14 @@ export function StudioTab() {
   const isRunning = status === "uploading" || status === "processing";
   const canRun = Boolean(model.file && garment.file) && !isRunning;
 
+  const handleGenerateClick = () => {
+    if (!hasSeenTryOnGuidelines()) {
+      setGuidelinesOpen(true);
+      return;
+    }
+    void run();
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Header */}
@@ -279,7 +289,7 @@ export function StudioTab() {
             <Button
               className="flex-1 h-11 gradient-primary text-primary-foreground shadow-soft"
               disabled={!canRun}
-              onClick={() => void run()}
+              onClick={handleGenerateClick}
             >
               {isRunning ? (
                 <>
@@ -400,6 +410,13 @@ export function StudioTab() {
           </AnimatePresence>
         </div>
       </div>
+
+      <TryOnGuidelinesModal
+        open={guidelinesOpen}
+        onOpenChange={setGuidelinesOpen}
+        onAcknowledge={() => void run()}
+        source="studio_tab"
+      />
     </div>
   );
 }

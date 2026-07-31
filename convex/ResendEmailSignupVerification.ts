@@ -76,8 +76,8 @@ export const ResendEmailSignupVerification = {
         from,
         to: [email],
         subject: "Verify your email to activate TryVerse",
-        text: signupVerificationEmailText(token),
-        html: signupVerificationEmailHtml(token),
+        text: signupVerificationEmailText(token, email),
+        html: signupVerificationEmailHtml(token, email),
       }),
     });
     if (!res.ok) {

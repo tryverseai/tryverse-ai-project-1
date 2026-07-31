@@ -1,7 +1,7 @@
 import { useState, useMemo, type FormEvent, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,6 +70,7 @@ const VerifyEmail = () => {
 
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [codeFailed, setCodeFailed] = useState(false);
 
   useEffect(() => {
     if (!payload?.email) {
@@ -105,6 +106,7 @@ const VerifyEmail = () => {
           variant: friendly?.variant ?? "destructive",
           duration: 9000,
         });
+        setCodeFailed(true);
         return;
       }
       if (verified.deviceApprovalRequired) {
@@ -186,10 +188,27 @@ const VerifyEmail = () => {
             type="submit"
             className="w-full gradient-primary text-primary-foreground h-12 shadow-soft"
             disabled={loading}
+            aria-busy={loading}
           >
-            {loading ? "Verifying…" : "Verify and continue"}
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                Verifying…
+              </>
+            ) : (
+              "Verify and continue"
+            )}
           </Button>
         </form>
+        {codeFailed && (
+          <p className="text-sm text-muted-foreground text-center mt-6">
+            Code expired or not working? Head back and sign up again with the same email and password — we&apos;ll
+            send a fresh code.{" "}
+            <Link to="/auth" className="text-foreground font-medium hover:underline">
+              Back to sign up
+            </Link>
+          </p>
+        )}
       </motion.div>
     </div>
   );

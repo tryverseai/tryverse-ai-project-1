@@ -1,0 +1,106 @@
+[
+  {
+    "slug": "sample-01-femme-casual",
+    "params": {
+      "gender": "Female",
+      "skinTone": "Medium",
+      "pose": "Standing",
+      "age": "26–35",
+      "hair": "Straight",
+      "background": "Studio white",
+      "fashionStyle": "Casual"
+    },
+    "file": "/ai-model-samples/sample-01-femme-casual.jpg"
+  },
+  {
+    "slug": "sample-03-femme-formal",
+    "params": {
+      "gender": "Female",
+      "skinTone": "Fair",
+      "pose": "Three-quarter",
+      "age": "36–45",
+      "hair": "Wavy",
+      "background": "Neutral gray",
+      "fashionStyle": "Formal"
+    },
+    "file": "/ai-model-samples/sample-03-femme-formal.jpg"
+  },
+  {
+    "slug": "sample-05-homme-casual",
+    "params": {
+      "gender": "Male",
+      "skinTone": "Medium",
+      "pose": "Standing",
+      "age": "26–35",
+      "hair": "Short / bald",
+      "background": "Studio white",
+      "fashionStyle": "Casual"
+    },
+    "file": "/ai-model-samples/sample-05-homme-casual.jpg"
+  },
+  {
+    "slug": "sample-06-homme-street",
+    "params": {
+      "gender": "Male",
+      "skinTone": "Dark",
+      "pose": "Walking",
+      "age": "18–25",
+      "hair": "Curly",
+      "background": "Urban street",
+      "fashionStyle": "Streetwear"
+    },
+    "file": "/ai-model-samples/sample-06-homme-street.jpg"
+  },
+  {
+    "slug": "sample-07-homme-formal",
+    "params": {
+      "gender": "Male",
+      "skinTone": "Light",
+      "pose": "Three-quarter",
+      "age": "46–55",
+      "hair": "Straight",
+      "background": "Neutral gray",
+      "fashionStyle": "Formal"
+    },
+    "file": "/ai-model-samples/sample-07-homme-formal.jpg"
+  },
+  {
+    "slug": "sample-02-femme-street",
+    "params": {
+      "gender": "Female",
+      "skinTone": "Deep",
+      "pose": "Walking",
+      "age": "18–25",
+      "hair": "Curly",
+      "background": "Urban street",
+      "fashionStyle": "Streetwear"
+    },
+    "file": "/ai-model-samples/sample-02-femme-street.jpg"
+  },
+  {
+    "slug": "sample-04-femme-athletic",
+    "params": {
+      "gender": "Female",
+      "skinTone": "Tan",
+      "pose": "Standing",
+      "age": "18–25",
+      "hair": "Coily",
+      "background": "Studio white",
+      "fashionStyle": "Athletic"
+    },
+    "file": "/ai-model-samples/sample-04-femme-athletic.jpg"
+  },
+  {
+    "slug": "sample-08-homme-minimal",
+    "params": {
+      "gender": "Male",
+      "skinTone": "Tan",
+      "pose": "Side profile",
+      "age": "26–35",
+      "hair": "Wavy",
+      "background": "Studio white",
+      "fashionStyle": "Minimalist"
+    },
+    "file": "/ai-model-samples/sample-08-homme-minimal.jpg"
+  }
+]

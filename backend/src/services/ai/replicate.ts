@@ -324,7 +324,8 @@ async function runFashnClothing(input: VtonInput): Promise<VtonOutput> {
 }
 
 /**
- * Multi-route try-on: FASHN (accessories), IDM-VTON (clothing default), Flux Kontext (full-body dresses when enabled).
+ * Multi-route try-on: FASHN (clothing default), IDM-VTON (clothing fallback), Flux Kontext (full-body dresses when enabled).
+ * TryVerse is apparel-only (clothing | tops | bottoms | dresses | one-pieces) — no accessory-specific routing.
  * When `REPLICATE_USE_FLUX_KONTEXT=true`, all clothing uses Flux (legacy single-toggle).
  */
 export async function runVtonInference(

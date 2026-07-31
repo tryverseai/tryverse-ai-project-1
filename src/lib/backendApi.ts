@@ -96,7 +96,7 @@ export function widgetBackendPublicUrl(): string {
   return 'http://localhost:3001';
 }
 
-export type TryOnCategory = 'clothing' | 'bags' | 'glasses';
+export type TryOnCategory = 'clothing' | 'tops' | 'bottoms' | 'dresses' | 'one-pieces';
 
 // ─── Typed API error (replaces `Error & { status?; code?; retryAfter? }`) ────
 
@@ -1055,6 +1055,12 @@ export async function getPersonalizeAnalytics(days = 30): Promise<PersonalizeAna
 
 // ─── Widget domains ───────────────────────────────────────────────────────────
 
+export async function listWidgetDomains() {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/widget/domains`, { headers });
+  return handleResponse<{ domains: Array<{ domain: string; apiKeyId: string; apiKeyName: string }> }>(res);
+}
+
 export async function addWidgetDomain(domain: string) {
   const headers = await getAuthHeaders();
   const res = await fetch(`${BACKEND_URL}/api/widget/domains`, {
@@ -1565,6 +1571,131 @@ export async function adminDeleteInvite(
     adminKey,
     { method: 'DELETE' }
   );
+}
+
+// ─── API Keys (dashboard) ──────────────────────────────────────────────────
+
+export interface ApiKeyRecord {
+  id: string;
+  key_value: string;
+  name: string;
+  created_at: string;
+}
+
+export async function listApiKeys(): Promise<ApiKeyRecord[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/account/api-keys`, { headers });
+  const data = await handleResponse<{ keys: ApiKeyRecord[] }>(res);
+  return data.keys;
+}
+
+/** Idempotent — returns the existing key if the account already has one, otherwise creates one. */
+export async function getOrCreateApiKey(): Promise<ApiKeyRecord> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/account/api-keys`, {
+    method: 'POST',
+    headers,
+  });
+  const data = await handleResponse<{ key: ApiKeyRecord; created: boolean }>(res);
+  return data.key;
+}
+
+/** Revokes existing key(s) and issues a fresh one — old key stops working immediately. */
+export async function regenerateApiKey(): Promise<ApiKeyRecord> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/account/api-keys/regenerate`, {
+    method: 'POST',
+    headers,
+  });
+  const data = await handleResponse<{ key: ApiKeyRecord }>(res);
+  return data.key;
+}
+
+// ─── AI Model Generation (Enterprise) ──────────────────────────────────────
+// Real backend at POST /api/ai-studio/models/generate — server enforces requireAuth +
+// requirePlan('enterprise') independently of this UI (see backend/src/middleware/requirePlan.ts).
+
+export interface AiModelGenerationParams {
+  gender: string;
+  skinTone: string;
+  pose: string;
+  age: string;
+  hair: string;
+  background: string;
+  fashionStyle: string;
+}
+
+export interface AiModelResult {
+  id: string;
+  imageUrl: string;
+  createdAt: string;
+}
+
+export async function generateAiModel(params: AiModelGenerationParams): Promise<AiModelResult> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/ai-studio/models/generate`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  const data = await handleResponse<{ id: string; storagePath: string; createdAt: string }>(res);
+  const imageUrl = await getSignedImageUrl(data.storagePath);
+  return { id: data.id, imageUrl, createdAt: data.createdAt };
+}
+
+export async function getSavedAiModels(): Promise<AiModelResult[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/ai-studio/models`, { headers });
+  const data = await handleResponse<{
+    models: Array<{ id: string; storagePath: string; createdAt: string }>;
+  }>(res);
+  return Promise.all(
+    data.models.map(async (m) => ({
+      id: m.id,
+      imageUrl: await getSignedImageUrl(m.storagePath),
+      createdAt: m.createdAt,
+    }))
+  );
+}
+
+export async function deleteAiModel(id: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/ai-studio/models/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers,
+  });
+  await handleResponse<{ ok: boolean }>(res);
+}
+
+// ─── AI Product Photoshoot (Enterprise) ────────────────────────────────────
+// Real backend at POST /api/ai-studio/photoshoot/generate — server enforces requireAuth +
+// requirePlan('enterprise'). Flow: upload a product photo, pick a model (stock library or one of
+// the brand's saved AI-generated models), generate.
+
+export interface PhotoshootGenerationParams {
+  productStoragePath: string;
+  modelId: string;
+  modelSource: 'library' | 'generated';
+  background?: string;
+  theme?: string;
+  lighting?: string;
+}
+
+export interface PhotoshootResult {
+  imageUrl: string;
+  createdAt: string;
+}
+
+export async function generateProductPhotoshoot(params: PhotoshootGenerationParams): Promise<PhotoshootResult> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/ai-studio/photoshoot/generate`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  const data = await handleResponse<{ storagePath: string; createdAt: string }>(res);
+  const imageUrl = await getSignedImageUrl(data.storagePath);
+  return { imageUrl, createdAt: data.createdAt };
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────

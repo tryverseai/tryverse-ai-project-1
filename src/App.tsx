@@ -32,15 +32,15 @@ import NotFound from "./pages/NotFound";
 // Lazily loaded: heavy pages that are not needed on the first paint
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Admin = lazy(() => import("./pages/Admin"));
-const ApiDocs = lazy(() => import("./pages/ApiDocs"));
 const WidgetPreview = lazy(() => import("./pages/WidgetPreview"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const About = lazy(() => import("./pages/About"));
 const PartnerWithUs = lazy(() => import("./pages/PartnerWithUs"));
-const WidgetGuide = lazy(() => import("./pages/WidgetGuide"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const DataProcessing = lazy(() => import("./pages/DataProcessing"));
+const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
+const AcceptableUsePolicy = lazy(() => import("./pages/AcceptableUsePolicy"));
 const Support = lazy(() => import("./pages/Support"));
 
 /** Minimal spinner shown while a lazy route chunk is loading. */
@@ -102,21 +102,13 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route path="/widget-guide" element={<WidgetGuide />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/data-processing" element={<DataProcessing />} />
+            <Route path="/cookie-policy" element={<CookiePolicy />} />
+            <Route path="/acceptable-use" element={<AcceptableUsePolicy />} />
             <Route path="/support" element={<Support />} />
-            <Route
-              path="/api-docs"
-              element={
-                <ProtectedRoute>
-                  <AccountTypeGate allowed={["business"]}>
-                    <ApiDocs />
-                  </AccountTypeGate>
-                </ProtectedRoute>
-              }
-            />
+            {/* Public — this is the API onboarding guide prospects read before signing up; account-specific parts (their own key) prompt sign-in inline instead of gating the whole page. */}
             <Route path="/studio" element={<Navigate to="/dashboard/business" replace />} />
             <Route path="/try-on-studio" element={<Navigate to="/dashboard/business" replace />} />
             <Route path="/admin" element={<Admin />} />

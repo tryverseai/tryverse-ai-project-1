@@ -1,8 +1,8 @@
 /**
  * Direct FASHN AI API client (https://api.fashn.ai/v1)
  *
- * When FASHN_API_KEY is set, all FASHN try-ons (clothing, bags, glasses)
- * call the FASHN API directly instead of routing through Replicate.
+ * When FASHN_API_KEY is set, clothing FASHN try-ons call the FASHN API directly
+ * instead of routing through Replicate.
  * This removes the Replicate intermediary, reducing latency and cost.
  *
  * Flow:
@@ -191,11 +191,11 @@ export function buildFashnDirectInputs(
 }
 
 /**
- * Run a FASHN try-on via the direct FASHN AI API (clothing, bags, glasses).
+ * Run a FASHN try-on via the direct FASHN AI API (clothing).
  *
  * @param input        - Canonical VtonInput (person + product URLs, category, etc.)
  * @param buildPayload - Category-specific function that maps VtonInput → FASHN request body
- * @param label        - Short label for logging (e.g. 'fashn-clothing', 'fashn-bags')
+ * @param label        - Short label for logging (e.g. 'fashn-clothing')
  */
 export async function runFashnDirect(
   input: VtonInput,

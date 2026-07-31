@@ -126,10 +126,27 @@ export const env = {
     'REPLICATE_MODEL_CLOTHING',
     'cuuupid/idm-vton:c871bb9b046607b680449ecbae55fd8c6d945e0a1948644bf2361b3d021d3ff4'
   ),
-  // Bags + Glasses → FASHN (accessories / overlays)
+  /**
+   * Replicate-hosted FASHN try-on model, used as the clothing engine when `TRYON_CLOTHING_USE_FASHN`
+   * is on and no direct `FASHN_API_KEY` is set (see `runFashnClothing` in `services/ai/replicate.ts`).
+   * Name is legacy from when FASHN also served now-removed bag/glasses/accessory categories —
+   * TryVerse is apparel-only today (clothing | tops | bottoms | dresses | one-pieces), so this is
+   * purely the clothing fallback model id. Kept as `REPLICATE_MODEL_ACCESSORIES` for backward
+   * compatibility with existing Railway/Convex env config; do not repurpose for a new category.
+   */
   REPLICATE_MODEL_ACCESSORIES: optionalEnv(
     'REPLICATE_MODEL_ACCESSORIES',
     'fashn/tryon:54bb2780ade1e2584e29a1b634a59571e59ddc65958fcfad8514a30c7d5d4ea5'
+  ),
+  // Enterprise "Generate AI Model" — text-to-image model for consistent fashion-model generation.
+  REPLICATE_MODEL_AI_MODEL_GENERATION: optionalEnv(
+    'REPLICATE_MODEL_AI_MODEL_GENERATION',
+    'black-forest-labs/flux-schnell'
+  ),
+  // Enterprise "AI Product Photoshoot" — garment + scene compositing model.
+  REPLICATE_MODEL_PRODUCT_PHOTOSHOOT: optionalEnv(
+    'REPLICATE_MODEL_PRODUCT_PHOTOSHOOT',
+    'black-forest-labs/flux-kontext-pro'
   ),
   // Optional: flux-kontext for dynamic prompt-based try-on (set to enable)
   REPLICATE_MODEL_FLUX_KONTEXT: optionalEnv(
@@ -142,7 +159,7 @@ export const env = {
   /** If Flux fails for full_body, fall back to IDM-VTON once. */
   TRYON_FULLBODY_FLUX_FALLBACK_IDM: optionalBool('TRYON_FULLBODY_FLUX_FALLBACK_IDM', true),
   /**
-   * Clothing via FASHN Try-On (`REPLICATE_MODEL_ACCESSORIES`) — closer to fashn.ai app quality; preserves face/neck without IDM artifacts.
+   * Clothing via FASHN Try-On (Replicate model id in `REPLICATE_MODEL_ACCESSORIES`) — closer to fashn.ai app quality; preserves face/neck without IDM artifacts.
    * Set false to use IDM-VTON only (`REPLICATE_MODEL_CLOTHING`).
    */
   TRYON_CLOTHING_USE_FASHN: optionalBool('TRYON_CLOTHING_USE_FASHN', true),

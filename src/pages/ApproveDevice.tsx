@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -149,9 +150,17 @@ export default function ApproveDevice() {
                 variant="secondary"
                 className="w-full h-11"
                 disabled={busy !== "idle"}
+                aria-busy={busy === "send"}
                 onClick={() => void onRequestCode()}
               >
-                {busy === "send" ? "Sending…" : "Email me a 6-digit code"}
+                {busy === "send" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                    Sending…
+                  </>
+                ) : (
+                  "Email me a 6-digit code"
+                )}
               </Button>
               <p className="text-xs text-muted-foreground text-center">
                 Opens your inbox ({email}); code expires in 10 minutes.
@@ -177,8 +186,16 @@ export default function ApproveDevice() {
                 type="submit"
                 className="w-full h-12 gradient-primary text-primary-foreground shadow-soft"
                 disabled={busy !== "idle"}
+                aria-busy={busy === "verify"}
               >
-                {busy === "verify" ? "Verifying…" : "Approve and continue"}
+                {busy === "verify" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                    Verifying…
+                  </>
+                ) : (
+                  "Approve and continue"
+                )}
               </Button>
 
               <div className="flex flex-wrap justify-center gap-3 pt-2 text-xs text-muted-foreground">

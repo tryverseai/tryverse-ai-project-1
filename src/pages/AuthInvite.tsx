@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
-import { ArrowRight, ChevronLeft, Eye, EyeOff, Building2, Mail, Lock, User } from "lucide-react";
+import { ArrowRight, ChevronLeft, Eye, EyeOff, Building2, Mail, Lock, User, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { posthogCapture } from "@/lib/posthog";
@@ -352,13 +352,19 @@ const AuthInvite = () => {
                   type="submit"
                   className="w-full gradient-primary text-primary-foreground h-12 shadow-soft"
                   disabled={loading}
+                  aria-busy={loading}
                 >
-                  {loading
-                    ? "Please wait..."
-                    : inviteKind === "personal"
-                      ? "Create My Account"
-                      : "Activate Business Account"}
-                  {!loading ? <ArrowRight className="ml-2 h-4 w-4" aria-hidden /> : null}
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                      Please wait…
+                    </>
+                  ) : (
+                    <>
+                      {inviteKind === "personal" ? "Create My Account" : "Activate Business Account"}
+                      <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
+                    </>
+                  )}
                 </Button>
               </form>
 

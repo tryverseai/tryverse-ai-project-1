@@ -168,9 +168,12 @@ export function Navbar() {
                   Log In
                 </Button>
               </Link>
-              <Link to="/book-demo">
-                <Button size="sm" className="gradient-primary text-primary-foreground text-sm shadow-soft">
-                  Book a Demo
+              <Link to="/auth?signup=business">
+                <Button
+                  size="sm"
+                  className="gradient-primary text-primary-foreground text-sm shadow-soft transition-transform duration-300 hover:-translate-y-0.5 active:translate-y-0"
+                >
+                  Start Free
                 </Button>
               </Link>
             </>
@@ -242,9 +245,9 @@ export function Navbar() {
                   Log In
                 </Button>
               </Link>
-              <Link to="/book-demo" onClick={() => setOpen(false)}>
+              <Link to="/auth?signup=business" onClick={() => setOpen(false)}>
                 <Button className="gradient-primary text-primary-foreground w-full">
-                  Book a Demo
+                  Start Free
                 </Button>
               </Link>
             </>

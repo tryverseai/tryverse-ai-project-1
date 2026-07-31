@@ -2,6 +2,7 @@ import Resend from "@auth/core/providers/resend";
 import { RandomReader, generateRandomString } from "@oslojs/crypto/random";
 import {
   TRYVERSE_AUTH_EMAIL_FROM,
+  PASSWORD_RESET_MAX_AGE_SECONDS,
   passwordResetEmailHtml,
   passwordResetEmailText,
 } from "./emailLayout";
@@ -13,6 +14,9 @@ const base = Resend({
   apiKey: trimResendSecret(process.env.AUTH_RESEND_KEY),
   from:
     trimResendSecret(process.env.AUTH_EMAIL_FROM) || TRYVERSE_AUTH_EMAIL_FROM,
+  // Without this, @auth/core's Resend provider defaults maxAge to 24 hours — far too long for
+  // an 8-digit reset code. Keep in sync with PASSWORD_RESET_EXPIRY_MINUTES copy in emailLayout.ts.
+  maxAge: PASSWORD_RESET_MAX_AGE_SECONDS,
 });
 
 /**

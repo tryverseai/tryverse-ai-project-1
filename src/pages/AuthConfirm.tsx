@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, ArrowRight } from "lucide-react";
+import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +23,24 @@ export default function AuthConfirm() {
       return () => clearTimeout(t);
     }
   }, [status, user, navigate]);
+
+  if (status === "confirming") {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <Link to="/" className="mb-8">
+          <TryVerseLogo height={64} />
+        </Link>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center max-w-md"
+        >
+          <Loader2 className="h-8 w-8 text-muted-foreground mx-auto mb-4 animate-spin" aria-hidden />
+          <p className="text-sm text-muted-foreground">Confirming your session…</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (status === "invalid") {
     return (

@@ -27,7 +27,7 @@ const router = Router();
  * Body:
  *   - personImagePath: string       (path returned by POST /api/upload)
  *   - productImagePath: string      (path returned by POST /api/upload)
- *   - category: ProductCategory     (clothing | bags | glasses)
+ *   - category: ProductCategory     (clothing | tops | bottoms | dresses | one-pieces — see VALID_TRY_ON_CATEGORIES)
  *   - productDescription?: string
  */
 router.post(
@@ -217,6 +217,29 @@ router.get(
         models,
         settings: { autoDetect: true, collectAnalytics: true },
       });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /api/widget/domains
+ * Lists allowed domains for the authenticated user's active API keys.
+ */
+router.get(
+  '/domains',
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user!.id;
+      const domains = await convexQueryTrusted<
+        Array<{ domain: string; apiKeyId: string; apiKeyName: string }>
+      >(anyApi.backendTrusted.listAllowedDomainsForUser, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId,
+      });
+      res.json({ domains: domains ?? [] });
     } catch (err) {
       next(err);
     }

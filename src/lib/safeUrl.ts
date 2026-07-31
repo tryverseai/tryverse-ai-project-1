@@ -55,7 +55,6 @@ const POST_LOGIN_REDIRECT_PREFIXES = [
   "/dashboard/individual",
   "/pricing",
   "/widget-preview",
-  "/api-docs",
   "/studio",
   "/try-on-studio",
   "/admin",

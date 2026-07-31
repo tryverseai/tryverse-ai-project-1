@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Scan, Sparkles, ArrowRight, Check, RotateCcw } from "lucide-react";
+import { Upload, Scan, ArrowRight, Check, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import maleBefore from "@/assets/model-male-before.jpg";
 import maleAfter from "@/assets/model-shirt-tryon.jpg";
 import femaleBefore from "@/assets/model-female-before.jpg";
-import femaleAfter from "@/assets/model-necklace-tryon.jpg";
+import dressAfter from "@/assets/runway-frame-1.jpg";
 import shirtProduct from "@/assets/shirt-product.jpg";
-import necklaceProduct from "@/assets/necklace-product.jpg";
 
 type Phase = "upload" | "scanning" | "result";
 
@@ -27,7 +26,7 @@ const demos: DemoConfig[] = [
   {
     id: "shirt",
     label: "Clothing",
-    category: "Apparel",
+    category: "Tops",
     productName: "Navy Oxford Shirt",
     productImage: shirtProduct,
     beforeImage: maleBefore,
@@ -35,14 +34,14 @@ const demos: DemoConfig[] = [
     fitLabel: "Perfect Fit · Size M",
   },
   {
-    id: "necklace",
-    label: "Jewelry",
-    category: "Accessories",
-    productName: "Gold Pendant Necklace",
-    productImage: necklaceProduct,
+    id: "dress",
+    label: "Clothing",
+    category: "Dresses",
+    productName: "Red Midi Dress",
+    productImage: dressAfter,
     beforeImage: femaleBefore,
-    afterImage: femaleAfter,
-    fitLabel: "Elegant Match · 18\" Chain",
+    afterImage: dressAfter,
+    fitLabel: "Perfect Fit · Size S",
   },
 ];
 
@@ -60,7 +59,7 @@ function DemoCard({ demo }: { demo: DemoConfig }) {
   const handleReset = () => setPhase("upload");
 
   return (
-    <div className="bg-card rounded-2xl overflow-hidden border border-border/50 shadow-card">
+    <div className="bg-card rounded-2xl overflow-hidden border border-border/50 shadow-card transition-shadow duration-500 hover:shadow-elevated">
       {/* Product header */}
       <div className="flex items-center gap-4 p-5 border-b border-border/50">
         <div className="w-14 h-14 rounded-xl overflow-hidden border border-border/50 flex-shrink-0">
@@ -195,6 +194,7 @@ export function TryOnShowcase() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           className="text-center mb-16"
         >
           <p className="text-xs font-medium text-muted-foreground mb-3 tracking-[0.2em] uppercase">Live Demo</p>
@@ -202,7 +202,7 @@ export function TryOnShowcase() {
             See It in Action
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Watch how TryVerse AI transforms a photo into a realistic virtual try-on — for both clothing and jewelry.
+            Watch how TryVerse AI transforms a photo into a realistic virtual try-on — for any piece in your catalog.
           </p>
         </motion.div>
 
@@ -212,8 +212,9 @@ export function TryOnShowcase() {
               key={demo.id}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.15 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ delay: i * 0.15, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{ y: -4, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } }}
             >
               <DemoCard demo={demo} />
             </motion.div>

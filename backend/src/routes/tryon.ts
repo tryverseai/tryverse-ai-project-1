@@ -36,12 +36,12 @@ router.get('/categories', (_req: Request, res: Response) => {
 
 /**
  * POST /api/tryon
- * Initiates a virtual try-on job for ANY product category.
+ * Initiates a virtual try-on job for an apparel product category.
  *
  * Body:
  *   - personImagePath: string       (path returned by POST /api/upload)
  *   - productImagePath: string      (path returned by POST /api/upload)
- *   - category: ProductCategory     (clothing|shoes|glasses|jewelry|earrings|bracelets|rings|hats|bags|accessories)
+ *   - category: ProductCategory     (clothing|tops|bottoms|dresses|one-pieces — see VALID_TRY_ON_CATEGORIES)
  *   - productDescription?: string   (optional: extra detail; server always adds product-first instructions for every try-on)
  *   - async?: boolean               (default true)
  */

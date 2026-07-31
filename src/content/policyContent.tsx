@@ -399,6 +399,152 @@ export function DataProcessingContent(_props: PolicyContentProps = {}) {
   );
 }
 
+/** Cookie Policy — matches the categories actually offered in CookieConsent.tsx. */
+export function CookiePolicyContent(_props: PolicyContentProps = {}) {
+  return (
+    <div className="prose prose-neutral max-w-none space-y-8 text-foreground/90 text-sm leading-relaxed">
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">1. What cookies are</h2>
+        <p>
+          Cookies are small text files stored on your device. We also use equivalent local-storage
+          entries in your browser for the same purposes described below.
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">2. Essential cookies (always on)</h2>
+        <p>
+          Required for the Service to function: keeping you signed in (Convex Auth session), remembering
+          your cookie preference, CSRF/security protections, and load-balancing. These cannot be disabled
+          without breaking core functionality — declining non-essential cookies in our consent banner
+          never disables these.
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">3. Analytics cookies (optional)</h2>
+        <p>
+          When enabled, we use PostHog to understand feature usage and improve the product — page views,
+          button clicks, and try-on funnel completion. PostHog is configured with a public project key and
+          does not receive your uploaded photos. You can decline analytics cookies at any time from the
+          cookie banner or the &quot;Cookie Settings&quot; link in the footer; declining stops new analytics
+          events from being sent.
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">4. Error monitoring</h2>
+        <p>
+          Where enabled, Sentry captures crash reports and error traces to help us fix bugs. This is
+          operational, not marketing, tracking, and is not affected by the analytics cookie toggle.
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">5. No third-party advertising cookies</h2>
+        <p>
+          We do not run advertising or cross-site retargeting cookies, and we do not sell data derived from
+          cookies to advertisers.
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">6. Managing your preference</h2>
+        <p>
+          Use the &quot;Cookie Settings&quot; link in the footer at any time to change your choice, or clear
+          cookies/local storage in your browser to reset it. Blocking essential cookies in your browser
+          settings may prevent sign-in from working.
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">7. Contact</h2>
+        <p>
+          Questions about cookies — use our{" "}
+          <Link to="/support" className="text-foreground underline font-medium">
+            Contact us
+          </Link>{" "}
+          page.
+        </p>
+      </section>
+    </div>
+  );
+}
+
+/** Acceptable Use Policy — specific to an AI image-generation / virtual try-on product. */
+export function AcceptableUsePolicyContent(_props: PolicyContentProps = {}) {
+  return (
+    <div className="prose prose-neutral max-w-none space-y-8 text-foreground/90 text-sm leading-relaxed">
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">1. Purpose</h2>
+        <p>
+          This Acceptable Use Policy applies to everyone who uses TryVerse — brand teams, their shoppers via
+          the embedded widget, and personal accounts. It exists because TryVerse generates images of real
+          people; misuse has real consequences for the people in those photos.
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">2. Consent for uploaded photos</h2>
+        <p>
+          Only upload a photo of yourself, or of someone else who has given you clear permission to generate
+          try-on or personalization images of them. Uploading a photo of another person without their
+          consent — including images taken from the internet, a screenshot, or a hidden/candid photo — is
+          prohibited.
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">3. No deceptive product imagery</h2>
+        <p>
+          Brands may not use TryVerse-generated images to misrepresent a product's actual appearance, fit,
+          fabric, or color in a way intended to mislead shoppers into a purchase they wouldn't otherwise
+          make. Generated imagery must be a fair representation of the underlying product.
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">4. Prohibited content</h2>
+        <p>
+          No uploads or generated output involving: minors in sexualized contexts, non-consensual intimate
+          imagery, content that impersonates a real person to defame or defraud them, hate symbols or content
+          promoting violence, or anything illegal in your jurisdiction.
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">5. No abuse of the platform</h2>
+        <p>
+          Do not attempt to bypass rate limits, API key restrictions, credit limits, or domain allowlists;
+          scrape or reverse-engineer the Service; share or resell API keys; or use automated bulk requests
+          outside your plan's intended usage.
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">6. Brand responsibilities for shopper data</h2>
+        <p>
+          Brands embedding the widget are responsible for having a lawful basis to let their own shoppers
+          upload photos through it (typically the shopper's own action and consent at the point of upload),
+          and for their own privacy disclosures on their storefront. TryVerse processes that shopper data as
+          described in our{" "}
+          <Link to="/data-processing" className="text-foreground underline font-medium">
+            Data Processing Agreement
+          </Link>
+          .
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">7. Enforcement</h2>
+        <p>
+          Violations may result in content removal, credit forfeiture, API key revocation, or account
+          suspension or termination, at TryVerse's discretion, with or without notice for serious violations.
+        </p>
+      </section>
+      <section>
+        <h2 className="font-display text-lg font-semibold text-foreground mb-3">8. Reporting misuse</h2>
+        <p>
+          If you believe TryVerse is being used to generate or host content that violates this policy,
+          contact us via{" "}
+          <Link to="/support" className="text-foreground underline font-medium">
+            Contact us
+          </Link>{" "}
+          and we will investigate.
+        </p>
+      </section>
+    </div>
+  );
+}
+
 /**
  * Personal accounts: data-processing notice structured like the merchant DPA, but written for
  * end users (you use TryVerse for yourself, not as a store controller).

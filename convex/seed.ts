@@ -111,7 +111,8 @@ export const seedPlansIfEmpty = mutation({
         price_usd: 0,
         tryons_per_month: -1,
         features: [
-          "AI video generation",
+          "AI Model Generation — build a reusable fashion-model library",
+          "AI Product Photoshoot — generate ecommerce photography from your catalog",
           "Custom models",
           "SLA",
           "Dedicated infrastructure",

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Code, Copy, Check, ExternalLink, Upload, Sparkles, ImageIcon, User, FileText } from "lucide-react";
+import { Code, Upload, Sparkles, ImageIcon, User, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,53 +12,15 @@ import {
   getCredits,
   isCreditsExhaustedApiError,
   widgetBackendPublicUrl,
+  listWidgetDomains,
+  addWidgetDomain,
   type TryOnCategory,
 } from "@/lib/backendApi";
 import { posthogCapture } from "@/lib/posthog";
 import { captureSentryException } from "@/lib/sentry";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-
-const getScriptBase = () =>
-  (typeof window !== 'undefined' ? window.location.origin : '') ||
-  import.meta.env.VITE_APP_URL ||
-  'https://tryverseai.com';
-const getPopupSnippet = (apiKey: string) => {
-  const backend = widgetBackendPublicUrl();
-  const scriptBase = getScriptBase();
-  return `<!-- Add to your product page -->
-<script src="${scriptBase}/tryverse-widget.js"></script>
-<button onclick="TryVerse.open({
-  apiKey: '${apiKey}',
-  productImage: document.querySelector('[data-product-image]')?.src || 'PRODUCT_IMAGE_URL',
-  category: 'clothing',
-  backendUrl: '${backend}'
-})">
-  Try It On
-</button>`;
-};
-
-const getEmbedSnippet = (apiKey: string) => {
-  const backend = widgetBackendPublicUrl();
-  const scriptBase = getScriptBase();
-  return `<!-- Add where you want the try-on to appear -->
-<div id="tryverse-embed"></div>
-<script src="${scriptBase}/tryverse-widget.js"></script>
-<script>
-  TryVerse.embed({
-    apiKey: '${apiKey}',
-    productImage: 'PRODUCT_IMAGE_URL',
-    category: 'clothing',
-    container: 'tryverse-embed',
-    backendUrl: '${backend}'
-  });
-</script>`;
-};
-
-const methods = [
-  { id: "popup", label: "Popup Widget", description: "Opens as a modal overlay on the product page" },
-  { id: "embed", label: "Embedded Component", description: "Renders directly inside the product page layout" },
-] as const;
+import { ConnectStoreWizard } from "@/components/dashboard/ConnectStoreWizard";
 
 const sampleModels = [
   { id: "model-1", name: "Model A", image: "/placeholder.svg" },
@@ -68,8 +30,6 @@ const sampleModels = [
 export function WidgetTab() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [selected, setSelected] = useState<"popup" | "embed">("popup");
-  const [copied, setCopied] = useState(false);
   const [activeView, setActiveView] = useState<"preview" | "install">("preview");
   const [creditsRemaining, setCreditsRemaining] = useState(20);
   const [creditsPoolTotal, setCreditsPoolTotal] = useState(20);
@@ -78,8 +38,10 @@ export function WidgetTab() {
   const [personImage, setPersonImage] = useState<string | null>(null);
   const [tryOnResult, setTryOnResult] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [apiKey, setApiKey] = useState<string | null>(null);
   const [productDescription, setProductDescription] = useState("");
+  const [allowedDomains, setAllowedDomains] = useState<Array<{ domain: string; apiKeyName: string }>>([]);
+  const [newDomain, setNewDomain] = useState("");
+  const [domainsLoading, setDomainsLoading] = useState(false);
 
   useEffect(() => {
     if (activeView === "preview") {
@@ -102,21 +64,34 @@ export function WidgetTab() {
         setCreditsRemaining(20);
         setCreditsPoolTotal(20);
       }
-
-      setApiKey(null);
     };
     void fetchUserData();
   }, [user]);
 
-  const copy = () => {
-    const code =
-      selected === 'popup'
-        ? getPopupSnippet(apiKey || 'YOUR_API_KEY')
-        : getEmbedSnippet(apiKey || 'YOUR_API_KEY');
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    toast.success("Code copied to clipboard");
-    setTimeout(() => setCopied(false), 2000);
+  useEffect(() => {
+    if (!user || activeView !== "install") return;
+    setDomainsLoading(true);
+    listWidgetDomains()
+      .then((data) => setAllowedDomains(data.domains.map((d) => ({ domain: d.domain, apiKeyName: d.apiKeyName }))))
+      .catch(() => setAllowedDomains([]))
+      .finally(() => setDomainsLoading(false));
+  }, [user, activeView]);
+
+  const handleAddDomain = async () => {
+    const clean = newDomain.trim().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+    if (!clean) {
+      toast.error("Enter a domain like yourshop.com");
+      return;
+    }
+    try {
+      await addWidgetDomain(clean);
+      toast.success(`Added ${clean}`);
+      setNewDomain("");
+      const data = await listWidgetDomains();
+      setAllowedDomains(data.domains.map((d) => ({ domain: d.domain, apiKeyName: d.apiKeyName })));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not add domain");
+    }
   };
 
   const handleProductUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -216,7 +191,7 @@ export function WidgetTab() {
           <p className="text-sm text-muted-foreground mt-1">Preview the try-on experience or install the widget</p>
         </div>
         <Link
-          to="/widget-guide"
+          to="/dashboard/business?tab=Developers"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <FileText className="h-4 w-4" /> Full documentation
@@ -369,70 +344,42 @@ export function WidgetTab() {
             </div>
           )}
 
-          {/* Method selector */}
-          <div className="grid sm:grid-cols-2 gap-4 mb-8">
-            {methods.map((method) => (
-              <button
-                key={method.id}
-                onClick={() => setSelected(method.id)}
-                className={`text-left p-5 rounded-xl border transition-all ${
-                  selected === method.id
-                    ? "border-foreground bg-foreground/[0.03] shadow-card"
-                    : "border-border/50 hover:border-border"
-                }`}
-              >
-                <p className="font-display text-sm font-semibold text-foreground">{method.label}</p>
-                <p className="text-xs text-muted-foreground mt-1">{method.description}</p>
-              </button>
-            ))}
-          </div>
+          <ConnectStoreWizard />
 
-          {/* Code block */}
-          <div className="bg-card rounded-xl border border-border/50 overflow-hidden shadow-card">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border/50">
-              <div className="flex items-center gap-2">
-                <Code className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">HTML</span>
-              </div>
-              <Button variant="ghost" size="sm" onClick={copy} className="gap-2 text-xs">
-                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                {copied ? "Copied" : "Copy"}
+          {/* Allowed domains */}
+          <div className="bg-card rounded-xl border border-border/50 p-5 shadow-card mt-8">
+            <h3 className="font-display text-sm font-semibold text-foreground mb-2">Allowed domains</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              API requests are only accepted from domains listed here (e.g.{" "}
+              <code className="text-foreground">fashion.useclickbox.com</code>). Add{" "}
+              <code className="text-foreground">localhost</code> for local dev.
+            </p>
+            {domainsLoading ? (
+              <p className="text-xs text-muted-foreground">Loading domains…</p>
+            ) : allowedDomains.length === 0 ? (
+              <p className="text-xs text-muted-foreground mb-3">No domains configured yet.</p>
+            ) : (
+              <ul className="space-y-1 mb-4">
+                {allowedDomains.map((d) => (
+                  <li key={d.domain} className="text-sm text-foreground font-mono">
+                    {d.domain}
+                    <span className="text-muted-foreground font-sans text-xs ml-2">({d.apiKeyName})</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={newDomain}
+                onChange={(e) => setNewDomain(e.target.value)}
+                placeholder="fashion.useclickbox.com"
+                className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              />
+              <Button type="button" variant="outline" onClick={handleAddDomain}>
+                Add domain
               </Button>
             </div>
-            <pre className="p-5 overflow-x-auto text-sm text-foreground font-mono leading-relaxed bg-muted/20">
-              <code>
-                {selected === 'popup'
-                  ? getPopupSnippet(apiKey || 'YOUR_API_KEY')
-                  : getEmbedSnippet(apiKey || 'YOUR_API_KEY')}
-              </code>
-            </pre>
-          </div>
-
-          {/* Steps */}
-          <div className="mt-8 space-y-4">
-            <h3 className="font-display text-base font-semibold text-foreground">Quick Start Guide</h3>
-            {[
-              "Copy the code snippet above",
-              "Replace YOUR_API_KEY with your production API key",
-              "Replace PRODUCT_IMAGE_URL with the product image source",
-              "Add the code to your product page template",
-              "Test the integration on a staging environment",
-            ].map((step, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                  {i + 1}
-                </div>
-                <p className="text-sm text-muted-foreground">{step}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 flex flex-wrap gap-3">
-            <a href="/WIDGET.md" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" className="gap-2">
-                <ExternalLink className="h-4 w-4" /> Widget Integration Guide
-              </Button>
-            </a>
           </div>
         </>
       )}

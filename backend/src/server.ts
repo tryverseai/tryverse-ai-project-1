@@ -30,6 +30,8 @@ import demoRouter from './routes/demo';
 import inviteRouter from './routes/invite';
 import authInviteRouter from './routes/authInvite';
 import personalizeRouter from './routes/personalize';
+import bodyEstimateRouter from './routes/bodyEstimate';
+import aiStudioRouter from './routes/aiStudio';
 
 // ─── Sentry (must init before everything else) ────────────────────────────────
 initSentry();
@@ -228,6 +230,8 @@ app.use('/api/analytics', analyticsRouter);
 app.use('/api/emails',    emailsRouter);
 app.use('/api/account',     accountRouter);
 app.use('/api/personalize', personalizeRouter);
+app.use('/api/body-estimate', bodyEstimateRouter);
+app.use('/api/ai-studio', aiStudioRouter);
 
 // ─── Sentry error handler ────────────────────────────────────────────────────
 try {
@@ -248,6 +252,11 @@ async function bootstrap(): Promise<void> {
   const { logStorageBucketStatus } = await import('./config/storageHealth');
   await logStorageBucketStatus();
   await mountBullBoard();
+
+  if (env.NODE_ENV === 'development') {
+    const { startWorker } = await import('./services/queue/worker');
+    startWorker();
+  }
 
   const port = env.PORT;
   app.listen(port, LISTEN_HOST, () => {

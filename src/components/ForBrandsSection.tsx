@@ -21,6 +21,7 @@ export function ForBrandsSection() {
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           >
             <p className="text-xs font-medium text-muted-foreground mb-3 tracking-[0.2em] uppercase">For Fashion Brands</p>
             <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-6">
@@ -52,7 +53,7 @@ export function ForBrandsSection() {
             </div>
 
             <Link to="/pricing">
-              <Button className="gradient-primary text-primary-foreground shadow-soft">
+              <Button className="gradient-primary text-primary-foreground shadow-soft transition-transform duration-300 hover:-translate-y-0.5 active:translate-y-0">
                 Partner With Us <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
@@ -62,6 +63,7 @@ export function ForBrandsSection() {
             initial={{ opacity: 0, x: 30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className={glassOuter}
           >
             <div className={cn(glassInner, "p-5 sm:p-6")}>

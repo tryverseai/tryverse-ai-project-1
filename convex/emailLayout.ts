@@ -14,6 +14,15 @@ export const TRYVERSE_AUTH_EMAIL_FROM = "TryVerse AI <info@tryverseai.com>";
 export const SIGNUP_VERIFICATION_MAX_AGE_SECONDS = 60 * 15;
 export const SIGNUP_VERIFICATION_EXPIRY_MINUTES = SIGNUP_VERIFICATION_MAX_AGE_SECONDS / 60;
 
+/**
+ * Password reset OTP TTL — must match maxAge on ResendOTPPasswordReset.
+ * Previously unset, so it silently inherited @auth/core's Resend provider default of 24 hours —
+ * far too long for an 8-digit code and a common source of "why did my code still work / why did
+ * it expire on me" confusion. Matches the sign-up code's 15-minute window.
+ */
+export const PASSWORD_RESET_MAX_AGE_SECONDS = 60 * 15;
+export const PASSWORD_RESET_EXPIRY_MINUTES = PASSWORD_RESET_MAX_AGE_SECONDS / 60;
+
 export function escapeHtml(s: string): string {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -136,19 +145,22 @@ export function renderBrandedEmail(params: {
 }
 
 /** Sign-up email verification OTP — premium fashion-tech tone. */
-export function signupVerificationEmailHtml(token: string): string {
+export function signupVerificationEmailHtml(token: string, email?: string): string {
   const bodyHtml = `
     <p style="margin:0 0 16px;">Welcome to TryVerse.</p>
     <p style="margin:0 0 16px;">You&rsquo;re one step away from activating your workspace. Enter the verification code below on the verify-email screen to confirm your address and unlock your account.</p>
     ${renderVerificationCodeBlock(token)}
-    <p style="margin:0;font-size:14px;color:#888888;line-height:1.6;">This verification code expires in ${SIGNUP_VERIFICATION_EXPIRY_MINUTES} minutes. If you did not create an account, you can safely ignore this email.</p>`;
+    <p style="margin:0;font-size:14px;color:#888888;line-height:1.6;">This verification code expires in ${SIGNUP_VERIFICATION_EXPIRY_MINUTES} minutes. If it expires before you enter it, just start signing up again with the same email and password — we'll send a fresh code. If you did not create an account, you can safely ignore this email.</p>`;
   return renderBrandedEmail({
     headline: "Verify your email",
     bodyHtml,
+    cta: email
+      ? { label: "Open verification page", href: `${TRYVERSE_APP_URL}/auth/verify-email?email=${encodeURIComponent(email)}` }
+      : undefined,
   });
 }
 
-export function signupVerificationEmailText(token: string): string {
+export function signupVerificationEmailText(token: string, email?: string): string {
   return [
     "Welcome to TryVerse.",
     "",
@@ -158,8 +170,9 @@ export function signupVerificationEmailText(token: string): string {
     token,
     "",
     "Enter this code on the verify-email screen after sign-up to confirm your address and unlock your account.",
+    ...(email ? ["", `Verification page: ${TRYVERSE_APP_URL}/auth/verify-email?email=${encodeURIComponent(email)}`] : []),
     "",
-    `This verification code expires in ${SIGNUP_VERIFICATION_EXPIRY_MINUTES} minutes. If you did not create an account, you can ignore this email.`,
+    `This verification code expires in ${SIGNUP_VERIFICATION_EXPIRY_MINUTES} minutes. If it expires before you enter it, just start signing up again with the same email and password — we'll send a fresh code. If you did not create an account, you can ignore this email.`,
     "",
     "— The TryVerse Team",
     "TryVerse AI",
@@ -174,7 +187,7 @@ export function passwordResetEmailHtml(token: string): string {
     <p style="margin:0 0 16px;">We received a request to reset your TryVerse password.</p>
     <p style="margin:0 0 16px;">Enter the code below on the reset password page along with your new password.</p>
     ${renderVerificationCodeBlock(token)}
-    <p style="margin:0;font-size:14px;color:#888888;">This code expires in 24 hours. If you did not request a reset, you can safely ignore this email.</p>`;
+    <p style="margin:0;font-size:14px;color:#888888;line-height:1.6;">This code expires in ${PASSWORD_RESET_EXPIRY_MINUTES} minutes. If it expires, just request a new one from the reset password page — that&rsquo;s expected. If you did not request a reset, you can safely ignore this email; your password will not change.</p>`;
   return renderBrandedEmail({
     headline: "Reset your password",
     bodyHtml,
@@ -190,7 +203,7 @@ export function passwordResetEmailText(token: string): string {
     "",
     "Enter it on the TryVerse reset password page along with your new password.",
     "",
-    "This code expires in 24 hours. If you did not request a reset, ignore this email.",
+    `This code expires in ${PASSWORD_RESET_EXPIRY_MINUTES} minutes. If it expires, just request a new one from the reset password page — that's expected. If you did not request a reset, ignore this email; your password will not change.`,
     "",
     "— The TryVerse Team",
     "TryVerse AI",
