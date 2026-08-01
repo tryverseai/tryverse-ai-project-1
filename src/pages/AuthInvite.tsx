@@ -180,8 +180,8 @@ const AuthInvite = () => {
 
       if ("needsEmailVerification" in signResult && signResult.needsEmailVerification) {
         saveEmailVerifyPending({
-          email: signResult.pendingEmail,
-          pendingBootstrap: signResult.pendingBootstrap,
+          email: (signResult as { pendingEmail: string }).pendingEmail,
+          pendingBootstrap: (signResult as { pendingBootstrap?: never }).pendingBootstrap,
           inviteToken: token.trim(),
           accountTypeAfterInvite: acctBootstrap,
         });

@@ -178,7 +178,7 @@ export function ProductsTab() {
         await updateProduct(editingProduct.id, {
           name: form.name.trim(),
           image_url: form.image_url || undefined,
-          category: form.category,
+          category: toTryOnCategory(form.category),
           product_url: form.product_url || undefined,
         });
         toast.success("Product updated");
@@ -186,7 +186,7 @@ export function ProductsTab() {
         await createProduct({
           name: form.name.trim(),
           image_url: form.image_url || undefined,
-          category: form.category,
+          category: toTryOnCategory(form.category),
           product_url: form.product_url || undefined,
         });
         toast.success("Product created");
