@@ -15,7 +15,7 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
     if (user && isAuthenticated) {
       posthogIdentify(user.id, {
         email: user.email,
-        created_at: user.created_at,
+        created_at: (user as { created_at?: string }).created_at,
         plan: (user.user_metadata as { plan?: string })?.plan ?? "free",
       });
       setSentryUser({ id: user.id, email: user.email });

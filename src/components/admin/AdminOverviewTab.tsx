@@ -96,7 +96,7 @@ export function AdminOverviewTab({ adminKey }: AdminOverviewTabProps) {
               {health.queue?.status === "healthy" ? (
                 <CheckCircle className="h-4 w-4 text-green-600" />
               ) : (
-                <XCircle className="h-4 w-4 text-amber-600" title={health.queue?.message} />
+                <XCircle className="h-4 w-4 text-amber-600" aria-label={health.queue?.message ?? "Queue unhealthy"} />
               )}
               <span className="text-sm">Queue</span>
             </div>
@@ -104,7 +104,7 @@ export function AdminOverviewTab({ adminKey }: AdminOverviewTabProps) {
               {health.ai?.status === "configured" ? (
                 <CheckCircle className="h-4 w-4 text-green-600" />
               ) : (
-                <XCircle className="h-4 w-4 text-destructive" title={health.ai?.message} />
+                <XCircle className="h-4 w-4 text-destructive" aria-label={health.ai?.message ?? "AI unavailable"} />
               )}
               <span className="text-sm">AI</span>
             </div>

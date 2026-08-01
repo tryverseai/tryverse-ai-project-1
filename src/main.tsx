@@ -24,7 +24,7 @@ if (!rootEl) {
             fallback={({ error, resetError }) => (
               <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
                 <h1 className="text-lg font-semibold text-foreground mb-2">Something went wrong</h1>
-                <p className="text-sm text-muted-foreground mb-4 max-w-md text-center">{error?.message}</p>
+                <p className="text-sm text-muted-foreground mb-4 max-w-md text-center">{(error as Error | undefined)?.message}</p>
                 <button
                   type="button"
                   onClick={resetError}

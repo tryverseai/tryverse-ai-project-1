@@ -38,7 +38,7 @@ export function AdminRevenueTab({ adminKey }: AdminRevenueTabProps) {
   useEffect(() => {
     setLoading(true);
     getAdminRevenue(adminKey, days)
-      .then(setData)
+      .then((d) => setData(d as unknown as typeof data))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, [adminKey, days]);

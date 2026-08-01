@@ -80,7 +80,7 @@ interface AuthContextType {
     email: string,
     code: string,
     opts?: { pendingBootstrap?: PendingEmailVerificationBootstrap }
-  ) => Promise<{ error: Error | null; deviceApprovalRequired?: true }>;
+  ) => Promise<{ error: Error | null; deviceApprovalRequired?: boolean }>;
   /**
    * After Convex Auth has already signed the user in (e.g. password reset verification),
    * sync the Node API session / credits profile using the current JWT.

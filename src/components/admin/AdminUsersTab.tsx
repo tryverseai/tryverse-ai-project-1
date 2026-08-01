@@ -74,7 +74,7 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
         search || undefined,
         accountFilter
       );
-      setUsers(res.users || []);
+      setUsers((res.users || []) as unknown as AdminUser[]);
       setPagination((p) => ({ ...p, ...res.pagination }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch users");

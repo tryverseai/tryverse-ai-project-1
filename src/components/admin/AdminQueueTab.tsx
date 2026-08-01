@@ -24,7 +24,7 @@ export function AdminQueueTab({ adminKey }: AdminQueueTabProps) {
     setError(null);
     getAdminQueue(adminKey)
       .then((d) => {
-        setData(d);
+        setData(d as unknown as typeof data);
       })
       .catch((err) => {
         setData(null);

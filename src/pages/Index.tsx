@@ -1,9 +1,9 @@
 import { Navbar } from "@/components/Navbar";
-import { HeroSection } from "@/components/HeroSection";
+import { HeroSection } from "@/components/landing/HeroSection";
+import { ProblemSection } from "@/components/landing/ProblemSection";
+import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { TrustedBy } from "@/components/TrustedBy";
-import { HowItWorks } from "@/components/HowItWorks";
 import { FeaturesSection } from "@/components/FeaturesSection";
-import { TechnologySection } from "@/components/TechnologySection";
 import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
 import { Helmet } from "react-helmet-async";
@@ -16,20 +16,31 @@ const Index = () => {
         <title>TryVerse AI — Virtual Try-On for Fashion Brands</title>
         <meta
           name="description"
-          content="B2B AI virtual try-on for fashion brands and e-commerce retailers. Embed try-on on your product pages, reduce returns, and increase conversions."
+          content="AI virtual try-on infrastructure for fashion brands. Let shoppers see garments on their own body before they buy — embedded in your storefront or called through the API."
         />
         <link rel="canonical" href="https://tryverseai.com/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="TryVerse AI — Virtual Try-On for Fashion Brands" />
+        <meta
+          property="og:description"
+          content="AI virtual try-on infrastructure for fashion brands. Shoppers see the garment on themselves before they commit."
+        />
+        <meta name="twitter:card" content="summary_large_image" />
       </Helmet>
-      {/* Global reduced-motion guard: shrinks every framer-motion animation in this subtree to
-          near-instant when the OS/browser "prefers-reduced-motion" setting is on. */}
+
+      {/* Global reduced-motion guard for every framer-motion animation in this subtree. */}
       <MotionConfig reducedMotion="user">
         <Navbar />
-        <HeroSection />
-        <TrustedBy />
-        <HowItWorks />
-        <FeaturesSection />
-        <TechnologySection />
-        <CTASection />
+        <main id="main">
+          <HeroSection />
+          <ProblemSection />
+          <HowItWorksSection />
+          <div id="platform">
+            <FeaturesSection />
+          </div>
+          <TrustedBy />
+          <CTASection />
+        </main>
         <Footer />
       </MotionConfig>
     </div>

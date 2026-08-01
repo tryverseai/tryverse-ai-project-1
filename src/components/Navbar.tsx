@@ -1,84 +1,60 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, LogOut } from "lucide-react";
-import { motion } from "framer-motion";
+import { Menu, X, ArrowUpRight } from "lucide-react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 
 const publicLinks = [
-  { label: "Product", href: "/#features" },
+  { label: "Platform", href: "/#platform" },
+  { label: "How it works", href: "/#how-it-works" },
   { label: "Partner with us", href: "/partner" },
   { label: "About", href: "/about" },
 ];
 
-const SPRING_TRANSITION = { type: "spring" as const, stiffness: 260, damping: 22 };
-
 export function Navbar() {
   const [open, setOpen] = useState(false);
-  const [isCompact, setIsCompact] = useState(false);
-  /** Narrow “focus” layout only on md+ — on mobile full width avoids broken menu / tap targets */
-  const [isDesktop, setIsDesktop] = useState(
-    typeof window !== "undefined" ? window.matchMedia("(min-width: 768px)").matches : false
-  );
-  const lastScrollY = useRef(0);
-  const ticking = useRef(false);
+  /** Solid chrome once the hero has scrolled past; transparent over the hero film. */
+  const [scrolled, setScrolled] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const lastY = useRef(0);
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, signOut } = useAuth();
+  const reduce = useReducedMotion();
 
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    const onMq = () => setIsDesktop(mq.matches);
-    onMq();
-    mq.addEventListener("change", onMq);
-    return () => mq.removeEventListener("change", onMq);
-  }, []);
-
-  useEffect(() => {
-    let rafId: number;
-    let lastUpdate = 0;
-    const THROTTLE_MS = 120;
-    const updateCompact = () => {
-      if (!isDesktop) {
-        setIsCompact(false);
-        ticking.current = false;
-        return;
-      }
-      const now = Date.now();
-      if (now - lastUpdate < THROTTLE_MS) {
-        ticking.current = false;
-        return;
-      }
-      lastUpdate = now;
-      const currentY = window.scrollY;
-      if (currentY <= 20) {
-        setIsCompact(false);
-      } else if (currentY > lastScrollY.current) {
-        setIsCompact(true);
-      } else {
-        setIsCompact(false);
-      }
-      lastScrollY.current = currentY;
-      ticking.current = false;
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        const y = window.scrollY;
+        setScrolled(y > 24);
+        setHidden(y > 180 && y > lastY.current);
+        lastY.current = y;
+        frame = 0;
+      });
     };
-    const handleScroll = () => {
-      if (!ticking.current) {
-        ticking.current = true;
-        rafId = requestAnimationFrame(updateCompact);
-      }
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
     return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener("scroll", handleScroll);
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
     };
-  }, [isDesktop]);
+  }, []);
 
   useEffect(() => {
     setOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
 
   const isRoute = (href: string) => !href.includes("#");
 
@@ -88,172 +64,180 @@ export function Navbar() {
   };
 
   return (
-    <motion.nav
-      className="fixed top-0 left-0 right-0 z-50 bg-background/98 backdrop-blur-md border-b border-border/40"
-      initial={false}
-      animate={{
-        boxShadow: isCompact
-          ? "0 4px 20px -4px rgba(0,0,0,0.12)"
-          : "0 1px 0 0 rgba(0,0,0,0.06)",
-      }}
-      transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
-    >
-      <motion.div
-        className="mx-auto flex items-center justify-between px-6 min-h-[56px] md:min-h-[72px] py-3 md:py-4"
-        animate={{
-          maxWidth: isDesktop ? (isCompact ? 720 : 1280) : "100%",
-        }}
-        transition={SPRING_TRANSITION}
-        style={{ width: "100%" }}
+    <>
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-[var(--radius-pill)] focus:bg-foreground focus:px-4 focus:py-2 focus:text-sm focus:text-background"
       >
-        <Link
-          to="/"
-          onClick={() => {
-            if (location.pathname === "/") {
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }
-          }}
-          className="flex items-center flex-shrink-0 text-foreground hover:opacity-90 transition-opacity"
-          style={{ maxWidth: "none", overflow: "visible" }}
-        >
-          <TryVerseLogo height={105} />
-        </Link>
+        Skip to content
+      </a>
 
-        <div className="hidden md:flex items-center gap-10">
-          {publicLinks.map((link) =>
-            isRoute(link.href) ? (
-              <Link
-                key={link.href}
-                to={link.href}
-                className={`text-sm font-medium transition-colors whitespace-nowrap px-1 ${
-                  location.pathname === link.href
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ) : (
-              <a
-                key={link.href}
-                href={link.href}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap px-1"
-              >
-                {link.label}
-              </a>
-            )
-          )}
-        </div>
-
-        <motion.div
-          className="hidden md:flex items-center"
-          animate={{ gap: isCompact ? 6 : 12 }}
-          transition={SPRING_TRANSITION}
-        >
-          {isAuthenticated ? (
-            <>
-              <Link to="/dashboard">
-                <Button variant="ghost" size="sm" className="text-sm">
-                  Dashboard
-                </Button>
-              </Link>
-              <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-sm gap-1.5">
-                <LogOut className="h-3.5 w-3.5" /> Sign Out
-              </Button>
-            </>
-          ) : (
-            <>
-              <Link to="/auth">
-                <Button variant="ghost" size="sm" className="text-sm">
-                  Log In
-                </Button>
-              </Link>
-              <Link to="/auth?signup=business">
-                <Button
-                  size="sm"
-                  className="gradient-primary text-primary-foreground text-sm shadow-soft transition-transform duration-300 hover:-translate-y-0.5 active:translate-y-0"
-                >
-                  Start Free
-                </Button>
-              </Link>
-            </>
-          )}
-        </motion.div>
-
-        <button
-          type="button"
-          className="md:hidden p-2 -mr-2 rounded-md hover:bg-muted/80 text-foreground"
-          aria-expanded={open}
-          aria-label={open ? "Close menu" : "Open menu"}
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
-      </motion.div>
-
-      {/* CSS transition menu — avoids framer “height: auto” glitches on mobile */}
-      <div
+      <motion.header
         className={cn(
-          "md:hidden overflow-hidden bg-background border-b border-border transition-all duration-300 ease-out",
-          open ? "max-h-[85vh] opacity-100 border-border" : "max-h-0 opacity-0 border-transparent pointer-events-none"
+          "fixed inset-x-0 top-0 z-50 transition-[background-color,border-color,backdrop-filter] duration-500",
+          scrolled || open
+            ? "border-b border-border bg-background/85 backdrop-blur-xl"
+            : "border-b border-transparent bg-transparent"
         )}
+        animate={{ y: hidden && !open ? "-100%" : "0%" }}
+        transition={{ duration: reduce ? 0 : 0.45, ease: [0.16, 1, 0.3, 1] }}
       >
-        <div className="px-6 py-4 flex flex-col gap-3">
-          {publicLinks.map((link) =>
-            isRoute(link.href) ? (
-              <Link
-                key={link.href}
-                to={link.href}
-                onClick={() => setOpen(false)}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground py-2"
-              >
-                {link.label}
-              </Link>
+        <nav
+          aria-label="Primary"
+          className="mx-auto flex h-[var(--navbar-height)] w-full max-w-[78rem] items-center justify-between gap-8 px-6 md:px-10"
+        >
+          <Link
+            to="/"
+            onClick={() => location.pathname === "/" && window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="flex flex-shrink-0 items-center text-foreground transition-opacity duration-200 hover:opacity-70"
+            aria-label="TryVerse home"
+          >
+            <TryVerseLogo height={34} />
+          </Link>
+
+          <div className="hidden items-center gap-9 md:flex">
+            {publicLinks.map((link) =>
+              isRoute(link.href) ? (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className={cn(
+                    "underline-sweep text-[0.8125rem] font-medium tracking-[-0.005em] transition-colors duration-200",
+                    location.pathname === link.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="underline-sweep text-[0.8125rem] font-medium tracking-[-0.005em] text-muted-foreground transition-colors duration-200 hover:text-foreground"
+                >
+                  {link.label}
+                </a>
+              )
+            )}
+          </div>
+
+          <div className="hidden items-center gap-2 md:flex">
+            {isAuthenticated ? (
+              <>
+                <Link to="/dashboard">
+                  <Button variant="ghost" size="sm">
+                    Dashboard
+                  </Button>
+                </Link>
+                <Button variant="outline" size="sm" onClick={handleSignOut}>
+                  Sign out
+                </Button>
+              </>
             ) : (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground py-2"
-              >
-                {link.label}
-              </a>
-            )
-          )}
-          {isAuthenticated ? (
-            <>
-              <Link to="/dashboard" onClick={() => setOpen(false)}>
-                <Button className="gradient-primary text-primary-foreground w-full mt-2">
-                  Dashboard
-                </Button>
-              </Link>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  void handleSignOut();
-                  setOpen(false);
-                }}
-                className="w-full gap-1.5"
-              >
-                <LogOut className="h-3.5 w-3.5" /> Sign Out
-              </Button>
-            </>
-          ) : (
-            <>
-              <Link to="/auth" onClick={() => setOpen(false)}>
-                <Button variant="outline" className="w-full mt-2">
-                  Log In
-                </Button>
-              </Link>
-              <Link to="/auth?signup=business" onClick={() => setOpen(false)}>
-                <Button className="gradient-primary text-primary-foreground w-full">
-                  Start Free
-                </Button>
-              </Link>
-            </>
-          )}
-        </div>
-      </div>
-    </motion.nav>
+              <>
+                <Link to="/auth">
+                  <Button variant="ghost" size="sm">
+                    Log in
+                  </Button>
+                </Link>
+                <Link to="/auth?signup=business">
+                  <Button size="sm" className="group">
+                    Start free
+                    <ArrowUpRight className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  </Button>
+                </Link>
+              </>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent md:hidden"
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+            aria-label={open ? "Close menu" : "Open menu"}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </nav>
+      </motion.header>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            id="mobile-nav"
+            className="fixed inset-0 z-40 flex flex-col bg-background pt-[var(--navbar-height)] md:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="flex flex-1 flex-col justify-between overflow-y-auto px-6 pb-10 pt-8">
+              <ul className="space-y-1">
+                {publicLinks.map((link, i) => (
+                  <motion.li
+                    key={link.href}
+                    initial={reduce ? { opacity: 0 } : { opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 + i * 0.05, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                    className="border-b border-border"
+                  >
+                    {isRoute(link.href) ? (
+                      <Link
+                        to={link.href}
+                        onClick={() => setOpen(false)}
+                        className="type-title block py-4 text-foreground"
+                      >
+                        {link.label}
+                      </Link>
+                    ) : (
+                      <a href={link.href} onClick={() => setOpen(false)} className="type-title block py-4 text-foreground">
+                        {link.label}
+                      </a>
+                    )}
+                  </motion.li>
+                ))}
+              </ul>
+
+              <div className="mt-10 flex flex-col gap-3">
+                {isAuthenticated ? (
+                  <>
+                    <Link to="/dashboard" onClick={() => setOpen(false)}>
+                      <Button size="lg" className="w-full">
+                        Dashboard
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="w-full"
+                      onClick={() => {
+                        void handleSignOut();
+                        setOpen(false);
+                      }}
+                    >
+                      Sign out
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/auth?signup=business" onClick={() => setOpen(false)}>
+                      <Button size="lg" className="w-full">
+                        Start free
+                      </Button>
+                    </Link>
+                    <Link to="/auth" onClick={() => setOpen(false)}>
+                      <Button variant="outline" size="lg" className="w-full">
+                        Log in
+                      </Button>
+                    </Link>
+                  </>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

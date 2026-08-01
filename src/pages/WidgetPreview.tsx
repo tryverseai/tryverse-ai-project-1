@@ -37,8 +37,7 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 function normalizeTryOnCategory(raw: string): TryOnCategory {
   const s = raw.toLowerCase();
-  if (s === "bags" || s === "glasses" || s === "clothing") return s;
-  if (s === "jewelry") return "bags";
+  if (s === "tops" || s === "bottoms" || s === "dresses" || s === "one-pieces" || s === "clothing") return s;
   return "clothing";
 }
 
@@ -139,8 +138,9 @@ const WidgetPreview = () => {
         if ("status" in started && started.status === "queued") {
           outUrl = await pollWidgetTryOnUntilResult(started.tryonId, apiKey);
         } else {
-          outUrl = started.resultUrl;
-          if (!outUrl) throw new Error(started.error || "No result image received");
+          const done = started as { resultUrl?: string; error?: string };
+          outUrl = done.resultUrl;
+          if (!outUrl) throw new Error(done.error || "No result image received");
         }
 
         setResultImage(outUrl);

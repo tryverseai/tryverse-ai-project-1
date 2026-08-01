@@ -29,7 +29,7 @@ export const ResendOTPPasswordReset = {
   async generateVerificationToken() {
     const random: RandomReader = {
       read(bytes) {
-        crypto.getRandomValues(bytes);
+        crypto.getRandomValues(bytes as Uint8Array<ArrayBuffer>);
       },
     };
     return generateRandomString(random, "0123456789", 8);

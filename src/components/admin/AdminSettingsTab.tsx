@@ -23,7 +23,7 @@ export function AdminSettingsTab({ adminKey }: AdminSettingsTabProps) {
     setLoading(true);
     setError(null);
     getAdminSettings(adminKey)
-      .then((d) => setData(d))
+      .then((d) => setData(d as unknown as typeof data))
       .catch((err) => {
         setData(null);
         setError(err instanceof Error ? err.message : "Failed to load settings");
