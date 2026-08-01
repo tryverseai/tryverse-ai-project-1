@@ -38,7 +38,7 @@ export function AdminTryonsTab({ adminKey }: AdminTryonsTabProps) {
     setLoading(true);
     try {
       const res = await getAdminTryons(adminKey, pagination.page, pagination.limit, statusFilter || undefined);
-      setTryons(res.tryons || []);
+      setTryons((res.tryons || []) as unknown as TryonRow[]);
       setPagination((p) => ({ ...p, ...res.pagination }));
     } catch {
       toast.error("Failed to fetch try-ons");

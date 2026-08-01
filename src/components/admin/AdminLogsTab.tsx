@@ -116,7 +116,7 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
     setLoading(true);
     try {
       const res = await getAdminLogs(adminKey, 300, levelFilter || undefined);
-      setLogs(res.logs || []);
+      setLogs((res.logs || []) as unknown as LogEntry[]);
     } catch {
       toast.error("Failed to load logs");
     } finally {
@@ -138,7 +138,7 @@ export function AdminLogsTab({ adminKey }: AdminLogsTabProps) {
     if (!autoRefresh) return;
     const id = setInterval(() => {
       getAdminLogs(adminKey, 300, levelFilter || undefined)
-        .then((res) => setLogs(res.logs || []))
+        .then((res) => setLogs((res.logs || []) as unknown as LogEntry[]))
         .catch(() => {});
     }, 5000);
     return () => clearInterval(id);

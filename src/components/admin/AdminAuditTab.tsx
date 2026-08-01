@@ -216,7 +216,7 @@ export function AdminAuditTab({ adminKey }: AdminAuditTabProps) {
         eventType: eventFilter || undefined,
         severity: !eventFilter && severityFilter ? severityFilter : undefined,
       });
-      setEntries(res.entries || []);
+      setEntries((res.entries || []) as unknown as AuditEntry[]);
     } catch {
       toast.error("Failed to load audit log");
       setEntries([]);

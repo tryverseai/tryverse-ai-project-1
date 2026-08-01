@@ -40,7 +40,7 @@ export function AdminApiKeysTab({ adminKey }: AdminApiKeysTabProps) {
         getAdminApiKeys(adminKey),
         getAdminDomains(adminKey).catch(() => ({ domains: [] })),
       ]);
-      setKeys(k.keys || []);
+      setKeys((k.keys || []) as typeof keys);
       setDomains(d.domains || []);
     } catch {
       toast.error("Failed to load API data");
