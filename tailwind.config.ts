@@ -13,9 +13,12 @@ export default {
       },
     },
     fontFamily: {
-      display: ['Space Grotesk', 'sans-serif'],
-      body: ['Inter', 'sans-serif'],
+      display: ["Bodoni Moda", "Times New Roman", "serif"],
+      body: ["Inter Tight", "system-ui", "sans-serif"],
+      sans: ["Inter Tight", "system-ui", "sans-serif"],
+      mono: ["JetBrains Mono", "ui-monospace", "monospace"],
     },
+
     extend: {
       colors: {
         border: "hsl(var(--border))",
