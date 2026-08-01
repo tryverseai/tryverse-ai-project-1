@@ -4,6 +4,8 @@
  */
 let convexJwt: string | null = null;
 
+import { getConvexUrl } from "@/convexReactClient";
+
 /** Same as `@convex-dev/auth` `JWT_STORAGE_KEY` + namespaced suffix (see `useNamespacedStorage`). */
 const CONVEX_AUTH_JWT_STORAGE_KEY = "__convexAuthJWT";
 
@@ -14,7 +16,7 @@ const CONVEX_AUTH_JWT_STORAGE_KEY = "__convexAuthJWT";
  */
 export function readConvexAuthJwtFromBrowserStorage(): string | null {
   if (typeof window === "undefined") return null;
-  const raw = typeof import.meta.env.VITE_CONVEX_URL === "string" ? import.meta.env.VITE_CONVEX_URL.trim() : "";
+  const raw = getConvexUrl();
   if (!raw) return null;
   const ns = raw.replace(/[^a-zA-Z0-9]/g, "");
   const key = `${CONVEX_AUTH_JWT_STORAGE_KEY}_${ns}`;

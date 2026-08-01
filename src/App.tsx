@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { convexReactClient } from "@/convexReactClient";
+import { ConvexSetupScreen } from "@/components/ConvexSetupScreen";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -55,7 +56,10 @@ const RouteLoader = () => (
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () =>
+  !convexReactClient ? (
+    <ConvexSetupScreen />
+  ) : (
   <HelmetProvider>
   <QueryClientProvider client={queryClient}>
     <ConvexAuthProvider client={convexReactClient}>
@@ -127,6 +131,6 @@ const App = () => (
     </ConvexAuthProvider>
   </QueryClientProvider>
   </HelmetProvider>
-);
+  );
 
 export default App;
