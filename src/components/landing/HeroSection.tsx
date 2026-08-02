@@ -5,16 +5,16 @@ import { ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AutoPlayVideo } from "@/components/AutoPlayVideo";
 import { RevealLines } from "@/components/motion/Reveal";
-import reelA from "@/assets/reel-a.mp4.asset.json";
-import reelAPoster from "@/assets/reel-a-poster.jpg.asset.json";
-import reelB from "@/assets/reel-b.mp4.asset.json";
-import reelBPoster from "@/assets/reel-b-poster.jpg.asset.json";
+import loopPrimary from "@/assets/loop-1.mp4";
+import loopPrimaryPoster from "@/assets/loop-1-poster.jpg";
+import loopSecondary from "@/assets/loop-2.mp4";
+import loopSecondaryPoster from "@/assets/loop-2-poster.jpg";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 /**
  * Editorial hero: type-led left column, two offset cinematic film cards on the right.
- * Parallax is scroll-linked (transform only) and disabled under reduced motion.
+ * Media is bundled (not CDN-pointer) so it ships with every deployment target.
  */
 export function HeroSection() {
   const reduce = useReducedMotion();
@@ -22,6 +22,7 @@ export function HeroSection() {
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const yPrimary = useTransform(scrollYProgress, [0, 1], ["0%", reduce ? "0%" : "-14%"]);
   const ySecondary = useTransform(scrollYProgress, [0, 1], ["0%", reduce ? "0%" : "-4%"]);
+  const fade = useTransform(scrollYProgress, [0, 0.85], [1, reduce ? 1 : 0.25]);
 
   return (
     <section
@@ -31,7 +32,7 @@ export function HeroSection() {
     >
       <div className="mx-auto grid w-full max-w-[78rem] grid-cols-1 items-center gap-14 px-6 pb-20 md:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:pb-32">
         {/* ---- Type column ---- */}
-        <div className="relative z-10">
+        <motion.div className="relative z-10" style={{ opacity: fade }}>
           <motion.p
             className="type-eyebrow mb-8 flex items-center gap-3"
             initial={{ opacity: 0 }}
@@ -99,7 +100,7 @@ export function HeroSection() {
               </div>
             ))}
           </motion.dl>
-        </div>
+        </motion.div>
 
         {/* ---- Film column ---- */}
         <div className="relative">
@@ -111,11 +112,7 @@ export function HeroSection() {
             className="relative ml-auto w-[86%] overflow-hidden rounded-[var(--radius-xl)] studio-frame shadow-[var(--shadow-elevated)] sm:w-[78%] lg:w-[84%]"
           >
             <div className="aspect-[3/4]">
-              <AutoPlayVideo
-                src={reelB.url}
-                poster={reelBPoster.url}
-                className="h-full w-full object-cover"
-              />
+              <AutoPlayVideo src={loopPrimary} poster={loopPrimaryPoster} className="h-full w-full object-cover" />
             </div>
             <div className="pointer-events-none absolute inset-0 scrim opacity-70" aria-hidden="true" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5">
@@ -131,7 +128,11 @@ export function HeroSection() {
             className="absolute -bottom-8 left-0 w-[42%] overflow-hidden rounded-[var(--radius-lg)] border border-border/60 shadow-[var(--shadow-elevated)] sm:w-[38%] lg:-bottom-12 lg:w-[44%]"
           >
             <div className="aspect-[3/4]">
-              <AutoPlayVideo src={reelA.url} poster={reelAPoster.url} className="h-full w-full object-cover" />
+              <AutoPlayVideo
+                src={loopSecondary}
+                poster={loopSecondaryPoster}
+                className="h-full w-full object-cover"
+              />
             </div>
           </motion.div>
         </div>
