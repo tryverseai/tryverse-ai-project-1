@@ -121,6 +121,6 @@ export function RevealLines({
           </motion.span>
         </span>
       ))}
-    </span>
+    </motion.span>
   );
 }
