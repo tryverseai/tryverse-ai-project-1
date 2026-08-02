@@ -24,7 +24,11 @@ export function ClosingSection() {
       <motion.div className="absolute inset-0" style={{ y, scale: reduce ? 1 : 1.15 }} aria-hidden="true">
         <AutoPlayVideo src={loopClosing} poster={loopClosingPoster} className="h-full w-full object-cover" />
       </motion.div>
-      <div className="absolute inset-0 bg-[hsl(var(--ink))]/78" aria-hidden="true" />
+      <div className="absolute inset-0 bg-[hsl(var(--ink))]/85" aria-hidden="true" />
+      <div
+        className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--ink))] via-[hsl(var(--ink))]/80 to-transparent"
+        aria-hidden="true"
+      />
 
       <div className="relative mx-auto w-full max-w-[78rem] px-6 py-32 md:px-10 md:py-48">
         <p className="type-eyebrow mb-10 text-[hsl(40_16%_95%/0.6)]">09 — Get started</p>
