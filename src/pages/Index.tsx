@@ -1,10 +1,15 @@
 import { Navbar } from "@/components/Navbar";
+import { ScrollProgress } from "@/components/landing/ScrollProgress";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { ProblemSection } from "@/components/landing/ProblemSection";
+import { ConfidenceSection } from "@/components/landing/ConfidenceSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
-import { TrustedBy } from "@/components/TrustedBy";
-import { FeaturesSection } from "@/components/FeaturesSection";
-import { CTASection } from "@/components/CTASection";
+import { TryOnProofSection } from "@/components/landing/TryOnProofSection";
+import { PlatformSection } from "@/components/landing/PlatformSection";
+import { IntegrationSection } from "@/components/landing/IntegrationSection";
+import { BenefitsSection } from "@/components/landing/BenefitsSection";
+import { PricingSection } from "@/components/landing/PricingSection";
+import { ClosingSection } from "@/components/landing/ClosingSection";
 import { Footer } from "@/components/Footer";
 import { Helmet } from "react-helmet-async";
 import { MotionConfig } from "framer-motion";
@@ -30,16 +35,19 @@ const Index = () => {
 
       {/* Global reduced-motion guard for every framer-motion animation in this subtree. */}
       <MotionConfig reducedMotion="user">
+        <ScrollProgress />
         <Navbar />
         <main id="main">
           <HeroSection />
           <ProblemSection />
+          <ConfidenceSection />
           <HowItWorksSection />
-          <div id="platform">
-            <FeaturesSection />
-          </div>
-          <TrustedBy />
-          <CTASection />
+          <TryOnProofSection />
+          <PlatformSection />
+          <IntegrationSection />
+          <BenefitsSection />
+          <PricingSection />
+          <ClosingSection />
         </main>
         <Footer />
       </MotionConfig>
