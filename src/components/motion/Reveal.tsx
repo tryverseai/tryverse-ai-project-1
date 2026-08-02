@@ -98,15 +98,24 @@ export function RevealLines({
   const reduce = useReducedMotion();
 
   return (
-    <span className={cn("block", className)}>
+    // The trigger lives on the unclipped wrapper: an IntersectionObserver on the inner
+    // span would never fire, because the mask clips it fully out of view at rest.
+    <motion.span
+      className={cn("block", className)}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: "-10% 0px" }}
+    >
       {lines.map((line, i) => (
         <span key={i} className="mask-line">
           <motion.span
             className={cn("block", lineClassName)}
-            initial={reduce ? { opacity: 0 } : { y: "108%" }}
-            whileInView={reduce ? { opacity: 1 } : { y: "0%" }}
-            viewport={{ once: true, margin: "-10% 0px" }}
-            transition={{ duration: reduce ? 0.25 : 0.95, delay: delay + i * 0.09, ease: EASE }}
+            variants={{
+              hidden: reduce ? { opacity: 0 } : { y: "108%" },
+              show: reduce
+                ? { opacity: 1, transition: { duration: 0.25, delay: delay + i * 0.05 } }
+                : { y: "0%", transition: { duration: 0.95, delay: delay + i * 0.09, ease: EASE } },
+            }}
           >
             {line}
           </motion.span>
