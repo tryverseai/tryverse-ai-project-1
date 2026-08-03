@@ -54,7 +54,7 @@ Embed the try-on UI directly in your page:
 |--------|----------|-------------|
 | `apiKey` | Yes | Your TryVerse API key |
 | `productImage` | Yes | URL of the product image, or storage path |
-| `category` | No | `clothing`, `bags`, or `glasses` (default: `clothing`) |
+| `category` | No | `clothing`, `tops`, `bottoms`, `dresses`, or `one-pieces` (default: `clothing`) |
 | `backendUrl` | Yes | Your TryVerse API base URL (e.g. `https://api.tryverse.ai`) |
 | `container` | Embed only | DOM element ID for inline display |
 | `productDescription` | No | Optional text to help the AI (e.g. "blue denim jacket") |
@@ -92,9 +92,11 @@ TryVerse.open({ productImage: 'https://...' });
 
 ## Supported categories
 
-- **clothing** – Tops, dresses, jackets, outerwear
-- **bags** – Handbags, backpacks, clutches
-- **glasses** – Sunglasses, prescription glasses, eyewear
+- **clothing** – General apparel, jackets, outerwear
+- **tops** – Shirts, blouses, sweaters
+- **bottoms** – Pants, skirts, shorts
+- **dresses** – Dresses
+- **one-pieces** – Jumpsuits, rompers
 
 ## CORS and domains
 

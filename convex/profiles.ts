@@ -30,6 +30,7 @@ const profilePatch = v.object({
   beta_rejected: v.optional(v.boolean()),
   beta_rejected_at: v.optional(v.string()),
   terms_of_service_accepted_at: v.optional(v.string()),
+  plan_selected_at: v.optional(v.string()),
   verification_email_sent_at: v.optional(v.string()),
   welcome_email_sent_at: v.optional(v.string()),
 });
@@ -154,6 +155,22 @@ export const acceptTermsOfService = mutation({
       terms_of_service_accepted_at: now,
       updated_at: now,
     });
+    return { ok: true as const };
+  },
+});
+
+/** One-time gate after Terms acceptance — records that the customer made an explicit plan choice. */
+export const confirmPlanSelection = mutation({
+  args: { plan_id: v.optional(v.string()) },
+  handler: async (ctx, { plan_id }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const existing = await findProfileBySubjectKeys(ctx, identity.subject);
+    if (!existing) throw new Error("Profile not found");
+    const now = new Date().toISOString();
+    const updates: Record<string, unknown> = { plan_selected_at: now, updated_at: now };
+    if (plan_id) updates.plan_id = plan_id;
+    await ctx.db.patch(existing._id, updates);
     return { ok: true as const };
   },
 });

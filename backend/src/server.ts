@@ -93,28 +93,59 @@ function isNonProductionLanDevOrigin(origin: string): boolean {
   }
 }
 
+/**
+ * These endpoints are called directly by tryverse-widget.js running on a brand's own storefront
+ * domain — an address we cannot know in advance and that WIDGET_ALLOWED_ORIGINS was never meant
+ * to enumerate. Their real access control is per-request (x-api-key + validateDomain's per-brand
+ * allowed-domains check), not CORS, so they get an origin-reflecting, credential-free policy:
+ * any site can receive a response, but only a valid API key can produce one, and cookies are
+ * never sent cross-origin (credentials: false) so session-authenticated dashboard routes can't be
+ * ridden along with a forged cross-site request.
+ */
+const WIDGET_PUBLIC_PATH_PREFIXES = ['/api/widget', '/api/upload', '/api/models'];
+
+function isWidgetPublicPath(path: string): boolean {
+  return WIDGET_PUBLIC_PATH_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+}
+
+const widgetPublicCorsOptions = {
+  origin: true as const,
+  credentials: false,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'x-api-key'],
+  exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
+  optionsSuccessStatus: 204,
+};
+
 app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (widgetOriginsRaw === '*') return callback(null, true);
-      const o = origin.trim().replace(/\/$/, '');
-      const list =
-        corsOriginsList && corsOriginsList.length > 0
-          ? [...new Set([env.FRONTEND_URL.trim(), ...corsOriginsList])]
-          : [...new Set([env.FRONTEND_URL.trim(), ...defaultProdOrigins])];
-      const normalizedList = list.map((x) => x.trim().replace(/\/$/, ''));
-      if (normalizedList.includes(o)) return callback(null, true);
-      if (isNonProductionLanDevOrigin(origin)) return callback(null, true);
-      // Never pass Error into cors callback — that invokes next(err) and preflight can miss CORS headers entirely.
-      logger.warn('CORS origin denied', { origin: o });
-      callback(null, false);
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-admin-key', 'Cookie'],
-    exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
-    optionsSuccessStatus: 204,
+  cors((req, callback) => {
+    if (isWidgetPublicPath(req.path)) {
+      callback(null, widgetPublicCorsOptions);
+      return;
+    }
+
+    callback(null, {
+      origin: (origin: string | undefined, originCallback: (err: Error | null, allow?: boolean) => void) => {
+        if (!origin) return originCallback(null, true);
+        if (widgetOriginsRaw === '*') return originCallback(null, true);
+        const o = origin.trim().replace(/\/$/, '');
+        const list =
+          corsOriginsList && corsOriginsList.length > 0
+            ? [...new Set([env.FRONTEND_URL.trim(), ...corsOriginsList])]
+            : [...new Set([env.FRONTEND_URL.trim(), ...defaultProdOrigins])];
+        const normalizedList = list.map((x) => x.trim().replace(/\/$/, ''));
+        if (normalizedList.includes(o)) return originCallback(null, true);
+        if (isNonProductionLanDevOrigin(origin)) return originCallback(null, true);
+        // Never pass Error into cors callback — that invokes next(err) and preflight can miss CORS headers entirely.
+        logger.warn('CORS origin denied', { origin: o });
+        originCallback(null, false);
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-admin-key', 'Cookie'],
+      exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
+      optionsSuccessStatus: 204,
+    });
   })
 );
 

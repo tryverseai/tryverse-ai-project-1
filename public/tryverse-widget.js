@@ -523,7 +523,7 @@
       log('TryVerse.open() requires productImage (URL or storage path)');
       return;
     }
-    if (!['clothing', 'bags', 'glasses'].includes(category)) {
+    if (!['clothing', 'tops', 'bottoms', 'dresses', 'one-pieces'].includes(category)) {
       category = 'clothing';
     }
 
@@ -554,7 +554,7 @@
       log('TryVerse.embed() requires backendUrl, apiKey, and productImage');
       return;
     }
-    if (!['clothing', 'bags', 'glasses'].includes(category)) category = 'clothing';
+    if (!['clothing', 'tops', 'bottoms', 'dresses', 'one-pieces'].includes(category)) category = 'clothing';
 
     fetchWidgetConfig(backendUrl, apiKey)
       .then(function (cfg) {

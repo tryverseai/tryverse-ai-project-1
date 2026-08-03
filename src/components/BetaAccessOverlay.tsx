@@ -3,6 +3,7 @@ import { useQuery } from "convex/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "../../convex/_generated/api";
 import { TermsPostBetaGate } from "@/components/TermsPostBetaGate";
+import { PlanSelectionGate } from "@/components/PlanSelectionGate";
 import { useAdminOperatorBypass } from "@/hooks/useAdminOperatorBypass";
 
 /**
@@ -55,5 +56,12 @@ export function BetaAccessOverlay() {
   if (!termsOk) {
     return <TermsPostBetaGate />;
   }
+
+  // Plan selection only applies to business accounts — individuals have no store to connect.
+  const planOk = profile.account_type !== "business" || Boolean(profile.plan_selected_at);
+  if (!planOk) {
+    return <PlanSelectionGate onComplete={() => {}} />;
+  }
+
   return null;
 }

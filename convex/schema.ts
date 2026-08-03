@@ -54,6 +54,8 @@ export default defineSchema({
     beta_rejected: v.optional(v.boolean()),
     beta_rejected_at: v.optional(v.string()),
     terms_of_service_accepted_at: v.optional(v.string()),
+    /** Set once the customer has made an explicit plan choice on the post-terms onboarding gate. */
+    plan_selected_at: v.optional(v.string()),
     /** Legacy: was used to dedupe post-verify “welcome” sends; prefer `welcome_email_sent_at`. */
     verification_email_sent_at: v.optional(v.string()),
     /** Set once after first successful email verification + bootstrap welcome email. */

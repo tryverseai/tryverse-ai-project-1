@@ -1,41 +1,44 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Copy,
   Check,
   Store,
-  PartyPopper,
-  ArrowRight,
   ShoppingBag,
   PlugZap,
   Globe2,
-  Terminal,
+  Code2,
   RefreshCw,
-  ChevronDown,
   CircleDashed,
+  Sparkles,
+  LifeBuoy,
+  CalendarClock,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getOrCreateApiKey, regenerateApiKey, widgetBackendPublicUrl, type ApiKeyRecord } from "@/lib/backendApi";
+import { getOrCreateApiKey, regenerateApiKey, type ApiKeyRecord } from "@/lib/backendApi";
 import { posthogCapture } from "@/lib/posthog";
 
-type PlatformId = "shopify" | "woocommerce" | "magento" | "bigcommerce" | "headless" | "custom-api";
+type PlatformId = "shopify" | "woocommerce" | "magento" | "bigcommerce" | "headless" | "custom";
 
 interface PlatformOption {
   id: PlatformId;
   label: string;
   icon: typeof Store;
-  note: string;
 }
 
 const PLATFORMS: PlatformOption[] = [
-  { id: "shopify", label: "Shopify", icon: ShoppingBag, note: "Add your key in your Shopify app settings — no theme code to edit." },
-  { id: "woocommerce", label: "WooCommerce", icon: Store, note: "Add your key in the WooCommerce plugin settings." },
-  { id: "magento", label: "Magento", icon: PlugZap, note: "Add your key in your Magento module configuration." },
-  { id: "bigcommerce", label: "BigCommerce", icon: Store, note: "Add your key in your BigCommerce app settings." },
-  { id: "headless", label: "Headless Commerce", icon: Globe2, note: "Use your key from your storefront's server layer." },
-  { id: "custom-api", label: "Custom API", icon: Terminal, note: "Call TryVerse directly from your own stack." },
+  { id: "shopify", label: "Shopify", icon: ShoppingBag },
+  { id: "woocommerce", label: "WooCommerce", icon: Store },
+  { id: "magento", label: "Magento", icon: PlugZap },
+  { id: "bigcommerce", label: "BigCommerce", icon: Store },
+  { id: "headless", label: "Headless Commerce", icon: Globe2 },
+  { id: "custom", label: "Custom Website", icon: Code2 },
 ];
+
+const PLATFORM_STORAGE_KEY = "tryverse.selectedPlatform";
 
 function CopyField({ label, value, eventName }: { label: string; value: string; eventName: string }) {
   const [copied, setCopied] = useState(false);
@@ -60,28 +63,39 @@ function CopyField({ label, value, eventName }: { label: string; value: string; 
   );
 }
 
+function StatusDot({ done, label }: { done: boolean; label: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs ${done ? "text-foreground" : "text-muted-foreground/60"}`}>
+      {done ? <Check className="h-3.5 w-3.5" /> : <CircleDashed className="h-3.5 w-3.5" />}
+      {label}
+    </span>
+  );
+}
+
 interface ConnectStoreWizardProps {
-  /** Called once a platform is chosen, so the parent can reflect "connected" status. */
-  onConnected?: () => void;
+  /** True once the account's plan includes AI Virtual Try-On. */
+  aiTryOnEnabled: boolean;
+  /** Current user's id — namespaces the locally-persisted platform choice so it can't leak
+   *  between accounts that share a browser (e.g. an agency switching between client logins). */
+  userKey?: string;
+  /** Called when the customer wants to try the capability themselves in-dashboard. */
+  onTryItYourself?: () => void;
 }
 
 /**
- * Effortless onboarding: Create Account -> API Key Generated Automatically -> Copy Key ->
- * Select Platform -> Connect -> Run first Try-On -> Done. No manual "Generate key" step, no
- * embed code shown up front — the raw request format is one click away for engineers, not the
- * default view.
+ * Phase 1 is API-first: TryVerse doesn't have a real Shopify/WooCommerce app, OAuth, or
+ * auto-installation yet. This screen never implies otherwise — it gets the customer to the one
+ * thing that's actually true (a working API key + a stated platform) and hands the rest to
+ * their developer or TryVerse's own implementation team. Nothing here claims "Connected."
  */
-export function ConnectStoreWizard({ onConnected }: ConnectStoreWizardProps) {
+export function ConnectStoreWizard({ aiTryOnEnabled, userKey, onTryItYourself }: ConnectStoreWizardProps) {
   const [apiKey, setApiKey] = useState<ApiKeyRecord | null>(null);
   const [keyLoading, setKeyLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformId | null>(null);
-  const [connected, setConnected] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const backendUrl = widgetBackendPublicUrl();
+  const storageKey = userKey ? `${PLATFORM_STORAGE_KEY}.${userKey}` : null;
 
-  // "API Key Generated Automatically" — no button, no wait for the customer to ask for one.
   useEffect(() => {
     let cancelled = false;
     getOrCreateApiKey()
@@ -90,6 +104,19 @@ export function ConnectStoreWizard({ onConnected }: ConnectStoreWizardProps) {
       .finally(() => { if (!cancelled) setKeyLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!storageKey) {
+      setSelectedPlatform(null);
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      setSelectedPlatform(stored && PLATFORMS.some((p) => p.id === stored) ? (stored as PlatformId) : null);
+    } catch {
+      setSelectedPlatform(null);
+    }
+  }, [storageKey]);
 
   const handleRegenerate = async () => {
     setRegenerating(true);
@@ -105,37 +132,44 @@ export function ConnectStoreWizard({ onConnected }: ConnectStoreWizardProps) {
     }
   };
 
-  const handleConnect = (platformId: PlatformId) => {
-    setSelectedPlatform(platformId);
-    setConnected(true);
-    posthogCapture("connect_store_platform_selected", { platform: platformId });
-    onConnected?.();
+  const choosePlatform = (id: PlatformId) => {
+    setSelectedPlatform(id);
+    if (storageKey) {
+      try { window.localStorage.setItem(storageKey, id); } catch { /* ignore */ }
+    }
+    posthogCapture("connect_store_platform_selected", { platform: id });
   };
 
-  const platform = PLATFORMS.find((p) => p.id === selectedPlatform) || null;
   const keyValue = apiKey?.key_value ?? "";
+  const platform = PLATFORMS.find((p) => p.id === selectedPlatform) || null;
+  const integrationReady = Boolean(apiKey) && Boolean(selectedPlatform);
 
   return (
     <div className="bg-card rounded-xl border border-border/50 shadow-card p-6 md:p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="font-display text-lg font-semibold text-foreground">Connect your store</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Estimated setup time: 2 minutes</p>
-        </div>
-        <div
-          className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
-            connected ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground bg-muted"
-          }`}
-        >
-          {connected ? <Check className="h-3 w-3" /> : <CircleDashed className="h-3 w-3" />}
-          {connected ? "Connected" : "Not connected"}
-        </div>
+      <div className="mb-6">
+        <h2 className="font-display text-lg font-semibold text-foreground">Connect your store</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Get your API key and platform ready — your developer (or ours) completes the integration.
+        </p>
+      </div>
+
+      {/* Honest status strip — every dot reflects something genuinely true right now */}
+      <div className="flex flex-wrap gap-x-5 gap-y-2 mb-8 pb-6 border-b border-border/50">
+        <StatusDot done label="Business Account Created" />
+        <StatusDot done label="Email Verified" />
+        <StatusDot done={aiTryOnEnabled} label="Plan Activated" />
+        <StatusDot done={Boolean(apiKey)} label="API Key Ready" />
+        <StatusDot done={Boolean(selectedPlatform)} label="Platform Selected" />
+        <StatusDot done={integrationReady} label="Integration Ready" />
       </div>
 
       <div className="space-y-8">
-        {/* Your API key — automatic, always visible, no "Generate" click required */}
+        {/* API key — automatic, always visible, the only credential the customer ever handles */}
         <div>
-          <h3 className="font-display text-sm font-semibold text-foreground mb-3">Your API key</h3>
+          <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            Your API Key
+            <span className="font-normal text-muted-foreground text-xs">Automatically generated</span>
+          </h3>
           {keyLoading ? (
             <div className="h-16 rounded-xl border border-border/50 bg-muted/20 animate-pulse" />
           ) : (
@@ -152,90 +186,118 @@ export function ConnectStoreWizard({ onConnected }: ConnectStoreWizardProps) {
               </button>
             </div>
           )}
-        </div>
-
-        {/* Choose your platform */}
-        <div>
-          <h3 className="font-display text-sm font-semibold text-foreground mb-3">Choose your platform</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {PLATFORMS.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => handleConnect(p.id)}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all ${
-                  selectedPlatform === p.id
-                    ? "border-foreground bg-foreground/[0.03] shadow-card"
-                    : "border-border/50 hover:border-border"
-                }`}
-              >
-                <p.icon className="h-5 w-5 text-foreground" />
-                <span className="text-xs font-medium text-foreground">{p.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Connect confirmation + optional technical detail */}
-        {platform && (
-          <div className="space-y-3">
-            <div className="bg-muted/50 border border-border/50 rounded-xl p-4 flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
-                <platform.icon className="h-4 w-4 text-foreground" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">{platform.label} connected</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{platform.note}</p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((v) => !v)}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-              Advanced: view request format
-            </button>
-            {showAdvanced && (
-              <pre className="p-4 rounded-lg bg-muted/30 text-xs text-foreground font-mono leading-relaxed overflow-x-auto">
-                <code>{`POST ${backendUrl}/api/widget/request
-x-api-key: ${keyValue || "tv_live_..."}
-Content-Type: application/json
-
-{
-  "personImagePath": "...",
-  "productImagePath": "...",
-  "category": "clothing"
-}`}</code>
-              </pre>
-            )}
-
-            <p className="text-xs text-muted-foreground">
-              Requests only work from domains you&apos;ve allow-listed below.
+          {!aiTryOnEnabled && (
+            <p className="text-xs text-muted-foreground mt-3">
+              <Link to="/pricing" className="text-foreground underline underline-offset-2">Choose a plan</Link> to activate AI Virtual Try-On on your account.
             </p>
+          )}
+        </div>
+
+        {/* Platform selection */}
+        <div>
+          <h3 className="font-display text-sm font-semibold text-foreground mb-3">
+            {platform ? "Selected Platform" : "Choose your platform"}
+          </h3>
+
+          <AnimatePresence mode="wait">
+            {platform ? (
+              <motion.div
+                key="selected"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/20 px-4 py-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-foreground/[0.06] flex items-center justify-center">
+                    <platform.icon className="h-4 w-4 text-foreground" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground">{platform.label}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPlatform(null);
+                    if (storageKey) {
+                      try { window.localStorage.removeItem(storageKey); } catch { /* ignore */ }
+                    }
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Change
+                </button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="grid"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+              >
+                {PLATFORMS.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => choosePlatform(p.id)}
+                    className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border/50 text-center transition-all hover:border-border"
+                  >
+                    <p.icon className="h-5 w-5 text-foreground" />
+                    <span className="text-xs font-medium text-foreground">{p.label}</span>
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Next step — the honest hand-off, shown once there's something to hand off */}
+        {integrationReady && (
+          <div className="rounded-xl border border-border/50 bg-muted/20 p-5">
+            <h3 className="font-display text-sm font-semibold text-foreground mb-2">Next Step</h3>
+            <p className="text-sm text-foreground">
+              Share your API key with your developer to complete your {platform?.label} integration.
+            </p>
+            <p className="text-sm text-muted-foreground mt-1.5">
+              Once integrated, your customers will be able to experience AI Virtual Try-On directly on your storefront.
+            </p>
+            <Link
+              to="/dashboard/business?tab=Developers"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground mt-4 hover:opacity-70 transition-opacity"
+            >
+              View Developer Documentation <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
         )}
 
-        {/* Run your first try-on */}
-        {connected && (
-          <div className="pt-2 border-t border-border/50">
-            <div className="flex items-center justify-between flex-wrap gap-3 pt-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-foreground/[0.06] flex items-center justify-center">
-                  <PartyPopper className="h-5 w-5 text-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">You&apos;re connected</p>
-                  <p className="text-xs text-muted-foreground">Run a test try-on to confirm everything works.</p>
-                </div>
-              </div>
-              <Link to="/widget-preview">
-                <Button className="gradient-primary text-primary-foreground shadow-soft gap-2">
-                  Run your first Try-On <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
+        {/* White-glove — a concierge option, not an admission the platform is unfinished */}
+        <div className="rounded-xl border border-border/50 p-5">
+          <h3 className="font-display text-sm font-semibold text-foreground mb-1.5">Need Help Integrating?</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Don&apos;t have a developer? Our implementation team can help your business integrate TryVerse into your
+            storefront quickly and professionally.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/support">
+              <Button variant="outline" className="gap-2">
+                <LifeBuoy className="h-4 w-4" /> Contact Our Integration Team
+              </Button>
+            </Link>
+            <Link to="/book-demo">
+              <Button variant="outline" className="gap-2">
+                <CalendarClock className="h-4 w-4" /> Schedule an Integration Call
+              </Button>
+            </Link>
           </div>
+        </div>
+
+        {onTryItYourself && (
+          <button
+            type="button"
+            onClick={onTryItYourself}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Want to see it in action first? Try it yourself in the dashboard.
+          </button>
         )}
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -133,6 +133,9 @@ const Dashboard = () => {
   const [storeConnected, setStoreConnected] = useState<boolean | null>(null);
   const { user } = useAuth();
   const brandName = user?.user_metadata?.brand_name || "Your Brand";
+  // Guards the forced first-visit redirect below so it fires exactly once per account, not on
+  // every render — after that, normal tab clicks and deep links behave as usual.
+  const appliedInitialLanding = useRef(false);
 
   // First thing a brand sees after signup: Connect Your Store — until they actually have a key
   // and an allowed domain, in which case the dashboard opens on the normal landing tab.
@@ -149,14 +152,26 @@ const Dashboard = () => {
   // Depend on the primitive string `tabParam` rather than the full URLSearchParams
   // object (which is recreated every render), to avoid spurious effect re-runs.
   useEffect(() => {
+    if (storeConnected === null) return; // wait for the connection check before deciding anything
+
+    // Unconditional on first visit: an account that hasn't connected a store always lands on
+    // Connect Store, even if the URL/browser history carries a stale ?tab= from a previous
+    // account or session in the same browser. Runs once; afterwards tabParam is honored normally.
+    if (!appliedInitialLanding.current) {
+      appliedInitialLanding.current = true;
+      if (!storeConnected) {
+        setActiveTab(CONNECT_TAB);
+        setSearchParams({ tab: CONNECT_TAB }, { replace: true });
+        return;
+      }
+    }
+
     if (tabParam && tabComponents[tabParam]) {
       setActiveTab(tabParam);
       return;
     }
-    if (storeConnected === null) return; // wait for the connection check before picking a default
-    const landingTab = storeConnected ? DEFAULT_TAB : CONNECT_TAB;
-    setActiveTab(landingTab);
-    setSearchParams({ tab: landingTab }, { replace: true });
+    setActiveTab(DEFAULT_TAB);
+    setSearchParams({ tab: DEFAULT_TAB }, { replace: true });
   }, [tabParam, setSearchParams, storeConnected]);
 
   const selectTab = (label: string) => {

@@ -111,19 +111,30 @@ export async function createAndDispatchTryOn(
   const queue = getTryOnQueue();
 
   if (asyncMode && queue) {
-    await enqueueTryOnJob(jobData);
-    logger.info('tryOnOrchestrator: job queued', {
-      jobId,
-      tryonId: tryonLegacyId,
-      userId,
-      category,
-    });
-    return {
-      dispatched: 'queued',
-      tryonLegacyId,
-      jobId,
-      estimatedWaitSeconds: ESTIMATED_WAIT_SECONDS,
-    };
+    try {
+      await enqueueTryOnJob(jobData);
+      logger.info('tryOnOrchestrator: job queued', {
+        jobId,
+        tryonId: tryonLegacyId,
+        userId,
+        category,
+      });
+      return {
+        dispatched: 'queued',
+        tryonLegacyId,
+        jobId,
+        estimatedWaitSeconds: ESTIMATED_WAIT_SECONDS,
+      };
+    } catch (err) {
+      // getTryOnQueue() caches the Bull instance after first construction, so a Redis
+      // connection that dies later still reads as "available" here — enqueueing then throws
+      // instead of failing fast. Fall through to the sync path rather than 500ing the request.
+      logger.warn('tryOnOrchestrator: enqueue failed, falling back to sync', {
+        jobId,
+        tryonId: tryonLegacyId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   // Sync path — no queue available or caller explicitly opted out of async

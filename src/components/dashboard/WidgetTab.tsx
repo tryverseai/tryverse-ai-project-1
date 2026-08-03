@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
-import { Code, Upload, Sparkles, ImageIcon, User, FileText } from "lucide-react";
+import { Upload, Sparkles, ImageIcon, User, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,9 +10,6 @@ import {
   startTryOn,
   getCredits,
   isCreditsExhaustedApiError,
-  widgetBackendPublicUrl,
-  listWidgetDomains,
-  addWidgetDomain,
   type TryOnCategory,
 } from "@/lib/backendApi";
 import { posthogCapture } from "@/lib/posthog";
@@ -30,21 +26,18 @@ const sampleModels = [
 export function WidgetTab() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeView, setActiveView] = useState<"preview" | "install">("preview");
+  const [activeView, setActiveView] = useState<"connect" | "try">("connect");
   const [creditsRemaining, setCreditsRemaining] = useState(20);
   const [creditsPoolTotal, setCreditsPoolTotal] = useState(20);
-  const [widgetActivated, setWidgetActivated] = useState(false);
+  const [aiTryOnEnabled, setAiTryOnEnabled] = useState(false);
   const [productImage, setProductImage] = useState<string | null>(null);
   const [personImage, setPersonImage] = useState<string | null>(null);
   const [tryOnResult, setTryOnResult] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [productDescription, setProductDescription] = useState("");
-  const [allowedDomains, setAllowedDomains] = useState<Array<{ domain: string; apiKeyName: string }>>([]);
-  const [newDomain, setNewDomain] = useState("");
-  const [domainsLoading, setDomainsLoading] = useState(false);
 
   useEffect(() => {
-    if (activeView === "preview") {
+    if (activeView === "try") {
       posthogCapture("brand_page_viewed", { source: "widget_tab" });
     }
   }, [activeView]);
@@ -59,7 +52,7 @@ export function WidgetTab() {
           credits.isUnlimited ? 999 : credits.monthlyCreditsRemaining + credits.freeCreditsRemaining
         );
         setCreditsPoolTotal(credits.freeCreditsTotal + credits.monthlyCreditsTotal);
-        setWidgetActivated(credits.isUnlimited || credits.plan !== "free");
+        setAiTryOnEnabled(credits.isUnlimited || credits.plan !== "free");
       } catch {
         setCreditsRemaining(20);
         setCreditsPoolTotal(20);
@@ -67,32 +60,6 @@ export function WidgetTab() {
     };
     void fetchUserData();
   }, [user]);
-
-  useEffect(() => {
-    if (!user || activeView !== "install") return;
-    setDomainsLoading(true);
-    listWidgetDomains()
-      .then((data) => setAllowedDomains(data.domains.map((d) => ({ domain: d.domain, apiKeyName: d.apiKeyName }))))
-      .catch(() => setAllowedDomains([]))
-      .finally(() => setDomainsLoading(false));
-  }, [user, activeView]);
-
-  const handleAddDomain = async () => {
-    const clean = newDomain.trim().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
-    if (!clean) {
-      toast.error("Enter a domain like yourshop.com");
-      return;
-    }
-    try {
-      await addWidgetDomain(clean);
-      toast.success(`Added ${clean}`);
-      setNewDomain("");
-      const data = await listWidgetDomains();
-      setAllowedDomains(data.domains.map((d) => ({ domain: d.domain, apiKeyName: d.apiKeyName })));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not add domain");
-    }
-  };
 
   const handleProductUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -116,7 +83,7 @@ export function WidgetTab() {
   };
 
   const handleTryOn = async () => {
-    if (creditsRemaining <= 0 && !widgetActivated) {
+    if (creditsRemaining <= 0 && !aiTryOnEnabled) {
       toast.error("No credits remaining. Upgrade your plan to continue.");
       return;
     }
@@ -185,50 +152,37 @@ export function WidgetTab() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">Widget</h1>
-          <p className="text-sm text-muted-foreground mt-1">Preview the try-on experience or install the widget</p>
-        </div>
-        <Link
-          to="/dashboard/business?tab=Developers"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <FileText className="h-4 w-4" /> Full documentation
-        </Link>
-      </div>
-
       {/* View toggle */}
       <div className="flex gap-2 mb-8">
         <Button
-          variant={activeView === "preview" ? "default" : "outline"}
+          variant={activeView === "connect" ? "default" : "outline"}
           size="sm"
-          onClick={() => setActiveView("preview")}
-          className={activeView === "preview" ? "gradient-primary text-primary-foreground" : ""}
+          onClick={() => setActiveView("connect")}
+          className={activeView === "connect" ? "gradient-primary text-primary-foreground" : ""}
         >
-          <Sparkles className="h-4 w-4 mr-2" /> Widget Preview
+          <Store className="h-4 w-4 mr-2" /> Connect Your Store
         </Button>
         <Button
-          variant={activeView === "install" ? "default" : "outline"}
+          variant={activeView === "try" ? "default" : "outline"}
           size="sm"
-          onClick={() => setActiveView("install")}
-          className={activeView === "install" ? "gradient-primary text-primary-foreground" : ""}
+          onClick={() => setActiveView("try")}
+          className={activeView === "try" ? "gradient-primary text-primary-foreground" : ""}
         >
-          <Code className="h-4 w-4 mr-2" /> Installation
+          <Sparkles className="h-4 w-4 mr-2" /> Try It Yourself
         </Button>
       </div>
 
-      {activeView === "preview" ? (
+      {activeView === "try" ? (
         <div className="space-y-6">
           {/* Credits counter */}
           <div className="flex items-center gap-3 p-4 rounded-xl border border-border/50 bg-card">
             <Sparkles className="h-5 w-5 text-foreground" />
             <div>
               <p className="text-sm font-semibold text-foreground">
-                {widgetActivated ? "Widget Activated" : "Free AI Try-On Credits"}
+                {aiTryOnEnabled ? "AI Virtual Try-On Enabled" : "Free AI Try-On Credits"}
               </p>
               <p className="text-xs text-muted-foreground">
-                {widgetActivated ? "Unlimited generations" : `${creditsRemaining} / ${creditsPoolTotal} Remaining`}
+                {aiTryOnEnabled ? "Unlimited generations" : `${creditsRemaining} / ${creditsPoolTotal} Remaining`}
               </p>
             </div>
           </div>
@@ -309,7 +263,8 @@ export function WidgetTab() {
               disabled={processing}
             />
             <p className="text-xs text-muted-foreground">
-              Passed to the same API as the live widget&apos;s <code className="text-[11px]">productDescription</code> field. Use it for gowns, cuts, and fabric notes.
+              Used to help the AI match length, cut, and fabric — the same detail your customers can add
+              when they try this product on.
             </p>
           </div>
 
@@ -317,71 +272,23 @@ export function WidgetTab() {
           <Button
             className="w-full gradient-primary text-primary-foreground shadow-soft"
             onClick={handleTryOn}
-            disabled={!productImage || !personImage || processing || (creditsRemaining <= 0 && !widgetActivated)}
+            disabled={!productImage || !personImage || processing || (creditsRemaining <= 0 && !aiTryOnEnabled)}
           >
             {processing ? "Generating..." : "Run AI Try-On"}
           </Button>
 
-          {creditsRemaining === 0 && !widgetActivated && (
+          {creditsRemaining === 0 && !aiTryOnEnabled && (
             <div className="bg-muted/50 border border-border/50 rounded-xl p-6 text-center">
               <p className="text-sm text-foreground font-semibold mb-2">You've used your free TryVerse tests</p>
-              <p className="text-sm text-muted-foreground mb-4">Activate your widget to continue using AI try-ons.</p>
+              <p className="text-sm text-muted-foreground mb-4">Choose a plan to keep using AI Virtual Try-On.</p>
               <Button onClick={() => navigate("/pricing")} className="gradient-primary text-primary-foreground shadow-soft">
-                Activate Widget
+                View plans
               </Button>
             </div>
           )}
         </div>
       ) : (
-        <>
-          {!widgetActivated && (
-            <div className="bg-muted/50 border border-border/50 rounded-xl p-6 mb-8 text-center">
-              <p className="text-sm text-foreground font-semibold mb-2">Widget Not Activated</p>
-              <p className="text-sm text-muted-foreground mb-4">Choose a plan to activate widget installation on your website.</p>
-              <Button onClick={() => navigate("/pricing")} className="gradient-primary text-primary-foreground shadow-soft">
-                Activate Widget
-              </Button>
-            </div>
-          )}
-
-          <ConnectStoreWizard />
-
-          {/* Allowed domains */}
-          <div className="bg-card rounded-xl border border-border/50 p-5 shadow-card mt-8">
-            <h3 className="font-display text-sm font-semibold text-foreground mb-2">Allowed domains</h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              API requests are only accepted from domains listed here (e.g.{" "}
-              <code className="text-foreground">fashion.useclickbox.com</code>). Add{" "}
-              <code className="text-foreground">localhost</code> for local dev.
-            </p>
-            {domainsLoading ? (
-              <p className="text-xs text-muted-foreground">Loading domains…</p>
-            ) : allowedDomains.length === 0 ? (
-              <p className="text-xs text-muted-foreground mb-3">No domains configured yet.</p>
-            ) : (
-              <ul className="space-y-1 mb-4">
-                {allowedDomains.map((d) => (
-                  <li key={d.domain} className="text-sm text-foreground font-mono">
-                    {d.domain}
-                    <span className="text-muted-foreground font-sans text-xs ml-2">({d.apiKeyName})</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="text"
-                value={newDomain}
-                onChange={(e) => setNewDomain(e.target.value)}
-                placeholder="fashion.useclickbox.com"
-                className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
-              />
-              <Button type="button" variant="outline" onClick={handleAddDomain}>
-                Add domain
-              </Button>
-            </div>
-          </div>
-        </>
+        <ConnectStoreWizard aiTryOnEnabled={aiTryOnEnabled} userKey={user?.id} onTryItYourself={() => setActiveView("try")} />
       )}
     </motion.div>
   );
