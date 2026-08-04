@@ -36,9 +36,17 @@ That's it. Uploading both images, starting generation, and polling until the res
 | Option | Default | Description |
 |---|---|---|
 | `apiKey` | `process.env.TRYVERSE_API_KEY` | Your TryVerse API key. |
-| `baseUrl` | `https://api.tryverseai.com` | Override for local development or self-hosted deployments. |
+| `baseUrl` | `process.env.TRYVERSE_BASE_URL` (or `TRYVERSE_API_URL`), else `https://api.tryverseai.com` | Override for local development or self-hosted deployments. |
 | `maxPollAttempts` | `60` | How many times to check a queued generation before giving up. |
 | `pollIntervalMs` | `2000` | Delay between status checks. |
+
+No source changes needed to point the SDK at a different environment — set env vars instead:
+
+```bash
+# .env (local development)
+TRYVERSE_API_KEY=tv_live_...
+TRYVERSE_BASE_URL=http://localhost:3001
+```
 
 ```ts
 const tryverse = new TryVerse({

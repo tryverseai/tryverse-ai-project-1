@@ -25,6 +25,15 @@ function detectEnvApiKey(): string | undefined {
   return undefined;
 }
 
+/** Mirrors detectEnvApiKey — lets self-hosted/local deployments override the API origin without
+ *  a code change (`baseUrl` in the constructor still wins if both are provided). */
+function detectEnvBaseUrl(): string | undefined {
+  if (typeof process !== "undefined" && process.env) {
+    return process.env.TRYVERSE_BASE_URL || process.env.TRYVERSE_API_URL;
+  }
+  return undefined;
+}
+
 async function toBlob(input: Buffer | Uint8Array | Blob): Promise<Blob> {
   if (typeof Blob !== "undefined" && input instanceof Blob) return input;
   // Buffer / Uint8Array — wrap directly; Blob accepts BlobPart[] including typed arrays.
@@ -62,7 +71,7 @@ export class TryVerseClient {
       );
     }
     this.apiKey = apiKey;
-    this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    this.baseUrl = (options.baseUrl ?? detectEnvBaseUrl() ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
     this.maxPollAttempts = options.maxPollAttempts ?? 60;
     this.pollIntervalMs = options.pollIntervalMs ?? 2000;
   }
