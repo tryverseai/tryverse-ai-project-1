@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import { logger } from '../config/logger';
 import { logAudit } from '../services/audit';
 import { Sentry } from '../config/sentry';
-import { env } from '../config/env';
+import { env, envAwareLimit } from '../config/env';
 
 const rateLimitResponse = (req: Request, res: Response) => {
   const identifier = (req as Request & { user?: { id: string }; apiKey?: { id: string; userId: string } }).user?.id
@@ -38,7 +38,7 @@ const rateLimitResponse = (req: Request, res: Response) => {
 // General API rate limit — 100 requests per minute
 export const generalRateLimit = rateLimit({
   windowMs: 60 * 1000,
-  max: 100,
+  max: envAwareLimit(100),
   standardHeaders: true,
   legacyHeaders: false,
   /** CORS preflight must not consume quota or return 429 without ACAO. */
@@ -49,7 +49,7 @@ export const generalRateLimit = rateLimit({
 // Try-on endpoint — expensive AI calls: 20 per minute per IP
 export const tryonRateLimit = rateLimit({
   windowMs: 60 * 1000,
-  max: 20,
+  max: envAwareLimit(20),
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
@@ -65,7 +65,7 @@ export const tryonRateLimit = rateLimit({
 // bucket instead of sharing a single IP limit with all their shoppers.
 export const uploadRateLimit = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: envAwareLimit(30),
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => req.user?.id || req.apiKey?.id || req.ip || 'unknown',
@@ -75,7 +75,7 @@ export const uploadRateLimit = rateLimit({
 // Payment endpoints — 10 requests per minute (anti-abuse)
 export const paymentRateLimit = rateLimit({
   windowMs: 60 * 1000,
-  max: 10,
+  max: envAwareLimit(10),
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitResponse,
@@ -84,7 +84,7 @@ export const paymentRateLimit = rateLimit({
 // Public early-access form — tight limit per IP
 export const earlyAccessRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 15,
+  max: envAwareLimit(15),
   standardHeaders: true,
   legacyHeaders: false,
   /** OPTIONS preflight must not return 429 without CORS headers. */
@@ -95,7 +95,7 @@ export const earlyAccessRateLimit = rateLimit({
 /** Public contact / support form */
 export const supportContactRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 12,
+  max: envAwareLimit(12),
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => req.method === 'OPTIONS',
@@ -105,7 +105,7 @@ export const supportContactRateLimit = rateLimit({
 // Auth endpoints — 10 per 15 minutes (brute force protection)
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: envAwareLimit(10),
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitResponse,
@@ -114,7 +114,7 @@ export const authRateLimit = rateLimit({
 // Widget requests — 60 per minute per API key
 export const widgetRateLimit = rateLimit({
   windowMs: 60 * 1000,
-  max: 60,
+  max: envAwareLimit(60),
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => req.apiKey?.id || req.ip || 'unknown',
@@ -124,7 +124,7 @@ export const widgetRateLimit = rateLimit({
 /** Invite link validation — public GET */
 export const inviteValidateRateLimit = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: envAwareLimit(30),
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitResponse,
@@ -133,7 +133,7 @@ export const inviteValidateRateLimit = rateLimit({
 /** Invite lifecycle completion after signup */
 export const inviteCompleteRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 20,
+  max: envAwareLimit(20),
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitResponse,

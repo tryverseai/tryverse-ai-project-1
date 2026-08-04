@@ -104,9 +104,12 @@ export async function verifyFlutterwaveTransaction(transactionId: string): Promi
  * Compare: incoming verif-hash must equal FLUTTERWAVE_WEBHOOK_SECRET.
  */
 export function validateFlutterwaveSignature(_payload: string, verifHash: string): boolean {
-  return (
-    Boolean(env.FLUTTERWAVE_WEBHOOK_SECRET) && verifHash === env.FLUTTERWAVE_WEBHOOK_SECRET && verifHash.length > 0
-  );
+  if (!env.FLUTTERWAVE_WEBHOOK_SECRET || !verifHash) return false;
+  // Timing-safe: this is a direct secret comparison (not HMAC), so length alone already leaks
+  // less than a naive === would under a timing attack — still worth closing with timingSafeEqual.
+  const a = Buffer.from(env.FLUTTERWAVE_WEBHOOK_SECRET, 'utf8');
+  const b = Buffer.from(verifHash, 'utf8');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 /**

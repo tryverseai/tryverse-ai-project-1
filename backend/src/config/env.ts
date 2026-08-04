@@ -345,6 +345,19 @@ export const env = {
 };
 
 /**
+ * Environment-aware rate-limit ceiling. Production keeps the exact tuned value (zero behavior
+ * change there); development/test get a generous multiple so local work — repeated onboarding
+ * runs, every plan tier, rapid AI-generation testing — never gets throttled by anti-abuse limits
+ * meant for the public internet. Set RATE_LIMIT_DEV_MULTIPLIER to override (e.g. in a staging
+ * env that wants closer-to-prod limits without being production).
+ */
+export function envAwareLimit(prodMax: number, devMultiplier?: number): number {
+  if (env.NODE_ENV === 'production') return prodMax;
+  const multiplier = devMultiplier ?? optionalInt('RATE_LIMIT_DEV_MULTIPLIER', 50, 1, 1000);
+  return prodMax * multiplier;
+}
+
+/**
  * Fail fast on unsafe production configuration.
  */
 export function assertProductionSecurityConfig(): void {

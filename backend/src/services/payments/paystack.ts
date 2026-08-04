@@ -97,12 +97,16 @@ export async function verifyPaystackTransaction(reference: string): Promise<{
  * Validates Paystack webhook signature.
  */
 export function validatePaystackSignature(payload: string, signature: string): boolean {
-  if (!env.PAYSTACK_WEBHOOK_SECRET) return false;
+  if (!env.PAYSTACK_WEBHOOK_SECRET || !signature) return false;
   const hash = crypto
     .createHmac('sha512', env.PAYSTACK_WEBHOOK_SECRET)
     .update(payload)
     .digest('hex');
-  return hash === signature;
+  // Timing-safe: both sides are fixed-length hex from the same HMAC algorithm, so a length
+  // mismatch can only mean an invalid signature — safe to short-circuit before the byte compare.
+  const a = Buffer.from(hash, 'utf8');
+  const b = Buffer.from(signature, 'utf8');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 /**

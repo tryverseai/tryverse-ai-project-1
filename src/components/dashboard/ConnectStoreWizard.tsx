@@ -15,10 +15,11 @@ import {
   LifeBuoy,
   CalendarClock,
   ArrowRight,
+  TriangleAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getOrCreateApiKey, regenerateApiKey, type ApiKeyRecord } from "@/lib/backendApi";
+import { getOrCreateApiKey, regenerateApiKey, listWidgetDomains, type ApiKeyRecord } from "@/lib/backendApi";
 import { posthogCapture } from "@/lib/posthog";
 
 type PlatformId = "shopify" | "woocommerce" | "magento" | "bigcommerce" | "headless" | "custom";
@@ -93,6 +94,7 @@ export function ConnectStoreWizard({ aiTryOnEnabled, userKey, onTryItYourself }:
   const [keyLoading, setKeyLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformId | null>(null);
+  const [domainCount, setDomainCount] = useState<number | null>(null);
 
   const storageKey = userKey ? `${PLATFORM_STORAGE_KEY}.${userKey}` : null;
 
@@ -102,6 +104,14 @@ export function ConnectStoreWizard({ aiTryOnEnabled, userKey, onTryItYourself }:
       .then((key) => { if (!cancelled) setApiKey(key); })
       .catch(() => { if (!cancelled) toast.error("Could not set up your API key — refresh to try again"); })
       .finally(() => { if (!cancelled) setKeyLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    listWidgetDomains()
+      .then((res) => { if (!cancelled) setDomainCount(res.domains.length); })
+      .catch(() => { /* nudge is best-effort; don't block the wizard on it */ });
     return () => { cancelled = true; };
   }, []);
 
@@ -190,6 +200,16 @@ export function ConnectStoreWizard({ aiTryOnEnabled, userKey, onTryItYourself }:
             <p className="text-xs text-muted-foreground mt-3">
               <Link to="/pricing" className="text-foreground underline underline-offset-2">Choose a plan</Link> to activate AI Virtual Try-On on your account.
             </p>
+          )}
+          {Boolean(apiKey) && domainCount === 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 mt-3">
+              <TriangleAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-900 dark:text-amber-200">
+                This key currently works from <strong>any</strong> website — no domain restriction yet.
+                That's fine for testing; before you launch, add your storefront domain in{" "}
+                <span className="font-medium">Developers → Allowed domains</span>.
+              </p>
+            </div>
           )}
         </div>
 

@@ -162,6 +162,15 @@ app.use(
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
+// Helmet has no Permissions-Policy default. This is a JSON API (no <iframe>/camera/mic use), so
+// deny every browser-feature grant outright — harmless for legitimate API clients either way.
+app.use((_req, res, next) => {
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=()'
+  );
+  next();
+});
 
 // ─── Logging ──────────────────────────────────────────────────────────────────
 app.use(

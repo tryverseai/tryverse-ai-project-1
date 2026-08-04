@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Code, Copy, Check, Terminal, Key, Webhook, Package, FlaskConical, Download, FileJson, Globe2, ChevronDown, Rocket } from "lucide-react";
+import { Code, Copy, Check, Terminal, Key, Webhook, Package, FlaskConical, Download, FileJson, Globe2, ChevronDown, Rocket, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { widgetBackendPublicUrl, listWidgetDomains, addWidgetDomain } from "@/lib/backendApi";
@@ -296,7 +296,13 @@ export function DeveloperDocsTab() {
           {domainsLoading ? (
             <p className="text-xs text-muted-foreground">Loading domains…</p>
           ) : domains.length === 0 ? (
-            <p className="text-xs text-muted-foreground mb-3">No domains configured yet.</p>
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 mb-3">
+              <TriangleAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-900 dark:text-amber-200">
+                No domains configured — this key currently accepts requests from <strong>any</strong> website.
+                Add your storefront domain below before going live to restrict it.
+              </p>
+            </div>
           ) : (
             <ul className="space-y-1 mb-4">
               {domains.map((d) => (

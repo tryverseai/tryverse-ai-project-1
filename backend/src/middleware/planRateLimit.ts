@@ -3,18 +3,23 @@ import { getRedisClient } from '../config/redis';
 import { getPlanId } from '../services/credits';
 import { convexProfileCreditLookupKey } from './auth';
 import { logger } from '../config/logger';
+import { envAwareLimit } from '../config/env';
 
 /**
  * Plan-based rate limits for try-on endpoint:
  * - Free: 1 request per 10 seconds (6/minute)
  * - Pro (starter, growth): 10 requests per minute
  * - Enterprise: 100 requests per minute
+ *
+ * `max` is environment-aware (see envAwareLimit) — production keeps these exact numbers;
+ * development/test get a generous multiple so testing the Free plan repeatedly doesn't mean
+ * waiting out a 1-req/10s limit meant for real shoppers.
  */
 const PLAN_LIMITS: Record<string, { windowSec: number; max: number }> = {
-  free: { windowSec: 10, max: 1 },
-  starter: { windowSec: 60, max: 10 },
-  growth: { windowSec: 60, max: 10 },
-  enterprise: { windowSec: 60, max: 100 },
+  free: { windowSec: 10, max: envAwareLimit(1) },
+  starter: { windowSec: 60, max: envAwareLimit(10) },
+  growth: { windowSec: 60, max: envAwareLimit(10) },
+  enterprise: { windowSec: 60, max: envAwareLimit(100) },
 };
 
 // ---------------------------------------------------------------------------
