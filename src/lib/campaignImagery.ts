@@ -1,9 +1,12 @@
-import crowd from "@/assets/campaign-crowd.png.asset.json";
-import transit from "@/assets/campaign-transit.png.asset.json";
-import seatedTrio from "@/assets/campaign-seated-trio.png.asset.json";
-import street from "@/assets/campaign-street.jpg.asset.json";
-import crossing from "@/assets/campaign-crossing.jpg.asset.json";
-import mannequins from "@/assets/campaign-mannequins.jpg.asset.json";
+// Bundled so the imagery ships with every deployment target (CDN-pointer media has
+// previously rendered blank in production builds).
+import crowd from "@/assets/campaign-crowd.jpg";
+import transit from "@/assets/campaign-transit.jpg";
+import seatedTrio from "@/assets/campaign-seated-trio.jpg";
+import street from "@/assets/campaign-street.jpg";
+import crossing from "@/assets/campaign-crossing.jpg";
+import mannequins from "@/assets/campaign-mannequins.jpg";
+
 
 /**
  * The TryVerse campaign library. These are brand assets, not decoration —
