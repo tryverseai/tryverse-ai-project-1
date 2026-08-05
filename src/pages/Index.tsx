@@ -39,6 +39,7 @@ const Index = () => {
 
       {/* Global reduced-motion guard for every framer-motion animation in this subtree. */}
       <MotionConfig reducedMotion="user">
+        <SmoothScroll />
         <ScrollProgress />
         <Navbar />
         <main id="main">
@@ -47,12 +48,15 @@ const Index = () => {
           <ConfidenceSection />
           <HowItWorksSection />
           <TryOnProofSection />
+          <CampaignGallerySection />
+          <MannequinSection />
           <PlatformSection />
           <IntegrationSection />
           <BenefitsSection />
           <PricingSection />
           <ClosingSection />
         </main>
+
         <Footer />
       </MotionConfig>
     </div>
