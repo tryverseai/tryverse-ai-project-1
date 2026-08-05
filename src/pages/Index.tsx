@@ -1,10 +1,13 @@
 import { Navbar } from "@/components/Navbar";
 import { ScrollProgress } from "@/components/landing/ScrollProgress";
+import { SmoothScroll } from "@/components/motion/SmoothScroll";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { ProblemSection } from "@/components/landing/ProblemSection";
 import { ConfidenceSection } from "@/components/landing/ConfidenceSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { TryOnProofSection } from "@/components/landing/TryOnProofSection";
+import { CampaignGallerySection } from "@/components/landing/CampaignGallerySection";
+import { MannequinSection } from "@/components/landing/MannequinSection";
 import { PlatformSection } from "@/components/landing/PlatformSection";
 import { IntegrationSection } from "@/components/landing/IntegrationSection";
 import { BenefitsSection } from "@/components/landing/BenefitsSection";
@@ -13,6 +16,7 @@ import { ClosingSection } from "@/components/landing/ClosingSection";
 import { Footer } from "@/components/Footer";
 import { Helmet } from "react-helmet-async";
 import { MotionConfig } from "framer-motion";
+
 
 const Index = () => {
   return (
