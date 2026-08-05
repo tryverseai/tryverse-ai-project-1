@@ -31,7 +31,7 @@ export function ClosingSection() {
       />
 
       <div className="relative mx-auto w-full max-w-[78rem] px-6 py-32 md:px-10 md:py-48">
-        <p className="type-eyebrow mb-10 text-[hsl(40_16%_95%/0.6)]">09 — Get started</p>
+        <p className="type-eyebrow mb-10 text-[hsl(40_16%_95%/0.6)]">11 — Get started</p>
         <h2 className="type-display max-w-3xl text-balance text-[hsl(40_16%_95%)]">
           <RevealLines
             lines={[
