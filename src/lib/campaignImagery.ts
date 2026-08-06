@@ -6,6 +6,9 @@ import seatedTrio from "@/assets/campaign-seated-trio.jpg";
 import street from "@/assets/campaign-street.jpg";
 import crossing from "@/assets/campaign-crossing.jpg";
 import mannequins from "@/assets/campaign-mannequins.jpg";
+import studio from "@/assets/campaign-studio.jpg";
+import shirt from "@/assets/campaign-shirt.jpg";
+import denim from "@/assets/campaign-denim.jpg";
 
 
 /**
@@ -25,6 +28,12 @@ export const campaign = {
   crossing: { src: crossing, alt: "Model in cream tailoring walking a crosswalk against a dark shutter" },
   /** Invisible-mannequin renders — the literal picture of how the pipeline sees garments. */
   mannequins: { src: mannequins, alt: "Three digital mannequins wearing streetwear outfits on a white field" },
+  /** Behind the scenes: the shoot itself, crew and lights inside the frame. */
+  studio: { src: studio, alt: "Model in a white t-shirt photographed by two crew members inside a bright studio" },
+  /** Oversized white shirt and wide-leg trousers against a grey sweep. */
+  shirt: { src: shirt, alt: "Model in an oversized white shirt and black wide-leg trousers against a grey backdrop" },
+  /** Cropped top and baggy light-wash denim — everyday fit, editorial light. */
+  denim: { src: denim, alt: "Model in a white crop top and light-wash baggy jeans" },
 } as const;
 
 export type CampaignKey = keyof typeof campaign;

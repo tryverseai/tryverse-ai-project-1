@@ -2,40 +2,31 @@ import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { Section, SectionIntro } from "@/components/layout/Section";
 import { Reveal } from "@/components/motion/Reveal";
-import { AutoPlayVideo } from "@/components/AutoPlayVideo";
-import loop2 from "@/assets/loop-2.mp4";
-import loop2Poster from "@/assets/loop-2-poster.jpg";
-import loop3 from "@/assets/loop-3.mp4";
-import loop3Poster from "@/assets/loop-3-poster.jpg";
-import loop4 from "@/assets/loop-4.mp4";
-import loop4Poster from "@/assets/loop-4-poster.jpg";
+import { campaign } from "@/lib/campaignImagery";
 
 const steps = [
   {
     index: "01",
     title: "Pick your style",
     body: "The shopper chooses a piece from your catalogue. Nothing about your product data or merchandising changes.",
-    video: loop2,
-    poster: loop2Poster,
+    image: campaign.shirt,
   },
   {
     index: "02",
     title: "Snap or upload a photo",
     body: "One clear photo from a phone camera or camera roll. No scanning rig, no measuring tape, no account required.",
-    video: loop3,
-    poster: loop3Poster,
+    image: campaign.studio,
   },
   {
     index: "03",
     title: "See it on you",
     body: "TryVerse renders the garment onto their body and returns the result in the same session, on the same page.",
-    video: loop4,
-    poster: loop4Poster,
+    image: campaign.crossing,
   },
 ];
 
-/** One step per row, alternating alignment, each film card drifting on scroll. */
-function StepMedia({ src, poster, flip }: { src: string; poster: string; flip: boolean }) {
+/** One step per row, alternating alignment, each campaign plate drifting on scroll. */
+function StepMedia({ src, alt, flip }: { src: string; alt: string; flip: boolean }) {
   const reduce = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
@@ -45,10 +36,16 @@ function StepMedia({ src, poster, flip }: { src: string; poster: string; flip: b
     <div ref={ref}>
       <motion.div
         style={{ y }}
-        className="overflow-hidden rounded-[var(--radius-xl)] border border-border studio-frame shadow-[var(--shadow-card)] lift"
+        className="group overflow-hidden rounded-[var(--radius-xl)] border border-border studio-frame shadow-[var(--shadow-card)] lift"
       >
         <div className="aspect-[4/5] md:aspect-[5/6]">
-          <AutoPlayVideo src={src} poster={poster} className="h-full w-full object-cover" />
+          <img
+            src={src}
+            alt={alt}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover transition-transform duration-[1200ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.03]"
+          />
         </div>
       </motion.div>
     </div>
@@ -83,7 +80,7 @@ export function HowItWorksSection() {
                 <p className="type-lead mt-5 max-w-md text-pretty">{step.body}</p>
               </Reveal>
 
-              <StepMedia src={step.video} poster={step.poster} flip={i % 2 === 1} />
+              <StepMedia src={step.image.src} alt={step.image.alt} flip={i % 2 === 1} />
             </div>
           </li>
         ))}

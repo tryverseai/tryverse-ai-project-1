@@ -3,18 +3,14 @@ import { Link } from "react-router-dom";
 import { useRef } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AutoPlayVideo } from "@/components/AutoPlayVideo";
 import { RevealLines } from "@/components/motion/Reveal";
-import loopPrimary from "@/assets/loop-1.mp4";
-import loopPrimaryPoster from "@/assets/loop-1-poster.jpg";
-import loopSecondary from "@/assets/loop-2.mp4";
-import loopSecondaryPoster from "@/assets/loop-2-poster.jpg";
+import { campaign } from "@/lib/campaignImagery";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 /**
- * Editorial hero: type-led left column, two offset cinematic film cards on the right.
- * Media is bundled (not CDN-pointer) so it ships with every deployment target.
+ * Editorial hero: type-led left column, two offset campaign plates on the right.
+ * Photography only — no motion assets — so the first frame is the finished image.
  */
 export function HeroSection() {
   const reduce = useReducedMotion();
@@ -30,7 +26,7 @@ export function HeroSection() {
       className="relative overflow-hidden pt-[calc(var(--navbar-height)+2.5rem)] md:pt-[calc(var(--navbar-height)+4rem)]"
       aria-label="TryVerse virtual try-on"
     >
-      <div className="mx-auto grid w-full max-w-[78rem] grid-cols-1 items-center gap-14 px-6 pb-20 md:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:pb-32">
+      <div className="mx-auto grid w-full max-w-[78rem] grid-cols-1 items-center gap-14 px-6 pb-24 md:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:pb-36">
         {/* ---- Type column ---- */}
         <motion.div className="relative z-10" style={{ opacity: fade }}>
           <motion.p
@@ -102,9 +98,9 @@ export function HeroSection() {
           </motion.dl>
         </motion.div>
 
-        {/* ---- Film column ---- */}
+        {/* ---- Campaign column ---- */}
         <div className="relative">
-          <motion.div
+          <motion.figure
             style={{ y: yPrimary }}
             initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 1.04 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -112,13 +108,20 @@ export function HeroSection() {
             className="relative ml-auto w-[86%] overflow-hidden rounded-[var(--radius-xl)] studio-frame shadow-[var(--shadow-elevated)] sm:w-[78%] lg:w-[84%]"
           >
             <div className="aspect-[3/4]">
-              <AutoPlayVideo src={loopPrimary} poster={loopPrimaryPoster} className="h-full w-full object-cover" />
+              <img
+                src={campaign.transit.src}
+                alt={campaign.transit.alt}
+                // eslint-disable-next-line react/no-unknown-property
+                {...{ fetchpriority: "high" }}
+                decoding="async"
+                className="h-full w-full object-cover"
+              />
             </div>
             <div className="pointer-events-none absolute inset-0 scrim opacity-70" aria-hidden="true" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5">
+            <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-end p-5">
               <p className="type-eyebrow text-[hsl(40_16%_95%)]">Rendered on the shopper</p>
-            </div>
-          </motion.div>
+            </figcaption>
+          </motion.figure>
 
           <motion.div
             style={{ y: ySecondary }}
@@ -128,9 +131,10 @@ export function HeroSection() {
             className="absolute -bottom-8 left-0 w-[42%] overflow-hidden rounded-[var(--radius-lg)] border border-border/60 shadow-[var(--shadow-elevated)] sm:w-[38%] lg:-bottom-12 lg:w-[44%]"
           >
             <div className="aspect-[3/4]">
-              <AutoPlayVideo
-                src={loopSecondary}
-                poster={loopSecondaryPoster}
+              <img
+                src={campaign.denim.src}
+                alt={campaign.denim.alt}
+                decoding="async"
                 className="h-full w-full object-cover"
               />
             </div>

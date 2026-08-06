@@ -11,9 +11,9 @@ const plates = [
     meta: "Campaign 01 — Stillness",
   },
   {
-    ...campaign.transit,
-    caption: "Outerwear, read at speed",
-    meta: "Campaign 02 — Transit",
+    ...campaign.studio,
+    caption: "The shoot, before the render",
+    meta: "Campaign 02 — Studio",
   },
   {
     ...campaign.seatedTrio,
@@ -21,16 +21,27 @@ const plates = [
     meta: "Campaign 03 — Ensemble",
   },
   {
+    ...campaign.shirt,
+    caption: "Volume, held on a grey sweep",
+    meta: "Campaign 04 — Tailoring",
+  },
+  {
     ...campaign.crossing,
     caption: "Tailoring in motion, shutter as backdrop",
-    meta: "Campaign 04 — Crossing",
+    meta: "Campaign 05 — Crossing",
+  },
+  {
+    ...campaign.denim,
+    caption: "Everyday denim, campaign light",
+    meta: "Campaign 06 — Denim",
   },
   {
     ...campaign.street,
     caption: "The pause before the decision",
-    meta: "Campaign 05 — Traffic",
+    meta: "Campaign 07 — Traffic",
   },
 ];
+
 
 /**
  * Horizontal editorial gallery. The page pins while the campaign strip travels sideways —
@@ -40,7 +51,7 @@ export function CampaignGallerySection() {
   const reduce = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const x = useTransform(scrollYProgress, [0, 1], ["0%", "-66%"]);
+  const x = useTransform(scrollYProgress, [0, 1], ["0%", "-74%"]);
 
   return (
     <section
@@ -71,7 +82,7 @@ export function CampaignGallerySection() {
       </div>
 
       {/* Desktop: pinned horizontal travel */}
-      <div ref={ref} className="relative hidden h-[320vh] lg:block">
+      <div ref={ref} className="relative hidden h-[420vh] lg:block">
         <div className="sticky top-0 flex h-screen items-center overflow-hidden">
           <motion.div
             style={{ x: reduce ? "0%" : x }}

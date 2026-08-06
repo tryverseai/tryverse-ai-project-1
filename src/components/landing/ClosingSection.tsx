@@ -3,17 +3,16 @@ import { Link } from "react-router-dom";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AutoPlayVideo } from "@/components/AutoPlayVideo";
 import { RevealLines, Reveal } from "@/components/motion/Reveal";
-import loopClosing from "@/assets/loop-4.mp4";
-import loopClosingPoster from "@/assets/loop-4-poster.jpg";
+import { campaign } from "@/lib/campaignImagery";
 
-/** Final beat: full-bleed film, one instruction. */
+/** Final beat: one full-bleed campaign frame, one instruction. */
 export function ClosingSection() {
   const reduce = useReducedMotion();
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
   const y = useTransform(scrollYProgress, [0, 1], reduce ? ["0%", "0%"] : ["-8%", "8%"]);
+  const scale = useTransform(scrollYProgress, [0, 1], reduce ? [1, 1] : [1.16, 1.02]);
 
   return (
     <section
@@ -21,10 +20,16 @@ export function ClosingSection() {
       aria-label="Get started with TryVerse"
       className="relative isolate overflow-hidden bg-[hsl(var(--ink))]"
     >
-      <motion.div className="absolute inset-0" style={{ y, scale: reduce ? 1 : 1.15 }} aria-hidden="true">
-        <AutoPlayVideo src={loopClosing} poster={loopClosingPoster} className="h-full w-full object-cover" />
-      </motion.div>
-      <div className="absolute inset-0 bg-[hsl(var(--ink))]/85" aria-hidden="true" />
+      <motion.img
+        src={campaign.crowd.src}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+        style={{ y, scale }}
+        className="absolute inset-0 h-full w-full object-cover will-change-transform"
+      />
+      <div className="absolute inset-0 bg-[hsl(var(--ink))]/72" aria-hidden="true" />
       <div
         className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--ink))] via-[hsl(var(--ink))]/80 to-transparent"
         aria-hidden="true"
@@ -32,7 +37,7 @@ export function ClosingSection() {
 
       <div className="relative mx-auto w-full max-w-[78rem] px-6 py-32 md:px-10 md:py-48">
         <p className="type-eyebrow mb-10 text-[hsl(40_16%_95%/0.6)]">11 — Get started</p>
-        <h2 className="type-display max-w-3xl text-balance text-[hsl(40_16%_95%)]">
+        <h2 className="type-hero max-w-3xl text-balance text-[hsl(40_16%_95%)]">
           <RevealLines
             lines={[
               <>Put the fitting room</>,
