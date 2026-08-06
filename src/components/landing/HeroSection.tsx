@@ -111,7 +111,8 @@ export function HeroSection() {
               <img
                 src={campaign.transit.src}
                 alt={campaign.transit.alt}
-                fetchPriority="high"
+                // eslint-disable-next-line react/no-unknown-property
+                {...{ fetchpriority: "high" }}
                 decoding="async"
                 className="h-full w-full object-cover"
               />
