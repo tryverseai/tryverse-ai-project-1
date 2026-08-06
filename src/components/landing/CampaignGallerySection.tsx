@@ -82,7 +82,7 @@ export function CampaignGallerySection() {
       </div>
 
       {/* Desktop: pinned horizontal travel */}
-      <div ref={ref} className="relative hidden h-[320vh] lg:block">
+      <div ref={ref} className="relative hidden h-[420vh] lg:block">
         <div className="sticky top-0 flex h-screen items-center overflow-hidden">
           <motion.div
             style={{ x: reduce ? "0%" : x }}
