@@ -118,7 +118,7 @@ export function HeroSection() {
               />
             </div>
             <div className="pointer-events-none absolute inset-0 scrim opacity-70" aria-hidden="true" />
-            <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 p-5">
+            <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-end p-5">
               <p className="type-eyebrow text-[hsl(40_16%_95%)]">Rendered on the shopper</p>
             </figcaption>
           </motion.figure>
