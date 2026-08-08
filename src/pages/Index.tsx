@@ -43,6 +43,7 @@ const Index = () => {
         <ScrollProgress />
         <Navbar />
         <main id="main">
+          <ClosingSection />
           <HeroSection />
           <ProblemSection />
           <ConfidenceSection />
@@ -54,7 +55,7 @@ const Index = () => {
           <IntegrationSection />
           <BenefitsSection />
           <PricingSection />
-          <ClosingSection />
+
         </main>
 
         <Footer />
