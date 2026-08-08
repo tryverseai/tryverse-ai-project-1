@@ -7,7 +7,10 @@ const ALLOWED_FORMATS = new Set(['jpeg', 'png', 'webp']);
  * Rejects polyglot / mismatched Content-Type uploads.
  */
 export async function validateImageBuffer(buffer: Buffer): Promise<'image/jpeg' | 'image/png' | 'image/webp'> {
-  let meta: sharp.Metadata;
+  // Derived from sharp's own return type rather than the `sharp.Metadata` namespace reference —
+  // sharp 0.35's type definitions no longer resolve that reference the same way under this
+  // tsconfig, and deriving it this way is robust to that regardless of the underlying cause.
+  let meta: Awaited<ReturnType<ReturnType<typeof sharp>['metadata']>>;
   try {
     meta = await sharp(buffer).metadata();
   } catch {
