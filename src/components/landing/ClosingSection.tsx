@@ -18,25 +18,28 @@ export function ClosingSection() {
     <section
       ref={ref}
       aria-label="Get started with TryVerse"
-      className="relative isolate overflow-hidden bg-[hsl(var(--ink))]"
+      className="relative isolate flex min-h-[100svh] items-center overflow-hidden bg-[hsl(var(--ink))]"
     >
       <motion.img
         src={campaign.crowd.src}
-        alt=""
-        aria-hidden="true"
+        alt={campaign.crowd.alt}
         loading="lazy"
         decoding="async"
         style={{ y, scale }}
-        className="absolute inset-0 h-full w-full object-cover will-change-transform"
+        className="absolute inset-0 h-full w-full object-cover object-[70%_center] will-change-transform md:object-[75%_center]"
       />
-      <div className="absolute inset-0 bg-[hsl(var(--ink))]/72" aria-hidden="true" />
+      {/* Legibility scrims: heavy on the left where the copy sits, clear on the right for the figure. */}
       <div
-        className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--ink))] via-[hsl(var(--ink))]/80 to-transparent"
+        className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--ink))] via-[hsl(var(--ink))]/80 to-[hsl(var(--ink))]/10"
+        aria-hidden="true"
+      />
+      <div
+        className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--ink))] via-transparent to-[hsl(var(--ink))]/40 md:from-[hsl(var(--ink))]/70"
         aria-hidden="true"
       />
 
-      <div className="relative mx-auto w-full max-w-[78rem] px-6 py-32 md:px-10 md:py-48">
-        <p className="type-eyebrow mb-10 text-[hsl(40_16%_95%/0.6)]">11 — Get started</p>
+      <div className="relative mx-auto w-full max-w-[78rem] px-6 py-24 md:px-10 md:py-32">
+        <p className="type-eyebrow mb-8 text-[hsl(40_16%_95%/0.6)] md:mb-10">11 — Get started</p>
         <h2 className="type-hero max-w-3xl text-balance text-[hsl(40_16%_95%)]">
           <RevealLines
             lines={[
@@ -48,13 +51,13 @@ export function ClosingSection() {
           />
         </h2>
 
-        <Reveal delay={0.18} className="mt-10 max-w-xl">
-          <p className="type-lead text-pretty text-[hsl(40_16%_95%/0.7)]">
+        <Reveal delay={0.18} className="mt-8 max-w-xl md:mt-10">
+          <p className="type-lead text-pretty text-[hsl(40_16%_95%/0.72)]">
             Create a brand account, run your first try-ons on your own catalogue, and decide from the results.
           </p>
         </Reveal>
 
-        <Reveal delay={0.28} className="mt-12">
+        <Reveal delay={0.28} className="mt-10 md:mt-12">
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link to="/auth?signup=business" className="w-full sm:w-auto">
               <Button size="xl" variant="contrast" className="group w-full sm:w-auto">
@@ -73,3 +76,4 @@ export function ClosingSection() {
     </section>
   );
 }
+

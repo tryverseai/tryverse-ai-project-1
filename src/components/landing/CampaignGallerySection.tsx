@@ -6,41 +6,37 @@ import { campaign } from "@/lib/campaignImagery";
 
 const plates = [
   {
-    ...campaign.crowd,
-    caption: "One still figure, the room moving around her",
-    meta: "Campaign 01 — Stillness",
-  },
-  {
     ...campaign.studio,
     caption: "The shoot, before the render",
-    meta: "Campaign 02 — Studio",
+    meta: "Campaign 01 — Studio",
   },
   {
     ...campaign.seatedTrio,
     caption: "Three fits, one empty seat",
-    meta: "Campaign 03 — Ensemble",
+    meta: "Campaign 02 — Ensemble",
   },
   {
     ...campaign.shirt,
     caption: "Volume, held on a grey sweep",
-    meta: "Campaign 04 — Tailoring",
+    meta: "Campaign 03 — Tailoring",
   },
   {
     ...campaign.crossing,
     caption: "Tailoring in motion, shutter as backdrop",
-    meta: "Campaign 05 — Crossing",
+    meta: "Campaign 04 — Crossing",
   },
   {
     ...campaign.denim,
     caption: "Everyday denim, campaign light",
-    meta: "Campaign 06 — Denim",
+    meta: "Campaign 05 — Denim",
   },
   {
     ...campaign.street,
     caption: "The pause before the decision",
-    meta: "Campaign 07 — Traffic",
+    meta: "Campaign 06 — Traffic",
   },
 ];
+
 
 
 /**
@@ -51,7 +47,7 @@ export function CampaignGallerySection() {
   const reduce = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const x = useTransform(scrollYProgress, [0, 1], ["0%", "-74%"]);
+  const x = useTransform(scrollYProgress, [0, 1], ["0%", "-68%"]);
 
   return (
     <section
@@ -82,7 +78,7 @@ export function CampaignGallerySection() {
       </div>
 
       {/* Desktop: pinned horizontal travel */}
-      <div ref={ref} className="relative hidden h-[420vh] lg:block">
+      <div ref={ref} className="relative hidden h-[360vh] lg:block">
         <div className="sticky top-0 flex h-screen items-center overflow-hidden">
           <motion.div
             style={{ x: reduce ? "0%" : x }}
