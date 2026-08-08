@@ -8,6 +8,8 @@ import {
 } from "./emailLayout";
 import { raiseUnlessResendResponseOk } from "./resendEmailErrors";
 import { trimResendSecret } from "./resendEnv";
+import { internal } from "./_generated/api";
+import type { ActionCtx } from "./_generated/server";
 
 const base = Resend({
   id: "resend-otp-reset",
@@ -44,8 +46,14 @@ export const ResendOTPPasswordReset = {
       theme: unknown;
       request: Request;
     },
+    // Optional only because EmailConfig's public type declares one param — @convex-dev/auth
+    // always passes ctx at runtime (see signIn.js), just doesn't type it yet. Fail closed
+    // (refuse to send) if that ever stops being true, rather than silently skipping the throttle.
+    ctx?: ActionCtx,
   ) {
     const email = params.identifier;
+    if (!ctx) throw new Error("Internal error: verification context unavailable.");
+    await ctx.runMutation(internal.emailVerificationThrottle.checkAndRecordSend, { email });
     const apiKey = trimResendSecret(params.provider.apiKey as string | undefined);
     if (!apiKey) {
       throw new Error("AUTH_RESEND_KEY is not set in Convex environment variables.");

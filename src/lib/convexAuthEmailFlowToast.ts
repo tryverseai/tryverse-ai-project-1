@@ -152,6 +152,21 @@ export function convexAuthEmailFlowToast(err: unknown, flow: AuthEmailFlow): nul
     };
   }
 
+  /** Our own cooldown/abuse-limit rejection (see convex/emailVerificationThrottle.ts) — a normal,
+   *  expected response, not a broken integration. Must be checked before the generic Convex-wrapper
+   *  branches below, which would otherwise bury this clear message under an unrelated Resend/env
+   *  diagnostic wall of text. */
+  const throttleMatch = collapsed.match(
+    /please wait \d+s before requesting another code\.?|too many verification emails requested\.[^.]*\.?/i,
+  );
+  if (throttleMatch) {
+    return {
+      title: "Slow down a little",
+      description: throttleMatch[0],
+      variant: "default",
+    };
+  }
+
   const nested = extractNestedAuthFailure(collapsed);
 
   const signupSimpleDestructive = (): { title: string; description: string; variant: "destructive" } => {

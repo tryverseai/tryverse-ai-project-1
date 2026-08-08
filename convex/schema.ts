@@ -268,6 +268,16 @@ export default defineSchema({
     window_start: v.string(),
   }).index("by_key_window", ["api_key_id", "window_start"]),
 
+  /** Durable per-email cooldown for signup/password-reset OTP sends — prevents email-bombing an
+   *  arbitrary inbox via unlimited "resend code" requests. Checked from inside the Convex Auth
+   *  email provider's `sendVerificationRequest`, which runs as an action (has ctx.db access). */
+  email_verification_throttle: defineTable({
+    email: v.string(),
+    last_sent_at: v.number(),
+    window_start: v.number(),
+    count_in_window: v.number(),
+  }).index("by_email", ["email"]),
+
   admin_audit_log: defineTable({
     event_type: v.string(),
     actor: v.optional(v.string()),
