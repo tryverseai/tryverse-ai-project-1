@@ -121,6 +121,11 @@ export default defineSchema({
     status: v.string(),
     created_at: v.optional(v.string()),
     last_used_at: v.optional(v.string()),
+    /** Subset of ["read","write"]. Undefined/empty = full access — every key created before this
+     *  field existed keeps working exactly as before. */
+    scopes: v.optional(v.array(v.string())),
+    /** ISO timestamp. Undefined = never expires. */
+    expires_at: v.optional(v.string()),
   })
     .index("by_userId", ["user_id"])
     .index("by_key_value", ["key_value"]),

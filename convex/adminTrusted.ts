@@ -361,14 +361,21 @@ export const createApiKeyAdmin = mutation({
     secret: v.string(),
     userId: v.string(),
     name: v.optional(v.string()),
+    scopes: v.optional(v.array(v.string())),
+    expiresInDays: v.optional(v.number()),
   },
-  handler: async (ctx, { secret, userId, name }) => {
+  handler: async (ctx, { secret, userId, name, scopes, expiresInDays }) => {
     requireBackendSecret(secret);
     const profile = await findProfileBySubjectKeys(ctx, userId);
     if (!profile) throw new Error("profile_not_found");
     const now = new Date().toISOString();
     const key_value = randomApiKeySecret();
     const legacy_id = crypto.randomUUID();
+    const normalizedScopes = scopes?.filter((s) => s === "read" || s === "write");
+    const expires_at =
+      typeof expiresInDays === "number" && expiresInDays > 0
+        ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+        : undefined;
     await ctx.db.insert("api_keys", {
       legacy_id,
       user_id: profile.id,
@@ -376,8 +383,19 @@ export const createApiKeyAdmin = mutation({
       name: name?.trim() || "Production",
       status: "active",
       created_at: now,
+      scopes: normalizedScopes && normalizedScopes.length > 0 ? normalizedScopes : undefined,
+      expires_at,
     });
-    return { id: legacy_id, user_id: profile.id, key_value, name: name?.trim() || "Production", created_at: now, status: "active" as const };
+    return {
+      id: legacy_id,
+      user_id: profile.id,
+      key_value,
+      name: name?.trim() || "Production",
+      created_at: now,
+      status: "active" as const,
+      scopes: normalizedScopes && normalizedScopes.length > 0 ? normalizedScopes : undefined,
+      expires_at,
+    };
   },
 });
 

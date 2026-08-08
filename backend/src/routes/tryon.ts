@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { body, param } from 'express-validator';
 import { requireAuth, optionalAuth, requireAuthenticatedActor, convexProfileCreditLookupKey } from '../middleware/auth';
-import { optionalApiKey } from '../middleware/apiKey';
+import { optionalApiKey, requireScope } from '../middleware/apiKey';
 import { tryonRateLimit } from '../middleware/rateLimiter';
 import { planAwareTryonRateLimit } from '../middleware/planRateLimit';
 import { handleValidationErrors } from '../middleware/validate';
@@ -49,6 +49,7 @@ router.post(
   '/',
   tryonRateLimit,
   optionalApiKey,
+  requireScope('write'),
   optionalAuth,
   requireAuthenticatedActor,
   planAwareTryonRateLimit,

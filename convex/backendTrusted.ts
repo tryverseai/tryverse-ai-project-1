@@ -478,6 +478,9 @@ export const lookupActiveApiKey = query({
       .withIndex("by_key_value", (q) => q.eq("key_value", keyValue))
       .unique();
     if (!row || row.status !== "active") return null;
+    // Expired keys behave exactly like inactive ones — same "invalid or revoked" error the
+    // caller already handles, no new error path needed anywhere downstream.
+    if (row.expires_at && row.expires_at < new Date().toISOString()) return null;
     const id = row.legacy_id ?? row._id;
     return {
       id,
@@ -485,6 +488,7 @@ export const lookupActiveApiKey = query({
       keyValue: row.key_value,
       status: row.status,
       name: row.name,
+      scopes: row.scopes ?? null,
     };
   },
 });
@@ -963,6 +967,10 @@ export const listApiKeysForUser = query({
         key_value: k.key_value,
         name: k.name,
         created_at: k.created_at ?? "",
+        last_used_at: k.last_used_at ?? null,
+        scopes: k.scopes ?? null,
+        expires_at: k.expires_at ?? null,
+        expired: Boolean(k.expires_at && k.expires_at < new Date().toISOString()),
       }));
   },
 });

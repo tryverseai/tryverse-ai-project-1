@@ -341,17 +341,103 @@ router.get('/me', requireAuth, async (req: Request, res: Response, next: NextFun
  * GET /api/account/api-keys
  * The caller's own active API keys.
  */
+interface ApiKeyListRow {
+  id: string;
+  key_value: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+  scopes: string[] | null;
+  expires_at: string | null;
+  expired: boolean;
+}
+
 router.get('/api-keys', requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const keys = await convexQueryTrusted<Array<{ id: string; key_value: string; name: string; created_at: string }>>(
-      anyApi.backendTrusted.listApiKeysForUser,
-      { secret: env.BACKEND_SHARED_SECRET, userId: req.user!.id }
-    );
+    const keys = await convexQueryTrusted<ApiKeyListRow[]>(anyApi.backendTrusted.listApiKeysForUser, {
+      secret: env.BACKEND_SHARED_SECRET,
+      userId: req.user!.id,
+    });
     res.json({ keys });
   } catch (err) {
     next(err);
   }
 });
+
+const VALID_SCOPES = new Set(['read', 'write']);
+
+/**
+ * POST /api/account/api-keys/create
+ * Always creates a NEW named key (unlike POST /api-keys, which is idempotent and returns the
+ * existing key). This is how a brand creates additional, purpose-scoped keys — e.g. a read-only
+ * key for a reporting integration, or a key that expires after a contractor engagement ends.
+ */
+router.post(
+  '/api-keys/create',
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const body = req.body as { name?: unknown; scopes?: unknown; expiresInDays?: unknown };
+      const name = typeof body.name === 'string' ? body.name.trim().slice(0, 80) : '';
+      let scopes: string[] | undefined;
+      if (Array.isArray(body.scopes)) {
+        const cleaned = body.scopes.filter((s): s is string => typeof s === 'string' && VALID_SCOPES.has(s));
+        if (cleaned.length === 0) {
+          res.status(400).json({ error: 'scopes must include at least one of "read", "write"' });
+          return;
+        }
+        scopes = cleaned;
+      }
+      let expiresInDays: number | undefined;
+      if (body.expiresInDays !== undefined && body.expiresInDays !== null) {
+        const n = Number(body.expiresInDays);
+        if (!Number.isFinite(n) || n <= 0 || n > 3650) {
+          res.status(400).json({ error: 'expiresInDays must be a positive number of days (max 3650)' });
+          return;
+        }
+        expiresInDays = n;
+      }
+      const created = await convexMutationTrusted(anyApi.adminTrusted.createApiKeyAdmin, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId: req.user!.id,
+        name: name || undefined,
+        scopes,
+        expiresInDays,
+      });
+      res.json({ key: created });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /api/account/api-keys/:id/revoke
+ * Revokes one specific key by id — unlike /regenerate, this does not touch the account's other keys.
+ */
+router.post(
+  '/api-keys/:id/revoke',
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ownedKeys = await convexQueryTrusted<Array<{ id: string }>>(anyApi.backendTrusted.listApiKeysForUser, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId: req.user!.id,
+      });
+      if (!ownedKeys.some((k) => k.id === req.params.id)) {
+        res.status(404).json({ error: 'Key not found' });
+        return;
+      }
+      await convexMutationTrusted(anyApi.adminTrusted.revokeApiKeyAdmin, {
+        secret: env.BACKEND_SHARED_SECRET,
+        legacyId: req.params.id,
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 /**
  * POST /api/account/api-keys

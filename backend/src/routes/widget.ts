@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { body } from 'express-validator';
 import { requireAuth } from '../middleware/auth';
-import { requireApiKey, validateDomain } from '../middleware/apiKey';
+import { requireApiKey, validateDomain, requireScope } from '../middleware/apiKey';
 import { listActiveModels } from '../services/models/modelLibrary';
 import { widgetRateLimit } from '../middleware/rateLimiter';
 import { handleValidationErrors } from '../middleware/validate';
@@ -34,6 +34,7 @@ router.post(
   '/request',
   widgetRateLimit,
   requireApiKey,
+  requireScope('write'),
   validateDomain,
   [
     body('personImagePath')

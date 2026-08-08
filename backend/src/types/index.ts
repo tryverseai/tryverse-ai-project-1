@@ -72,6 +72,8 @@ export interface ApiKeyPayload {
   keyValue: string;
   status: ApiKeyStatus;
   name: string;
+  /** Subset of ["read","write"]. null/undefined = full access (legacy/unscoped key). */
+  scopes?: string[] | null;
 }
 
 export interface CreditCheckResult {

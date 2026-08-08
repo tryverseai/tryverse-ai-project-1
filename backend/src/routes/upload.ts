@@ -3,7 +3,7 @@ import multer from 'multer';
 import { uploadImageBuffer, getSignedUrl, INPUT_BUCKET } from '../services/storage/images';
 import type { StorageFolder } from '../types';
 import { optionalAuth, requireAuth } from '../middleware/auth';
-import { optionalApiKey } from '../middleware/apiKey';
+import { optionalApiKey, requireScope } from '../middleware/apiKey';
 import { uploadRateLimit } from '../middleware/rateLimiter';
 import { logger } from '../config/logger';
 import { fetchWithSsrfRedirectChecks, MAX_REMOTE_RESPONSE_BYTES } from '../utils/ssrfFetch';
@@ -38,6 +38,7 @@ router.post(
   '/',
   uploadRateLimit,
   optionalApiKey,
+  requireScope('write'),
   optionalAuth,
   (req: Request, res: Response, next: NextFunction) => {
     upload.single('image')(req, res, (err) => {
@@ -114,6 +115,7 @@ router.post(
   '/from-url',
   uploadRateLimit,
   optionalApiKey,
+  requireScope('write'),
   optionalAuth,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {

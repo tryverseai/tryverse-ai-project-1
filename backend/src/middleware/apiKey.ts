@@ -32,6 +32,7 @@ export async function optionalApiKey(req: Request, res: Response, next: NextFunc
       keyValue: string;
       status: string;
       name: string;
+      scopes?: string[] | null;
     } | null>(anyApi.backendTrusted.lookupActiveApiKey, {
       secret: env.BACKEND_SHARED_SECRET,
       keyValue,
@@ -44,6 +45,7 @@ export async function optionalApiKey(req: Request, res: Response, next: NextFunc
         keyValue: apiKey.keyValue,
         status: apiKey.status,
         name: apiKey.name,
+        scopes: apiKey.scopes,
       } as ApiKeyPayload;
       req.widgetUserId = apiKey.userId;
     }
@@ -82,6 +84,7 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
       keyValue: string;
       status: string;
       name: string;
+      scopes?: string[] | null;
     } | null>(anyApi.backendTrusted.lookupActiveApiKey, {
       secret: env.BACKEND_SHARED_SECRET,
       keyValue,
@@ -106,6 +109,7 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
       keyValue: apiKey.keyValue,
       status: apiKey.status,
       name: apiKey.name,
+      scopes: apiKey.scopes,
     } as ApiKeyPayload;
 
     req.widgetUserId = apiKey.userId;
@@ -114,6 +118,39 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
     logger.error('API key middleware error', { error: String(err) });
     res.status(500).json({ error: 'API key validation failed' });
   }
+}
+
+/**
+ * Gates a route behind a required scope on the calling API key. No-ops when the request wasn't
+ * API-key-authenticated at all (e.g. dashboard JWT auth on routes that accept either) — scoping
+ * only applies to API keys. A key with no `scopes` set is a legacy/unscoped key with full access,
+ * so every key created before scopes existed keeps working exactly as before.
+ */
+export function requireScope(scope: 'read' | 'write') {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.apiKey) {
+      next();
+      return;
+    }
+    const scopes = req.apiKey.scopes;
+    if (!scopes || scopes.length === 0 || scopes.includes(scope)) {
+      next();
+      return;
+    }
+    logAudit({
+      event_type: 'api_key_blocked',
+      actor: `api_key:${req.apiKey.id}`,
+      action: 'insufficient_scope',
+      target_id: req.apiKey.id,
+      details: { requiredScope: scope, keyScopes: scopes, path: req.path },
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    });
+    res.status(403).json({
+      error: `This API key does not have "${scope}" access.`,
+      code: 'INSUFFICIENT_SCOPE',
+    });
+  };
 }
 
 /**

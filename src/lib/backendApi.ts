@@ -1575,11 +1575,18 @@ export async function adminDeleteInvite(
 
 // ─── API Keys (dashboard) ──────────────────────────────────────────────────
 
+export type ApiKeyScope = 'read' | 'write';
+
 export interface ApiKeyRecord {
   id: string;
   key_value: string;
   name: string;
   created_at: string;
+  last_used_at?: string | null;
+  /** null = legacy/unscoped key with full access. */
+  scopes?: ApiKeyScope[] | null;
+  expires_at?: string | null;
+  expired?: boolean;
 }
 
 export async function listApiKeys(): Promise<ApiKeyRecord[]> {
@@ -1609,6 +1616,32 @@ export async function regenerateApiKey(): Promise<ApiKeyRecord> {
   });
   const data = await handleResponse<{ key: ApiKeyRecord }>(res);
   return data.key;
+}
+
+/** Always creates a NEW key — unlike getOrCreateApiKey, which is idempotent. */
+export async function createNamedApiKey(options: {
+  name: string;
+  scopes?: ApiKeyScope[];
+  expiresInDays?: number;
+}): Promise<ApiKeyRecord> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/account/api-keys/create`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(options),
+  });
+  const data = await handleResponse<{ key: ApiKeyRecord }>(res);
+  return data.key;
+}
+
+/** Revokes one specific key by id — does not touch the account's other keys. */
+export async function revokeApiKeyById(id: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/account/api-keys/${encodeURIComponent(id)}/revoke`, {
+    method: 'POST',
+    headers,
+  });
+  await handleResponse<{ ok: true }>(res);
 }
 
 // ─── AI Model Generation (Enterprise) ──────────────────────────────────────
