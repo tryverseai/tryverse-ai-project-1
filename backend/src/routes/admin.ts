@@ -201,7 +201,7 @@ router.post(
       .withMessage('key is too long'),
   ],
   handleValidationErrors,
-  (req: Request, res: Response): void => {
+  async (req: Request, res: Response): Promise<void> => {
     const submitted = normalizeAdminKeyInput((req.body as { key?: string }).key);
     if (submitted !== env.ADMIN_SECRET_KEY) {
       logAudit({
@@ -220,7 +220,7 @@ router.post(
       res.status(403).json({ error: 'Invalid admin key' });
       return;
     }
-    const token = createAdminSession();
+    const token = await createAdminSession();
     res.cookie(ADMIN_SESSION_COOKIE, token, adminSessionCookieOptions());
     logAudit({
       event_type: 'admin_login',
@@ -237,9 +237,9 @@ router.post(
  * DELETE /api/admin/session
  * Revokes the current session and clears the cookie.
  */
-router.delete('/session', (req: Request, res: Response): void => {
+router.delete('/session', async (req: Request, res: Response): Promise<void> => {
   const token = parseCookie(req.headers.cookie, ADMIN_SESSION_COOKIE);
-  revokeAdminSession(token);
+  await revokeAdminSession(token);
   const cookieOpts = adminSessionCookieOptions();
   res.clearCookie(ADMIN_SESSION_COOKIE, {
     path: cookieOpts.path,
@@ -254,9 +254,9 @@ router.delete('/session', (req: Request, res: Response): void => {
  * Returns 200 if the session cookie is valid; 401 otherwise.
  * Used by the frontend on page mount to restore admin state without re-entering the key.
  */
-router.get('/session/check', (req: Request, res: Response): void => {
+router.get('/session/check', async (req: Request, res: Response): Promise<void> => {
   const token = parseCookie(req.headers.cookie, ADMIN_SESSION_COOKIE);
-  if (validateAndRefreshSession(token)) {
+  if (await validateAndRefreshSession(token)) {
     res.json({ ok: true });
     return;
   }

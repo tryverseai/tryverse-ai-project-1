@@ -223,14 +223,14 @@ export function requireAuthenticatedActor(req: Request, res: Response, next: Nex
  *  1. HttpOnly session cookie (preferred — key never leaves the server)
  *  2. x-admin-key header (backward-compat for CLI / Postman access)
  */
-export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+export async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   // Import inline to avoid circular dependency (adminSession ↔ auth)
   const { validateAndRefreshSession, parseCookie, ADMIN_SESSION_COOKIE } =
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     require('../services/adminSession') as typeof import('../services/adminSession');
 
   const sessionToken = parseCookie(req.headers.cookie, ADMIN_SESSION_COOKIE);
-  if (validateAndRefreshSession(sessionToken)) {
+  if (await validateAndRefreshSession(sessionToken)) {
     next();
     return;
   }
