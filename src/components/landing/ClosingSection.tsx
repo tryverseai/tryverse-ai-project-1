@@ -39,7 +39,7 @@ export function ClosingSection() {
       />
 
       <div className="relative mx-auto w-full max-w-[78rem] px-6 py-24 md:px-10 md:py-32">
-        <p className="type-eyebrow mb-8 text-[hsl(40_16%_95%/0.6)] md:mb-10">01 — Get started</p>
+        <p className="type-eyebrow mb-8 text-[hsl(40_16%_95%/0.6)] md:mb-10">Get started</p>
         <h2 className="type-hero max-w-3xl text-balance text-[hsl(40_16%_95%)]">
           <RevealLines
             lines={[

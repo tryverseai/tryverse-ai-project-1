@@ -28,7 +28,7 @@ export function IntegrationSection() {
     <Section id="integration" rhythm="wide">
       <SectionIntro
         eyebrow="Brand integration"
-        index="08"
+        index="07"
         title={
           <>
             Three ways in. <em className="font-normal italic">No replatforming.</em>

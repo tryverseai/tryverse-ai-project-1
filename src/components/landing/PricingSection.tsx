@@ -28,7 +28,7 @@ export function PricingSection() {
     <Section id="pricing" rhythm="wide">
       <SectionIntro
         eyebrow="Pricing"
-        index="10"
+        index="09"
         title={
           <>
             Try it first. <em className="font-normal italic">Pay when it earns it.</em>

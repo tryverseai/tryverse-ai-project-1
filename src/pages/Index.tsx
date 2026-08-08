@@ -5,7 +5,6 @@ import { HeroSection } from "@/components/landing/HeroSection";
 import { ProblemSection } from "@/components/landing/ProblemSection";
 import { ConfidenceSection } from "@/components/landing/ConfidenceSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
-import { TryOnProofSection } from "@/components/landing/TryOnProofSection";
 import { CampaignGallerySection } from "@/components/landing/CampaignGallerySection";
 import { MannequinSection } from "@/components/landing/MannequinSection";
 import { PlatformSection } from "@/components/landing/PlatformSection";
@@ -43,19 +42,17 @@ const Index = () => {
         <ScrollProgress />
         <Navbar />
         <main id="main">
-          <ClosingSection />
           <HeroSection />
           <ProblemSection />
           <ConfidenceSection />
           <HowItWorksSection />
-          <TryOnProofSection />
           <CampaignGallerySection />
           <MannequinSection />
           <PlatformSection />
           <IntegrationSection />
           <BenefitsSection />
           <PricingSection />
-
+          <ClosingSection />
         </main>
 
         <Footer />

@@ -56,7 +56,7 @@ export function CampaignGallerySection() {
       className="relative bg-[hsl(var(--ink))] text-[hsl(40_16%_95%)]"
     >
       <div className="mx-auto w-full max-w-[78rem] px-6 pt-28 md:px-10 md:pt-40">
-        <Eyebrow index="05" className="mb-8 text-[hsl(40_16%_95%/0.55)]">
+        <Eyebrow index="04" className="mb-8 text-[hsl(40_16%_95%/0.55)]">
           The campaign
         </Eyebrow>
         <h2 className="type-display max-w-3xl text-balance">
