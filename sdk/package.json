@@ -4,6 +4,9 @@
   "description": "Official TryVerse SDK — AI virtual try-on for fashion brands. Install, add your API key, initialize, done.",
   "license": "MIT",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
