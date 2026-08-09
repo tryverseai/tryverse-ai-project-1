@@ -1,5 +1,5 @@
 {
-  "name": "@tryverse/sdk",
+  "name": "@tryverseai/sdk",
   "version": "0.1.0",
   "description": "Official TryVerse SDK — AI virtual try-on for fashion brands. Install, add your API key, initialize, done.",
   "license": "MIT",

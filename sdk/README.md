@@ -1,11 +1,11 @@
-# @tryverse/sdk
+# @tryverseai/sdk
 
 The official TryVerse SDK — AI virtual try-on for fashion brands. Install it, add your API key, and generate try-ons in one call.
 
 ## Install
 
 ```bash
-npm install @tryverse/sdk
+npm install @tryverseai/sdk
 ```
 
 ## Quick start
@@ -16,7 +16,7 @@ TRYVERSE_API_KEY=tv_live_your_key_here
 ```
 
 ```ts
-import { TryVerse } from "@tryverse/sdk";
+import { TryVerse } from "@tryverseai/sdk";
 
 const tryverse = new TryVerse(); // reads TRYVERSE_API_KEY automatically
 
@@ -78,7 +78,7 @@ await tryverse.tryOn({
 Failures throw `TryVerseError`, with `status` and `code` populated when the API returned them (e.g. `code: "CREDITS_EXHAUSTED"`).
 
 ```ts
-import { TryVerse, TryVerseError } from "@tryverse/sdk";
+import { TryVerse, TryVerseError } from "@tryverseai/sdk";
 
 try {
   await tryverse.tryOn({ personImage, productImage });

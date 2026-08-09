@@ -14,7 +14,7 @@ export type {
  * The official TryVerse SDK.
  *
  * ```ts
- * import { TryVerse } from "@tryverse/sdk";
+ * import { TryVerse } from "@tryverseai/sdk";
  *
  * const tryverse = new TryVerse(); // reads TRYVERSE_API_KEY from the environment
  *

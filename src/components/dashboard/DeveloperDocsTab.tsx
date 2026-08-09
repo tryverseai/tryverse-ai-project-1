@@ -63,12 +63,12 @@ const endpoints = [
 
 const getApiBaseUrl = () => widgetBackendPublicUrl().replace(/\/$/, "");
 
-const sdkInstallExample = () => `npm install @tryverse/sdk`;
+const sdkInstallExample = () => `npm install @tryverseai/sdk`;
 
 const sdkEnvExample = () => `# .env
 TRYVERSE_API_KEY=tv_live_your_api_key_here`;
 
-const sdkUsageExample = () => `import { TryVerse } from "@tryverse/sdk";
+const sdkUsageExample = () => `import { TryVerse } from "@tryverseai/sdk";
 
 const tryverse = new TryVerse(); // reads TRYVERSE_API_KEY automatically
 
