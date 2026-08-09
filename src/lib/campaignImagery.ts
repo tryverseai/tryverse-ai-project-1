@@ -16,9 +16,9 @@ import denim from "@/assets/campaign-denim.jpg";
  * every surface that needs photography pulls from here so the visual language stays one voice.
  */
 export const campaign = {
-  /** Still figure seated, crowd smeared into motion around her. Stillness inside noise. */
+  /** Still figure seated, crowd smeared into motion around her. Stillness inside noise. Hero only. */
   crowd: { src: crowd, alt: "Model seated still while a blurred crowd moves around her" },
-  /** Editorial transit portrait, yellow train streaking past. */
+  /** Editorial transit portrait, yellow train streaking past. Retired from the page — kept for reuse. */
   transit: { src: transit, alt: "Model in a black coat on a platform as a yellow train blurs past" },
   /** Three models seated on red theatre seats, one seat empty. */
   seatedTrio: { src: seatedTrio, alt: "Three models in coloured outerwear seated on red theatre seats" },
