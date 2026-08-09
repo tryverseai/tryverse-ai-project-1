@@ -57,7 +57,7 @@ export function HowItWorksSection() {
     <Section id="how-it-works" rhythm="wide">
       <SectionIntro
         eyebrow="How it works"
-        index="03"
+        index="05"
         title={
           <>
             Three steps between <em className="font-normal italic">curiosity</em> and confidence.

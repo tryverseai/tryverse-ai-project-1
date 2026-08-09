@@ -2,14 +2,13 @@ import { Navbar } from "@/components/Navbar";
 import { ScrollProgress } from "@/components/landing/ScrollProgress";
 import { SmoothScroll } from "@/components/motion/SmoothScroll";
 import { HeroSection } from "@/components/landing/HeroSection";
-import { ProblemSection } from "@/components/landing/ProblemSection";
 import { ConfidenceSection } from "@/components/landing/ConfidenceSection";
-import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
-import { CampaignGallerySection } from "@/components/landing/CampaignGallerySection";
+import { ProblemSection } from "@/components/landing/ProblemSection";
 import { MannequinSection } from "@/components/landing/MannequinSection";
+import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
+import { BenefitsSection } from "@/components/landing/BenefitsSection";
 import { PlatformSection } from "@/components/landing/PlatformSection";
 import { IntegrationSection } from "@/components/landing/IntegrationSection";
-import { BenefitsSection } from "@/components/landing/BenefitsSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { ClosingSection } from "@/components/landing/ClosingSection";
 import { Footer } from "@/components/Footer";
@@ -43,14 +42,13 @@ const Index = () => {
         <Navbar />
         <main id="main">
           <HeroSection />
-          <ProblemSection />
           <ConfidenceSection />
-          <HowItWorksSection />
-          <CampaignGallerySection />
+          <ProblemSection />
           <MannequinSection />
+          <HowItWorksSection />
+          <BenefitsSection />
           <PlatformSection />
           <IntegrationSection />
-          <BenefitsSection />
           <PricingSection />
           <ClosingSection />
         </main>

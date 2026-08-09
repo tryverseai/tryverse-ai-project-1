@@ -34,7 +34,7 @@ export function BenefitsSection() {
     <Section id="benefits" tone="studio" rhythm="wide">
       <SectionIntro
         eyebrow="Customer benefits"
-        index="08"
+        index="06"
         title={
           <>
             What changes the day it goes <em className="font-normal italic">live</em>.

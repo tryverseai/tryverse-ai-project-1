@@ -9,15 +9,14 @@ import { campaign } from "@/lib/campaignImagery";
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 /**
- * Editorial hero: type-led left column, two offset campaign plates on the right.
- * Photography only — no motion assets — so the first frame is the finished image.
+ * Editorial hero: type-led left column, a single dominant campaign plate on the right.
+ * One image, given room, not a collage — the first frame is the finished photograph.
  */
 export function HeroSection() {
   const reduce = useReducedMotion();
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const yPrimary = useTransform(scrollYProgress, [0, 1], ["0%", reduce ? "0%" : "-14%"]);
-  const ySecondary = useTransform(scrollYProgress, [0, 1], ["0%", reduce ? "0%" : "-4%"]);
   const fade = useTransform(scrollYProgress, [0, 0.85], [1, reduce ? 1 : 0.25]);
 
   return (
@@ -98,16 +97,16 @@ export function HeroSection() {
           </motion.dl>
         </motion.div>
 
-        {/* ---- Campaign column ---- */}
+        {/* ---- Campaign column — one image, given room ---- */}
         <div className="relative">
           <motion.figure
             style={{ y: yPrimary }}
             initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 1.04 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.2, delay: 0.2, ease: EASE }}
-            className="relative ml-auto w-[86%] overflow-hidden rounded-[var(--radius-xl)] studio-frame shadow-[var(--shadow-elevated)] sm:w-[78%] lg:w-[84%]"
+            className="relative ml-auto w-full overflow-hidden rounded-[var(--radius-xl)] studio-frame shadow-[var(--shadow-elevated)]"
           >
-            <div className="aspect-[3/4]">
+            <div className="aspect-[4/5] lg:aspect-[3/4]">
               <img
                 src={campaign.transit.src}
                 alt={campaign.transit.alt}
@@ -122,23 +121,6 @@ export function HeroSection() {
               <p className="type-eyebrow text-[hsl(40_16%_95%)]">Rendered on the shopper</p>
             </figcaption>
           </motion.figure>
-
-          <motion.div
-            style={{ y: ySecondary }}
-            initial={reduce ? { opacity: 0 } : { opacity: 0, y: 34 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.2, delay: 0.45, ease: EASE }}
-            className="absolute -bottom-8 left-0 w-[42%] overflow-hidden rounded-[var(--radius-lg)] border border-border/60 shadow-[var(--shadow-elevated)] sm:w-[38%] lg:-bottom-12 lg:w-[44%]"
-          >
-            <div className="aspect-[3/4]">
-              <img
-                src={campaign.denim.src}
-                alt={campaign.denim.alt}
-                decoding="async"
-                className="h-full w-full object-cover"
-              />
-            </div>
-          </motion.div>
         </div>
       </div>
 

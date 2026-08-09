@@ -65,7 +65,7 @@ export function MannequinSection() {
         </div>
 
         <div className="order-1 lg:order-2">
-          <Eyebrow index="05" className="mb-8">
+          <Eyebrow index="04" className="mb-8">
             The workflow
           </Eyebrow>
           <h2 className="type-display max-w-2xl text-balance">
