@@ -205,9 +205,9 @@ export function ConnectStoreWizard({ aiTryOnEnabled, userKey, onTryItYourself }:
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 mt-3">
               <TriangleAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <p className="text-xs text-amber-900 dark:text-amber-200">
-                This key currently works from <strong>any</strong> website — no domain restriction yet.
-                That's fine for testing; before you launch, add your storefront domain in{" "}
-                <span className="font-medium">Developers → Allowed domains</span>.
+                No allowed domain yet — the storefront widget won't run on your site until you add one in{" "}
+                <span className="font-medium">Developers → Allowed domains</span>. Server-side calls (the SDK,
+                your own backend) aren't affected.
               </p>
             </div>
           )}

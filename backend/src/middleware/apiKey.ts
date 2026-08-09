@@ -186,7 +186,25 @@ export async function validateDomain(req: Request, res: Response, next: NextFunc
     );
 
     if (!allowedDomains || allowedDomains.length === 0) {
-      return next();
+      const { logAudit } = await import('../services/audit');
+      logAudit({
+        event_type: 'api_key_blocked',
+        actor: `api_key:${req.apiKey.id}`,
+        action: 'domain_not_configured',
+        target_id: req.apiKey.id,
+        details: { domain: requestDomain, apiKeyId: req.apiKey.id },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+      logger.warn('Browser request blocked — no allowed domains configured for this key', {
+        domain: requestDomain,
+        apiKeyId: req.apiKey.id,
+      });
+      res.status(403).json({
+        error: 'No allowed domains are configured for this API key. Add your storefront domain in the TryVerse dashboard (Developers → Allowed domains) before using this key from a browser.',
+        code: 'NO_ALLOWED_DOMAINS',
+      });
+      return;
     }
 
     const isAllowed = allowedDomains.some((d) => {

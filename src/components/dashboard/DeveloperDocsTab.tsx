@@ -299,8 +299,8 @@ export function DeveloperDocsTab() {
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 mb-3">
               <TriangleAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <p className="text-xs text-amber-900 dark:text-amber-200">
-                No domains configured — this key currently accepts requests from <strong>any</strong> website.
-                Add your storefront domain below before going live to restrict it.
+                No domains configured — the storefront widget won't accept requests from any website until you
+                add one below. Server-side calls (the SDK, your own backend) aren't affected.
               </p>
             </div>
           ) : (
