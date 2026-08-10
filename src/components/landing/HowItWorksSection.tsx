@@ -1,7 +1,7 @@
 import { Section, SectionIntro } from "@/components/layout/Section";
-import { Reveal, RevealGroup, RevealItem } from "@/components/motion/Reveal";
-import { AutoPlayVideo } from "@/components/AutoPlayVideo";
-import demoVideo from "@/assets/how-it-works-demo.mp4";
+import { RevealGroup, RevealItem } from "@/components/motion/Reveal";
+import { ParallaxImage } from "@/components/motion/ParallaxImage";
+import productDemo from "@/assets/how-it-works-product.jpg";
 
 const steps = [
   {
@@ -49,18 +49,19 @@ export function HowItWorksSection() {
         ))}
       </RevealGroup>
 
-      {/* The demo, not a diagram of it — the actual flow described above, recorded end to end. */}
-      <Reveal
-        delay={0.15}
-        className="relative mx-auto mt-16 w-full max-w-[320px] overflow-hidden rounded-[var(--radius-xl)] border border-border studio-frame shadow-[var(--shadow-card)] md:mt-24"
-      >
-        <div className="aspect-[375/812] bg-secondary">
-          <AutoPlayVideo src={demoVideo} className="h-full w-full object-cover" />
-        </div>
-        <span className="pointer-events-none absolute left-4 top-4 rounded-[var(--radius-pill)] bg-background/85 px-3 py-1.5 type-eyebrow backdrop-blur-sm">
-          Live product demo
+      {/* The demo, not a diagram of it — a real product upload inside TryVerse itself, not a mockup. */}
+      <div className="relative mt-16 overflow-hidden rounded-[var(--radius-xl)] border border-border studio-frame shadow-[var(--shadow-card)] md:mt-24">
+        <ParallaxImage
+          src={productDemo}
+          alt="The TryVerse dashboard showing a shopper's reference photo alongside a product just uploaded for try-on"
+          className="aspect-[16/9] bg-secondary md:aspect-[21/9]"
+          distance={6}
+          scaleFrom={1.08}
+        />
+        <span className="pointer-events-none absolute left-4 top-4 rounded-[var(--radius-pill)] bg-background/85 px-3 py-1.5 type-eyebrow backdrop-blur-sm md:left-6 md:top-6">
+          Inside TryVerse
         </span>
-      </Reveal>
+      </div>
     </Section>
   );
 }

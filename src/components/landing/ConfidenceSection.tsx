@@ -57,9 +57,6 @@ export function ConfidenceSection() {
           className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[hsl(var(--ink))] to-transparent"
           aria-hidden="true"
         />
-        <p className="pointer-events-none absolute bottom-6 left-6 type-eyebrow text-[hsl(40_16%_95%/0.75)] md:bottom-8 md:left-10">
-          Ensemble — three fits, one open seat
-        </p>
       </div>
     </section>
   );

@@ -9,6 +9,8 @@ import { Link } from "react-router-dom";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { Helmet } from "react-helmet-async";
 import { useSignupChooser } from "@/components/signup/SignupChooserContext";
+import { ParallaxImage } from "@/components/motion/ParallaxImage";
+import partnerMirror from "@/assets/partner-mirror.jpg";
 
 const benefits = [
   { icon: TrendingDown, title: "Help Reduce Returns", description: "Customers know how items fit before buying." },
@@ -103,6 +105,24 @@ const PartnerWithUs = () => {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* A single photograph — confidence is the product being sold here, not just the code. */}
+      <section aria-label="The confidence TryVerse sells" className="relative overflow-hidden bg-[hsl(var(--ink))]">
+        <ParallaxImage
+          src={partnerMirror}
+          alt="A shopper checking her reflection in a mirror before going out"
+          className="aspect-[4/5] sm:aspect-[16/9] lg:aspect-[21/9]"
+          distance={8}
+          scaleFrom={1.1}
+        />
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[hsl(var(--ink))] to-transparent"
+          aria-hidden="true"
+        />
+        <p className="pointer-events-none absolute bottom-6 left-6 type-eyebrow text-[hsl(40_16%_95%/0.75)] md:bottom-8 md:left-10">
+          The confidence your customers buy for
+        </p>
       </section>
 
       {/* The Infrastructure Powering Virtual Try-On */}

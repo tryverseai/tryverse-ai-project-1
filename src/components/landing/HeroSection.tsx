@@ -44,7 +44,7 @@ export function HeroSection() {
         aria-hidden="true"
         style={{
           backgroundImage:
-            "linear-gradient(to top, hsl(var(--ink)) 0%, hsl(var(--ink)) 30%, hsl(var(--ink) / 0.75) 48%, transparent 62%)",
+            "linear-gradient(to top, hsl(var(--ink)) 0%, hsl(var(--ink)) 55%, transparent 70%)",
         }}
       />
       {/* Thin top wash so the transparent navbar's wordmark stays legible over the frame. */}
@@ -67,9 +67,9 @@ export function HeroSection() {
         <h1 className="type-hero max-w-2xl text-balance text-[hsl(40_16%_95%)]">
           <RevealLines
             lines={[
-              <>See yourself</>,
+              <>Experience it</>,
               <>
-                <em className="font-normal italic">before</em> you buy.
+                on <em className="font-normal italic">You</em>.
               </>,
             ]}
           />
@@ -81,7 +81,7 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.5, ease: EASE }}
         >
-          AI virtual try-on for fashion brands. One photo, and your shopper sees the garment on their own body.
+          AI virtual try-on for fashion brands. One photo, and your shopper sees the product on their own body.
         </motion.p>
 
         <motion.div

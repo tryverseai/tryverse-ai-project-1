@@ -23,6 +23,11 @@ export function TryVerseLogo({ className = "", height = 48, invert = false }: Tr
           ...(height != null ? { height: `${height}px` } : {}),
           width: "auto",
           display: "block",
+          // The source file has a baked-in white background rather than transparency.
+          // Multiply dissolves that white into whatever sits behind it (photo, gradient,
+          // page background) while keeping the dark mark solid — skipped when inverted,
+          // since that variant already targets a dark background directly.
+          ...(!invert && { mixBlendMode: "multiply" }),
         }}
       />
     </div>
