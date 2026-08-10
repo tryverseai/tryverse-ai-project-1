@@ -1,7 +1,8 @@
 import { Section, SectionIntro } from "@/components/layout/Section";
 import { RevealGroup, RevealItem } from "@/components/motion/Reveal";
 import { ParallaxImage } from "@/components/motion/ParallaxImage";
-import productDemo from "@/assets/how-it-works-product.jpg";
+import referencePhoto from "@/assets/how-it-works-model.jpg";
+import productPhoto from "@/assets/how-it-works-product-only.jpg";
 
 const steps = [
   {
@@ -49,15 +50,26 @@ export function HowItWorksSection() {
         ))}
       </RevealGroup>
 
-      {/* The demo, not a diagram of it — a real product upload inside TryVerse itself, not a mockup. */}
-      <div className="relative mt-16 overflow-hidden rounded-[var(--radius-xl)] border border-border studio-frame shadow-[var(--shadow-card)] md:mt-24">
-        <ParallaxImage
-          src={productDemo}
-          alt="The TryVerse dashboard showing a shopper's reference photo alongside a product just uploaded for try-on"
-          className="aspect-[16/9] bg-secondary md:aspect-[21/9]"
-          distance={6}
-          scaleFrom={1.08}
-        />
+      {/* The demo, not a diagram of it — a real reference photo and a real product upload, inside TryVerse itself. */}
+      <div className="mt-16 grid grid-cols-2 gap-3 md:mt-24 md:gap-4">
+        <div className="overflow-hidden rounded-[var(--radius-xl)] border border-border studio-frame shadow-[var(--shadow-card)]">
+          <ParallaxImage
+            src={referencePhoto}
+            alt="A shopper's reference photo uploaded to TryVerse"
+            className="aspect-[3/4] bg-secondary"
+            distance={5}
+            scaleFrom={1.06}
+          />
+        </div>
+        <div className="overflow-hidden rounded-[var(--radius-xl)] border border-border studio-frame shadow-[var(--shadow-card)]">
+          <ParallaxImage
+            src={productPhoto}
+            alt="A product uploaded to TryVerse, ready for try-on"
+            className="aspect-[3/4] bg-secondary"
+            distance={5}
+            scaleFrom={1.06}
+          />
+        </div>
       </div>
     </Section>
   );
