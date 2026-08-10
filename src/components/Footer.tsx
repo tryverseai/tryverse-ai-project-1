@@ -79,7 +79,7 @@ export function Footer() {
         <Reveal className="overflow-hidden border-b border-[hsl(40_16%_95%/0.12)] py-12 md:py-16">
           <p
             aria-hidden="true"
-            className="select-none font-display leading-[0.8] tracking-[-0.045em] text-[hsl(40_16%_95%/0.08)]"
+            className="select-none font-display leading-[0.8] tracking-[-0.045em] text-[hsl(40_16%_95%)]"
             style={{ fontSize: "clamp(4rem, 17vw, 15rem)" }}
           >
             TryVerse

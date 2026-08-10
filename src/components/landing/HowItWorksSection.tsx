@@ -58,9 +58,6 @@ export function HowItWorksSection() {
           distance={6}
           scaleFrom={1.08}
         />
-        <span className="pointer-events-none absolute left-4 top-4 rounded-[var(--radius-pill)] bg-background/85 px-3 py-1.5 type-eyebrow backdrop-blur-sm md:left-6 md:top-6">
-          Inside TryVerse
-        </span>
       </div>
     </Section>
   );
