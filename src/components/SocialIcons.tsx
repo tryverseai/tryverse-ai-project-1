@@ -43,9 +43,11 @@ const SOCIAL_LINKS = [
 
 interface SocialIconsProps {
   className?: string;
+  /** Override the default light-theme link colors, e.g. for placement on a dark section. */
+  linkClassName?: string;
 }
 
-export function SocialIcons({ className }: SocialIconsProps) {
+export function SocialIcons({ className, linkClassName }: SocialIconsProps) {
   return (
     <div className={cn("flex items-center gap-4", className)}>
       {SOCIAL_LINKS.map((social) => (
@@ -54,7 +56,7 @@ export function SocialIcons({ className }: SocialIconsProps) {
           href={social.href}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-muted-foreground hover:text-foreground transition-colors"
+          className={cn("text-muted-foreground hover:text-foreground transition-colors", linkClassName)}
           aria-label={social.name}
         >
           <social.icon />

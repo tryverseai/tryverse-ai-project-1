@@ -41,7 +41,7 @@ export function PlatformSection() {
     <Section id="platform" tone="ink" rhythm="wide">
       <SectionIntro
         eyebrow="Enterprise platform"
-        index="07"
+        index="05"
         title={
           <>
             One render is a demo. <em className="font-normal italic">A platform</em> is a business.

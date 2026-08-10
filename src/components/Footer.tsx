@@ -10,8 +10,7 @@ const columns: { title: string; links: FooterLink[] }[] = [
     title: "Platform",
     links: [
       { label: "How it works", href: "/#how-it-works" },
-      { label: "Integration", href: "/#integrate" },
-      { label: "Enterprise", href: "/#enterprise" },
+      { label: "Enterprise", href: "/#platform" },
       { label: "Partner with us", href: "/partner" },
     ],
   },
@@ -38,7 +37,7 @@ const columns: { title: string; links: FooterLink[] }[] = [
 
 function FooterAnchor({ link }: { link: FooterLink }) {
   const cls =
-    "underline-sweep inline-block text-[0.8125rem] text-muted-foreground transition-colors duration-200 hover:text-foreground";
+    "underline-sweep inline-block text-[0.8125rem] text-[hsl(40_16%_95%/0.6)] transition-colors duration-200 hover:text-[hsl(40_16%_95%)]";
 
   if (link.cookieSettings) {
     return (
@@ -74,13 +73,13 @@ function FooterAnchor({ link }: { link: FooterLink }) {
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-background">
+    <footer className="border-t border-[hsl(40_16%_95%/0.12)] bg-[hsl(var(--ink))]">
       <div className="mx-auto w-full max-w-[78rem] px-6 md:px-10">
         {/* Oversized wordmark — the type is the graphic */}
-        <Reveal className="overflow-hidden border-b border-border py-12 md:py-16">
+        <Reveal className="overflow-hidden border-b border-[hsl(40_16%_95%/0.12)] py-12 md:py-16">
           <p
             aria-hidden="true"
-            className="select-none font-display leading-[0.8] tracking-[-0.045em] text-foreground/[0.07]"
+            className="select-none font-display leading-[0.8] tracking-[-0.045em] text-[hsl(40_16%_95%/0.08)]"
             style={{ fontSize: "clamp(4rem, 17vw, 15rem)" }}
           >
             TryVerse
@@ -89,10 +88,10 @@ export function Footer() {
 
         <div className="grid gap-12 py-14 md:grid-cols-[1.4fr_repeat(3,1fr)] md:gap-8">
           <div>
-            <Link to="/" className="inline-flex text-foreground transition-opacity hover:opacity-70">
-              <TryVerseLogo height={30} />
+            <Link to="/" className="inline-flex transition-opacity hover:opacity-70">
+              <TryVerseLogo height={30} invert />
             </Link>
-            <p className="type-caption mt-4 max-w-xs text-pretty">
+            <p className="type-caption mt-4 max-w-xs text-pretty text-[hsl(40_16%_95%/0.55)]">
               Virtual try-on infrastructure for fashion brands. Shoppers see the garment on themselves before they
               commit — embedded directly in your storefront.
             </p>
@@ -100,7 +99,7 @@ export function Footer() {
 
           {columns.map((col) => (
             <nav key={col.title} aria-label={col.title}>
-              <p className="type-eyebrow mb-5">{col.title}</p>
+              <p className="type-eyebrow mb-5 text-[hsl(40_16%_95%/0.45)]">{col.title}</p>
               <ul className="space-y-3">
                 {col.links.map((link) => (
                   <li key={link.label}>
@@ -112,9 +111,11 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="flex flex-col items-center justify-between gap-5 border-t border-border py-8 sm:flex-row">
-          <span className="type-caption">© {new Date().getFullYear()} TryVerse AI. All rights reserved.</span>
-          <SocialIcons />
+        <div className="flex flex-col items-center justify-between gap-5 border-t border-[hsl(40_16%_95%/0.12)] py-8 sm:flex-row">
+          <span className="type-caption text-[hsl(40_16%_95%/0.5)]">
+            © {new Date().getFullYear()} TryVerse AI. All rights reserved.
+          </span>
+          <SocialIcons linkClassName="text-[hsl(40_16%_95%/0.55)] hover:text-[hsl(40_16%_95%)]" />
         </div>
       </div>
     </footer>

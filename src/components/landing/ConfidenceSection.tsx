@@ -24,29 +24,19 @@ export function ConfidenceSection() {
           Why it matters
         </p>
         <h2 className="type-display max-w-2xl text-balance">
-          <RevealLines
-            lines={[
-              <>Confidence is the</>,
-              <>
-                <em className="font-normal italic">only</em> thing between
-              </>,
-              <>a browse and a purchase.</>,
-            ]}
-          />
+          <RevealLines lines={[<>Turn uncertainty</>, <>into conversion.</>]} />
         </h2>
-        <div className="mt-9 flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
+        <div className="mt-9 flex flex-col gap-6">
           <Reveal delay={0.18} className="max-w-lg">
             <p className="type-lead text-pretty text-[hsl(40_16%_95%/0.7)]">
-              Every product page asks the shopper to imagine. Remove the imagining, and the decision gets easier —
-              for them, and for the brand carrying the return.
+              Online fashion brands ask customers to make a decision from static product images. TryVerse gives them
+              a way to visualize products on themselves — directly within the shopping experience.
             </p>
           </Reveal>
-          <Reveal delay={0.28} className="max-w-sm shrink-0">
-            <blockquote className="border-l border-[hsl(40_16%_95%/0.25)] pl-6">
-              <p className="type-title text-balance text-[hsl(40_16%_95%)]">
-                &ldquo;The seat is empty because the shopper hasn&apos;t seen themselves in it yet.&rdquo;
-              </p>
-            </blockquote>
+          <Reveal delay={0.28} className="max-w-lg">
+            <p className="type-title text-balance text-[hsl(40_16%_95%)]">
+              More confidence for shoppers. Better product experiences for brands.
+            </p>
           </Reveal>
         </div>
       </div>

@@ -3,14 +3,9 @@ import { ScrollProgress } from "@/components/landing/ScrollProgress";
 import { SmoothScroll } from "@/components/motion/SmoothScroll";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { ConfidenceSection } from "@/components/landing/ConfidenceSection";
-import { ProblemSection } from "@/components/landing/ProblemSection";
 import { MannequinSection } from "@/components/landing/MannequinSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
-import { BenefitsSection } from "@/components/landing/BenefitsSection";
 import { PlatformSection } from "@/components/landing/PlatformSection";
-import { IntegrationSection } from "@/components/landing/IntegrationSection";
-import { PricingSection } from "@/components/landing/PricingSection";
-import { ClosingSection } from "@/components/landing/ClosingSection";
 import { Footer } from "@/components/Footer";
 import { Helmet } from "react-helmet-async";
 import { MotionConfig } from "framer-motion";
@@ -43,14 +38,9 @@ const Index = () => {
         <main id="main">
           <HeroSection />
           <ConfidenceSection />
-          <ProblemSection />
           <MannequinSection />
           <HowItWorksSection />
-          <BenefitsSection />
           <PlatformSection />
-          <IntegrationSection />
-          <PricingSection />
-          <ClosingSection />
         </main>
 
         <Footer />
