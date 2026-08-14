@@ -1,8 +1,21 @@
 import { Section, SectionIntro } from "@/components/layout/Section";
 import { RevealGroup, RevealItem } from "@/components/motion/Reveal";
-import { ParallaxImage } from "@/components/motion/ParallaxImage";
-import referencePhoto from "@/assets/how-it-works-model.jpg";
-import productPhoto from "@/assets/how-it-works-product-only.jpg";
+import { VoyagerShowcase } from "@/components/landing/VoyagerShowcase";
+import showcase01 from "@/assets/showcase-01-sweater.jpg";
+import showcase02 from "@/assets/showcase-02-dress.jpg";
+import showcase03 from "@/assets/showcase-03-polo.jpg";
+import showcase04 from "@/assets/showcase-04-traditional.jpg";
+import showcase05 from "@/assets/showcase-05-yellow-shirt.jpg";
+import showcase06 from "@/assets/showcase-06-navy.jpg";
+
+const showcaseSlides = [
+  { src: showcase01, alt: "TryVerse try-on demo: reference photo, cream sweater, and result" },
+  { src: showcase02, alt: "TryVerse try-on demo: reference photo, burgundy dress, and result" },
+  { src: showcase03, alt: "TryVerse try-on demo: reference photo, black polo, and result" },
+  { src: showcase04, alt: "TryVerse try-on demo: reference photo, traditional outfit, and result" },
+  { src: showcase05, alt: "TryVerse try-on demo: reference photo, yellow shirt, and result" },
+  { src: showcase06, alt: "TryVerse try-on demo: reference photo, navy garment, and result" },
+];
 
 const steps = [
   {
@@ -50,26 +63,9 @@ export function HowItWorksSection() {
         ))}
       </RevealGroup>
 
-      {/* The demo, not a diagram of it — a real reference photo and a real product upload, inside TryVerse itself. */}
-      <div className="mt-16 grid grid-cols-2 gap-3 md:mt-24 md:gap-4">
-        <div className="overflow-hidden rounded-[var(--radius-xl)] border border-border studio-frame shadow-[var(--shadow-card)]">
-          <ParallaxImage
-            src={referencePhoto}
-            alt="A shopper's reference photo uploaded to TryVerse"
-            className="aspect-[3/4] bg-secondary"
-            distance={5}
-            scaleFrom={1.06}
-          />
-        </div>
-        <div className="overflow-hidden rounded-[var(--radius-xl)] border border-border studio-frame shadow-[var(--shadow-card)]">
-          <ParallaxImage
-            src={productPhoto}
-            alt="A product uploaded to TryVerse, ready for try-on"
-            className="aspect-[3/4] bg-secondary"
-            distance={5}
-            scaleFrom={1.06}
-          />
-        </div>
+      {/* The demo, not a diagram of it — six real TryVerse sessions, scroll-scrubbed. No video, no arrows. */}
+      <div className="mt-16 md:mt-24">
+        <VoyagerShowcase slides={showcaseSlides} />
       </div>
     </Section>
   );
