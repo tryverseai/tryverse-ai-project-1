@@ -37,7 +37,7 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <Section id="how-it-works" rhythm="wide">
+    <Section id="how-it-works" rhythm="normal">
       <SectionIntro
         eyebrow="How it works"
         index="04"
@@ -49,7 +49,7 @@ export function HowItWorksSection() {
         lead="No avatars, no approximations, no separate app to download. The whole flow happens where the shopper already is."
       />
 
-      <RevealGroup className="mt-16 divide-y divide-border border-y border-border md:mt-20">
+      <RevealGroup className="mt-12 divide-y divide-border border-y border-border md:mt-16">
         {steps.map((step) => (
           <RevealItem key={step.index}>
             <div className="grid grid-cols-[auto_1fr] gap-6 py-7 md:py-9">
@@ -64,7 +64,7 @@ export function HowItWorksSection() {
       </RevealGroup>
 
       {/* The demo, not a diagram of it — six real TryVerse sessions, scroll-scrubbed. No video, no arrows. */}
-      <div className="mt-16 md:mt-24">
+      <div className="mt-10 md:mt-14">
         <VoyagerShowcase slides={showcaseSlides} />
       </div>
     </Section>

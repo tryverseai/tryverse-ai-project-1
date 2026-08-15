@@ -28,6 +28,7 @@ import {
   type TryOnCategory,
 } from "@/lib/backendApi";
 import { TryOnGuidelinesModal, hasSeenTryOnGuidelines } from "@/components/TryOnGuidelinesModal";
+import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
 
 const CATEGORIES: { id: TryOnCategory; label: string }[] = [
   { id: "clothing", label: "Full outfit" },
@@ -311,17 +312,6 @@ export function StudioTab() {
             )}
           </div>
 
-          {isRunning && (
-            <motion.div
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground"
-            >
-              {status === "uploading"
-                ? "Uploading images securely…"
-                : "AI is generating the try-on. This usually takes 15–45 seconds."}
-            </motion.div>
-          )}
         </div>
 
         {/* Right — Result */}
@@ -377,19 +367,13 @@ export function StudioTab() {
                 </Button>
               </motion.div>
             ) : isRunning ? (
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center rounded-xl border border-border bg-muted min-h-[320px] gap-4"
-              >
-                <div className="relative">
-                  <div className="h-14 w-14 rounded-full border-2 border-muted-foreground/20 border-t-foreground animate-spin" />
-                  <Sparkles className="h-5 w-5 text-muted-foreground absolute inset-0 m-auto" />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {status === "uploading" ? "Uploading…" : "Generating try-on…"}
-                </p>
+              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <GenerationLoadingScreen
+                  previewItems={[
+                    ...(model.preview ? [{ label: "Model", imageUrl: model.preview }] : []),
+                    ...(garment.preview ? [{ label: "Garment", imageUrl: garment.preview }] : []),
+                  ]}
+                />
               </motion.div>
             ) : (
               <motion.div

@@ -4,6 +4,8 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Upload, User, ShoppingBag, Star, Heart, ChevronRight, Scan, Check, RotateCcw, AlertCircle, Loader2 } from "lucide-react";
+import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
+import { TryOnGuidelinesModal, hasSeenTryOnGuidelines } from "@/components/TryOnGuidelinesModal";
 import { useSearchParams } from "react-router-dom";
 import { posthogCapture } from "@/lib/posthog";
 import { toast } from "sonner";
@@ -59,6 +61,7 @@ const WidgetPreview = () => {
   const [personUploadFile, setPersonUploadFile] = useState<File | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [guidelinesOpen, setGuidelinesOpen] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -252,7 +255,13 @@ const WidgetPreview = () => {
             </div>
 
             <Button
-              onClick={handleTryOn}
+              onClick={() => {
+                if (!hasSeenTryOnGuidelines()) {
+                  setGuidelinesOpen(true);
+                  return;
+                }
+                void handleTryOn();
+              }}
               disabled={!selectedModel && !uploadedPersonImage && !personUploadFile}
               className="w-full gradient-primary text-primary-foreground text-xs h-9"
             >
@@ -260,6 +269,13 @@ const WidgetPreview = () => {
             </Button>
           </motion.div>
         )}
+
+        <TryOnGuidelinesModal
+          open={guidelinesOpen}
+          onOpenChange={setGuidelinesOpen}
+          onAcknowledge={() => void handleTryOn()}
+          source="widget_preview"
+        />
 
         {phase === "uploading" && (
           <motion.div key="uploading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center">
@@ -269,15 +285,13 @@ const WidgetPreview = () => {
         )}
 
         {phase === "processing" && (
-          <motion.div key="proc" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center">
-            <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }} className="w-10 h-10 rounded-full border-2 border-border border-t-foreground flex items-center justify-center mx-auto mb-4">
-              <Scan className="h-4 w-4 text-foreground" />
-            </motion.div>
-            <p className="text-sm font-semibold text-foreground">Generating...</p>
-            <p className="text-xs text-muted-foreground mt-1">This may take up to 30 seconds</p>
-            <div className="mt-3 h-1 bg-muted rounded-full overflow-hidden max-w-[200px] mx-auto">
-              <motion.div className="h-full bg-foreground rounded-full" initial={{ width: "0%" }} animate={{ width: "100%" }} transition={{ duration: 25 }} />
-            </div>
+          <motion.div key="proc" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-4">
+            <GenerationLoadingScreen
+              previewItems={[
+                ...(uploadedPersonImage ? [{ label: "You", imageUrl: uploadedPersonImage }] : []),
+                ...(productImg ? [{ label: "Product", imageUrl: productImg }] : []),
+              ]}
+            />
           </motion.div>
         )}
 

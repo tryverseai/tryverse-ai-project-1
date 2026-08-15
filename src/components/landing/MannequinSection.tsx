@@ -2,7 +2,9 @@ import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { Eyebrow } from "@/components/layout/Section";
 import { Reveal, RevealGroup, RevealItem, RevealLines } from "@/components/motion/Reveal";
+import { AutoPlayVideo } from "@/components/AutoPlayVideo";
 import { campaign } from "@/lib/campaignImagery";
+import featuresModelVideo from "@/assets/features-model-video.mp4";
 
 const stages = [
   {
@@ -75,14 +77,14 @@ export function MannequinSection() {
       {/* The photograph carries the rest of the section — full width, no card, no border. */}
       <div ref={ref} className="relative mt-16 overflow-hidden md:mt-24">
         <div className="aspect-[4/5] sm:aspect-[16/10] lg:aspect-[21/9]">
-          <motion.img
-            src={campaign.sofa.src}
-            alt={campaign.sofa.alt}
-            loading="lazy"
-            decoding="async"
-            style={{ y, scale }}
-            className="h-full w-full object-cover will-change-transform"
-          />
+          <motion.div style={{ y, scale }} className="h-full w-full will-change-transform">
+            <AutoPlayVideo
+              src={featuresModelVideo}
+              poster={campaign.sofa.src}
+              posterAlt={campaign.sofa.alt}
+              className="h-full w-full object-cover"
+            />
+          </motion.div>
         </div>
         <div
           className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-background to-transparent"

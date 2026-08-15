@@ -91,7 +91,7 @@ export function VoyagerShowcase({ slides }: { slides: Slide[] }) {
   return (
     <div ref={ref} className="relative" style={{ height: `${n * 62}vh` }}>
       <div className="sticky top-0 flex h-[100svh] items-center justify-center overflow-hidden">
-        <div className="relative h-[min(68vh,620px)] w-full" style={{ perspective: 1600 }}>
+        <div className="relative h-[min(78vh,620px)] w-full md:h-[min(68vh,620px)]" style={{ perspective: 1600 }}>
           {slides.map((slide, i) => (
             <VoyagerCard
               key={slide.src}
