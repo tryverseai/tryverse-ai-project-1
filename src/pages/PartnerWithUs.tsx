@@ -16,7 +16,7 @@ const benefits = [
   { icon: TrendingDown, title: "Help Reduce Returns", description: "Customers know how items fit before buying." },
   { icon: TrendingUp, title: "Boost Conversions", description: "Interactive try-on drives purchase confidence." },
   { icon: ShieldCheck, title: "Better Shopping Experience", description: "Delight customers with AI-powered personalization." },
-  { icon: Code2, title: "Easy Widget Integration", description: "Embed virtual try-on into your store in minutes." },
+  { icon: Code2, title: "Flexible Integration", description: "Ship with our SDK and API, or embed the widget — whatever fits your stack." },
 ];
 
 const reasons = [
@@ -140,7 +140,7 @@ const PartnerWithUs = () => {
                 The Infrastructure Powering Virtual Try-On
               </h2>
               <p className="text-muted-foreground text-lg leading-relaxed mb-8">
-                Integrate TryVerse AI into your e-commerce store, marketplace, or mobile app. Our widget handles the heavy lifting so you can focus on selling.
+                Integrate TryVerse AI into your e-commerce store, marketplace, or mobile app with our SDK and API — or embed the widget for a drop-in experience. Our infrastructure handles the heavy lifting so you can focus on selling.
               </p>
 
               <div className="grid sm:grid-cols-2 gap-5 mb-8">
@@ -199,19 +199,19 @@ const PartnerWithUs = () => {
             >
               <div className={cn(glassInner, "p-5 sm:p-6")}>
               <div className="rounded-xl bg-foreground/[0.03] p-5 font-mono text-sm">
-                <p className="text-muted-foreground mb-2">{"<!-- Add to your product page -->"}</p>
+                <p className="text-muted-foreground mb-2">{"// Server-side, with the TryVerse SDK"}</p>
                 <p className="text-foreground">
-                  {"<"}<span className="text-foreground/70">script</span> src=<span className="text-foreground/60">"https://tryverseai.com/tryverse-widget.js"</span>{">"}
+                  <span className="text-foreground/70">import</span> {"{ TryVerse }"} <span className="text-foreground/70">from</span> <span className="text-foreground/60">"@tryverseai/sdk"</span>;
                 </p>
-                <p className="text-foreground">{"</"}<span className="text-foreground/70">script</span>{">"}</p>
                 <p className="text-foreground mt-3">
-                  {"<"}<span className="text-foreground/70">button</span> onclick=<span className="text-foreground/60">"TryVerse.open({"{"}</span>
+                  <span className="text-foreground/70">const</span> tryverse = <span className="text-foreground/70">new</span> TryVerse();
                 </p>
-                <p className="text-muted-foreground pl-4">apiKey: <span className="text-foreground/60">'YOUR_API_KEY'</span>,</p>
-                <p className="text-muted-foreground pl-4">productImage: <span className="text-foreground/60">'PRODUCT_URL'</span></p>
-                <p className="text-foreground"><span className="text-foreground/60">{"}"})</span>{"\">"}</p>
-                <p className="text-foreground pl-2">Try It On</p>
-                <p className="text-foreground">{"</"}<span className="text-foreground/70">button</span>{">"}</p>
+                <p className="text-foreground mt-3">
+                  <span className="text-foreground/70">const</span> {"{ resultUrl }"} = <span className="text-foreground/70">await</span> tryverse.tryOn({"{"}
+                </p>
+                <p className="text-muted-foreground pl-4">personImage: <span className="text-foreground/60">shopperPhoto</span>,</p>
+                <p className="text-muted-foreground pl-4">productImage: <span className="text-foreground/60">'PRODUCT_URL'</span>,</p>
+                <p className="text-foreground">{"})"};</p>
               </div>
 
               <div className="mt-5 grid grid-cols-3 gap-3">

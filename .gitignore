@@ -39,3 +39,4 @@ Thumbs.db
 **/.claude/
 .vercel
 .env*.local
+.env*

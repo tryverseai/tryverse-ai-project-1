@@ -87,7 +87,7 @@ const BookDemo = () => {
         </Link>
         <h1 className="font-display text-3xl font-bold text-foreground mb-3">Book a Demo</h1>
         <p className="text-muted-foreground text-lg mb-10 leading-relaxed">
-          See exactly how TryVerse works for your store. We&apos;ll walk you through the widget, dashboard, and
+          See exactly how TryVerse works for your store. We&apos;ll walk you through the SDK, dashboard, and
           integration options.
         </p>
 

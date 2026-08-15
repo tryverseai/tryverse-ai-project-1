@@ -34,10 +34,10 @@ VITE_CONVEX_URL=https://<your-deployment>.convex.cloud
 
 ## Dev vs production pushes
 
-- **`npx convex dev --once`** (or `npx convex dev`) pushes functions + schema to the **development** deployment in `.env.local` (`CONVEX_DEPLOYMENT=dev:…`), e.g. **limitless-magpie-618**. Use this when that’s the deployment you open in the Convex dashboard.
+- **`npx convex dev --once`** (or `npx convex dev`) pushes functions + schema to the **development** deployment in `.env.local` (`CONVEX_DEPLOYMENT=dev:…`), e.g. **patient-axolotl-17**. Use this when that’s the deployment you open in the Convex dashboard.
 - **`npx convex deploy`** pushes to your linked **production** deployment (often a different `*.convex.cloud` URL). Only use it when you intend to update prod.
 
-Keep **`backend/.env`** `CONVEX_URL` and the app **`VITE_CONVEX_URL`** / **`.env.local`** pointed at the **same** deployment you care about. **Vercel:** set **`VITE_CONVEX_URL`** and your hosted API’s **`CONVEX_URL`** to that same URL (e.g. `https://limitless-magpie-618.convex.cloud`).
+Keep **`backend/.env`** `CONVEX_URL` and the app **`VITE_CONVEX_URL`** / **`.env.local`** pointed at the **same** deployment you care about. **Vercel:** set **`VITE_CONVEX_URL`** and your hosted API’s **`CONVEX_URL`** to that same URL (e.g. `https://patient-axolotl-17.eu-west-1.convex.cloud`).
 
 ## Scripts
 

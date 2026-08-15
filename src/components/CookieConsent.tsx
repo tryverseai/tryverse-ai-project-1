@@ -43,9 +43,9 @@ export function CookieConsent() {
             <Cookie className="h-5 w-5 text-muted-foreground" />
           </div>
           <div>
-            <p className="font-medium text-foreground">We use cookies!</p>
+            <p className="font-medium text-foreground">Cookies</p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              This website uses essential cookies to ensure its proper operation and tracking cookies to understand how you interact with it. The latter will be set only after your consent.
+              We use cookies to improve your experience and analyze site usage. You can manage your preferences anytime.
             </p>
           </div>
         </div>
