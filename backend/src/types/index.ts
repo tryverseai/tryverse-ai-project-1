@@ -8,6 +8,15 @@ export type ProductCategory =
   | 'dresses'
   | 'one-pieces';
 
+/**
+ * Product catalog category — a superset of `ProductCategory` that also allows `'shoes'`, for the
+ * Outfit Builder. Deliberately NOT part of `ProductCategory` itself: the single-garment try-on
+ * pipeline (`VALID_TRY_ON_CATEGORIES`, `mapToFashnCategory`) has no handling for shoes, so adding
+ * it there would let a shoes-tagged product be submitted to the regular try-on flow and produce
+ * an unpredictable result instead of a clean rejection.
+ */
+export type CatalogCategory = ProductCategory | 'shoes';
+
 /** Lifecycle states a try-on record can be in (mirrors Convex schema). */
 export type TryOnStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
@@ -63,6 +72,41 @@ export interface TryOnResult {
   error?: string;
   /** Machine-readable error code (e.g. NO_PERSON_DETECTED, TIMEOUT). */
   errorCode?: string;
+  processingTimeMs?: number;
+}
+
+/**
+ * Outfit Builder job — deliberately separate from `TryOnJob`/`tryon-jobs`. One model photo +
+ * multiple product image URLs (per slot) → one composited flat-lay → one FASHN Try-On Max result.
+ * Processed by its own `outfit-jobs` Bull queue (`services/queue/outfitProducer.ts`) and its own
+ * `executeOutfitPipeline` — never touches the single-garment pipeline.
+ */
+export interface OutfitJob {
+  jobId: string;
+  userId: string;
+  outfitDbId: string;
+  modelImageUrl: string;
+  slotImageUrls: {
+    top?: string;
+    bottom?: string;
+    one_piece?: string;
+    shoes?: string;
+    outerwear?: string;
+  };
+  slotLabels: {
+    top?: string;
+    bottom?: string;
+    one_piece?: string;
+    shoes?: string;
+    outerwear?: string;
+  };
+}
+
+export interface OutfitResult {
+  jobId: string;
+  status: 'completed' | 'failed';
+  resultUrl?: string;
+  error?: string;
   processingTimeMs?: number;
 }
 

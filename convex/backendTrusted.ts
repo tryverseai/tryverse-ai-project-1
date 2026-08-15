@@ -881,6 +881,104 @@ export const archiveGeneratedAiModel = mutation({
   },
 });
 
+const outfitSlotsValidator = v.object({
+  top: v.optional(v.string()),
+  bottom: v.optional(v.string()),
+  one_piece: v.optional(v.string()),
+  shoes: v.optional(v.string()),
+  outerwear: v.optional(v.string()),
+});
+
+/** Inserts a new Outfit Builder generation row in "processing" status. Mirrors `insertTryon`. */
+export const insertOutfitGeneration = mutation({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    modelImage: v.string(),
+    slots: outfitSlotsValidator,
+    promptUsed: v.string(),
+  },
+  handler: async (ctx, { secret, userId, modelImage, slots, promptUsed }) => {
+    requireBackendSecret(secret);
+    const id = await ctx.db.insert("outfit_generations", {
+      user_id: userId,
+      model_image: modelImage,
+      slots,
+      prompt_used: promptUsed,
+      status: "processing",
+      created_at: new Date().toISOString(),
+    });
+    return { id: String(id) };
+  },
+});
+
+/** Patches an Outfit Builder generation by its Convex `_id`. Mirrors `patchTryonByLegacyId`. */
+export const patchOutfitGeneration = mutation({
+  args: {
+    secret: v.string(),
+    id: v.id("outfit_generations"),
+    patch: v.object({
+      status: v.optional(v.string()),
+      composite_image: v.optional(v.string()),
+      result_image: v.optional(v.string()),
+      error: v.optional(v.string()),
+      completed_at: v.optional(v.string()),
+    }),
+  },
+  handler: async (ctx, { secret, id, patch }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db.get(id);
+    if (!row) throw new Error("Outfit generation not found");
+    await ctx.db.patch(id, patch);
+    return { ok: true as const };
+  },
+});
+
+/** Reads one Outfit Builder generation — owner-checked. */
+export const getOutfitGenerationForUser = query({
+  args: { secret: v.string(), userId: v.string(), id: v.id("outfit_generations") },
+  handler: async (ctx, { secret, userId, id }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db.get(id);
+    if (!row || row.user_id !== userId) return null;
+    return {
+      id: String(row._id),
+      status: row.status,
+      resultImage: row.result_image ?? null,
+      error: row.error ?? null,
+      createdAt: row.created_at,
+      completedAt: row.completed_at ?? null,
+    };
+  },
+});
+
+/**
+ * Batch product lookup for the Outfit Builder — resolves a brand's own catalog products by ID,
+ * ownership-scoped by `user_id` (mirrors `products.ts::getMyProduct`'s ownership check, but via
+ * the trusted-secret pattern with an explicit `userId` so it's consistent with the rest of
+ * `aiStudio.ts`, which never uses the JWT-passthrough Convex client `products.ts` routes use).
+ * IDs the caller doesn't own are silently omitted from the result rather than erroring.
+ */
+export const getProductsForOutfit = query({
+  args: { secret: v.string(), userId: v.string(), productIds: v.array(v.string()) },
+  handler: async (ctx, { secret, userId, productIds }) => {
+    requireBackendSecret(secret);
+    const wanted = new Set(productIds);
+    const rows = await ctx.db
+      .query("products")
+      .withIndex("by_userId", (q) => q.eq("user_id", userId))
+      .collect();
+    return rows
+      .filter((r) => wanted.has(r.legacy_id ?? String(r._id)))
+      .map((r) => ({
+        id: r.legacy_id ?? String(r._id),
+        name: r.name,
+        image_url: r.image_url ?? null,
+        category: r.category,
+      }));
+  },
+});
+
 /** Idempotent: fills `tryverse_model_library` when empty (called from Railway GET /api/models). */
 export const ensureModelLibrarySeeded = mutation({
   args: { secret: v.string() },

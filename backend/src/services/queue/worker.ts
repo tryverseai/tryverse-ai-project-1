@@ -1,9 +1,11 @@
 import Bull from 'bull';
 import { getTryOnQueue } from './producer';
+import { getOutfitQueue } from './outfitProducer';
 import { executeTryOnPipeline } from '../ai/pipeline';
+import { executeOutfitPipeline } from '../ai/outfitPipeline';
 import { logger } from '../../config/logger';
 import { env } from '../../config/env';
-import type { TryOnJob, TryOnResult } from '../../types';
+import type { TryOnJob, TryOnResult, OutfitJob, OutfitResult } from '../../types';
 
 /**
  * Starts the Bull worker that processes try-on jobs from the queue.
@@ -66,7 +68,53 @@ export function startWorker(): boolean {
   });
 
   logger.info('Worker ready and listening for jobs');
+  startOutfitWorker();
   return true;
+}
+
+/**
+ * Processes the separate `outfit-jobs` queue in the same worker process. Deliberately isolated
+ * from the `tryon-jobs` handler above — a bug in `executeOutfitPipeline` cannot touch or block
+ * single try-on processing, since they're different Bull queues with independent job streams.
+ */
+function startOutfitWorker(): void {
+  const outfitQueue = getOutfitQueue();
+  if (!outfitQueue) {
+    logger.warn('Outfit worker not started — outfit queue not available');
+    return;
+  }
+
+  outfitQueue.process(env.JOB_CONCURRENCY, async (job: Bull.Job<OutfitJob>): Promise<OutfitResult> => {
+    logger.info('Processing outfit job', { jobId: job.id, outfitDbId: job.data.outfitDbId });
+    await job.progress(10);
+
+    const result = await executeOutfitPipeline(job.data);
+    await job.progress(100);
+
+    if (result.status === 'failed') {
+      throw new Error(result.error || 'Outfit pipeline execution failed');
+    }
+    return result;
+  });
+
+  outfitQueue.on('completed', (job, result: OutfitResult) => {
+    logger.info('Outfit job completed', {
+      jobId: job.id,
+      outfitDbId: job.data.outfitDbId,
+      processingTimeMs: result.processingTimeMs,
+    });
+  });
+
+  outfitQueue.on('failed', (job, err) => {
+    logger.error('Outfit job failed permanently', {
+      jobId: job.id,
+      outfitDbId: job.data.outfitDbId,
+      attemptsMade: job.attemptsMade,
+      error: err.message,
+    });
+  });
+
+  logger.info('Outfit worker ready and listening for jobs');
 }
 
 // When run directly

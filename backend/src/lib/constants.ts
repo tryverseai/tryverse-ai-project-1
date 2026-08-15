@@ -1,4 +1,4 @@
-import type { ProductCategory } from '../types';
+import type { ProductCategory, CatalogCategory } from '../types';
 
 /** Try-on categories accepted by both the dashboard API and the widget API. */
 export const VALID_TRY_ON_CATEGORIES: ProductCategory[] = [
@@ -8,6 +8,14 @@ export const VALID_TRY_ON_CATEGORIES: ProductCategory[] = [
   'dresses',
   'one-pieces',
 ];
+
+/**
+ * Product catalog categories — a superset of `VALID_TRY_ON_CATEGORIES` that also allows `'shoes'`
+ * (Outfit Builder). Used only by `routes/products.ts`'s catalog CRUD validators — `routes/tryon.ts`
+ * and `routes/widget.ts` deliberately keep using `VALID_TRY_ON_CATEGORIES` unchanged, since those
+ * are the actual single-garment try-on request validators.
+ */
+export const VALID_PRODUCT_CATEGORIES: CatalogCategory[] = [...VALID_TRY_ON_CATEGORIES, 'shoes'];
 
 /** Signed URL lifetime for try-on result images (seconds). */
 export const SIGNED_URL_TTL_SECONDS = 3600;

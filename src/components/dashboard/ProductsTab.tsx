@@ -36,32 +36,34 @@ import {
   uploadImage,
   resolveProductImageDisplayUrl,
   type Product,
-  type TryOnCategory,
+  type ProductCategory,
 } from "@/lib/backendApi";
 import { openExternalHttpUrlInNewTab, safeImageSrcForDom, safeHttpHrefForDom } from "@/lib/safeUrl";
 
-const CATEGORIES: { id: TryOnCategory; label: string }[] = [
+const CATEGORIES: { id: ProductCategory; label: string }[] = [
   { id: "clothing", label: "Clothing" },
   { id: "tops", label: "Tops" },
   { id: "bottoms", label: "Bottoms" },
   { id: "dresses", label: "Dresses" },
   { id: "one-pieces", label: "One-pieces" },
+  { id: "shoes", label: "Shoes" },
 ];
 
-/** Type guard — narrows an unknown string to TryOnCategory. */
-function isTryOnCategory(value: unknown): value is TryOnCategory {
+/** Type guard — narrows an unknown string to ProductCategory. */
+function isProductCategory(value: unknown): value is ProductCategory {
   return (
     value === "clothing" ||
     value === "tops" ||
     value === "bottoms" ||
     value === "dresses" ||
-    value === "one-pieces"
+    value === "one-pieces" ||
+    value === "shoes"
   );
 }
 
-/** Coerce an API-returned string to TryOnCategory, falling back to 'clothing'. */
-function toTryOnCategory(value: unknown): TryOnCategory {
-  return isTryOnCategory(value) ? value : "clothing";
+/** Coerce an API-returned string to ProductCategory, falling back to 'clothing'. */
+function toProductCategory(value: unknown): ProductCategory {
+  return isProductCategory(value) ? value : "clothing";
 }
 
 /** Renders validated image URLs via CSS background (avoids raw user/state → img src for SAST). */
@@ -80,14 +82,14 @@ export function ProductsTab() {
     pages: 1,
   });
   const [nameQuery, setNameQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<TryOnCategory | "">("");
+  const [categoryFilter, setCategoryFilter] = useState<ProductCategory | "">("");
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState({
     name: "",
     image_url: "",
-    category: "clothing" satisfies TryOnCategory,
+    category: "clothing" satisfies ProductCategory,
     product_url: "",
   });
   const [uploading, setUploading] = useState(false);
@@ -178,7 +180,7 @@ export function ProductsTab() {
         await updateProduct(editingProduct.id, {
           name: form.name.trim(),
           image_url: form.image_url || undefined,
-          category: toTryOnCategory(form.category),
+          category: toProductCategory(form.category),
           product_url: form.product_url || undefined,
         });
         toast.success("Product updated");
@@ -186,7 +188,7 @@ export function ProductsTab() {
         await createProduct({
           name: form.name.trim(),
           image_url: form.image_url || undefined,
-          category: toTryOnCategory(form.category),
+          category: toProductCategory(form.category),
           product_url: form.product_url || undefined,
         });
         toast.success("Product created");
@@ -251,7 +253,7 @@ export function ProductsTab() {
         </div>
         <Select
           value={categoryFilter || "all"}
-          onValueChange={(v) => setCategoryFilter(isTryOnCategory(v) ? v : "")}
+          onValueChange={(v) => setCategoryFilter(isProductCategory(v) ? v : "")}
         >
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="All categories" />
@@ -492,7 +494,7 @@ export function ProductsTab() {
               <Select
                 value={form.category}
                 onValueChange={(v) =>
-                  setForm((f) => ({ ...f, category: isTryOnCategory(v) ? v : f.category }))
+                  setForm((f) => ({ ...f, category: isProductCategory(v) ? v : f.category }))
                 }
               >
                 <SelectTrigger>

@@ -98,6 +98,14 @@ export function widgetBackendPublicUrl(): string {
 
 export type TryOnCategory = 'clothing' | 'tops' | 'bottoms' | 'dresses' | 'one-pieces';
 
+/**
+ * Product catalog category — a superset of `TryOnCategory` that also allows `'shoes'` for the
+ * Outfit Builder. Deliberately kept separate from `TryOnCategory` (used by the single-garment
+ * try-on request) since the existing FASHN single-item category mapping has no 'shoes' handling —
+ * offering it there would let a shopper pick a category that always fails server-side.
+ */
+export type ProductCategory = TryOnCategory | 'shoes';
+
 // ─── Typed API error (replaces `Error & { status?; code?; retryAfter? }`) ────
 
 /**
@@ -942,7 +950,7 @@ export interface Product {
   name: string;
   image_url: string | null;
   image_display_url?: string | null;
-  category: TryOnCategory;
+  category: ProductCategory;
   product_url: string | null;
   tryons_count?: number;
   created_at: string;
@@ -967,7 +975,7 @@ export async function resolveProductImageDisplayUrl(pathOrUrl: string | null): P
   }
 }
 
-export async function getProducts(page = 1, limit = 20, category?: TryOnCategory) {
+export async function getProducts(page = 1, limit = 20, category?: ProductCategory) {
   if (!getBackendAuthBearerHeader()) throw new Error('Not authenticated');
   const headers = await getAuthHeaders();
   const q = new URLSearchParams({ page: String(page), limit: String(limit) });
@@ -980,7 +988,7 @@ export async function getProducts(page = 1, limit = 20, category?: TryOnCategory
   const products: Product[] = await Promise.all(
     (body.products || []).map(async (p) => ({
       ...p,
-      category: p.category as TryOnCategory,
+      category: p.category as ProductCategory,
       image_display_url: p.image_display_url ?? (await resolveProductImageDisplayUrl(p.image_url)),
     }))
   );
@@ -990,7 +998,7 @@ export async function getProducts(page = 1, limit = 20, category?: TryOnCategory
 export async function createProduct(data: {
   name: string;
   image_url?: string;
-  category: TryOnCategory;
+  category: ProductCategory;
   product_url?: string;
 }) {
   const headers = await getAuthHeaders();
@@ -1006,7 +1014,7 @@ export async function createProduct(data: {
 
 export async function updateProduct(
   id: string,
-  data: { name?: string; image_url?: string; category?: TryOnCategory; product_url?: string }
+  data: { name?: string; image_url?: string; category?: ProductCategory; product_url?: string }
 ): Promise<Product> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${BACKEND_URL}/api/products/${encodeURIComponent(id)}`, {
@@ -1729,6 +1737,52 @@ export async function generateProductPhotoshoot(params: PhotoshootGenerationPara
   const data = await handleResponse<{ storagePath: string; createdAt: string }>(res);
   const imageUrl = await getSignedImageUrl(data.storagePath);
   return { imageUrl, createdAt: data.createdAt };
+}
+
+// ─── Outfit Builder (Enterprise) ────────────────────────────────────────────
+// Combines multiple selected catalog products (top+bottom-or-one-piece, optional shoes/outerwear)
+// into one flat-lay try-on, worn by a chosen model. Async/polled like the main try-on flow (see
+// startTryOn/pollTryOnStatus above), since a full-outfit FASHN generation can take as long as the
+// existing single-garment path.
+
+export interface OutfitSlotSelection {
+  top?: string;
+  bottom?: string;
+  one_piece?: string;
+  shoes?: string;
+  outerwear?: string;
+}
+
+export interface GenerateOutfitParams {
+  modelId: string;
+  modelSource: 'library' | 'generated';
+  slots: OutfitSlotSelection;
+}
+
+export interface OutfitResponse {
+  outfitId: string;
+  jobId?: string;
+  status: 'processing' | 'completed' | 'failed';
+  resultUrl?: string;
+  error?: string;
+  createdAt?: string;
+  completedAt?: string;
+}
+
+export async function generateOutfit(params: GenerateOutfitParams): Promise<OutfitResponse> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/ai-studio/outfit/generate`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  return handleResponse<OutfitResponse>(res, { feature: 'outfit_builder' });
+}
+
+export async function pollOutfitStatus(outfitId: string): Promise<OutfitResponse> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/ai-studio/outfit/${outfitId}`, { headers });
+  return handleResponse<OutfitResponse>(res, { feature: 'outfit_builder' });
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────

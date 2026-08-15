@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_ENABLE_INVITE_SIGNUP?: string;
   /** Set to "false" to block /auth?signup=individual (default: personal sign-up allowed). */
   readonly VITE_ENABLE_B2C_SIGNUP?: string;
+  /** Set to "true" to show the Outfit Builder dashboard tab (Enterprise-gated, default: hidden). */
+  readonly VITE_OUTFIT_BUILDER_ENABLED?: string;
 }
 
 declare module "*.mp4" {

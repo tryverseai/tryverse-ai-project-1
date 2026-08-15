@@ -24,8 +24,12 @@ export interface ProductPhotoshootResult {
   createdAt: string;
 }
 
-/** Resolves the chosen model (stock library or the brand's own saved AI-generated model) to a fetchable image URL. */
-async function resolveModelUrl(userId: string, modelId: string, source: PhotoshootModelSource): Promise<string> {
+/**
+ * Resolves the chosen model (stock library or the brand's own saved AI-generated model) to a
+ * fetchable image URL. Exported for reuse by the Outfit Builder (`aiStudio.ts` outfit routes),
+ * which picks a model the same way this feature does.
+ */
+export async function resolveModelUrl(userId: string, modelId: string, source: PhotoshootModelSource): Promise<string> {
   if (source === 'library') {
     const row = await convexQueryTrusted<{ id: string; image_url: string; is_active: boolean } | null>(
       anyApi.backendTrusted.getModelForResolvePath,

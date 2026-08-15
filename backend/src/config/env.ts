@@ -202,6 +202,12 @@ export const env = {
    * positives block legitimate fashion photos (review FASHN / product policy before turning off in prod).
    */
   FASHN_NSFW_FILTER: optionalBool('FASHN_NSFW_FILTER', true),
+  /**
+   * FASHN model used by the Outfit Builder (`services/ai/fashn.ts::runFashnOutfit`) — a separate,
+   * additive path from the single-garment `tryon-v1.6` model above. Try-On Max supports shoes/
+   * hats/bags, which tryon-v1.6 does not. Configurable in case FASHN renames/versions this model.
+   */
+  FASHN_OUTFIT_MODEL_NAME: optionalEnv('FASHN_OUTFIT_MODEL_NAME', 'tryon-max'),
 
   // Preprocessing — background removal (rembg)
   REPLICATE_MODEL_REMBG: optionalEnv(

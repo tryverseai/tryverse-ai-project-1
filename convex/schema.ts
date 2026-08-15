@@ -303,9 +303,36 @@ export default defineSchema({
    */
   ai_generation_usage: defineTable({
     user_id: v.string(),
-    feature: v.union(v.literal("ai_model"), v.literal("ai_photoshoot")),
+    feature: v.union(v.literal("ai_model"), v.literal("ai_photoshoot"), v.literal("outfit_builder")),
     created_at: v.optional(v.string()),
   }).index("by_userId", ["user_id"]),
+
+  /**
+   * Enterprise "Outfit Builder" generations — a composited flat-lay of multiple products
+   * (top/bottom-or-one-piece + optional shoes/outerwear) worn together by one model, generated
+   * via FASHN's Try-On Max model. Deliberately separate from `tryons`, which models exactly one
+   * product per generation and is not touched by this feature.
+   */
+  outfit_generations: defineTable({
+    user_id: v.string(),
+    model_image: v.string(),
+    slots: v.object({
+      top: v.optional(v.string()),
+      bottom: v.optional(v.string()),
+      one_piece: v.optional(v.string()),
+      shoes: v.optional(v.string()),
+      outerwear: v.optional(v.string()),
+    }),
+    composite_image: v.optional(v.string()),
+    prompt_used: v.string(),
+    result_image: v.optional(v.string()),
+    status: v.string(),
+    error: v.optional(v.string()),
+    created_at: v.string(),
+    completed_at: v.optional(v.string()),
+  })
+    .index("by_userId", ["user_id"])
+    .index("by_user_created", ["user_id", "created_at"]),
 
   /** Enterprise "Generate AI Model" library — saved/reusable generated fashion models. */
   ai_generated_models: defineTable({

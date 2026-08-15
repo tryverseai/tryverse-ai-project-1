@@ -20,4 +20,11 @@ export const FEATURE_FLAGS = {
   INVITE_ONLY_MODE:
     import.meta.env.VITE_INVITE_ONLY_MODE === "true" ||
     import.meta.env.VITE_INVITE_ONLY_ACCESS === "true",
+  /**
+   * Outfit Builder (multi-product flat-lay try-on via FASHN Try-On Max) — a second, deliberate
+   * safety layer on top of the server-side Enterprise plan gate. Defaults off so the feature can
+   * be dark-shipped and tested before it's ever shown to a real brand. Set VITE_OUTFIT_BUILDER_ENABLED=true
+   * to turn it on.
+   */
+  OUTFIT_BUILDER_ENABLED: import.meta.env.VITE_OUTFIT_BUILDER_ENABLED === "true",
 } as const;

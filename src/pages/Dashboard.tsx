@@ -4,7 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, BarChart3, Settings, Key, LayoutDashboard, CreditCard, BookOpen, FlaskConical, Sparkles,
-  Users, Camera, Terminal, PlugZap,
+  Users, Camera, Terminal, PlugZap, Shirt,
 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { listApiKeys, listWidgetDomains } from "@/lib/backendApi";
@@ -78,6 +78,23 @@ const AiPhotoshootTab = lazy(() =>
     .catch(() => ({ default: AiPhotoshootTabUnavailable }))
 );
 
+function OutfitBuilderTabUnavailable() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <p className="text-sm font-medium text-foreground mb-1">Outfit Builder unavailable</p>
+      <p className="text-xs text-muted-foreground max-w-md text-center">
+        This section could not be loaded. Refresh the page or try again in a moment.
+      </p>
+    </div>
+  );
+}
+
+const OutfitBuilderTab = lazy(() =>
+  import("@/components/dashboard/OutfitBuilderTab")
+    .then((m) => ({ default: m.OutfitBuilderTab }))
+    .catch(() => ({ default: OutfitBuilderTabUnavailable }))
+);
+
 const DeveloperDocsTab = lazyWithRetry(
   () => import("@/components/dashboard/DeveloperDocsTab").then((m) => ({ default: m.DeveloperDocsTab })),
   "developer-docs"
@@ -97,6 +114,7 @@ const sidebarItems = [
   { icon: Sparkles, label: "Personalization" },
   { icon: Users, label: "AI Models" },
   { icon: Camera, label: "AI Photoshoot" },
+  { icon: Shirt, label: "Outfit Builder" },
   { icon: Key, label: "API Keys" },
   { icon: CreditCard, label: "Billing" },
   { icon: Settings, label: "Settings" },
@@ -113,6 +131,7 @@ const tabComponents: Record<string, React.ComponentType> = {
   Personalization: PersonalizeTab,
   "AI Models": AiModelsTab,
   "AI Photoshoot": AiPhotoshootTab,
+  "Outfit Builder": OutfitBuilderTab,
   "API Keys": ApiKeysTab,
   Billing: BillingTab,
   Settings: SettingsTab,

@@ -50,17 +50,23 @@ function fashnHeaders(): Record<string, string> {
 /**
  * Wrap a flat inputs payload in the envelope the FASHN direct API requires:
  *   { model_name: "fashn/tryon", inputs: { model_image, garment_image, ... } }
+ *
+ * `modelName` defaults to the existing single-garment model so every current call site keeps its
+ * exact behavior; only the Outfit Builder path (`runFashnOutfit`) passes a different value.
  */
-function wrapForDirectApi(inputs: Record<string, unknown>): Record<string, unknown> {
+function wrapForDirectApi(
+  inputs: Record<string, unknown>,
+  modelName: string = 'tryon-v1.6'
+): Record<string, unknown> {
   return {
-    model_name: 'tryon-v1.6',
+    model_name: modelName,
     inputs,
   };
 }
 
 /** Start a FASHN prediction. Returns the prediction ID. */
-async function startFashnRun(body: Record<string, unknown>): Promise<string> {
-  const payload = wrapForDirectApi(body);
+async function startFashnRun(body: Record<string, unknown>, modelName?: string): Promise<string> {
+  const payload = wrapForDirectApi(body, modelName);
   try {
     const response = await fetch(`${FASHN_BASE_URL}/run`, {
       method: 'POST',
@@ -240,3 +246,52 @@ export async function runFashnDirect(
 
 /** @deprecated Use {@link runFashnDirect}; kept as an alias for older call sites. */
 export const runFashnTryOn = runFashnDirect;
+
+/** FASHN model used for the Outfit Builder (product + prompt → full outfit). */
+const OUTFIT_MODEL_NAME = env.FASHN_OUTFIT_MODEL_NAME;
+
+export interface FashnOutfitOutput {
+  resultUrl: string;
+  processingTimeMs: number;
+}
+
+/**
+ * Runs a FASHN Try-On Max prediction for the Outfit Builder: a single pre-composited flat-lay
+ * image (built by `outfitComposite.ts` from the shopper's/brand's selected products) plus a
+ * generated styling prompt, applied to one model photo — the same mechanism proven by hand
+ * (multiple garments combined into one picture-frame image, not multiple API inputs, since
+ * Try-On Max — like tryon-v1.6 — accepts exactly one product image per request).
+ *
+ * Deliberately separate from `runFashnDirect`/`buildFashnDirectInputs`: Try-On Max's accepted
+ * fields aren't 100% confirmed from docs alone, so this fails loud (the same raw-response-body
+ * logging `startFashnRun` already does) rather than silently degrading output on a schema
+ * mismatch — this is new, unproven integration surface and should surface problems immediately
+ * during testing, not produce quietly-wrong results.
+ */
+export async function runFashnOutfit(
+  compositeImageUrl: string,
+  modelImageUrl: string,
+  prompt: string
+): Promise<FashnOutfitOutput> {
+  const startTime = Date.now();
+
+  const payload = {
+    model_image: modelImageUrl,
+    product_image: compositeImageUrl,
+    prompt,
+  };
+
+  logger.info('FASHN outfit: starting prediction', { modelName: OUTFIT_MODEL_NAME });
+
+  const predictionId = await startFashnRun(payload, OUTFIT_MODEL_NAME);
+
+  logger.info('FASHN outfit: prediction started', { predictionId });
+
+  const resultUrl = await pollFashnStatus(predictionId);
+
+  const processingTimeMs = Date.now() - startTime;
+
+  logger.info('FASHN outfit: prediction complete', { predictionId, processingTimeMs });
+
+  return { resultUrl, processingTimeMs };
+}

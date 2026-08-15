@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { posthogCapture } from "@/lib/posthog";
 
-export type EnterpriseUpgradeContext = "photoshoot" | "models";
+export type EnterpriseUpgradeContext = "photoshoot" | "models" | "outfit-builder";
 
 interface EnterpriseUpgradeModalProps {
   open: boolean;
@@ -48,6 +48,13 @@ const MODEL_USE_CASES = [
   { icon: ShoppingBag, label: "Reuse generated models across Try-Ons" },
 ];
 
+const OUTFIT_BUILDER_USE_CASES = [
+  { icon: Layers, label: "Full outfits from multiple products, not just one item at a time" },
+  { icon: ShoppingBag, label: "Top + bottom, dresses, and shoes shown together" },
+  { icon: Sparkles, label: "Higher purchase confidence for complete looks" },
+  { icon: Megaphone, label: "Cross-sell related products automatically" },
+];
+
 const COPY: Record<
   EnterpriseUpgradeContext,
   { eyebrow: string; title: string; description: string; useCases: typeof PHOTOSHOOT_USE_CASES }
@@ -65,6 +72,13 @@ const COPY: Record<
     description:
       "Generate a full library of diverse, on-brand AI fashion models for your catalog. Upgrade to Enterprise to unlock generation.",
     useCases: MODEL_USE_CASES,
+  },
+  "outfit-builder": {
+    eyebrow: "Outfit Builder",
+    title: "Outfit Builder is an Enterprise feature",
+    description:
+      "Combine a top, bottom, and shoes into one complete look on a single model — not just one product at a time. Upgrade to Enterprise to unlock it.",
+    useCases: OUTFIT_BUILDER_USE_CASES,
   },
 };
 

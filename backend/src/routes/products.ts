@@ -5,7 +5,7 @@ import { handleValidationErrors } from '../middleware/validate';
 import { getSignedUrl, INPUT_BUCKET } from '../services/storage/images';
 import { logger } from '../config/logger';
 import { createConvexClient, anyApi } from '../config/convexHttp';
-import { VALID_TRY_ON_CATEGORIES, SIGNED_URL_TTL_SECONDS } from '../lib/constants';
+import { VALID_PRODUCT_CATEGORIES, SIGNED_URL_TTL_SECONDS } from '../lib/constants';
 
 /**
  * Returns true when a Convex mutation throws a "record not found" error.
@@ -63,7 +63,7 @@ router.get(
   [
     query('page').optional().isInt({ min: 1 }).toInt(),
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
-    query('category').optional().isIn(VALID_TRY_ON_CATEGORIES),
+    query('category').optional().isIn(VALID_PRODUCT_CATEGORIES),
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -110,7 +110,7 @@ router.post(
     body('name').isString().trim().notEmpty().isLength({ max: 200 }),
     body('image_url').optional().isString().isLength({ max: 2048 })
       .custom((v: string) => { if (v && !isImageUrlSafe(v)) throw new Error('image_url must be a valid HTTPS URL or storage path'); return true; }),
-    body('category').isIn(VALID_TRY_ON_CATEGORIES),
+    body('category').isIn(VALID_PRODUCT_CATEGORIES),
     body('product_url').optional().isURL({ protocols: ['https'], require_protocol: true }).isLength({ max: 2048 }),
   ],
   handleValidationErrors,
@@ -160,7 +160,7 @@ router.put(
     body('name').optional().isString().trim().notEmpty().isLength({ max: 200 }),
     body('image_url').optional().isString().isLength({ max: 2048 })
       .custom((v: string) => { if (v && !isImageUrlSafe(v)) throw new Error('image_url must be a valid HTTPS URL or storage path'); return true; }),
-    body('category').optional().isIn(VALID_TRY_ON_CATEGORIES),
+    body('category').optional().isIn(VALID_PRODUCT_CATEGORIES),
     body('product_url').optional().isURL({ protocols: ['https'], require_protocol: true }).isLength({ max: 2048 }),
   ],
   handleValidationErrors,
