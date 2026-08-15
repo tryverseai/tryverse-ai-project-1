@@ -27,4 +27,8 @@ export const FEATURE_FLAGS = {
    * to turn it on.
    */
   OUTFIT_BUILDER_ENABLED: import.meta.env.VITE_OUTFIT_BUILDER_ENABLED === "true",
+  /** AI Model Studio (FASHN product-to-model) — same dark-ship pattern as Outfit Builder above. */
+  PRODUCT_MODEL_ENABLED: import.meta.env.VITE_PRODUCT_MODEL_ENABLED === "true",
+  /** AI Video (FASHN image-to-video, real per-credit cost) — same dark-ship pattern. */
+  VIDEO_ENABLED: import.meta.env.VITE_VIDEO_ENABLED === "true",
 } as const;

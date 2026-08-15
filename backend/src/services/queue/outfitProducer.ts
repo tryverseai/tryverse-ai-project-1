@@ -3,7 +3,7 @@ import Redis from 'ioredis';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 import { REDIS_CONNECT_OPTIONS } from '../../config/redis';
-import type { OutfitJob, OutfitResult } from '../../types';
+import type { OutfitJob } from '../../types';
 
 /**
  * A separate Bull queue from `tryon-jobs` (same Redis instance, own queue name) — deliberate
@@ -51,35 +51,4 @@ export async function enqueueOutfitJob(jobData: OutfitJob): Promise<string> {
   const job = await queue.add(jobData, { jobId: jobData.jobId });
   logger.info('Outfit job enqueued', { jobId: job.id, outfitDbId: jobData.outfitDbId });
   return String(job.id);
-}
-
-export interface OutfitJobStatusResult {
-  status: string;
-  progress: number;
-  result?: OutfitResult;
-  error?: string;
-}
-
-/** Reads job status only if it belongs to the given user (IDOR prevention, mirrors getJobStatusForUser). */
-export async function getOutfitJobStatusForUser(
-  jobId: string,
-  userId: string
-): Promise<OutfitJobStatusResult | null> {
-  const queue = getOutfitQueue();
-  if (!queue) return null;
-
-  const job = await queue.getJob(jobId);
-  if (!job || !job.data) return null;
-  if (job.data.userId !== userId) return null;
-
-  const state = await job.getState();
-  const rawProgress = job.progress();
-  const progress = typeof rawProgress === 'number' ? rawProgress : 0;
-
-  return {
-    status: state,
-    progress,
-    result: job.returnvalue as OutfitResult | undefined,
-    error: job.failedReason ?? undefined,
-  };
 }

@@ -979,6 +979,132 @@ export const getProductsForOutfit = query({
   },
 });
 
+/** Inserts a new AI Model Studio generation row in "processing" status. Mirrors `insertOutfitGeneration`. */
+export const insertProductModelGeneration = mutation({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    productImage: v.string(),
+    faceReference: v.optional(v.string()),
+    promptUsed: v.optional(v.string()),
+  },
+  handler: async (ctx, { secret, userId, productImage, faceReference, promptUsed }) => {
+    requireBackendSecret(secret);
+    const id = await ctx.db.insert("product_model_generations", {
+      user_id: userId,
+      product_image: productImage,
+      face_reference: faceReference,
+      prompt_used: promptUsed,
+      status: "processing",
+      created_at: new Date().toISOString(),
+    });
+    return { id: String(id) };
+  },
+});
+
+/** Patches an AI Model Studio generation by its Convex `_id`. */
+export const patchProductModelGeneration = mutation({
+  args: {
+    secret: v.string(),
+    id: v.id("product_model_generations"),
+    patch: v.object({
+      status: v.optional(v.string()),
+      result_image: v.optional(v.string()),
+      error: v.optional(v.string()),
+      completed_at: v.optional(v.string()),
+    }),
+  },
+  handler: async (ctx, { secret, id, patch }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db.get(id);
+    if (!row) throw new Error("Product model generation not found");
+    await ctx.db.patch(id, patch);
+    return { ok: true as const };
+  },
+});
+
+/** Reads one AI Model Studio generation — owner-checked. */
+export const getProductModelGenerationForUser = query({
+  args: { secret: v.string(), userId: v.string(), id: v.id("product_model_generations") },
+  handler: async (ctx, { secret, userId, id }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db.get(id);
+    if (!row || row.user_id !== userId) return null;
+    return {
+      id: String(row._id),
+      status: row.status,
+      resultImage: row.result_image ?? null,
+      error: row.error ?? null,
+      createdAt: row.created_at,
+      completedAt: row.completed_at ?? null,
+    };
+  },
+});
+
+/** Inserts a new AI Video generation row in "processing" status. Mirrors `insertOutfitGeneration`. */
+export const insertVideoGeneration = mutation({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    sourceImage: v.string(),
+    promptUsed: v.optional(v.string()),
+    durationSeconds: v.number(),
+    resolution: v.string(),
+  },
+  handler: async (ctx, { secret, userId, sourceImage, promptUsed, durationSeconds, resolution }) => {
+    requireBackendSecret(secret);
+    const id = await ctx.db.insert("video_generations", {
+      user_id: userId,
+      source_image: sourceImage,
+      prompt_used: promptUsed,
+      duration_seconds: durationSeconds,
+      resolution,
+      status: "processing",
+      created_at: new Date().toISOString(),
+    });
+    return { id: String(id) };
+  },
+});
+
+/** Patches an AI Video generation by its Convex `_id`. */
+export const patchVideoGeneration = mutation({
+  args: {
+    secret: v.string(),
+    id: v.id("video_generations"),
+    patch: v.object({
+      status: v.optional(v.string()),
+      result_video: v.optional(v.string()),
+      error: v.optional(v.string()),
+      completed_at: v.optional(v.string()),
+    }),
+  },
+  handler: async (ctx, { secret, id, patch }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db.get(id);
+    if (!row) throw new Error("Video generation not found");
+    await ctx.db.patch(id, patch);
+    return { ok: true as const };
+  },
+});
+
+/** Reads one AI Video generation — owner-checked. */
+export const getVideoGenerationForUser = query({
+  args: { secret: v.string(), userId: v.string(), id: v.id("video_generations") },
+  handler: async (ctx, { secret, userId, id }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db.get(id);
+    if (!row || row.user_id !== userId) return null;
+    return {
+      id: String(row._id),
+      status: row.status,
+      resultVideo: row.result_video ?? null,
+      error: row.error ?? null,
+      createdAt: row.created_at,
+      completedAt: row.completed_at ?? null,
+    };
+  },
+});
+
 /** Idempotent: fills `tryverse_model_library` when empty (called from Railway GET /api/models). */
 export const ensureModelLibrarySeeded = mutation({
   args: { secret: v.string() },

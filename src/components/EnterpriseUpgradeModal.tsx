@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { posthogCapture } from "@/lib/posthog";
 
-export type EnterpriseUpgradeContext = "photoshoot" | "models" | "outfit-builder";
+export type EnterpriseUpgradeContext = "photoshoot" | "models" | "outfit-builder" | "product-model" | "video";
 
 interface EnterpriseUpgradeModalProps {
   open: boolean;
@@ -55,6 +55,19 @@ const OUTFIT_BUILDER_USE_CASES = [
   { icon: Megaphone, label: "Cross-sell related products automatically" },
 ];
 
+const PRODUCT_MODEL_USE_CASES = [
+  { icon: Camera, label: "Turn a flat-lay product photo into professional model photography" },
+  { icon: Sparkles, label: "No studio, no photographer, no model booking" },
+  { icon: Users, label: "Optionally guide identity with a face reference" },
+  { icon: ShoppingBag, label: "Catalog-ready imagery in minutes" },
+];
+
+const VIDEO_USE_CASES = [
+  { icon: Sparkles, label: "Turn a still result into a short animated clip" },
+  { icon: Megaphone, label: "Content for Reels, TikTok, and product ads" },
+  { icon: Repeat, label: "5 or 10 second clips, up to 1080p" },
+];
+
 const COPY: Record<
   EnterpriseUpgradeContext,
   { eyebrow: string; title: string; description: string; useCases: typeof PHOTOSHOOT_USE_CASES }
@@ -79,6 +92,20 @@ const COPY: Record<
     description:
       "Combine a top, bottom, and shoes into one complete look on a single model — not just one product at a time. Upgrade to Enterprise to unlock it.",
     useCases: OUTFIT_BUILDER_USE_CASES,
+  },
+  "product-model": {
+    eyebrow: "AI Model Studio",
+    title: "AI Model Studio is an Enterprise feature",
+    description:
+      "Turn a product photo into professional on-model photography, instantly. Upgrade to Enterprise to unlock generation.",
+    useCases: PRODUCT_MODEL_USE_CASES,
+  },
+  video: {
+    eyebrow: "AI Video",
+    title: "AI Video is an Enterprise feature",
+    description:
+      "Animate a still result into a short clip for social and ads. Upgrade to Enterprise to unlock it.",
+    useCases: VIDEO_USE_CASES,
   },
 };
 

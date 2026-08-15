@@ -18,7 +18,9 @@ import { generateProductPhotoshoot, resolveModelUrl } from '../services/ai/produ
 import { validateOutfitSlots, type OutfitSlots } from '../services/ai/outfitSlots';
 import { buildOutfitPrompt } from '../services/ai/outfitPrompt';
 import { enqueueOutfitJob } from '../services/queue/outfitProducer';
-import type { OutfitJob } from '../types';
+import { enqueueProductModelJob } from '../services/queue/productModelProducer';
+import { enqueueVideoJob } from '../services/queue/videoProducer';
+import type { OutfitJob, ProductModelJob, VideoJob } from '../types';
 
 const router = Router();
 
@@ -264,6 +266,226 @@ router.get(
         error: outfit.error ?? undefined,
         createdAt: outfit.createdAt,
         completedAt: outfit.completedAt,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── AI Model Studio (Enterprise) ───────────────────────────────────────────
+// Uploads a flat-lay/ghost-mannequin product photo and generates a professional on-model shot via
+// FASHN product-to-model. Unlike AI Product Photoshoot (product + a specific saved model photo),
+// this generates the person itself — optionally guided by a face reference for identity. Async/
+// queued (its own `product-model-jobs` queue), same reasoning as the Outfit Builder above.
+
+router.post(
+  '/product-model/generate',
+  generalRateLimit,
+  requireAuth,
+  requirePlan('enterprise'),
+  [
+    body('productStoragePath').isString().trim().notEmpty(),
+    body('faceReferenceStoragePath').optional().isString().trim().notEmpty(),
+    body('prompt').optional().isString().trim().isLength({ max: 500 }),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user!.id;
+      const params = matchedData(req) as {
+        productStoragePath: string;
+        faceReferenceStoragePath?: string;
+        prompt?: string;
+      };
+      if (!params.productStoragePath.startsWith(`${userId}/`)) {
+        throw new AppError('Product image does not belong to this account', 403);
+      }
+      if (params.faceReferenceStoragePath && !params.faceReferenceStoragePath.startsWith(`${userId}/`)) {
+        throw new AppError('Face reference image does not belong to this account', 403);
+      }
+
+      const productImageUrl = await getSignedUrl(INPUT_BUCKET, params.productStoragePath);
+      const faceReferenceUrl = params.faceReferenceStoragePath
+        ? await getSignedUrl(INPUT_BUCKET, params.faceReferenceStoragePath)
+        : undefined;
+
+      const { id: generationDbId } = (await convexMutationTrusted(anyApi.backendTrusted.insertProductModelGeneration, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId,
+        productImage: productImageUrl,
+        faceReference: faceReferenceUrl,
+        promptUsed: params.prompt,
+      })) as { id: string };
+
+      const jobId = `product_model_${generationDbId}_${Date.now()}`;
+      const job: ProductModelJob = {
+        jobId,
+        userId,
+        generationDbId,
+        productImageUrl,
+        faceReferenceUrl,
+        prompt: params.prompt,
+      };
+      await enqueueProductModelJob(job);
+
+      res.status(202).json({ generationId: generationDbId, jobId, status: 'processing' });
+    } catch (err) {
+      logger.error('AI Model Studio generation failed', { error: err instanceof Error ? err.message : String(err) });
+      next(err instanceof AppError ? err : new AppError('Could not start generation right now', 502));
+    }
+  }
+);
+
+router.get(
+  '/product-model/:id',
+  requireAuth,
+  requirePlan('enterprise'),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user!.id;
+      const id = String(req.params.id);
+
+      const generation = await convexQueryTrusted<{
+        id: string;
+        status: string;
+        resultImage: string | null;
+        error: string | null;
+        createdAt: string;
+        completedAt: string | null;
+      } | null>(anyApi.backendTrusted.getProductModelGenerationForUser, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId,
+        id,
+      });
+
+      if (!generation) {
+        res.status(404).json({ error: 'Generation not found' });
+        return;
+      }
+
+      let resultUrl: string | null = null;
+      if (generation.status === 'completed' && generation.resultImage) {
+        resultUrl = await getSignedUrl(RESULT_BUCKET, generation.resultImage);
+      }
+
+      res.json({
+        generationId: generation.id,
+        status: generation.status,
+        resultUrl,
+        error: generation.error ?? undefined,
+        createdAt: generation.createdAt,
+        completedAt: generation.completedAt,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── AI Video (Enterprise) ───────────────────────────────────────────────────
+// Animates a still image (any upload — a try-on result, a photoshoot/outfit result the brand
+// downloaded and re-uploaded, or any product image) into a short clip via FASHN image-to-video.
+// Real per-credit cost (480p=1, 720p=3, 1080p=6, x2 for 10s) — same Enterprise gate + dark-ship
+// flag as every other feature here, own isolated `video-jobs` queue.
+
+router.post(
+  '/video/generate',
+  generalRateLimit,
+  requireAuth,
+  requirePlan('enterprise'),
+  [
+    body('sourceStoragePath').isString().trim().notEmpty(),
+    body('prompt').optional().isString().trim().isLength({ max: 200 }),
+    body('duration').optional().isIn([5, 10]),
+    body('resolution').optional().isIn(['480p', '720p', '1080p']),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user!.id;
+      const params = matchedData(req) as {
+        sourceStoragePath: string;
+        prompt?: string;
+        duration?: 5 | 10;
+        resolution?: '480p' | '720p' | '1080p';
+      };
+      if (!params.sourceStoragePath.startsWith(`${userId}/`)) {
+        throw new AppError('Source image does not belong to this account', 403);
+      }
+
+      const sourceImageUrl = await getSignedUrl(INPUT_BUCKET, params.sourceStoragePath);
+      const duration = params.duration ?? 5;
+      const resolution = params.resolution ?? '1080p';
+
+      const { id: generationDbId } = (await convexMutationTrusted(anyApi.backendTrusted.insertVideoGeneration, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId,
+        sourceImage: sourceImageUrl,
+        promptUsed: params.prompt,
+        durationSeconds: duration,
+        resolution,
+      })) as { id: string };
+
+      const jobId = `video_${generationDbId}_${Date.now()}`;
+      const job: VideoJob = {
+        jobId,
+        userId,
+        generationDbId,
+        sourceImageUrl,
+        prompt: params.prompt,
+        duration,
+        resolution,
+      };
+      await enqueueVideoJob(job);
+
+      res.status(202).json({ generationId: generationDbId, jobId, status: 'processing' });
+    } catch (err) {
+      logger.error('AI Video generation failed', { error: err instanceof Error ? err.message : String(err) });
+      next(err instanceof AppError ? err : new AppError('Could not start video generation right now', 502));
+    }
+  }
+);
+
+router.get(
+  '/video/:id',
+  requireAuth,
+  requirePlan('enterprise'),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user!.id;
+      const id = String(req.params.id);
+
+      const generation = await convexQueryTrusted<{
+        id: string;
+        status: string;
+        resultVideo: string | null;
+        error: string | null;
+        createdAt: string;
+        completedAt: string | null;
+      } | null>(anyApi.backendTrusted.getVideoGenerationForUser, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId,
+        id,
+      });
+
+      if (!generation) {
+        res.status(404).json({ error: 'Generation not found' });
+        return;
+      }
+
+      let resultUrl: string | null = null;
+      if (generation.status === 'completed' && generation.resultVideo) {
+        resultUrl = await getSignedUrl(RESULT_BUCKET, generation.resultVideo);
+      }
+
+      res.json({
+        generationId: generation.id,
+        status: generation.status,
+        resultUrl,
+        error: generation.error ?? undefined,
+        createdAt: generation.createdAt,
+        completedAt: generation.completedAt,
       });
     } catch (err) {
       next(err);

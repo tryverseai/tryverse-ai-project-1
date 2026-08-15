@@ -208,6 +208,15 @@ export const env = {
    * hats/bags, which tryon-v1.6 does not. Configurable in case FASHN renames/versions this model.
    */
   FASHN_OUTFIT_MODEL_NAME: optionalEnv('FASHN_OUTFIT_MODEL_NAME', 'tryon-max'),
+  /** FASHN model used by AI Model Studio (`services/ai/fashn.ts::runFashnProductToModel`). */
+  FASHN_PRODUCT_MODEL_MODEL_NAME: optionalEnv('FASHN_PRODUCT_MODEL_MODEL_NAME', 'product-to-model'),
+  /** FASHN model used by AI Video (`services/ai/fashn.ts::runFashnImageToVideo`). */
+  FASHN_VIDEO_MODEL_NAME: optionalEnv('FASHN_VIDEO_MODEL_NAME', 'image-to-video'),
+  /**
+   * Poll timeout specifically for video predictions (ms) — longer than the shared
+   * POLL_TIMEOUT_MS below, since video rendering can take longer than a still image.
+   */
+  FASHN_VIDEO_POLL_TIMEOUT_MS: parseInt(optionalEnv('FASHN_VIDEO_POLL_TIMEOUT_MS', '360000'), 10),
 
   // Preprocessing — background removal (rembg)
   REPLICATE_MODEL_REMBG: optionalEnv(

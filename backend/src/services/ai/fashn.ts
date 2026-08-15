@@ -107,9 +107,14 @@ async function startFashnRun(body: Record<string, unknown>, modelName?: string):
   }
 }
 
-/** Poll FASHN status until the prediction finishes. Returns the output URL. */
-async function pollFashnStatus(predictionId: string): Promise<string> {
-  const deadline = Date.now() + POLL_TIMEOUT_MS;
+/**
+ * Poll FASHN status until the prediction finishes. Returns the output URL.
+ * `timeoutMs` defaults to POLL_TIMEOUT_MS (unchanged for every existing call site); video
+ * generation can run longer than a still-image prediction, so `runFashnImageToVideo` passes a
+ * longer override rather than risk a slow-but-succeeding video job being cut off early.
+ */
+async function pollFashnStatus(predictionId: string, timeoutMs: number = POLL_TIMEOUT_MS): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL_MS);
@@ -140,7 +145,7 @@ async function pollFashnStatus(predictionId: string): Promise<string> {
     logger.debug('FASHN prediction in progress', { id: predictionId, status: data.status });
   }
 
-  throw new Error(`FASHN prediction timed out after ${POLL_TIMEOUT_MS / 1000}s`);
+  throw new Error(`FASHN prediction timed out after ${timeoutMs / 1000}s`);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -292,6 +297,95 @@ export async function runFashnOutfit(
   const processingTimeMs = Date.now() - startTime;
 
   logger.info('FASHN outfit: prediction complete', { predictionId, processingTimeMs });
+
+  return { resultUrl, processingTimeMs };
+}
+
+/** FASHN model used for AI Model Studio (product photo → on-model shot). */
+const PRODUCT_MODEL_MODEL_NAME = env.FASHN_PRODUCT_MODEL_MODEL_NAME;
+
+export interface FashnProductToModelInput {
+  productImageUrl: string;
+  faceReferenceUrl?: string;
+  prompt?: string;
+}
+
+/**
+ * Runs FASHN's `product-to-model`: turns a flat-lay/ghost-mannequin product photo into a
+ * professional on-model shot. Unlike the existing Replicate-based AI Product Photoshoot (product +
+ * a specific pre-chosen model photo → composite), this generates the person itself — an optional
+ * `faceReferenceUrl` guides identity, but there's no "use exactly this saved model" input the way
+ * Photoshoot has. Deliberately a separate feature/table, not a second engine bolted onto Photoshoot.
+ * Field names confirmed against the live FASHN docs (product_image, image_prompt, face_reference,
+ * prompt, aspect_ratio, resolution) — see PRs/plan notes for the source.
+ */
+export async function runFashnProductToModel(input: FashnProductToModelInput): Promise<FashnOutfitOutput> {
+  const startTime = Date.now();
+
+  const payload: Record<string, unknown> = {
+    product_image: input.productImageUrl,
+  };
+  if (input.faceReferenceUrl) payload.face_reference = input.faceReferenceUrl;
+  if (input.prompt) payload.prompt = input.prompt;
+
+  logger.info('FASHN product-to-model: starting prediction', { modelName: PRODUCT_MODEL_MODEL_NAME });
+
+  const predictionId = await startFashnRun(payload, PRODUCT_MODEL_MODEL_NAME);
+
+  logger.info('FASHN product-to-model: prediction started', { predictionId });
+
+  const resultUrl = await pollFashnStatus(predictionId);
+
+  const processingTimeMs = Date.now() - startTime;
+
+  logger.info('FASHN product-to-model: prediction complete', { predictionId, processingTimeMs });
+
+  return { resultUrl, processingTimeMs };
+}
+
+/** FASHN model used for AI Video (still image → short animated clip). */
+const IMAGE_TO_VIDEO_MODEL_NAME = env.FASHN_VIDEO_MODEL_NAME;
+
+export interface FashnImageToVideoInput {
+  imageUrl: string;
+  prompt?: string;
+  duration?: 5 | 10;
+  resolution?: '480p' | '720p' | '1080p';
+}
+
+/**
+ * Runs FASHN's `image-to-video`: animates a single still image into a short clip. Field names
+ * confirmed against the live FASHN docs (image, prompt, duration, resolution). Real per-credit
+ * cost (480p=1, 720p=3, 1080p=6, ×2 for 10s) — the caller is responsible for plan-gating and
+ * surfacing that cost, this function just runs the prediction.
+ */
+export async function runFashnImageToVideo(input: FashnImageToVideoInput): Promise<FashnOutfitOutput> {
+  const startTime = Date.now();
+
+  const payload: Record<string, unknown> = {
+    image: input.imageUrl,
+    duration: input.duration ?? 5,
+    resolution: input.resolution ?? '1080p',
+  };
+  if (input.prompt) payload.prompt = input.prompt;
+
+  logger.info('FASHN image-to-video: starting prediction', {
+    modelName: IMAGE_TO_VIDEO_MODEL_NAME,
+    duration: payload.duration,
+    resolution: payload.resolution,
+  });
+
+  const predictionId = await startFashnRun(payload, IMAGE_TO_VIDEO_MODEL_NAME);
+
+  logger.info('FASHN image-to-video: prediction started', { predictionId });
+
+  // Video rendering can run longer than a still-image prediction — use the longer configurable
+  // timeout so a slow-but-succeeding job isn't cut off at the still-image POLL_TIMEOUT_MS.
+  const resultUrl = await pollFashnStatus(predictionId, env.FASHN_VIDEO_POLL_TIMEOUT_MS);
+
+  const processingTimeMs = Date.now() - startTime;
+
+  logger.info('FASHN image-to-video: prediction complete', { predictionId, processingTimeMs });
 
   return { resultUrl, processingTimeMs };
 }

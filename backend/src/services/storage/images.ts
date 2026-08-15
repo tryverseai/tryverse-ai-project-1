@@ -151,6 +151,46 @@ export async function storeResultImage(
   return `${base}/${storageId}.jpg`;
 }
 
+/**
+ * Downloads and stores a video result (AI Video / FASHN `image-to-video`) — same SSRF guard as
+ * `storeResultImage`, but stored as-is with no Sharp re-encode (Sharp is image-only).
+ */
+export async function storeResultVideo(videoUrl: string, userId?: string): Promise<string> {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(videoUrl);
+  } catch {
+    throw new Error('storeResultVideo: invalid URL');
+  }
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error('storeResultVideo: only HTTPS URLs are allowed');
+  }
+  const PRIVATE_HOST = /^(localhost|127\.|0\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1)/i;
+  if (PRIVATE_HOST.test(parsedUrl.hostname)) {
+    throw new Error('storeResultVideo: URL host not allowed');
+  }
+
+  const response = await fetch(videoUrl);
+  if (!response.ok) throw new Error(`Failed to fetch result video: ${response.status}`);
+
+  // Video clips are short (5-10s) but can still be a few MB — cap well above a typical clip.
+  const RESULT_VIDEO_MAX_BYTES = 100 * 1024 * 1024; // 100 MB cap
+  const contentLength = response.headers.get('content-length');
+  if (contentLength && parseInt(contentLength, 10) > RESULT_VIDEO_MAX_BYTES) {
+    throw new Error('storeResultVideo: remote video exceeds size limit');
+  }
+  const rawBuffer = await response.arrayBuffer();
+  if (rawBuffer.byteLength > RESULT_VIDEO_MAX_BYTES) {
+    throw new Error('storeResultVideo: remote video exceeds size limit');
+  }
+  const buffer = Buffer.from(rawBuffer);
+
+  const contentType = response.headers.get('content-type') || 'video/mp4';
+  const storageId = await convexUploadBuffer(buffer, contentType);
+  const base = userId ? `${userId}/videos` : `anonymous/videos`;
+  return `${base}/${storageId}.mp4`;
+}
+
 export async function getSignedUrl(
   _bucket: string,
   filePath: string,

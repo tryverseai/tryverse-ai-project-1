@@ -1,11 +1,18 @@
 import Bull from 'bull';
 import { getTryOnQueue } from './producer';
 import { getOutfitQueue } from './outfitProducer';
+import { getProductModelQueue } from './productModelProducer';
+import { getVideoQueue } from './videoProducer';
 import { executeTryOnPipeline } from '../ai/pipeline';
 import { executeOutfitPipeline } from '../ai/outfitPipeline';
+import { executeProductModelPipeline } from '../ai/productModelPipeline';
+import { executeVideoPipeline } from '../ai/videoPipeline';
 import { logger } from '../../config/logger';
 import { env } from '../../config/env';
-import type { TryOnJob, TryOnResult, OutfitJob, OutfitResult } from '../../types';
+import type {
+  TryOnJob, TryOnResult, OutfitJob, OutfitResult,
+  ProductModelJob, ProductModelResult, VideoJob, VideoResult,
+} from '../../types';
 
 /**
  * Starts the Bull worker that processes try-on jobs from the queue.
@@ -69,6 +76,8 @@ export function startWorker(): boolean {
 
   logger.info('Worker ready and listening for jobs');
   startOutfitWorker();
+  startProductModelWorker();
+  startVideoWorker();
   return true;
 }
 
@@ -115,6 +124,88 @@ function startOutfitWorker(): void {
   });
 
   logger.info('Outfit worker ready and listening for jobs');
+}
+
+/** Processes the separate `product-model-jobs` queue — isolated from every other queue above. */
+function startProductModelWorker(): void {
+  const queue = getProductModelQueue();
+  if (!queue) {
+    logger.warn('Product-model worker not started — queue not available');
+    return;
+  }
+
+  queue.process(env.JOB_CONCURRENCY, async (job: Bull.Job<ProductModelJob>): Promise<ProductModelResult> => {
+    logger.info('Processing product-model job', { jobId: job.id, generationDbId: job.data.generationDbId });
+    await job.progress(10);
+
+    const result = await executeProductModelPipeline(job.data);
+    await job.progress(100);
+
+    if (result.status === 'failed') {
+      throw new Error(result.error || 'Product-model pipeline execution failed');
+    }
+    return result;
+  });
+
+  queue.on('completed', (job, result: ProductModelResult) => {
+    logger.info('Product-model job completed', {
+      jobId: job.id,
+      generationDbId: job.data.generationDbId,
+      processingTimeMs: result.processingTimeMs,
+    });
+  });
+
+  queue.on('failed', (job, err) => {
+    logger.error('Product-model job failed permanently', {
+      jobId: job.id,
+      generationDbId: job.data.generationDbId,
+      attemptsMade: job.attemptsMade,
+      error: err.message,
+    });
+  });
+
+  logger.info('Product-model worker ready and listening for jobs');
+}
+
+/** Processes the separate `video-jobs` queue — isolated from every other queue above. */
+function startVideoWorker(): void {
+  const queue = getVideoQueue();
+  if (!queue) {
+    logger.warn('Video worker not started — queue not available');
+    return;
+  }
+
+  queue.process(env.JOB_CONCURRENCY, async (job: Bull.Job<VideoJob>): Promise<VideoResult> => {
+    logger.info('Processing video job', { jobId: job.id, generationDbId: job.data.generationDbId });
+    await job.progress(10);
+
+    const result = await executeVideoPipeline(job.data);
+    await job.progress(100);
+
+    if (result.status === 'failed') {
+      throw new Error(result.error || 'Video pipeline execution failed');
+    }
+    return result;
+  });
+
+  queue.on('completed', (job, result: VideoResult) => {
+    logger.info('Video job completed', {
+      jobId: job.id,
+      generationDbId: job.data.generationDbId,
+      processingTimeMs: result.processingTimeMs,
+    });
+  });
+
+  queue.on('failed', (job, err) => {
+    logger.error('Video job failed permanently', {
+      jobId: job.id,
+      generationDbId: job.data.generationDbId,
+      attemptsMade: job.attemptsMade,
+      error: err.message,
+    });
+  });
+
+  logger.info('Video worker ready and listening for jobs');
 }
 
 // When run directly

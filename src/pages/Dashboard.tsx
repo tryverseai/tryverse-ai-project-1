@@ -4,7 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, BarChart3, Settings, Key, LayoutDashboard, CreditCard, BookOpen, FlaskConical, Sparkles,
-  Users, Camera, Terminal, PlugZap, Shirt,
+  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film,
 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { listApiKeys, listWidgetDomains } from "@/lib/backendApi";
@@ -95,6 +95,40 @@ const OutfitBuilderTab = lazy(() =>
     .catch(() => ({ default: OutfitBuilderTabUnavailable }))
 );
 
+function ProductModelTabUnavailable() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <p className="text-sm font-medium text-foreground mb-1">AI Model Studio unavailable</p>
+      <p className="text-xs text-muted-foreground max-w-md text-center">
+        This section could not be loaded. Refresh the page or try again in a moment.
+      </p>
+    </div>
+  );
+}
+
+const ProductModelTab = lazy(() =>
+  import("@/components/dashboard/ProductModelTab")
+    .then((m) => ({ default: m.ProductModelTab }))
+    .catch(() => ({ default: ProductModelTabUnavailable }))
+);
+
+function VideoTabUnavailable() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <p className="text-sm font-medium text-foreground mb-1">AI Video unavailable</p>
+      <p className="text-xs text-muted-foreground max-w-md text-center">
+        This section could not be loaded. Refresh the page or try again in a moment.
+      </p>
+    </div>
+  );
+}
+
+const VideoTab = lazy(() =>
+  import("@/components/dashboard/VideoTab")
+    .then((m) => ({ default: m.VideoTab }))
+    .catch(() => ({ default: VideoTabUnavailable }))
+);
+
 const DeveloperDocsTab = lazyWithRetry(
   () => import("@/components/dashboard/DeveloperDocsTab").then((m) => ({ default: m.DeveloperDocsTab })),
   "developer-docs"
@@ -115,6 +149,8 @@ const sidebarItems = [
   { icon: Users, label: "AI Models" },
   { icon: Camera, label: "AI Photoshoot" },
   { icon: Shirt, label: "Outfit Builder" },
+  { icon: Wand2, label: "AI Model Studio" },
+  { icon: Film, label: "AI Video" },
   { icon: Key, label: "API Keys" },
   { icon: CreditCard, label: "Billing" },
   { icon: Settings, label: "Settings" },
@@ -132,6 +168,8 @@ const tabComponents: Record<string, React.ComponentType> = {
   "AI Models": AiModelsTab,
   "AI Photoshoot": AiPhotoshootTab,
   "Outfit Builder": OutfitBuilderTab,
+  "AI Model Studio": ProductModelTab,
+  "AI Video": VideoTab,
   "API Keys": ApiKeysTab,
   Billing: BillingTab,
   Settings: SettingsTab,

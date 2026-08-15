@@ -13,6 +13,10 @@ interface ImportMetaEnv {
   readonly VITE_ENABLE_B2C_SIGNUP?: string;
   /** Set to "true" to show the Outfit Builder dashboard tab (Enterprise-gated, default: hidden). */
   readonly VITE_OUTFIT_BUILDER_ENABLED?: string;
+  /** Set to "true" to show the AI Model Studio dashboard tab (Enterprise-gated, default: hidden). */
+  readonly VITE_PRODUCT_MODEL_ENABLED?: string;
+  /** Set to "true" to show the AI Video dashboard tab (Enterprise-gated, default: hidden). */
+  readonly VITE_VIDEO_ENABLED?: string;
 }
 
 declare module "*.mp4" {

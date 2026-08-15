@@ -5,15 +5,18 @@ import { anyApi, convexMutationTrusted, convexQueryTrusted } from '../config/con
 const secretArg = () => ({ secret: env.BACKEND_SHARED_SECRET });
 
 /**
- * Convex file storage path: `{userId}/{person|garment|results|_inference_scratch}/{storageId}.jpg`
- * where `storageId` is the Convex `_storage` document id.
+ * Convex file storage path: `{userId}/{person|garment|results|videos|_inference_scratch}/{storageId}.{ext}`
+ * where `storageId` is the Convex `_storage` document id. `.jpg` for every existing image asset;
+ * `.mp4` added for AI Video results (`storeResultVideo`) — every other extension stays rejected.
  */
 export function storagePathToConvexId(filePath: string): string {
   const base = filePath.split('/').pop();
-  if (!base || !base.toLowerCase().endsWith('.jpg')) {
+  const lower = base?.toLowerCase() ?? '';
+  const knownExt = ['.jpg', '.mp4'].find((ext) => lower.endsWith(ext));
+  if (!base || !knownExt) {
     throw new Error(`Invalid Convex storage path: ${filePath.slice(0, 80)}`);
   }
-  return base.slice(0, -4);
+  return base.slice(0, -knownExt.length);
 }
 
 export async function convexUploadBuffer(buffer: Buffer, contentType: string): Promise<string> {

@@ -303,7 +303,13 @@ export default defineSchema({
    */
   ai_generation_usage: defineTable({
     user_id: v.string(),
-    feature: v.union(v.literal("ai_model"), v.literal("ai_photoshoot"), v.literal("outfit_builder")),
+    feature: v.union(
+      v.literal("ai_model"),
+      v.literal("ai_photoshoot"),
+      v.literal("outfit_builder"),
+      v.literal("product_model"),
+      v.literal("video")
+    ),
     created_at: v.optional(v.string()),
   }).index("by_userId", ["user_id"]),
 
@@ -350,4 +356,45 @@ export default defineSchema({
     status: v.union(v.literal("active"), v.literal("archived")),
     created_at: v.string(),
   }).index("by_userId", ["user_id"]),
+
+  /**
+   * Enterprise "AI Model Studio" — a product photo generated onto an AI-created model via FASHN's
+   * `product-to-model` endpoint. Deliberately separate from `ai_generated_models` (a saved,
+   * reusable model library) and from the existing Replicate-based AI Product Photoshoot — this is
+   * a lighter-weight, single-shot generator with no model library step.
+   */
+  product_model_generations: defineTable({
+    user_id: v.string(),
+    product_image: v.string(),
+    face_reference: v.optional(v.string()),
+    prompt_used: v.optional(v.string()),
+    result_image: v.optional(v.string()),
+    status: v.string(),
+    error: v.optional(v.string()),
+    created_at: v.string(),
+    completed_at: v.optional(v.string()),
+  })
+    .index("by_userId", ["user_id"])
+    .index("by_user_created", ["user_id", "created_at"]),
+
+  /**
+   * Enterprise "AI Video" — animates a still image (any result the brand already generated, or a
+   * fresh upload) via FASHN's `image-to-video` endpoint. Real per-credit cost (480p=1, 720p=3,
+   * 1080p=6, x2 for 10s) — kept behind the same Enterprise gate + dark-ship flag as everything else
+   * here, and separate from all other generation tables/queues.
+   */
+  video_generations: defineTable({
+    user_id: v.string(),
+    source_image: v.string(),
+    prompt_used: v.optional(v.string()),
+    duration_seconds: v.number(),
+    resolution: v.string(),
+    result_video: v.optional(v.string()),
+    status: v.string(),
+    error: v.optional(v.string()),
+    created_at: v.string(),
+    completed_at: v.optional(v.string()),
+  })
+    .index("by_userId", ["user_id"])
+    .index("by_user_created", ["user_id", "created_at"]),
 });

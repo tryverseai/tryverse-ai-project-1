@@ -110,6 +110,50 @@ export interface OutfitResult {
   processingTimeMs?: number;
 }
 
+/**
+ * AI Model Studio job — separate from every other queue. Product photo (+ optional face
+ * reference) → one FASHN `product-to-model` result. Processed by its own `product-model-jobs`
+ * Bull queue and `executeProductModelPipeline`.
+ */
+export interface ProductModelJob {
+  jobId: string;
+  userId: string;
+  generationDbId: string;
+  productImageUrl: string;
+  faceReferenceUrl?: string;
+  prompt?: string;
+}
+
+export interface ProductModelResult {
+  jobId: string;
+  status: 'completed' | 'failed';
+  resultUrl?: string;
+  error?: string;
+  processingTimeMs?: number;
+}
+
+/**
+ * AI Video job — separate from every other queue. One still image → one FASHN `image-to-video`
+ * clip. Processed by its own `video-jobs` Bull queue and `executeVideoPipeline`.
+ */
+export interface VideoJob {
+  jobId: string;
+  userId: string;
+  generationDbId: string;
+  sourceImageUrl: string;
+  prompt?: string;
+  duration: 5 | 10;
+  resolution: '480p' | '720p' | '1080p';
+}
+
+export interface VideoResult {
+  jobId: string;
+  status: 'completed' | 'failed';
+  resultUrl?: string;
+  error?: string;
+  processingTimeMs?: number;
+}
+
 export interface ApiKeyPayload {
   id: string;
   userId: string;

@@ -1785,6 +1785,78 @@ export async function pollOutfitStatus(outfitId: string): Promise<OutfitResponse
   return handleResponse<OutfitResponse>(res, { feature: 'outfit_builder' });
 }
 
+// ─── AI Model Studio (Enterprise) ───────────────────────────────────────────
+// Turns a flat-lay product photo into professional on-model photography via FASHN
+// product-to-model. No model-library step — optionally guided by a face reference for identity.
+
+export interface GenerateProductModelParams {
+  productStoragePath: string;
+  faceReferenceStoragePath?: string;
+  prompt?: string;
+}
+
+export interface ProductModelGenerationResponse {
+  generationId: string;
+  jobId?: string;
+  status: 'processing' | 'completed' | 'failed';
+  resultUrl?: string;
+  error?: string;
+  createdAt?: string;
+  completedAt?: string;
+}
+
+export async function generateProductModel(params: GenerateProductModelParams): Promise<ProductModelGenerationResponse> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/ai-studio/product-model/generate`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  return handleResponse<ProductModelGenerationResponse>(res, { feature: 'product_model' });
+}
+
+export async function pollProductModelStatus(generationId: string): Promise<ProductModelGenerationResponse> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/ai-studio/product-model/${generationId}`, { headers });
+  return handleResponse<ProductModelGenerationResponse>(res, { feature: 'product_model' });
+}
+
+// ─── AI Video (Enterprise) ───────────────────────────────────────────────────
+// Animates a still image into a short clip via FASHN image-to-video. Real per-credit cost.
+
+export interface GenerateVideoParams {
+  sourceStoragePath: string;
+  prompt?: string;
+  duration?: 5 | 10;
+  resolution?: '480p' | '720p' | '1080p';
+}
+
+export interface VideoGenerationResponse {
+  generationId: string;
+  jobId?: string;
+  status: 'processing' | 'completed' | 'failed';
+  resultUrl?: string;
+  error?: string;
+  createdAt?: string;
+  completedAt?: string;
+}
+
+export async function generateVideo(params: GenerateVideoParams): Promise<VideoGenerationResponse> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/ai-studio/video/generate`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  return handleResponse<VideoGenerationResponse>(res, { feature: 'video' });
+}
+
+export async function pollVideoStatus(generationId: string): Promise<VideoGenerationResponse> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/ai-studio/video/${generationId}`, { headers });
+  return handleResponse<VideoGenerationResponse>(res, { feature: 'video' });
+}
+
 // ─── Health ───────────────────────────────────────────────────────────────────
 
 export async function checkBackendHealth(): Promise<boolean> {
