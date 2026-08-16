@@ -89,7 +89,7 @@ export function VoyagerShowcase({ slides }: { slides: Slide[] }) {
   const { cardWidth, spacing } = useResponsiveCardMetrics();
 
   return (
-    <div ref={ref} className="relative" style={{ height: `${n * 62}vh` }}>
+    <div ref={ref} className="relative" style={{ height: `${n * 62}svh` }}>
       <div className="sticky top-0 flex h-[100svh] items-center justify-center overflow-hidden">
         <div className="relative h-[min(78vh,620px)] w-full md:h-[min(68vh,620px)]" style={{ perspective: 1600 }}>
           {slides.map((slide, i) => (
