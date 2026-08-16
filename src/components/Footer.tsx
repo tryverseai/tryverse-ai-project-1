@@ -75,25 +75,14 @@ export function Footer() {
   return (
     <footer className="border-t border-[hsl(40_16%_95%/0.12)] bg-[hsl(var(--ink))]">
       <div className="mx-auto w-full max-w-[78rem] px-6 md:px-10">
-        {/* Oversized wordmark — the type is the graphic */}
-        <Reveal className="overflow-hidden border-b border-[hsl(40_16%_95%/0.12)] py-12 md:py-16">
-          <p
-            aria-hidden="true"
-            className="select-none font-display leading-[0.8] tracking-[-0.045em] text-[hsl(40_16%_95%)]"
-            style={{ fontSize: "clamp(4rem, 17vw, 15rem)" }}
-          >
-            TryVerse
-          </p>
-        </Reveal>
-
         <div className="grid gap-12 py-14 md:grid-cols-[1.4fr_repeat(3,1fr)] md:gap-8">
           <div>
             <Link to="/" className="inline-flex transition-opacity hover:opacity-70">
               <TryVerseLogo height={30} invert />
             </Link>
             <p className="type-caption mt-4 max-w-xs text-pretty text-[hsl(40_16%_95%/0.55)]">
-              Virtual try-on infrastructure for fashion brands. Shoppers see the garment on themselves before they
-              commit — embedded directly in your storefront.
+              AI infrastructure for fashion visualization. Virtual try-on, AI model photography, and campaign
+              content — from a single platform, embedded directly in your storefront.
             </p>
           </div>
 
@@ -117,6 +106,17 @@ export function Footer() {
           </span>
           <SocialIcons linkClassName="text-[hsl(40_16%_95%/0.55)] hover:text-[hsl(40_16%_95%)]" />
         </div>
+
+        {/* Oversized wordmark — the type is the graphic. Last element on the page, deliberately. */}
+        <Reveal className="overflow-hidden border-t border-[hsl(40_16%_95%/0.12)] py-12 md:py-16">
+          <p
+            aria-hidden="true"
+            className="select-none font-display leading-[0.8] tracking-[-0.045em] text-[hsl(40_16%_95%)]"
+            style={{ fontSize: "clamp(4rem, 17vw, 15rem)" }}
+          >
+            TryVerse
+          </p>
+        </Reveal>
       </div>
     </footer>
   );

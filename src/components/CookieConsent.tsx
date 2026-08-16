@@ -45,7 +45,8 @@ export function CookieConsent() {
           <div>
             <p className="font-medium text-foreground">Cookies</p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              We use cookies to improve your experience and analyze site usage. You can manage your preferences anytime.
+              We use cookies to improve site performance, personalize your experience, and understand how visitors
+              use TryVerse. Optional cookies are only enabled with your consent.
             </p>
           </div>
         </div>

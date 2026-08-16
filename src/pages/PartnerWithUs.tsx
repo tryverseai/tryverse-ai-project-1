@@ -13,16 +13,16 @@ import { ParallaxImage } from "@/components/motion/ParallaxImage";
 import partnerMirror from "@/assets/partner-mirror.jpg";
 
 const benefits = [
-  { icon: TrendingDown, title: "Help Reduce Returns", description: "Customers know how items fit before buying." },
-  { icon: TrendingUp, title: "Boost Conversions", description: "Interactive try-on drives purchase confidence." },
-  { icon: ShieldCheck, title: "Better Shopping Experience", description: "Delight customers with AI-powered personalization." },
+  { icon: TrendingDown, title: "Reduce Purchase Uncertainty", description: "Help customers visualize products before committing." },
+  { icon: TrendingUp, title: "Increase Conversion Rates", description: "Visual experiences help shoppers make faster buying decisions." },
+  { icon: ShieldCheck, title: "Elevate Customer Experience", description: "Transform static product pages into interactive shopping experiences." },
   { icon: Code2, title: "Flexible Integration", description: "Ship with our SDK and API, or embed the widget — whatever fits your stack." },
 ];
 
 const reasons = [
   { icon: Sparkles, title: "AI-Powered Try-On", description: "Let shoppers see products on themselves before buying." },
   { icon: Globe, title: "Global Scale", description: "Infrastructure built to scale with brands worldwide." },
-  { icon: Zap, title: "Simple Integration", description: "Embed TryVerse into your store with a few lines of code." },
+  { icon: Zap, title: "Flexible Integration", description: "Connect TryVerse through APIs, SDKs, and commerce integrations built for modern fashion platforms." },
   { icon: Shield, title: "Enterprise Ready", description: "Secure, reliable, and designed for production workloads." },
 ];
 
@@ -31,8 +31,8 @@ const PartnerWithUs = () => {
   return (
   <div className="min-h-screen bg-background">
     <Helmet>
-      <title>Partner With Us — TryVerse AI Virtual Try-On</title>
-      <meta name="description" content="Integrate TryVerse AI into your e-commerce store. The infrastructure powering virtual try-on for fashion brands. Reduce returns, boost conversions." />
+      <title>Partner With Us — TryVerse AI Infrastructure for Fashion Visualization</title>
+      <meta name="description" content="Integrate TryVerse's fashion visualization platform into your commerce stack. Virtual try-on, AI model photography, and outfit visualization through APIs and SDKs." />
       <link rel="canonical" href="https://tryverseai.com/partner" />
     </Helmet>
     <Navbar />
@@ -137,10 +137,12 @@ const PartnerWithUs = () => {
             >
               <p className="text-xs font-medium text-muted-foreground mb-3 tracking-[0.2em] uppercase">For Fashion Brands</p>
               <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-6">
-                The Infrastructure Powering Virtual Try-On
+                The Infrastructure Powering Fashion Visualization
               </h2>
               <p className="text-muted-foreground text-lg leading-relaxed mb-8">
-                Integrate TryVerse AI into your e-commerce store, marketplace, or mobile app with our SDK and API — or embed the widget for a drop-in experience. Our infrastructure handles the heavy lifting so you can focus on selling.
+                Integrate TryVerse into your commerce stack through APIs, SDKs, and storefront integrations. Deliver
+                fashion visualization experiences directly inside your shopping journey without changing how your
+                catalog works.
               </p>
 
               <div className="grid sm:grid-cols-2 gap-5 mb-8">

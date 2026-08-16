@@ -26,7 +26,7 @@ export function HeroSection() {
   return (
     <section
       ref={ref}
-      aria-label="TryVerse virtual try-on"
+      aria-label="TryVerse AI infrastructure for fashion visualization"
       className="relative isolate flex min-h-[100svh] flex-col justify-end overflow-hidden bg-[hsl(var(--ink))]"
     >
       <motion.img
@@ -61,15 +61,15 @@ export function HeroSection() {
           transition={{ duration: 0.7, delay: 0.15 }}
         >
           <span className="h-px w-8 bg-current opacity-40" aria-hidden="true" />
-          Virtual try-on infrastructure
+          AI infrastructure for fashion visualization
         </motion.p>
 
         <h1 className="type-hero max-w-2xl text-balance text-[hsl(40_16%_95%)]">
           <RevealLines
             lines={[
-              <>Experience it</>,
+              <>Turn fashion products</>,
               <>
-                on <em className="font-normal italic">You</em>.
+                into <em className="font-normal italic">visual experiences</em>.
               </>,
             ]}
           />
@@ -81,7 +81,8 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.5, ease: EASE }}
         >
-          AI virtual try-on for fashion brands. One photo, and your shopper sees the product on their own body.
+          Generate virtual try-ons, AI model photography, outfit visualizations, campaign assets, and fashion
+          content from a single platform.
         </motion.p>
 
         <motion.div

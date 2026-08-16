@@ -1,37 +1,51 @@
 import { Section, SectionIntro } from "@/components/layout/Section";
 import { RevealGroup, RevealItem } from "@/components/motion/Reveal";
-import { Eye, Ruler, Camera, Video, BarChart3, ShieldCheck } from "lucide-react";
+import {
+  Eye,
+  Ruler,
+  Sparkles,
+  Layers,
+  Camera,
+  Wand2,
+  Image,
+  Video,
+  Code2,
+  Package,
+  BarChart3,
+  ShieldCheck,
+  Gauge,
+  Users,
+} from "lucide-react";
 
-const capabilities = [
+const categories = [
   {
-    icon: Eye,
-    title: "Virtual try-on",
-    body: "Photorealistic garment rendering on the shopper's own photo, returned to your product page.",
+    title: "Shopper experiences",
+    items: [
+      { icon: Eye, label: "Virtual try-on" },
+      { icon: Layers, label: "Outfit visualization" },
+      { icon: Ruler, label: "Fit intelligence" },
+      { icon: Sparkles, label: "AI styling" },
+    ],
   },
   {
-    icon: Ruler,
-    title: "Fit intelligence",
-    body: "Body proportions read from the photo inform a size suggestion alongside the render.",
+    title: "Content creation",
+    items: [
+      { icon: Camera, label: "AI model photography" },
+      { icon: Wand2, label: "Product-to-model generation" },
+      { icon: Image, label: "Campaign assets" },
+      { icon: Video, label: "Product motion" },
+    ],
   },
   {
-    icon: Camera,
-    title: "AI campaign stills",
-    body: "Generate model and catalogue imagery from flat product shots, without booking a studio.",
-  },
-  {
-    icon: Video,
-    title: "Product motion",
-    body: "Turn stills into short editorial loops for PDPs, ads and social placements.",
-  },
-  {
-    icon: BarChart3,
-    title: "Analytics",
-    body: "Try-on volume, conversion signals and per-product engagement in your dashboard.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Enterprise controls",
-    body: "Team roles, API keys, domain allow-lists, rate limits and an audit trail.",
+    title: "Infrastructure",
+    items: [
+      { icon: Code2, label: "APIs" },
+      { icon: Package, label: "SDKs" },
+      { icon: BarChart3, label: "Analytics" },
+      { icon: ShieldCheck, label: "Enterprise controls" },
+      { icon: Gauge, label: "Rate limits" },
+      { icon: Users, label: "Team management" },
+    ],
   },
 ];
 
@@ -40,30 +54,33 @@ export function PlatformSection() {
   return (
     <Section id="platform" tone="ink" rhythm="wide">
       <SectionIntro
-        eyebrow="Enterprise platform"
+        eyebrow="Fashion visualization platform"
         index="05"
         title={
           <>
             One render is a demo. <em className="font-normal italic">A platform</em> is a business.
           </>
         }
-        lead="Everything a fashion team needs to run try-on in production — not a single endpoint bolted onto a storefront."
+        lead="Everything a fashion team needs to run visualization in production — shopper experiences, content creation, and the infrastructure underneath, not a single endpoint bolted onto a storefront."
         className="[&_h2]:text-[hsl(40_16%_95%)] [&_p]:text-[hsl(40_16%_95%/0.65)]"
       />
 
-      <RevealGroup className="mt-20 grid gap-px overflow-hidden rounded-[var(--radius-lg)] bg-[hsl(40_16%_95%/0.14)] sm:grid-cols-2 lg:grid-cols-3">
-        {capabilities.map((c) => (
-          <RevealItem
-            key={c.title}
-            className="group bg-[hsl(var(--ink))] p-8 transition-colors duration-500 hover:bg-[hsl(40_16%_95%/0.05)] md:p-10"
-          >
-            <c.icon
-              className="h-5 w-5 text-[hsl(40_16%_95%/0.7)] transition-transform duration-500 group-hover:-translate-y-0.5"
-              strokeWidth={1.5}
-              aria-hidden="true"
-            />
-            <p className="type-heading mt-6 text-[hsl(40_16%_95%)]">{c.title}</p>
-            <p className="type-body mt-3 text-[hsl(40_16%_95%/0.6)]">{c.body}</p>
+      <RevealGroup className="mt-20 grid gap-px overflow-hidden rounded-[var(--radius-lg)] bg-[hsl(40_16%_95%/0.14)] sm:grid-cols-3">
+        {categories.map((cat) => (
+          <RevealItem key={cat.title} className="bg-[hsl(var(--ink))] p-8 md:p-10">
+            <p className="type-eyebrow text-[hsl(40_16%_95%/0.45)]">{cat.title}</p>
+            <ul className="mt-6 space-y-4">
+              {cat.items.map((item) => (
+                <li key={item.label} className="group flex items-center gap-3">
+                  <item.icon
+                    className="h-4 w-4 flex-shrink-0 text-[hsl(40_16%_95%/0.55)] transition-transform duration-500 group-hover:-translate-y-0.5"
+                    strokeWidth={1.5}
+                    aria-hidden="true"
+                  />
+                  <span className="type-body text-[hsl(40_16%_95%/0.85)]">{item.label}</span>
+                </li>
+              ))}
+            </ul>
           </RevealItem>
         ))}
       </RevealGroup>

@@ -14,6 +14,7 @@ import {
 import { captureSentryException } from "@/lib/sentry";
 import { assignTrustedPaymentCheckoutUrl } from "@/lib/safeUrl";
 import { cn } from "@/lib/utils";
+import { Helmet } from "react-helmet-async";
 
 type PricingAudience = "individual" | "business";
 
@@ -465,6 +466,14 @@ const Pricing = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Pricing — TryVerse AI Infrastructure for Fashion Visualization</title>
+        <meta
+          name="description"
+          content="Plans for fashion brands using TryVerse's fashion visualization platform — virtual try-on, AI model photography, and outfit visualization, from free to enterprise."
+        />
+        <link rel="canonical" href="https://tryverseai.com/pricing" />
+      </Helmet>
       <Navbar />
       <main className="pt-[var(--navbar-height)] pb-20">
         <div className="max-w-7xl mx-auto px-6">
@@ -478,7 +487,8 @@ const Pricing = () => {
               Plans for fashion brands
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
-              Scale virtual try-on for your storefront — start with 20 free try-ons, then upgrade when you&apos;re ready.
+              Scale fashion visualization for your storefront — virtual try-on, AI photography, and more — start
+              with 20 free try-ons, then upgrade when you&apos;re ready.
             </p>
 
             {(providers.flutterwave || providers.paystack) && (

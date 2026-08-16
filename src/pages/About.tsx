@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { GLASS_EASE, glassOuter, glassInner, glassInnerCard } from "@/lib/glassFrame";
 import { Globe, Target, Zap } from "lucide-react";
+import { Helmet } from "react-helmet-async";
 
 const values = [
   {
@@ -27,6 +28,14 @@ const values = [
 const About = () => {
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>About — TryVerse AI Infrastructure for Fashion Visualization</title>
+        <meta
+          name="description"
+          content="TryVerse builds AI infrastructure for fashion visualization — virtual try-on, AI model photography, and outfit visualization for online fashion commerce."
+        />
+        <link rel="canonical" href="https://tryverseai.com/about" />
+      </Helmet>
       <Navbar />
       <main className="pt-[var(--navbar-height)] pb-0">
         <div className="max-w-7xl mx-auto px-6">
@@ -41,7 +50,9 @@ const About = () => {
               Building the Infrastructure for Fashion's Digital Future
             </h1>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              TryVerse AI is a virtual try-on and fit intelligence platform for online fashion commerce. We're building tools to help brands sell more, reduce returns, and build customer trust.
+              TryVerse is AI infrastructure for fashion visualization — virtual try-on, AI model photography, and
+              outfit visualization for online fashion commerce. We're building tools to help brands sell more,
+              reduce returns, and build customer trust.
             </p>
           </motion.div>
 
