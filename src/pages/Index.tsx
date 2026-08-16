@@ -6,6 +6,7 @@ import { ConfidenceSection } from "@/components/landing/ConfidenceSection";
 import { MannequinSection } from "@/components/landing/MannequinSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { PlatformSection } from "@/components/landing/PlatformSection";
+import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
 import { Helmet } from "react-helmet-async";
 import { MotionConfig } from "framer-motion";
@@ -41,6 +42,7 @@ const Index = () => {
           <MannequinSection />
           <HowItWorksSection />
           <PlatformSection />
+          <CTASection />
         </main>
 
         <Footer />

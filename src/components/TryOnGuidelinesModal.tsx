@@ -41,9 +41,10 @@ export function markTryOnGuidelinesSeen(): void {
 
 const TIPS = [
   { icon: UserSquare2, label: "Full-body photo" },
-  { icon: ScanFace, label: "Natural standing pose" },
-  { icon: Sun, label: "Good lighting" },
-  { icon: Shirt, label: "Entire outfit visible" },
+  { icon: ScanFace, label: "Neutral, natural pose" },
+  { icon: CheckCircle2, label: "Clear, unobstructed visibility" },
+  { icon: Shirt, label: "Fitted clothing preferred" },
+  { icon: Sun, label: "Good, even lighting" },
 ];
 
 type Step = "guidance" | "consent";

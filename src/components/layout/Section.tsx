@@ -31,9 +31,9 @@ export function Section({
   }[tone];
 
   const rhythmClass = {
-    tight: "py-16 md:py-20",
-    normal: "py-24 md:py-32",
-    wide: "py-28 md:py-44",
+    tight: "py-10 sm:py-14 md:py-20",
+    normal: "py-14 sm:py-20 md:py-32",
+    wide: "py-16 sm:py-24 md:py-44",
   }[rhythm];
 
   return (

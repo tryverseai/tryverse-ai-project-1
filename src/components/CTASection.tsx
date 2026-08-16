@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 
 export function CTASection() {
   return (
-    <section className="py-24 md:py-32">
+    <section className="py-14 sm:py-20 md:py-32">
       <div className="max-w-7xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 24 }}

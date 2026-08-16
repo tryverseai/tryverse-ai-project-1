@@ -4,7 +4,7 @@ import { CTASection } from "@/components/CTASection";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { GLASS_EASE, glassOuter, glassInner, glassInnerCard } from "@/lib/glassFrame";
-import { Globe, Target, Zap } from "lucide-react";
+import { Globe, Target, Zap, Layers } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 
 const values = [
@@ -14,9 +14,14 @@ const values = [
     description: "Every pixel matters. We build AI that produces photorealistic results brands can trust.",
   },
   {
+    icon: Layers,
+    title: "Infrastructure",
+    description: "Built as a platform, not a single feature — the visualization layer commerce is missing.",
+  },
+  {
     icon: Globe,
     title: "Global Scale",
-    description: "Infrastructure designed to scale with your brand and handle growing demand.",
+    description: "Infrastructure designed to scale with your brand and handle growing demand, worldwide.",
   },
   {
     icon: Zap,
@@ -43,7 +48,7 @@ const About = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-20 max-w-3xl mx-auto"
+            className="text-center mb-12 sm:mb-16 md:mb-20 max-w-3xl mx-auto"
           >
             <p className="text-xs font-medium text-muted-foreground mb-3 tracking-[0.2em] uppercase">About</p>
             <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-6 leading-tight">
@@ -61,17 +66,21 @@ const About = () => {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className={`${glassOuter} mb-20`}
+            className={`${glassOuter} mb-12 sm:mb-16 md:mb-20`}
           >
             <div className={cn(glassInner, "p-8 md:p-10 lg:p-14")}>
             <div className="grid md:grid-cols-2 gap-10 items-center">
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-3 tracking-[0.2em] uppercase">Our Mission</p>
                 <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground mb-4">
-                  Making Online Shopping Feel Real
+                  Building the Infrastructure Layer for Fashion Visualization
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  TryVerse AI exists to bridge the gap between physical and digital shopping. We believe every shopper deserves to see how a product will look and fit before they buy — and every brand deserves the tools to make that possible. We're building the AI infrastructure that powers the next generation of fashion commerce.
+                  Fashion commerce runs on static photos in a category built for motion and fit. TryVerse exists to
+                  close that gap — the AI infrastructure layer that lets any brand, marketplace, or platform turn a
+                  product photo into a visualization a shopper can actually trust. Virtual try-on is where we
+                  started; the vision is the visualization and commerce layer the next generation of global fashion
+                  brands builds on.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -92,7 +101,7 @@ const About = () => {
           </motion.div>
 
           {/* Values */}
-          <div className="mb-20">
+          <div className="mb-12 sm:mb-16 md:mb-20">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -101,7 +110,7 @@ const About = () => {
             >
               <h2 className="font-display text-3xl font-bold text-foreground mb-3">What We Stand For</h2>
             </motion.div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {values.map((v, i) => (
                 <motion.div
                   key={v.title}

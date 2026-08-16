@@ -112,9 +112,9 @@ export function Footer() {
           <p
             aria-hidden="true"
             className="select-none font-display leading-[0.8] tracking-[-0.045em] text-[hsl(40_16%_95%)]"
-            style={{ fontSize: "clamp(4rem, 17vw, 15rem)" }}
+            style={{ fontSize: "clamp(3.4rem, 15vw, 13rem)" }}
           >
-            TryVerse
+            TryVerse AI
           </p>
         </Reveal>
       </div>

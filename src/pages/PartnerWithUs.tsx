@@ -38,7 +38,7 @@ const PartnerWithUs = () => {
     <Navbar />
     <main className="pt-[var(--navbar-height)] pb-24">
       {/* Bring Your Collection to Life — first */}
-      <section className="py-16 md:py-24 bg-muted/30">
+      <section className="py-10 sm:py-16 md:py-24 bg-muted/30">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -126,7 +126,7 @@ const PartnerWithUs = () => {
       </section>
 
       {/* The Infrastructure Powering Virtual Try-On */}
-      <section className="py-24 md:py-32">
+      <section className="py-14 sm:py-20 md:py-32">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <motion.div

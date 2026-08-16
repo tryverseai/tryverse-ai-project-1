@@ -37,7 +37,7 @@ export function MannequinSection() {
   const scale = useTransform(scrollYProgress, [0, 1], reduce ? [1, 1] : [1.1, 1]);
 
   return (
-    <section id="pipeline" aria-label="How TryVerse renders a garment" className="relative overflow-hidden bg-background py-24 md:py-36">
+    <section id="pipeline" aria-label="How TryVerse renders a garment" className="relative overflow-hidden bg-background py-14 sm:py-20 md:py-36">
       <div className="mx-auto w-full max-w-[78rem] px-6 md:px-10">
         <Eyebrow index="03" className="mb-8">
           The workflow
