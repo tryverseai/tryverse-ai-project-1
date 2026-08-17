@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Lock, Wand2, Trash2, RefreshCw, Users } from "lucide-react";
+import { Sparkles, Lock, Wand2, Trash2, RefreshCw, Users, Film, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { generateAiModel, getSavedAiModels, type AiModelResult } from "@/lib/backendApi";
+import {
+  generateAiModel,
+  getSavedAiModels,
+  generateVideo,
+  pollVideoStatus,
+  type AiModelResult,
+} from "@/lib/backendApi";
 import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
 import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { posthogCapture } from "@/lib/posthog";
@@ -69,6 +75,9 @@ export function AiModelsTab() {
   const [generating, setGenerating] = useState(false);
   const [models, setModels] = useState<AiModelResult[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
+  const [videoByModel, setVideoByModel] = useState<
+    Record<string, { status: "generating" | "done" | "error"; url?: string }>
+  >({});
 
   useEffect(() => {
     if (!isEnterprise) return;
@@ -107,6 +116,35 @@ export function AiModelsTab() {
       });
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleGenerateVideo = async (modelId: string) => {
+    setVideoByModel((prev) => ({ ...prev, [modelId]: { status: "generating" } }));
+    try {
+      const started = await generateVideo({ modelId, modelSource: "generated" });
+      if (started.status === "completed" && started.resultUrl) {
+        setVideoByModel((prev) => ({ ...prev, [modelId]: { status: "done", url: started.resultUrl } }));
+        return;
+      }
+
+      let attempts = 0;
+      while (attempts < 60) {
+        await new Promise<void>((r) => setTimeout(r, 5000));
+        attempts++;
+        const update = await pollVideoStatus(started.generationId);
+        if (update.status === "completed" && update.resultUrl) {
+          setVideoByModel((prev) => ({ ...prev, [modelId]: { status: "done", url: update.resultUrl } }));
+          return;
+        }
+        if (update.status === "failed") {
+          throw new Error(update.error ?? "Video generation failed.");
+        }
+      }
+      throw new Error("Video generation timed out. Please try again.");
+    } catch (e) {
+      setVideoByModel((prev) => ({ ...prev, [modelId]: { status: "error" } }));
+      toast.error(e instanceof Error ? e.message : "Could not generate the video.");
     }
   };
 
@@ -184,27 +222,50 @@ export function AiModelsTab() {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {models.map((m) => (
-                  <div key={m.id} className="rounded-xl overflow-hidden border border-border/50 bg-card group relative">
-                    <div className="aspect-[3/4] bg-muted">
-                      <img src={m.imageUrl} alt="Generated AI model" className="w-full h-full object-cover" />
+                {models.map((m) => {
+                  const video = videoByModel[m.id];
+                  return (
+                    <div key={m.id} className="rounded-xl overflow-hidden border border-border/50 bg-card group relative">
+                      <div className="aspect-[3/4] bg-muted">
+                        {video?.status === "done" && video.url ? (
+                          <video src={video.url} controls loop className="w-full h-full object-cover" />
+                        ) : (
+                          <img src={m.imageUrl} alt="Generated AI model" className="w-full h-full object-cover" />
+                        )}
+                      </div>
+                      {!(video?.status === "done" && video.url) && (
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <Button size="icon" variant="secondary" className="h-8 w-8" title="Reuse in a try-on">
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-8 w-8"
+                            title="Generate video from this model"
+                            disabled={video?.status === "generating"}
+                            onClick={() => void handleGenerateVideo(m.id)}
+                          >
+                            {video?.status === "generating" ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Film className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-8 w-8 text-destructive"
+                            title="Delete"
+                            onClick={() => setModels((prev) => prev.filter((x) => x.id !== m.id))}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <Button size="icon" variant="secondary" className="h-8 w-8" title="Reuse in a try-on">
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        className="h-8 w-8 text-destructive"
-                        title="Delete"
-                        onClick={() => setModels((prev) => prev.filter((x) => x.id !== m.id))}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

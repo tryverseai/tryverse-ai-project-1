@@ -15,6 +15,7 @@ import {
   archiveSavedAiModel,
 } from '../services/ai/modelGeneration';
 import { generateProductPhotoshoot, resolveModelUrl } from '../services/ai/productPhotoshoot';
+import { cxGetTryonForUser } from '../services/tryonConvexBridge';
 import { validateOutfitSlots, type OutfitSlots } from '../services/ai/outfitSlots';
 import { buildOutfitPrompt } from '../services/ai/outfitPrompt';
 import { enqueueOutfitJob } from '../services/queue/outfitProducer';
@@ -395,7 +396,11 @@ router.post(
   requireAuth,
   requirePlan('enterprise'),
   [
-    body('sourceStoragePath').isString().trim().notEmpty(),
+    // Exactly one source: a fresh upload, an existing try-on result, or a saved/library AI model.
+    body('sourceStoragePath').optional().isString().trim().notEmpty(),
+    body('tryonId').optional().isString().trim().notEmpty(),
+    body('modelId').optional().isString().trim().notEmpty(),
+    body('modelSource').optional().isIn(['library', 'generated']),
     body('prompt').optional().isString().trim().isLength({ max: 200 }),
     body('duration').optional().isIn([5, 10]),
     body('resolution').optional().isIn(['480p', '720p', '1080p']),
@@ -405,16 +410,44 @@ router.post(
     try {
       const userId = req.user!.id;
       const params = matchedData(req) as {
-        sourceStoragePath: string;
+        sourceStoragePath?: string;
+        tryonId?: string;
+        modelId?: string;
+        modelSource?: 'library' | 'generated';
         prompt?: string;
         duration?: 5 | 10;
         resolution?: '480p' | '720p' | '1080p';
       };
-      if (!params.sourceStoragePath.startsWith(`${userId}/`)) {
-        throw new AppError('Source image does not belong to this account', 403);
+
+      const sourceCount = [params.sourceStoragePath, params.tryonId, params.modelId].filter(Boolean).length;
+      if (sourceCount !== 1) {
+        throw new AppError('Provide exactly one of sourceStoragePath, tryonId, or modelId', 400);
       }
 
-      const sourceImageUrl = await getSignedUrl(INPUT_BUCKET, params.sourceStoragePath);
+      let sourceImageUrl: string;
+      if (params.sourceStoragePath) {
+        if (!params.sourceStoragePath.startsWith(`${userId}/`)) {
+          throw new AppError('Source image does not belong to this account', 403);
+        }
+        sourceImageUrl = await getSignedUrl(INPUT_BUCKET, params.sourceStoragePath);
+      } else if (params.tryonId) {
+        // "Generate video from a try-on result" — animate a completed try-on's own result image.
+        const tryon = await cxGetTryonForUser(params.tryonId, userId);
+        if (!tryon) {
+          throw new AppError('Try-on not found', 404);
+        }
+        if (tryon.status !== 'completed' || !tryon.result_image) {
+          throw new AppError('This try-on has no completed result yet', 400);
+        }
+        sourceImageUrl = await getSignedUrl(RESULT_BUCKET, tryon.result_image);
+      } else {
+        // "Generate campaign video" — animate a saved AI model (library stock or the brand's own).
+        if (!params.modelSource) {
+          throw new AppError('modelSource is required when modelId is provided', 400);
+        }
+        sourceImageUrl = await resolveModelUrl(userId, params.modelId!, params.modelSource);
+      }
+
       const duration = params.duration ?? 5;
       const resolution = params.resolution ?? '1080p';
 

@@ -25,10 +25,18 @@ import {
   uploadImage,
   startTryOn,
   pollTryOnStatus,
+  generateVideo,
+  pollVideoStatus,
   type TryOnCategory,
 } from "@/lib/backendApi";
 import { TryOnGuidelinesModal, hasSeenTryOnGuidelines } from "@/components/TryOnGuidelinesModal";
 import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
+import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
+import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
+import { Film } from "lucide-react";
+
+const VIDEO_MAX_POLL_ATTEMPTS = 60;
+const VIDEO_POLL_INTERVAL_MS = 5000;
 
 const CATEGORIES: { id: TryOnCategory; label: string }[] = [
   { id: "clothing", label: "Full outfit" },
@@ -144,8 +152,13 @@ export function StudioTab() {
   const [category, setCategory] = useState<TryOnCategory>("clothing");
   const [status, setStatus] = useState<Status>("idle");
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultTryonId, setResultTryonId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
+  const isEnterprise = useIsEnterprisePlan();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [videoStatus, setVideoStatus] = useState<"idle" | "generating" | "done" | "error">("idle");
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   const handleFile = useCallback((
     slot: "model" | "garment",
@@ -169,7 +182,10 @@ export function StudioTab() {
     setCategory("clothing");
     setStatus("idle");
     setResultUrl(null);
+    setResultTryonId(null);
     setErrorMsg(null);
+    setVideoStatus("idle");
+    setVideoUrl(null);
   };
 
   const run = async () => {
@@ -197,6 +213,7 @@ export function StudioTab() {
 
       if (job.status === "completed" && job.resultUrl) {
         setResultUrl(job.resultUrl);
+        setResultTryonId(job.tryonId);
         setStatus("done");
         return;
       }
@@ -210,6 +227,7 @@ export function StudioTab() {
         const update = await pollTryOnStatus(id);
         if (update.status === "completed" && update.resultUrl) {
           setResultUrl(update.resultUrl);
+          setResultTryonId(id);
           setStatus("done");
           return;
         }
@@ -236,6 +254,45 @@ export function StudioTab() {
       return;
     }
     void run();
+  };
+
+  const handleGenerateVideo = async () => {
+    if (!isEnterprise) {
+      setUpgradeOpen(true);
+      return;
+    }
+    if (!resultTryonId) return;
+
+    setVideoStatus("generating");
+    setVideoUrl(null);
+    try {
+      const started = await generateVideo({ tryonId: resultTryonId });
+      if (started.status === "completed" && started.resultUrl) {
+        setVideoUrl(started.resultUrl);
+        setVideoStatus("done");
+        return;
+      }
+
+      let attempts = 0;
+      while (attempts < VIDEO_MAX_POLL_ATTEMPTS) {
+        await new Promise<void>((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
+        attempts++;
+        const update = await pollVideoStatus(started.generationId);
+        if (update.status === "completed" && update.resultUrl) {
+          setVideoUrl(update.resultUrl);
+          setVideoStatus("done");
+          return;
+        }
+        if (update.status === "failed") {
+          throw new Error(update.error ?? "Video generation failed.");
+        }
+      }
+      throw new Error("Video generation timed out. Please try again.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Something went wrong.";
+      setVideoStatus("error");
+      toast.error(msg);
+    }
   };
 
   return (
@@ -335,7 +392,23 @@ export function StudioTab() {
                   alt="Try-on result"
                   className="w-full object-contain max-h-[520px]"
                 />
-                <div className="absolute bottom-3 right-3">
+                <div className="absolute bottom-3 right-3 flex gap-2">
+                  {videoStatus === "done" && videoUrl ? null : (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="rounded-full shadow-md"
+                      disabled={videoStatus === "generating"}
+                      onClick={() => void handleGenerateVideo()}
+                    >
+                      {videoStatus === "generating" ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Film className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      {videoStatus === "generating" ? "Animating…" : "Generate video"}
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="secondary"
@@ -392,6 +465,20 @@ export function StudioTab() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {videoStatus === "done" && videoUrl && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-2 rounded-xl border border-border bg-muted p-3"
+            >
+              <p className="text-xs font-medium text-muted-foreground">Animated from this result</p>
+              <video src={videoUrl} controls loop className="w-full rounded-lg" />
+            </motion.div>
+          )}
+          {videoStatus === "error" && (
+            <p className="text-xs text-destructive">Could not generate the video. Please try again.</p>
+          )}
         </div>
       </div>
 
@@ -401,6 +488,7 @@ export function StudioTab() {
         onAcknowledge={() => void run()}
         source="studio_tab"
       />
+      <EnterpriseUpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} context="video" />
     </div>
   );
 }

@@ -1825,7 +1825,13 @@ export async function pollProductModelStatus(generationId: string): Promise<Prod
 // Animates a still image into a short clip via FASHN image-to-video. Real per-credit cost.
 
 export interface GenerateVideoParams {
-  sourceStoragePath: string;
+  /** Exactly one of these three source fields must be set. */
+  sourceStoragePath?: string;
+  /** Animate a completed try-on's own result image. */
+  tryonId?: string;
+  /** Animate a saved AI model (stock library or the brand's own generated model). */
+  modelId?: string;
+  modelSource?: 'library' | 'generated';
   prompt?: string;
   duration?: 5 | 10;
   resolution?: '480p' | '720p' | '1080p';
