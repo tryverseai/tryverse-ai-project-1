@@ -1,5 +1,5 @@
 import { Section, SectionIntro } from "@/components/layout/Section";
-import { RevealGroup, RevealItem } from "@/components/motion/Reveal";
+import { Reveal, RevealGroup, RevealItem } from "@/components/motion/Reveal";
 import {
   Eye,
   Ruler,
@@ -16,9 +16,11 @@ import {
   Gauge,
   Users,
 } from "lucide-react";
+import showcase01 from "@/assets/showcase-01-sweater.jpg";
 
-const categories = [
+const beats = [
   {
+    index: "a",
     title: "Shopper experiences",
     items: [
       { icon: Eye, label: "Virtual try-on" },
@@ -28,6 +30,7 @@ const categories = [
     ],
   },
   {
+    index: "b",
     title: "Content creation",
     items: [
       { icon: Camera, label: "AI model photography" },
@@ -37,6 +40,7 @@ const categories = [
     ],
   },
   {
+    index: "c",
     title: "Infrastructure",
     items: [
       { icon: Code2, label: "APIs" },
@@ -49,7 +53,14 @@ const categories = [
   },
 ];
 
-/** Act five: the platform behind the render. */
+/**
+ * Act five: the platform behind the render, paced as its own sequence of beats rather than
+ * one grid landing all at once — each category gets room to register on its own before the
+ * next arrives. Only "Shopper experiences" carries a photograph: a real result already shown
+ * in the carousel above, brought back small as a callback, not new evidence. The other two
+ * beats stay type-led — there's no real generated output yet for content-creation capabilities
+ * (no live FASHN subscription), so this doesn't fabricate screenshots for them.
+ */
 export function PlatformSection() {
   return (
     <Section id="platform" tone="ink" rhythm="wide">
@@ -65,25 +76,43 @@ export function PlatformSection() {
         className="[&_h2]:text-[hsl(40_16%_95%)] [&_p]:text-[hsl(40_16%_95%/0.65)]"
       />
 
-      <RevealGroup className="mt-20 grid gap-px overflow-hidden rounded-[var(--radius-lg)] bg-[hsl(40_16%_95%/0.14)] sm:grid-cols-3">
-        {categories.map((cat) => (
-          <RevealItem key={cat.title} className="bg-[hsl(var(--ink))] p-8 md:p-10">
-            <p className="type-eyebrow text-[hsl(40_16%_95%/0.45)]">{cat.title}</p>
-            <ul className="mt-6 space-y-4">
-              {cat.items.map((item) => (
-                <li key={item.label} className="group flex items-center gap-3">
-                  <item.icon
-                    className="h-4 w-4 flex-shrink-0 text-[hsl(40_16%_95%/0.55)] transition-transform duration-500 group-hover:-translate-y-0.5"
-                    strokeWidth={1.5}
-                    aria-hidden="true"
+      <div className="mt-20 divide-y divide-[hsl(40_16%_95%/0.12)] border-y border-[hsl(40_16%_95%/0.12)]">
+        {beats.map((beat) => (
+          <Reveal key={beat.title} as="div" className="py-14 first:pt-0 last:pb-0 md:py-16">
+            <div className={beat.index === "a" ? "grid gap-10 md:grid-cols-[1fr_auto] md:items-center md:gap-16" : undefined}>
+              <div>
+                <p className="type-eyebrow text-[hsl(40_16%_95%/0.45)]">{beat.title}</p>
+                <RevealGroup className="mt-6 grid gap-x-8 gap-y-4 sm:grid-cols-2">
+                  {beat.items.map((item) => (
+                    <RevealItem key={item.label}>
+                      <div className="group flex items-center gap-3">
+                        <item.icon
+                          className="h-4 w-4 flex-shrink-0 text-[hsl(40_16%_95%/0.55)] transition-transform duration-500 group-hover:-translate-y-0.5"
+                          strokeWidth={1.5}
+                          aria-hidden="true"
+                        />
+                        <span className="type-body text-[hsl(40_16%_95%/0.85)]">{item.label}</span>
+                      </div>
+                    </RevealItem>
+                  ))}
+                </RevealGroup>
+              </div>
+
+              {beat.index === "a" ? (
+                <div className="h-40 w-32 flex-shrink-0 overflow-hidden rounded-2xl sm:h-48 sm:w-40">
+                  <img
+                    src={showcase01}
+                    alt="A real TryVerse virtual try-on result, shown in full above"
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
                   />
-                  <span className="type-body text-[hsl(40_16%_95%/0.85)]">{item.label}</span>
-                </li>
-              ))}
-            </ul>
-          </RevealItem>
+                </div>
+              ) : null}
+            </div>
+          </Reveal>
         ))}
-      </RevealGroup>
+      </div>
     </Section>
   );
 }
