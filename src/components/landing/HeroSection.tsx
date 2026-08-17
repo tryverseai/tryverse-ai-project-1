@@ -9,13 +9,18 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 const STATEMENT = "AI infrastructure for fashion visualization.";
 
 /**
- * Full-bleed on desktop. The photograph's crop (object-position 22% from top, wide
- * container over a portrait source) only shows her from the head down to roughly the
- * waist — the bottom third of the frame is empty floor/crowd, which is where the
- * statement sits: centered, directly under her, no card, just a soft scrim for
- * legibility. Mobile crops to her full figure top-to-bottom instead (portrait viewport,
- * portrait source), so there's no safe zone to overlay — the caption runs directly
- * below the full-bleed image instead, same as the SPREEAI reference.
+ * Full-bleed on both breakpoints, same treatment: photograph fills the screen, statement
+ * sits centered in the empty band below her, no card, no separate section.
+ *
+ * Desktop's wide container over a portrait source already crops to head-to-waist via
+ * object-fit alone (verified against the live DOM: her figure ends at ~61% of the frame).
+ * Mobile's narrow container doesn't get that crop for free — object-cover on a portrait
+ * viewport shows her full figure top-to-bottom with nothing to spare. `scale-[1.82]
+ * origin-top` re-creates the same effect deliberately: it zooms into the already-cover-fitted
+ * image from its top edge, so the visible window becomes the top ~55% of the photo (her head
+ * to roughly her waist) and the bottom ~45% — her legs, the block she's seated on — is pushed
+ * out of frame by the surrounding `overflow-hidden`, leaving the same kind of empty lower band
+ * desktop gets from its aspect ratio alone.
  */
 export function HeroSection() {
   const reduce = useReducedMotion();
@@ -87,22 +92,28 @@ export function HeroSection() {
         />
       </div>
 
-      {/* Mobile — full-bleed edge to edge, statement runs below the image (her full figure fills the crop, so nothing overlays her). */}
-      <div className="flex min-h-[100svh] flex-col md:hidden">
-        <div className="h-[78svh] w-full overflow-hidden">
+      {/* Mobile — full-bleed, same overlay treatment as desktop. */}
+      <div className="relative min-h-[100svh] overflow-hidden md:hidden">
+        <div className="absolute inset-0 overflow-hidden">
           <img
             src={campaign.crowd.src}
             alt={campaign.crowd.alt}
             // eslint-disable-next-line react/no-unknown-property
             {...{ fetchpriority: "high" }}
             decoding="async"
-            className="h-full w-full object-cover object-[50%_18%]"
+            className="h-full w-full origin-top scale-[1.82] object-cover object-[50%_0%]"
           />
         </div>
 
-        <div className="flex flex-1 flex-col items-center justify-center px-6 py-6 text-center">
+        {/* Legibility scrim — confined to the empty lower band the zoom just created, never reaches her figure. */}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-t from-[hsl(var(--ink)/0.82)] to-transparent"
+          aria-hidden="true"
+        />
+
+        <div className="absolute inset-x-0 bottom-12 z-10 flex flex-col items-center px-6 text-center">
           <motion.h1
-            className="type-heading max-w-xs text-balance"
+            className="type-heading max-w-xs text-balance text-[hsl(40_16%_95%)]"
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: EASE }}
@@ -110,21 +121,22 @@ export function HeroSection() {
             {STATEMENT}
           </motion.h1>
           <motion.div
-            className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center"
+            className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center"
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.35, ease: EASE }}
           >
             <Link to="/auth?signup=business" className="w-full sm:w-auto">
-              <Button size="lg" className="group w-full sm:w-auto">
+              <Button size="lg" variant="contrast" className="group w-full sm:w-auto">
                 Start free
                 <ArrowUpRight className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </Button>
             </Link>
-            <Link to="/book-demo" className="w-full sm:w-auto">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                Book a demo
-              </Button>
+            <Link
+              to="/book-demo"
+              className="underline-sweep type-body text-[hsl(40_16%_95%/0.75)] transition-colors duration-200 hover:text-[hsl(40_16%_95%)]"
+            >
+              Book a demo
             </Link>
           </motion.div>
         </div>
