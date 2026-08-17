@@ -3,107 +3,85 @@ import { Link } from "react-router-dom";
 import { useRef } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { RevealLines } from "@/components/motion/Reveal";
+import { Eyebrow } from "@/components/layout/Section";
+import { Reveal, RevealLines } from "@/components/motion/Reveal";
 import { campaign } from "@/lib/campaignImagery";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 /**
- * Full-bleed cinematic open: one photograph fills the viewport behind the transparent
- * navbar. Content is pinned to a scrim band at the bottom of the frame — the only zone
- * that stays clear of her face on every breakpoint, since object-cover shows her full
- * height on narrow viewports (cropping happens on the sides, not top-to-bottom).
- * Full height on every breakpoint — this is the cover, not a card.
+ * Editorial split, not a cinematic cover: the photograph keeps its own frame instead of
+ * being cropped full-bleed behind type. Mobile stacks image-then-copy so the model reads
+ * first, on her own, before any headline; desktop sets them side by side so neither one
+ * sits on top of the other. No scrim, no text-over-face — legibility comes from separation.
  */
 export function HeroSection() {
   const reduce = useReducedMotion();
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", reduce ? "0%" : "16%"]);
-  const scale = useTransform(scrollYProgress, [0, 1], reduce ? [1, 1] : [1.05, 1.16]);
-  const fade = useTransform(scrollYProgress, [0, 0.85], [1, reduce ? 1 : 0]);
+  const y = useTransform(scrollYProgress, [0, 1], ["0%", reduce ? "0%" : "8%"]);
+  const scale = useTransform(scrollYProgress, [0, 1], reduce ? [1, 1] : [1, 1.06]);
 
   return (
-    <section
-      ref={ref}
-      aria-label="TryVerse AI infrastructure for fashion visualization"
-      className="relative isolate flex min-h-[100svh] flex-col justify-end overflow-hidden bg-[hsl(var(--ink))]"
-    >
-      <motion.img
-        src={campaign.crowd.src}
-        alt={campaign.crowd.alt}
-        // eslint-disable-next-line react/no-unknown-property
-        {...{ fetchpriority: "high" }}
-        decoding="async"
-        style={{ y, scale }}
-        className="absolute inset-0 h-full w-full object-cover object-center will-change-transform"
-      />
-      {/* Legibility scrim: clear over her face and shoulders, solid across the lower band where the copy sits. */}
-      <div
-        className="absolute inset-0"
-        aria-hidden="true"
-        style={{
-          backgroundImage:
-            "linear-gradient(to top, hsl(var(--ink)) 0%, hsl(var(--ink)) 55%, transparent 70%)",
-        }}
-      />
-      {/* Thin top wash so the transparent navbar's wordmark stays legible over the frame. */}
-      <div
-        className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[hsl(var(--ink))]/35 to-transparent"
-        aria-hidden="true"
-      />
+    <section aria-label="TryVerse AI infrastructure for fashion visualization" className="bg-background pt-[calc(var(--navbar-height)+1.5rem)] sm:pt-[calc(var(--navbar-height)+2.5rem)]">
+      <div className="mx-auto grid w-full max-w-[78rem] grid-cols-1 items-center gap-10 px-6 md:grid-cols-2 md:gap-14 md:px-10 lg:gap-20">
+        {/* Image — full frame, no crop beyond the container's own aspect ratio, no overlay. */}
+        <div ref={ref} className="order-1 overflow-hidden rounded-[1.75rem] bg-secondary md:order-2">
+          <div className="aspect-[4/5] sm:aspect-[3/4] md:aspect-[4/5]">
+            <motion.img
+              src={campaign.crowd.src}
+              alt={campaign.crowd.alt}
+              // eslint-disable-next-line react/no-unknown-property
+              {...{ fetchpriority: "high" }}
+              decoding="async"
+              style={{ y, scale }}
+              className="h-full w-full object-cover object-top will-change-transform"
+            />
+          </div>
+        </div>
 
-      <motion.div className="relative mx-auto w-full max-w-[78rem] px-6 pb-14 pt-24 md:px-10 md:pb-20" style={{ opacity: fade }}>
-        <motion.p
-          className="type-eyebrow mb-8 flex items-center gap-3 text-[hsl(40_16%_95%/0.65)]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.7, delay: 0.15 }}
-        >
-          <span className="h-px w-8 bg-current opacity-40" aria-hidden="true" />
-          AI infrastructure for fashion visualization
-        </motion.p>
+        {/* Copy — clears the image entirely, mobile and desktop alike. */}
+        <div className="order-2 py-2 md:order-1 md:py-0">
+          <Eyebrow className="mb-8">AI infrastructure for fashion visualization</Eyebrow>
 
-        <h1 className="type-hero max-w-2xl text-balance text-[hsl(40_16%_95%)]">
-          <RevealLines
-            lines={[
-              <>Turn fashion products</>,
-              <>
-                into <em className="font-normal italic">visual experiences</em>.
-              </>,
-            ]}
-          />
-        </h1>
+          <h1 className="type-hero max-w-xl text-balance">
+            <RevealLines
+              lines={[
+                <>Turn fashion products</>,
+                <>
+                  into <em className="font-normal italic">visual experiences</em>.
+                </>,
+              ]}
+            />
+          </h1>
 
-        <motion.p
-          className="type-lead mt-8 max-w-md text-pretty text-[hsl(40_16%_95%/0.75)]"
-          initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.5, ease: EASE }}
-        >
-          Generate virtual try-ons, AI model photography, outfit visualizations, campaign assets, and fashion
-          content from a single platform.
-        </motion.p>
+          <Reveal delay={0.45} className="mt-8 max-w-md">
+            <p className="type-lead text-pretty">
+              Generate virtual try-ons, AI model photography, outfit visualizations, campaign assets, and fashion
+              content from a single platform.
+            </p>
+          </Reveal>
 
-        <motion.div
-          className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center"
-          initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.62, ease: EASE }}
-        >
-          <Link to="/auth?signup=business" className="w-full sm:w-auto">
-            <Button size="xl" variant="contrast" className="group w-full sm:w-auto">
-              Start free
-              <ArrowUpRight className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-            </Button>
-          </Link>
-          <Link to="/book-demo" className="w-full sm:w-auto">
-            <Button size="xl" variant="onInk" className="w-full sm:w-auto">
-              Book a demo
-            </Button>
-          </Link>
-        </motion.div>
-      </motion.div>
+          <motion.div
+            className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center"
+            initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.62, ease: EASE }}
+          >
+            <Link to="/auth?signup=business" className="w-full sm:w-auto">
+              <Button size="xl" className="group w-full sm:w-auto">
+                Start free
+                <ArrowUpRight className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Button>
+            </Link>
+            <Link to="/book-demo" className="w-full sm:w-auto">
+              <Button size="xl" variant="outline" className="w-full sm:w-auto">
+                Book a demo
+              </Button>
+            </Link>
+          </motion.div>
+        </div>
+      </div>
     </section>
   );
 }
