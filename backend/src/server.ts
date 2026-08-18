@@ -112,7 +112,11 @@ const widgetPublicCorsOptions = {
   origin: true as const,
   credentials: false,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-api-key'],
+  // 'Authorization' is required here too: these same prefixes (/api/upload, /api/widget) are also
+  // called by the authenticated dashboard (session Bearer token), not only by the public storefront
+  // widget (x-api-key) — omitting it silently CORS-blocks every authenticated upload/domain request
+  // from the browser (fetch fails before reaching the server; unauthenticated curl tests won't show it).
+  allowedHeaders: ['Content-Type', 'x-api-key', 'Authorization'],
   exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
   optionsSuccessStatus: 204,
 };
