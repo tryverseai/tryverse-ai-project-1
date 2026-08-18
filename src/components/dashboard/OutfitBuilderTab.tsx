@@ -18,6 +18,7 @@ import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
 import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { posthogCapture } from "@/lib/posthog";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import { downloadFile, dateStampedFilename } from "@/lib/utils";
 import { safeImageSrcForDom } from "@/lib/safeUrl";
 
 type PickedModel = { id: string; source: "library" | "generated"; imageUrl: string; label: string };
@@ -394,13 +395,19 @@ export function OutfitBuilderTab() {
                     <div className="aspect-[4/5] bg-muted">
                       <img src={r.imageUrl} alt="Generated outfit" className="w-full h-full object-cover" />
                     </div>
-                    <a
-                      href={r.imageUrl}
-                      download
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void downloadFile(r.imageUrl, dateStampedFilename("tryverse-outfit")).catch(() =>
+                          toast.error("Download failed")
+                        )
+                      }
                       className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                     >
-                      <Button size="icon" variant="secondary" className="h-8 w-8"><Download className="h-3.5 w-3.5" /></Button>
-                    </a>
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-secondary-foreground shadow">
+                        <Download className="h-3.5 w-3.5" />
+                      </span>
+                    </button>
                   </div>
                 ))}
               </div>

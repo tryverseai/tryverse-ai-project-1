@@ -101,8 +101,8 @@ export function WidgetTab() {
     posthogCapture("try_on_started", { source: "widget_tab", category: "clothing" });
 
     try {
-      const productFile = await dataUrlToFile(productImage);
-      const personFile = await dataUrlToFile(personImage);
+      const productFile = dataUrlToFile(productImage);
+      const personFile = dataUrlToFile(personImage);
 
       const [productUpload, personUpload] = await Promise.all([
         uploadImage(productFile, "product"),
@@ -144,10 +144,15 @@ export function WidgetTab() {
     }
   };
 
-  const dataUrlToFile = (dataUrl: string): Promise<File> => {
-    return fetch(dataUrl)
-      .then((r) => r.blob())
-      .then((blob) => new File([blob], "image.jpg", { type: blob.type || "image/jpeg" }));
+  // Decoded locally (no fetch()) — the page's CSP connect-src doesn't allow the data: scheme,
+  // so fetch(dataUrl) is silently blocked in production even though img-src allows rendering it.
+  const dataUrlToFile = (dataUrl: string): File => {
+    const [header, base64] = dataUrl.split(",");
+    const mime = /data:(.*?);base64/.exec(header)?.[1] || "image/jpeg";
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new File([bytes], "image.jpg", { type: mime });
   };
 
   return (

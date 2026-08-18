@@ -22,6 +22,7 @@ import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
 import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { posthogCapture } from "@/lib/posthog";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import { downloadFile, dateStampedFilename } from "@/lib/utils";
 
 const MAX_POLL_ATTEMPTS = 40;
 const POLL_INTERVAL_MS = 5000;
@@ -265,13 +266,18 @@ export function VideoTab() {
                 {results.map((r) => (
                   <div key={r.videoUrl} className="rounded-xl overflow-hidden border border-border/50 bg-card group relative">
                     <video src={r.videoUrl} className="w-full aspect-[4/5] object-cover bg-muted" controls loop muted playsInline />
-                    <a
-                      href={r.videoUrl}
-                      download
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() =>
+                        void downloadFile(r.videoUrl, dateStampedFilename("tryverse-video", "mp4")).catch(() =>
+                          toast.error("Download failed")
+                        )
+                      }
                     >
-                      <Button size="icon" variant="secondary" className="h-8 w-8"><Download className="h-3.5 w-3.5" /></Button>
-                    </a>
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 ))}
               </div>

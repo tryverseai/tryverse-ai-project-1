@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useRef } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,7 +7,6 @@ import {
   Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film,
 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { listApiKeys, listWidgetDomains } from "@/lib/backendApi";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
 // Eagerly load the default tab — zero extra latency on first visit
@@ -139,8 +138,8 @@ const CONNECT_TAB = "Connect Store";
 const DEFAULT_TAB = GUIDE_TAB;
 
 const sidebarItems = [
-  { icon: PlugZap, label: CONNECT_TAB },
   { icon: BookOpen, label: GUIDE_TAB },
+  { icon: PlugZap, label: CONNECT_TAB },
   { icon: LayoutDashboard, label: "Overview" },
   { icon: BarChart3, label: "Analytics" },
   { icon: Package, label: "Products" },
@@ -185,49 +184,24 @@ const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(DEFAULT_TAB);
-  const [storeConnected, setStoreConnected] = useState<boolean | null>(null);
   const { user } = useAuth();
   const brandName = user?.user_metadata?.brand_name || "Your Brand";
-  // Guards the forced first-visit redirect below so it fires exactly once per account, not on
-  // every render — after that, normal tab clicks and deep links behave as usual.
-  const appliedInitialLanding = useRef(false);
-
-  // First thing a brand sees after signup: Connect Your Store — until they actually have a key
-  // and an allowed domain, in which case the dashboard opens on the normal landing tab.
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    Promise.all([listApiKeys().catch(() => []), listWidgetDomains().catch(() => ({ domains: [] }))])
-      .then(([keys, { domains }]) => {
-        if (!cancelled) setStoreConnected(keys.length > 0 && domains.length > 0);
-      });
-    return () => { cancelled = true; };
-  }, [user]);
 
   // Depend on the primitive string `tabParam` rather than the full URLSearchParams
   // object (which is recreated every render), to avoid spurious effect re-runs.
+  //
+  // Try-On Guide is the first page every brand sees (walks them through the workflow before
+  // asking them to integrate anything) — Connect Store no longer force-overrides it on first
+  // visit, per explicit product direction: the user should understand the workflow before
+  // seeing integration instructions.
   useEffect(() => {
-    if (storeConnected === null) return; // wait for the connection check before deciding anything
-
-    // Unconditional on first visit: an account that hasn't connected a store always lands on
-    // Connect Store, even if the URL/browser history carries a stale ?tab= from a previous
-    // account or session in the same browser. Runs once; afterwards tabParam is honored normally.
-    if (!appliedInitialLanding.current) {
-      appliedInitialLanding.current = true;
-      if (!storeConnected) {
-        setActiveTab(CONNECT_TAB);
-        setSearchParams({ tab: CONNECT_TAB }, { replace: true });
-        return;
-      }
-    }
-
     if (tabParam && tabComponents[tabParam]) {
       setActiveTab(tabParam);
       return;
     }
     setActiveTab(DEFAULT_TAB);
     setSearchParams({ tab: DEFAULT_TAB }, { replace: true });
-  }, [tabParam, setSearchParams, storeConnected]);
+  }, [tabParam, setSearchParams]);
 
   const selectTab = (label: string) => {
     setActiveTab(label);

@@ -1,5 +1,31 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+
+/**
+ * createProduct never sets legacy_id, so every product made through the current UI is only
+ * findable by its real Convex _id. The by_legacyId index lookup alone (as update/delete used to
+ * do) never matches those rows — always "Not found". Fall back to a direct _id get, same pattern
+ * getMyProduct already used correctly.
+ */
+async function findOwnedProduct(
+  ctx: any,
+  id: string,
+  ownerId: string
+): Promise<Doc<"products"> | null> {
+  const byLegacy = await ctx.db
+    .query("products")
+    .withIndex("by_legacyId", (q: any) => q.eq("legacy_id", id))
+    .unique();
+  if (byLegacy) return byLegacy.user_id === ownerId ? byLegacy : null;
+  try {
+    const byId = await ctx.db.get(id as Id<"products">);
+    if (byId && byId.user_id === ownerId) return byId;
+  } catch {
+    /* not a valid Convex id */
+  }
+  return null;
+}
 
 export const listMyProducts = query({
   args: {
@@ -119,13 +145,8 @@ export const updateProduct = mutation({
   handler: async (ctx, { id, ...patch }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
-    // O(1) lookup by legacy_id; fallback to linear scan only when id looks like a
-    // Convex internal _id (no dashes — legacy UUIDs always contain dashes).
-    const doc = await ctx.db
-      .query("products")
-      .withIndex("by_legacyId", (q) => q.eq("legacy_id", id))
-      .unique();
-    if (!doc || doc.user_id !== identity.subject) throw new Error("Not found");
+    const doc = await findOwnedProduct(ctx, id, identity.subject);
+    if (!doc) throw new Error("Not found");
     const now = new Date().toISOString();
     const updates: Record<string, unknown> = { updated_at: now };
     if (patch.name !== undefined) updates.name = patch.name;
@@ -153,12 +174,8 @@ export const deleteProduct = mutation({
   handler: async (ctx, { id }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
-    // O(1) lookup via the by_legacyId index with ownership verification.
-    const doc = await ctx.db
-      .query("products")
-      .withIndex("by_legacyId", (q) => q.eq("legacy_id", id))
-      .unique();
-    if (!doc || doc.user_id !== identity.subject) throw new Error("Not found");
+    const doc = await findOwnedProduct(ctx, id, identity.subject);
+    if (!doc) throw new Error("Not found");
     await ctx.db.delete(doc._id);
   },
 });

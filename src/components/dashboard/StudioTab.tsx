@@ -34,6 +34,7 @@ import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
 import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
 import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { Film } from "lucide-react";
+import { downloadFile, dateStampedFilename } from "@/lib/utils";
 
 const VIDEO_MAX_POLL_ATTEMPTS = 60;
 const VIDEO_POLL_INTERVAL_MS = 5000;
@@ -393,12 +394,12 @@ export function StudioTab() {
                 initial={{ opacity: 0, scale: 0.97 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
-                className="relative rounded-xl overflow-hidden border border-border bg-muted"
+                className="relative rounded-lg overflow-hidden"
               >
                 <img
                   src={resultUrl}
                   alt="Try-on result"
-                  className="w-full object-contain max-h-[520px]"
+                  className="w-full object-contain max-h-[640px]"
                 />
                 <div className="absolute bottom-3 right-3 flex gap-2">
                   {videoStatus === "done" && videoUrl ? null : (
@@ -422,10 +423,9 @@ export function StudioTab() {
                     variant="secondary"
                     className="rounded-full shadow-md"
                     onClick={() => {
-                      const a = document.createElement("a");
-                      a.href = resultUrl;
-                      a.download = "tryverse-studio-result.jpg";
-                      a.click();
+                      void downloadFile(resultUrl, dateStampedFilename("tryverse-result")).catch(() =>
+                        toast.error("Download failed")
+                      );
                     }}
                   >
                     <Download className="h-3.5 w-3.5 mr-1.5" />
