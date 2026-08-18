@@ -21,10 +21,11 @@ export function TermsContent({ audience = "business" }: PolicyContentProps) {
         <section>
           <h2 className="font-display text-lg font-semibold text-foreground mb-3">2. Description of Service</h2>
           <p>
-            TryVerse provides AI-powered virtual try-on for <strong>your personal use</strong>. You can upload your
-            photo (or use preset models where available), add product images, and generate try-on results to view and
-            download. This personal experience does not include storefront widgets, merchant APIs, or team analytics
-            unless you separately use a business account.
+            TryVerse provides AI infrastructure for fashion visualization for <strong>your personal use</strong> —
+            virtual try-on, AI-generated model photography, and outfit visualization. You can upload your photo (or
+            use preset models where available), add product images, and generate results to view and download. This
+            personal experience does not include storefront widgets, merchant APIs, or team analytics unless you
+            separately use a business account.
           </p>
         </section>
         <section>
@@ -105,8 +106,9 @@ export function TermsContent({ audience = "business" }: PolicyContentProps) {
       <section>
         <h2 className="font-display text-lg font-semibold text-foreground mb-3">2. Description of Service</h2>
         <p>
-          TryVerse provides AI-powered virtual try-on technology for e-commerce brands. The Service includes an
-          embeddable widget, API access, image processing, and analytics dashboard.
+          TryVerse provides AI infrastructure for fashion visualization for e-commerce brands — virtual try-on, AI
+          photoshoots, AI-generated models, outfit visualization, and product motion. The Service includes an
+          embeddable widget, API and SDK access, image and video processing, and an analytics dashboard.
         </p>
       </section>
       <section>
@@ -333,21 +335,24 @@ export function DataProcessingContent(_props: PolicyContentProps = {}) {
         <h2 className="font-display text-lg font-semibold text-foreground mb-3">1. Scope</h2>
         <p>
           This Data Processing Agreement (&quot;DPA&quot;) applies to the processing of personal data by TryVerse on
-          behalf of brands (&quot;Data Controllers&quot;) who use our virtual try-on service.
+          behalf of brands (&quot;Data Controllers&quot;) who use our platform — virtual try-on, AI photoshoots,
+          AI-generated models, outfit visualization, product motion, and the APIs and SDKs that deliver them.
         </p>
       </section>
       <section>
         <h2 className="font-display text-lg font-semibold text-foreground mb-3">2. Data Processing Activities</h2>
         <p>
-          TryVerse processes the following data on behalf of brands: end-user uploaded photos for try-on generation,
-          product images, usage analytics, and widget interaction data.
+          TryVerse processes the following data on behalf of brands: end-user uploaded photos for try-on and AI
+          generation, product images, AI-generated media (images and video), usage analytics, and widget/API
+          interaction data.
         </p>
       </section>
       <section>
         <h2 className="font-display text-lg font-semibold text-foreground mb-3">3. Processing Purpose</h2>
         <p>
-          Data is processed solely for the purpose of providing the virtual try-on service, generating analytics
-          reports, and improving AI model accuracy.
+          Data is processed solely for the purpose of providing TryVerse&rsquo;s fashion visualization services
+          (virtual try-on, AI photoshoots, model generation, outfit visualization, and product motion), generating
+          analytics reports, and improving AI model accuracy.
         </p>
       </section>
       <section>

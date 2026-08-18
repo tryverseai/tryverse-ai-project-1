@@ -230,7 +230,7 @@ export function AiModelsTab() {
                         {video?.status === "done" && video.url ? (
                           <video src={video.url} controls loop className="w-full h-full object-cover" />
                         ) : (
-                          <img src={m.imageUrl} alt="Generated AI model" className="w-full h-full object-cover" />
+                          <img src={m.imageUrl} alt="Generated AI model" className="w-full h-full object-cover object-top" />
                         )}
                       </div>
                       {!(video?.status === "done" && video.url) && (

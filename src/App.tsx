@@ -39,6 +39,7 @@ const Admin = lazyWithRetry(() => import("./pages/Admin"), "admin");
 const WidgetPreview = lazyWithRetry(() => import("./pages/WidgetPreview"), "widget-preview");
 const Pricing = lazyWithRetry(() => import("./pages/Pricing"), "pricing");
 const About = lazyWithRetry(() => import("./pages/About"), "about");
+const Technology = lazyWithRetry(() => import("./pages/Technology"), "technology");
 const PartnerWithUs = lazyWithRetry(() => import("./pages/PartnerWithUs"), "partner");
 const TermsOfService = lazyWithRetry(() => import("./pages/TermsOfService"), "terms");
 const PrivacyPolicy = lazyWithRetry(() => import("./pages/PrivacyPolicy"), "privacy");
@@ -88,6 +89,7 @@ const App = () =>
             <Route path="/dashboard/individual" element={<Navigate to="/dashboard/business" replace />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/about" element={<About />} />
+            <Route path="/technology" element={<Technology />} />
             <Route path="/partner" element={<PartnerWithUs />} />
             <Route path="/early-access" element={<Navigate to="/book-demo" replace />} />
             <Route path="/waitlist" element={<Navigate to="/book-demo" replace />} />

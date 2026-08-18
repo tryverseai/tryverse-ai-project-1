@@ -168,7 +168,7 @@ export function AdminModelLibraryTab({ adminKey }: { adminKey: string }) {
                 <img
                   src={`${m.image_url}${m.image_url.includes("?") ? "&" : "?"}tryverse_slug=${encodeURIComponent(m.slug)}`}
                   alt={m.display_name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover object-top"
                   loading="lazy"
                 />
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">

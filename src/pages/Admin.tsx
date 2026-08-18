@@ -13,7 +13,6 @@ import {
   CreditCard,
   Cpu,
   Settings,
-  Server,
   FileText,
   Key,
   ScrollText,
@@ -22,7 +21,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { TechnologySection } from "@/components/TechnologySection";
 import {
   getStoredAdminKey,
   clearStoredAdminKey,
@@ -55,7 +53,6 @@ const sidebarItems = [
   { icon: Settings, label: "Settings" },
   { icon: ScrollText, label: "Logs" },
   { icon: FileText, label: "Audit" },
-  { icon: Server, label: "Technology" },
 ];
 
 const Admin = () => {
@@ -143,12 +140,6 @@ const Admin = () => {
         return <AdminSettingsTab adminKey={storedKey} />;
       case "Logs":
         return <AdminLogsTab adminKey={storedKey} />;
-      case "Technology":
-        return (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <TechnologySection />
-          </motion.div>
-        );
       case "Audit":
         return <AdminAuditTab adminKey={storedKey} />;
       default:

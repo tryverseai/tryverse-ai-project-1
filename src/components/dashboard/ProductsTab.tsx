@@ -159,7 +159,7 @@ export function ProductsTab() {
       toast.success("Image uploaded");
     } catch (err) {
       setImagePreviewUrl(null);
-      toast.error("Upload failed");
+      toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }
@@ -236,9 +236,6 @@ export function ProductsTab() {
             Manage your product catalog for virtual try-on
           </p>
         </div>
-        <Button onClick={handleOpenCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Add Product
-        </Button>
       </div>
 
       <div className="flex flex-wrap gap-3 mb-6">
@@ -267,6 +264,9 @@ export function ProductsTab() {
             ))}
           </SelectContent>
         </Select>
+        <Button onClick={handleOpenCreate} className="gap-2 ml-auto">
+          <Plus className="h-4 w-4" /> Add Product
+        </Button>
       </div>
 
       {loading ? (
@@ -296,13 +296,10 @@ export function ProductsTab() {
           <p className="text-sm font-medium text-foreground mb-1">
             No products yet
           </p>
-          <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-4">
+          <p className="text-xs text-muted-foreground max-w-sm mx-auto">
             Add products to your catalog so shoppers can try them on with the
             widget.
           </p>
-          <Button onClick={handleOpenCreate} className="gap-2">
-            <Plus className="h-4 w-4" /> Add Product
-          </Button>
         </div>
       ) : (
         <div className="bg-card rounded-xl border border-border/50 shadow-card overflow-hidden">

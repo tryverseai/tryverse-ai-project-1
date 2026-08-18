@@ -278,7 +278,7 @@ const Pricing = () => {
 
   const handleSubscribe = async (plan: PlanRow) => {
     if (plan.id === "enterprise") {
-      window.open("mailto:sales@tryverseai.com?subject=TryVerse%20Enterprise%20%2F%20custom%20plan", "_blank");
+      navigate("/book-demo");
       return;
     }
 

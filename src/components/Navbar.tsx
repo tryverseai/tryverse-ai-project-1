@@ -10,6 +10,7 @@ import { TryVerseLogo } from "@/components/TryVerseLogo";
 const publicLinks = [
   { label: "Platform", href: "/#platform" },
   { label: "How it works", href: "/#how-it-works" },
+  { label: "Technology", href: "/technology" },
   { label: "Partner with us", href: "/partner" },
   { label: "About", href: "/about" },
 ];

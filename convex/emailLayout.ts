@@ -89,6 +89,8 @@ export function renderBrandedEmail(params: {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="x-apple-disable-message-reformatting">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
   <title>${safeHeadline}</title>
   <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
 </head>
@@ -100,8 +102,14 @@ export function renderBrandedEmail(params: {
           <tr>
             <td align="center" style="padding:36px 32px 24px;">
               <a href="${TRYVERSE_APP_URL}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-                <img src="${TRYVERSE_LOGO_URL}" alt="TryVerse AI" width="140" height="auto"
-                     style="display:block;border:0;outline:none;text-decoration:none;max-width:140px;height:auto;margin:0 auto;" />
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;border-radius:10px;">
+                  <tr>
+                    <td style="padding:12px 20px;">
+                      <img src="${TRYVERSE_LOGO_URL}" alt="TryVerse AI" width="140" height="auto"
+                           style="display:block;border:0;outline:none;text-decoration:none;max-width:140px;height:auto;margin:0 auto;" />
+                    </td>
+                  </tr>
+                </table>
               </a>
             </td>
           </tr>
@@ -128,7 +136,7 @@ export function renderBrandedEmail(params: {
           <tr>
             <td align="center" style="padding:24px 32px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#888888;">
               <p style="margin:0 0 4px;font-weight:600;color:#666666;">TryVerse AI</p>
-              <p style="margin:0 0 12px;">AI-Powered Virtual Try-On Infrastructure</p>
+              <p style="margin:0 0 12px;">AI Infrastructure for Fashion Visualization</p>
               <p style="margin:0;">
                 <a href="${TRYVERSE_APP_URL}" style="color:#666666;text-decoration:underline;">tryverseai.com</a>
                 &nbsp;&middot;&nbsp;
@@ -176,7 +184,7 @@ export function signupVerificationEmailText(token: string, email?: string): stri
     "",
     "— The TryVerse Team",
     "TryVerse AI",
-    "AI-Powered Virtual Try-On Infrastructure",
+    "AI Infrastructure for Fashion Visualization",
     TRYVERSE_APP_URL,
     TRYVERSE_CONTACT_EMAIL,
   ].join("\n");

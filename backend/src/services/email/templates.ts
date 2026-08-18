@@ -28,18 +28,20 @@ export function welcomeEmail(params: { name: string; brandName: string; appUrl?:
     <p style="margin:0 0 16px;">Hi ${escapeHtml(first)},</p>
     <p style="margin:0 0 16px;">Welcome to TryVerse.</p>
     <p style="margin:0 0 16px;">Your account has been successfully verified and your workspace is now active.</p>
-    <p style="margin:0 0 16px;">You can now access the platform and begin exploring AI-powered virtual try-on experiences designed for modern fashion brands and e-commerce retailers.</p>
+    <p style="margin:0 0 16px;">TryVerse is AI infrastructure for fashion visualization — virtual try-on, AI photoshoots, AI-generated models, outfit visualization, and product motion, all from a single platform with the APIs and SDKs to put them on your storefront.</p>
     <p style="margin:0 0 8px;font-weight:600;color:#1a1a1a;">What&rsquo;s available now</p>
     ${renderBulletList([
       'Your TryVerse dashboard is ready',
-      '20 complimentary AI try-ons have been added to your account',
-      'Upload products and generate virtual try-on experiences',
-      'Explore integration options for your storefront',
+      '20 complimentary AI generations have been added to your account',
+      'Virtual try-on — upload a product and see it on a model instantly',
+      'AI photoshoots and AI-generated models for your catalog',
+      'Outfit visualization and product motion for campaign content',
+      'API and SDK access to bring any of this to your storefront',
     ])}
     <p style="margin:16px 0 0;font-weight:600;color:#1a1a1a;">Access your workspace</p>`;
 
   const closingLine =
-    "As we continue expanding the platform, you'll receive updates on new features, integrations, and capabilities designed to help brands improve customer confidence and reduce purchase uncertainty. We're excited to have you with us.";
+    "As we continue expanding the platform, you'll receive updates on new capabilities designed to help brands visualize fashion at every stage of the shopper journey. We're excited to have you with us.";
 
   return {
     subject: 'Your TryVerse account is ready',
@@ -56,13 +58,15 @@ export function welcomeEmail(params: { name: string; brandName: string; appUrl?:
       '',
       'Your account has been successfully verified and your workspace is now active.',
       '',
-      'You can now access the platform and begin exploring AI-powered virtual try-on experiences designed for modern fashion brands and e-commerce retailers.',
+      'TryVerse is AI infrastructure for fashion visualization — virtual try-on, AI photoshoots, AI-generated models, outfit visualization, and product motion, all from a single platform with the APIs and SDKs to put them on your storefront.',
       '',
       "What's available now:",
       '• Your TryVerse dashboard is ready',
-      '• 20 complimentary AI try-ons have been added to your account',
-      '• Upload products and generate virtual try-on experiences',
-      '• Explore integration options for your storefront',
+      '• 20 complimentary AI generations have been added to your account',
+      '• Virtual try-on — upload a product and see it on a model instantly',
+      '• AI photoshoots and AI-generated models for your catalog',
+      '• Outfit visualization and product motion for campaign content',
+      '• API and SDK access to bring any of this to your storefront',
       '',
       `Open Dashboard: ${dashboardUrl}`,
       '',
@@ -70,7 +74,7 @@ export function welcomeEmail(params: { name: string; brandName: string; appUrl?:
       '',
       '— The TryVerse Team',
       'TryVerse AI',
-      'AI-Powered Virtual Try-On Infrastructure',
+      'AI Infrastructure for Fashion Visualization',
       `${TRYVERSE_CONTACT_EMAIL}`,
       DEFAULT_APP_URL,
     ].join('\n'),
@@ -86,18 +90,20 @@ export function accountVerifiedEmail(params: { firstName?: string; signInUrl?: s
     <p style="margin:0 0 16px;">Hi ${firstEsc},</p>
     <p style="margin:0 0 16px;">Welcome to TryVerse.</p>
     <p style="margin:0 0 16px;">Your account has been successfully verified and your workspace is now active.</p>
-    <p style="margin:0 0 16px;">You can now access the platform and begin exploring AI-powered virtual try-on experiences designed for modern fashion brands and e-commerce retailers.</p>
+    <p style="margin:0 0 16px;">TryVerse is AI infrastructure for fashion visualization — virtual try-on, AI photoshoots, AI-generated models, outfit visualization, and product motion, all from a single platform with the APIs and SDKs to put them on your storefront.</p>
     <p style="margin:0 0 8px;font-weight:600;color:#1a1a1a;">What&rsquo;s available now</p>
     ${renderBulletList([
       'Your TryVerse dashboard is ready',
-      '20 complimentary AI try-ons have been added to your account',
-      'Upload products and generate virtual try-on experiences',
-      'Explore integration options for your storefront',
+      '20 complimentary AI generations have been added to your account',
+      'Virtual try-on — upload a product and see it on a model instantly',
+      'AI photoshoots and AI-generated models for your catalog',
+      'Outfit visualization and product motion for campaign content',
+      'API and SDK access to bring any of this to your storefront',
     ])}
     <p style="margin:16px 0 0;font-weight:600;color:#1a1a1a;">Access your workspace</p>`;
 
   const closingLine =
-    "As we continue expanding the platform, you'll receive updates on new features, integrations, and capabilities designed to help brands improve customer confidence and reduce purchase uncertainty. We're excited to have you with us.";
+    "As we continue expanding the platform, you'll receive updates on new capabilities designed to help brands visualize fashion at every stage of the shopper journey. We're excited to have you with us.";
 
   return {
     subject: 'Your TryVerse account is ready',
@@ -113,6 +119,16 @@ export function accountVerifiedEmail(params: { firstName?: string; signInUrl?: s
       'Welcome to TryVerse.',
       '',
       'Your account has been successfully verified and your workspace is now active.',
+      '',
+      'TryVerse is AI infrastructure for fashion visualization — virtual try-on, AI photoshoots, AI-generated models, outfit visualization, and product motion, all from a single platform with the APIs and SDKs to put them on your storefront.',
+      '',
+      "What's available now:",
+      '• Your TryVerse dashboard is ready',
+      '• 20 complimentary AI generations have been added to your account',
+      '• Virtual try-on — upload a product and see it on a model instantly',
+      '• AI photoshoots and AI-generated models for your catalog',
+      '• Outfit visualization and product motion for campaign content',
+      '• API and SDK access to bring any of this to your storefront',
       '',
       `Open Dashboard: ${signInUrlRaw}`,
       '',

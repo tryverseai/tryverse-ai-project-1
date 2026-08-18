@@ -481,13 +481,13 @@ async function handleResponse<T>(res: Response, context?: { feature?: string }):
     }
 
     // 401 — Only force sign-out when the token was sent but rejected (expired / malformed).
-    // Missing actor (no Bearer) must not log the user out — that breaks dashboard reload races.
+    // Missing actor (no Bearer) must not log the user out — that breaks dashboard reload races,
+    // and momentary token-refresh gaps (e.g. around tab visibility changes) legitimately send no
+    // Authorization header. The backend's "missing" message must never trip this.
     if (res.status === 401) {
       if (typeof window !== 'undefined') {
         const msg = (message || '').toLowerCase();
-        const shouldSignOut =
-          msg.includes('invalid or expired') ||
-          msg.includes('missing or invalid authorization');
+        const shouldSignOut = msg.includes('invalid or expired');
         if (shouldSignOut) {
           window.dispatchEvent(new CustomEvent('tryverse:auth:expired'));
         }

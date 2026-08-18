@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type ChangeEvent } from "react";
+import { useState, useRef, useCallback, useEffect, type ChangeEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -155,6 +155,14 @@ export function StudioTab() {
   const [resultTryonId, setResultTryonId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
+
+  // First-time visitors see consent immediately on entering Personal Studio, not only when
+  // they click Generate — the upload UI itself was reachable/usable before consent otherwise.
+  useEffect(() => {
+    if (!hasSeenTryOnGuidelines()) {
+      setGuidelinesOpen(true);
+    }
+  }, []);
   const isEnterprise = useIsEnterprisePlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [videoStatus, setVideoStatus] = useState<"idle" | "generating" | "done" | "error">("idle");
@@ -485,7 +493,11 @@ export function StudioTab() {
       <TryOnGuidelinesModal
         open={guidelinesOpen}
         onOpenChange={setGuidelinesOpen}
-        onAcknowledge={() => void run()}
+        onAcknowledge={() => {
+          // Consent can now open on mount too, before any photo is uploaded — only
+          // auto-run when the user was actually mid-generate when it opened.
+          if (model.file && garment.file) void run();
+        }}
         source="studio_tab"
       />
       <EnterpriseUpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} context="video" />
