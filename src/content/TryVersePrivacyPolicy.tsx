@@ -29,8 +29,8 @@ export function TryVersePrivacyPolicy({
       <p>
         Welcome to TryVerse. This Privacy Policy explains how TryVerse AI (&quot;TryVerse,&quot; &quot;we,&quot;
         &quot;our,&quot; or &quot;us&quot;) collects, uses, stores, and protects your information when you use our
-        website, applications, AI virtual try-on tools, embeddable storefront widget, and related services
-        (collectively, the &quot;Services&quot;).
+        website, applications, AI fashion-visualization tools, embeddable storefront widget, developer API/SDK, and
+        related services (collectively, the &quot;Services&quot;).
       </p>
       <p>By accessing or using TryVerse, you agree to the practices described in this Privacy Policy.</p>
 
@@ -39,16 +39,19 @@ export function TryVersePrivacyPolicy({
       <section>
         <h2>1. Who We Are</h2>
         <p>
-          TryVerse is an AI-powered virtual try-on platform. Brands connect their product catalogue and embed our
-          widget or call our API so shoppers can see clothing, bags, and eyewear rendered onto a photo of themselves
-          (or a preset model) before buying. Individuals can also use TryVerse directly through our web app to try on
-          outfits for themselves.
+          TryVerse is an AI infrastructure platform for fashion visualization. Brands connect their product
+          catalogue and embed our widget, call our API, or use our dashboard tools to generate virtual try-ons,
+          complete-outfit visualizations, AI fashion models, product photoshoots, and short product videos —
+          rendered onto a photo of a shopper (or a preset/generated model) before they buy. Individuals can also use
+          TryVerse directly through our web app (Personal Studio) to try on outfits for themselves.
         </p>
         <p>Our Services include:</p>
         <ul>
-          <li>AI virtual try-on generation (clothing, bags, and eyeglasses)</li>
+          <li>AI virtual try-on and complete-outfit generation (clothing, bags, and eyewear)</li>
+          <li>AI Model Generation and AI Product Photoshoot — generated or catalogue-based fashion models and imagery</li>
+          <li>AI Video — short product/try-on video generation</li>
           <li>An embeddable storefront widget and personalization script for e-commerce sites</li>
-          <li>A developer API and API keys for programmatic try-on requests</li>
+          <li>A developer API, SDK, and API keys for programmatic try-on and content-generation requests</li>
           <li>A merchant dashboard with product management, analytics, and billing</li>
           <li>Waitlist, early-access, and invite-based onboarding</li>
         </ul>

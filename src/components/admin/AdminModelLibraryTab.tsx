@@ -164,7 +164,7 @@ export function AdminModelLibraryTab({ adminKey }: { adminKey: string }) {
               key={m.id}
               className="rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm hover:shadow-md transition-shadow"
             >
-              <div className="aspect-[3/4] bg-muted relative">
+              <div className="aspect-[4/5] bg-muted relative">
                 <img
                   src={`${m.image_url}${m.image_url.includes("?") ? "&" : "?"}tryverse_slug=${encodeURIComponent(m.slug)}`}
                   alt={m.display_name}

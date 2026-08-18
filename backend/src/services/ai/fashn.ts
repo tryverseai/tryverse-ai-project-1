@@ -139,7 +139,13 @@ async function pollFashnStatus(predictionId: string, timeoutMs: number = POLL_TI
     }
 
     if (data.status === 'failed') {
-      throw new Error(`FASHN prediction failed: ${data.error ?? 'unknown reason'}`);
+      const reason =
+        typeof data.error === 'string'
+          ? data.error
+          : data.error
+            ? JSON.stringify(data.error)
+            : 'unknown reason';
+      throw new Error(`FASHN prediction failed: ${reason}`);
     }
 
     logger.debug('FASHN prediction in progress', { id: predictionId, status: data.status });

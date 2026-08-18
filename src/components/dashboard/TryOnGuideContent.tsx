@@ -57,6 +57,36 @@ export function TryOnGuideContent() {
 
       <SectionDivider />
 
+      <section className="space-y-4">
+        <h3 className="font-display text-lg font-semibold text-foreground">Complete Outfits, Shoes &amp; Accessories</h3>
+        <ul className="space-y-4 text-sm text-foreground/90 leading-relaxed list-none pl-0">
+          <li>
+            <span className="font-medium text-foreground">Single reference photo:</span> Personal Studio&apos;s
+            &quot;Full outfit&quot; category works from one photo that already shows the complete look. It&apos;s
+            best for simple, clearly-photographed outfits — busy or layered garments in one photo can render with
+            some detail loss.
+          </li>
+          <li>
+            <span className="font-medium text-foreground">Combining separate pieces:</span> To build a look from
+            individual top, bottom, and shoe product photos, use <strong>Outfit Builder</strong> instead of Personal
+            Studio. It composites each piece before generating, which preserves multi-garment fidelity far better
+            than asking a single photo to represent an entire outfit.
+          </li>
+          <li>
+            <span className="font-medium text-foreground">Shoes:</span> Upload a clear side or three-quarter product
+            shot on a plain background, the same as any other garment photo — avoid shoes shown mid-stride or at an
+            extreme angle.
+          </li>
+          <li>
+            <span className="font-medium text-foreground">Accessories (bags, eyewear):</span> Supported the same way
+            as clothing — upload a clean product photo and a model photo where the relevant area (hands, face) is
+            clearly visible and unobstructed.
+          </li>
+        </ul>
+      </section>
+
+      <SectionDivider />
+
       <section className="space-y-3">
         <h3 className="font-display text-lg font-semibold text-foreground">Notes</h3>
         <p className="text-sm text-foreground/90 leading-relaxed">

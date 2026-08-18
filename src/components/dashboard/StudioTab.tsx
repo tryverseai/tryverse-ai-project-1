@@ -350,6 +350,15 @@ export function StudioTab() {
                 ))}
               </SelectContent>
             </Select>
+            {category === "clothing" && (
+              <p className="text-xs text-muted-foreground">
+                Best for a single reference photo already showing the full look. For combining
+                separate top + bottom (or shoe) product photos into one outfit, use{" "}
+                <span className="font-medium text-foreground">Outfit Builder</span> instead —
+                it composites each piece before generating, which preserves multi-garment
+                fidelity better than a single photo can.
+              </p>
+            )}
           </div>
 
           <div className="flex gap-3">

@@ -3,7 +3,8 @@
  * Mirrors backend/src/services/email/layout.ts — presentation only.
  */
 
-export const TRYVERSE_LOGO_URL = "https://tryverseai.com/tryverse-logo.png";
+// Fully-opaque white-background variant — see backend/src/services/email/layout.ts for why.
+export const TRYVERSE_LOGO_URL = "https://tryverseai.com/tryverse-logo-email.png";
 export const TRYVERSE_APP_URL = "https://tryverseai.com";
 export const TRYVERSE_CONTACT_EMAIL = "info@tryverseai.com";
 

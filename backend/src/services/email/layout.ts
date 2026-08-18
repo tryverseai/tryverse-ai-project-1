@@ -3,7 +3,11 @@
  * Table-based, inline styles — compatible with Gmail, Outlook, and Apple Mail.
  */
 
-export const TRYVERSE_LOGO_URL = 'https://tryverseai.com/tryverse-logo.png';
+// A separate, fully-opaque (no alpha channel visible) white-background variant of the site logo.
+// Some dark-mode email clients (notably Apple Mail on iOS) can still darken/invert a transparent
+// PNG even inside a table cell with an explicit background-color — an opaque image removes that
+// failure mode entirely instead of relying on the surrounding markup to stay light.
+export const TRYVERSE_LOGO_URL = 'https://tryverseai.com/tryverse-logo-email.png';
 export const TRYVERSE_APP_URL = 'https://tryverseai.com';
 export const TRYVERSE_CONTACT_EMAIL = 'info@tryverseai.com';
 
