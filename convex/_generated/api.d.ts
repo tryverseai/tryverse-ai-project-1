@@ -10,6 +10,7 @@
 
 import type * as ResendEmailSignupVerification from "../ResendEmailSignupVerification.js";
 import type * as ResendOTPPasswordReset from "../ResendOTPPasswordReset.js";
+import type * as _devTestAccountTools from "../_devTestAccountTools.js";
 import type * as adminTrusted from "../adminTrusted.js";
 import type * as apiKeys from "../apiKeys.js";
 import type * as auth from "../auth.js";
@@ -45,6 +46,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   ResendEmailSignupVerification: typeof ResendEmailSignupVerification;
   ResendOTPPasswordReset: typeof ResendOTPPasswordReset;
+  _devTestAccountTools: typeof _devTestAccountTools;
   adminTrusted: typeof adminTrusted;
   apiKeys: typeof apiKeys;
   auth: typeof auth;

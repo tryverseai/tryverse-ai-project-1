@@ -105,7 +105,7 @@ const ResetPassword = () => {
         className="w-full max-w-md"
       >
         <Link to="/" className="inline-block mb-8">
-          <TryVerseLogo height={120} />
+          <TryVerseLogo height={44} />
         </Link>
         <Link
           to="/forgot-password"

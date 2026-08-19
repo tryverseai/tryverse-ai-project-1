@@ -28,7 +28,7 @@ export default function AuthConfirm() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <Link to="/" className="mb-8">
-          <TryVerseLogo height={64} />
+          <TryVerseLogo height={44} />
         </Link>
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -46,7 +46,7 @@ export default function AuthConfirm() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <Link to="/" className="mb-8">
-          <TryVerseLogo height={64} />
+          <TryVerseLogo height={44} />
         </Link>
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -68,7 +68,7 @@ export default function AuthConfirm() {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
       <Link to="/" className="mb-8">
-        <TryVerseLogo height={64} />
+        <TryVerseLogo height={44} />
       </Link>
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}

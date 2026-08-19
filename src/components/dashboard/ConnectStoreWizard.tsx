@@ -11,7 +11,6 @@ import {
   Code2,
   RefreshCw,
   CircleDashed,
-  Sparkles,
   LifeBuoy,
   CalendarClock,
   ArrowRight,
@@ -79,8 +78,6 @@ interface ConnectStoreWizardProps {
   /** Current user's id — namespaces the locally-persisted platform choice so it can't leak
    *  between accounts that share a browser (e.g. an agency switching between client logins). */
   userKey?: string;
-  /** Called when the customer wants to try the capability themselves in-dashboard. */
-  onTryItYourself?: () => void;
 }
 
 /**
@@ -89,7 +86,7 @@ interface ConnectStoreWizardProps {
  * thing that's actually true (a working API key + a stated platform) and hands the rest to
  * their developer or TryVerse's own implementation team. Nothing here claims "Connected."
  */
-export function ConnectStoreWizard({ aiTryOnEnabled, userKey, onTryItYourself }: ConnectStoreWizardProps) {
+export function ConnectStoreWizard({ aiTryOnEnabled, userKey }: ConnectStoreWizardProps) {
   const [apiKey, setApiKey] = useState<ApiKeyRecord | null>(null);
   const [keyLoading, setKeyLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
@@ -309,16 +306,6 @@ export function ConnectStoreWizard({ aiTryOnEnabled, userKey, onTryItYourself }:
             </Link>
           </div>
         </div>
-
-        {onTryItYourself && (
-          <button
-            type="button"
-            onClick={onTryItYourself}
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Sparkles className="h-3.5 w-3.5" /> Want to see it in action first? Try it yourself in the dashboard.
-          </button>
-        )}
       </div>
     </div>
   );

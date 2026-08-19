@@ -122,7 +122,7 @@ export default function ApproveDevice() {
         className="w-full max-w-md"
       >
         <Link to="/" className="inline-block mb-8">
-          <TryVerseLogo height={110} />
+          <TryVerseLogo height={44} />
         </Link>
 
         {!user ? (

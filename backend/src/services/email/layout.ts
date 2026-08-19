@@ -80,16 +80,18 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
     <tr>
       <td align="center" style="padding:40px 16px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e8e8ea;">
-          <!-- Logo — its own guaranteed-white chip so the dark mark stays visible even in
-               email clients that force a dark background around transparent images. -->
+          <!-- Logo — its own guaranteed-white chip (email clients can force a dark background
+               around transparent images) AND rendered at >=54px tall: Gmail's dark-mode
+               auto-invert heuristic specifically targets small images it treats as "icons",
+               and this logo was rendering at ~40px, right under that threshold. -->
           <tr>
             <td align="center" style="padding:36px 32px 24px;">
               <a href="${TRYVERSE_APP_URL}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;border-radius:10px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border-radius:10px;">
                   <tr>
-                    <td style="padding:12px 20px;">
-                      <img src="${TRYVERSE_LOGO_URL}" alt="TryVerse AI" width="140" height="auto"
-                           style="display:block;border:0;outline:none;text-decoration:none;max-width:140px;height:auto;margin:0 auto;"
+                    <td style="padding:14px 24px;">
+                      <img src="${TRYVERSE_LOGO_URL}" alt="TryVerse AI" width="195" height="56"
+                           style="display:block;border:0;outline:none;text-decoration:none;width:195px;height:56px;margin:0 auto;"
                            />
                     </td>
                   </tr>
