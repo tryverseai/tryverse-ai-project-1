@@ -82,8 +82,14 @@ router.post(
         throw new AppError('Plan not available for Paystack checkout', 400);
       }
 
+      const profile = await cxGetProfile(convexProfileCreditLookupKey(req));
+      const email = req.user!.email || (profile as { contact_email?: string } | null)?.contact_email;
+      if (!email) {
+        throw new AppError('No email on file for this account — update your email in Settings and try again.', 400);
+      }
+
       const result = await initializePaystackPayment({
-        email: req.user!.email,
+        email,
         amount: p.price_ngn,
         planId,
         userId: req.user!.id,
@@ -147,9 +153,17 @@ router.post(
       }
 
       const profile = await cxGetProfile(convexProfileCreditLookupKey(req));
+      // req.user.email comes from the Convex Auth session identity, which can be blank for
+      // some account shapes (e.g. business signups where the JWT identity email claim never
+      // got populated) — Flutterwave rejects an empty email outright ("Customer email is
+      // required"), so fall back to the profile's stored contact email before giving up.
+      const email = req.user!.email || (profile as { contact_email?: string } | null)?.contact_email;
+      if (!email) {
+        throw new AppError('No email on file for this account — update your email in Settings and try again.', 400);
+      }
 
       const result = await initializeFlutterwavePayment({
-        email: req.user!.email,
+        email,
         amount,
         currency: cur,
         planId,

@@ -2,6 +2,7 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
+import { AppError } from '../../middleware/errorHandler';
 import { allocateCredits } from '../credits';
 import {
   paymentSuccessExists,
@@ -33,29 +34,45 @@ export async function initializePaystackPayment(params: {
   }
   const reference = `TV_PS_${params.userId.slice(0, 8)}_${Date.now()}`;
 
-  const response = await axios.post(
-    `${PAYSTACK_API}/transaction/initialize`,
-    {
-      email: params.email,
-      amount: params.amount * 100, // convert to kobo
-      reference,
-      callback_url: params.callbackUrl,
-      metadata: {
-        user_id: params.userId,
-        plan_id: params.planId,
-        cancel_action: `${params.callbackUrl}?payment=cancelled`,
+  let response;
+  try {
+    response = await axios.post(
+      `${PAYSTACK_API}/transaction/initialize`,
+      {
+        email: params.email,
+        amount: params.amount * 100, // convert to kobo
+        reference,
+        callback_url: params.callbackUrl,
+        metadata: {
+          user_id: params.userId,
+          plan_id: params.planId,
+          cancel_action: `${params.callbackUrl}?payment=cancelled`,
+        },
       },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      {
+        headers: {
+          Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+  } catch (e) {
+    // Same failure mode as Flutterwave: axios only surfaces the HTTP status in e.message,
+    // losing Paystack's actual rejection reason from the response body.
+    if (axios.isAxiosError(e)) {
+      const body = e.response?.data as { message?: string } | undefined;
+      logger.error('Paystack payment initialization request failed', {
+        status: e.response?.status,
+        body: e.response?.data,
+        reference,
+      });
+      throw new AppError(`Payment initialization failed: ${body?.message || e.message}`, 502);
     }
-  );
+    throw e;
+  }
 
   if (!response.data.status) {
-    throw new Error(`Paystack initialization failed: ${response.data.message}`);
+    throw new AppError(`Payment initialization failed: ${response.data.message}`, 502);
   }
 
   logger.info('Paystack payment initialized', { reference, planId: params.planId });
