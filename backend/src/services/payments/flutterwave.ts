@@ -2,6 +2,7 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
+import { AppError } from '../../middleware/errorHandler';
 import {
   paymentSuccessExists,
   insertPaymentRow,
@@ -33,34 +34,50 @@ export async function initializeFlutterwavePayment(params: {
   }
   const tx_ref = `TV_FLW_${params.userId.slice(0, 8)}_${Date.now()}`;
 
-  const response = await axios.post(
-    `${FLW_API}/payments`,
-    {
-      tx_ref,
-      amount: params.amount,
-      currency: params.currency,
-      redirect_url: params.callbackUrl,
-      customer: {
-        email: params.email,
-        name: params.fullName || 'TryVerse User',
+  let response;
+  try {
+    response = await axios.post(
+      `${FLW_API}/payments`,
+      {
+        tx_ref,
+        amount: params.amount,
+        currency: params.currency,
+        redirect_url: params.callbackUrl,
+        customer: {
+          email: params.email,
+          name: params.fullName || 'TryVerse User',
+        },
+        meta: {
+          user_id: params.userId,
+          plan_id: params.planId,
+        },
+        customizations: {
+          title: 'TryVerse',
+          description: `Subscribe to ${params.planId} plan`,
+          logo: 'https://tryverseai.com/logo.png',
+        },
       },
-      meta: {
-        user_id: params.userId,
-        plan_id: params.planId,
-      },
-      customizations: {
-        title: 'TryVerse',
-        description: `Subscribe to ${params.planId} plan`,
-        logo: 'https://tryverseai.com/logo.png',
-      },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${env.FLUTTERWAVE_SECRET_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      {
+        headers: {
+          Authorization: `Bearer ${env.FLUTTERWAVE_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+  } catch (e) {
+    // Surface Flutterwave's actual rejection reason — axios only puts the HTTP status in
+    // e.message ("Request failed with status code 400"), losing the real cause from the body.
+    if (axios.isAxiosError(e)) {
+      const body = e.response?.data as { message?: string } | undefined;
+      logger.error('Flutterwave payment initialization request failed', {
+        status: e.response?.status,
+        body: e.response?.data,
+        tx_ref,
+      });
+      throw new AppError(`Payment initialization failed: ${body?.message || e.message}`, 502);
     }
-  );
+    throw e;
+  }
 
   if (response.data.status !== 'success') {
     throw new Error(`Flutterwave initialization failed: ${response.data.message}`);
