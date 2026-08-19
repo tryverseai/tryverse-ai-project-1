@@ -1657,13 +1657,8 @@ export async function revokeApiKeyById(id: string): Promise<void> {
 // requirePlan('enterprise') independently of this UI (see backend/src/middleware/requirePlan.ts).
 
 export interface AiModelGenerationParams {
-  gender: string;
-  skinTone: string;
-  pose: string;
-  age: string;
-  hair: string;
-  background: string;
-  fashionStyle: string;
+  /** Free-text description of the model to generate. */
+  prompt: string;
 }
 
 export interface AiModelResult {

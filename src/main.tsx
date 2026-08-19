@@ -16,7 +16,7 @@ if (!rootEl) {
 } else {
   // Load the app asynchronously so import-time errors (e.g. invalid env, bad modules)
   // surface here instead of a silent blank page.
-  void import("./App.tsx")
+  void loadApp()
     .then(({ default: App }) => {
       try {
         createRoot(rootEl).render(
@@ -56,6 +56,30 @@ ${escapeHtml(stack)}</pre>
       </div>`;
       console.error(e);
     });
+}
+
+/**
+ * Same stale-deployment self-heal as lazyWithRetry.ts, but for the entry-point import itself:
+ * if a deploy has replaced this chunk's hashed filename since the tab's index.html was cached
+ * (or first painted), the dynamic import 404s. One silent reload almost always fixes it by
+ * fetching the current index.html + matching assets; a sessionStorage flag stops a real outage
+ * from reload-looping.
+ */
+async function loadApp() {
+  const flagKey = "tv-chunk-retry:App";
+  try {
+    const mod = await import("./App.tsx");
+    sessionStorage.removeItem(flagKey);
+    return mod;
+  } catch (err) {
+    if (!sessionStorage.getItem(flagKey)) {
+      sessionStorage.setItem(flagKey, "1");
+      window.location.reload();
+      return new Promise<typeof import("./App.tsx")>(() => {});
+    }
+    sessionStorage.removeItem(flagKey);
+    throw err;
+  }
 }
 
 function escapeHtml(s: string): string {

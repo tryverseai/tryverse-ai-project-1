@@ -3,10 +3,11 @@
  * Table-based, inline styles — compatible with Gmail, Outlook, and Apple Mail.
  */
 
-// A separate, fully-opaque (no alpha channel visible) white-background variant of the site logo.
-// Some dark-mode email clients (notably Apple Mail on iOS) can still darken/invert a transparent
-// PNG even inside a table cell with an explicit background-color — an opaque image removes that
-// failure mode entirely instead of relying on the surrounding markup to stay light.
+// A separate, fully-opaque (no alpha channel) white-mark-on-solid-black variant of the site logo.
+// Gmail/Apple Mail/Outlook dark-mode engines auto-invert or recolor light images and light CSS
+// backgrounds — a white logo on a white/transparent background kept getting darkened or inverted
+// into invisibility regardless of surrounding markup. An already-dark chip isn't "light", so that
+// heuristic leaves it alone and it renders correctly in both light and dark clients.
 export const TRYVERSE_LOGO_URL = 'https://tryverseai.com/tryverse-logo-email.png';
 export const TRYVERSE_APP_URL = 'https://tryverseai.com';
 export const TRYVERSE_CONTACT_EMAIL = 'info@tryverseai.com';
@@ -80,14 +81,16 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
     <tr>
       <td align="center" style="padding:40px 16px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e8e8ea;">
-          <!-- Logo — its own guaranteed-white chip (email clients can force a dark background
-               around transparent images) AND rendered at >=54px tall: Gmail's dark-mode
-               auto-invert heuristic specifically targets small images it treats as "icons",
-               and this logo was rendering at ~40px, right under that threshold. -->
+          <!-- Logo is baked onto a solid black chip (opaque, no alpha) rather than relying on a
+               white background: Gmail/Apple Mail/Outlook dark-mode engines auto-invert or recolor
+               light images and CSS backgrounds they detect as "light", which silently broke every
+               earlier attempt that used a white background behind the mark. An already-dark image
+               is left alone by that heuristic (it only "fixes" light content), so it renders
+               correctly regardless of the client's light/dark state. -->
           <tr>
             <td align="center" style="padding:36px 32px 24px;">
               <a href="${TRYVERSE_APP_URL}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border-radius:10px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background-color:#000000;border-radius:10px;">
                   <tr>
                     <td style="padding:14px 24px;">
                       <img src="${TRYVERSE_LOGO_URL}" alt="TryVerse AI" width="195" height="56"

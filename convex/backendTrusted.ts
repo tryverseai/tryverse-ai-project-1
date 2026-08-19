@@ -804,7 +804,13 @@ export const logAiGenerationUsage = mutation({
   args: {
     secret: v.string(),
     userId: v.string(),
-    feature: v.union(v.literal("ai_model"), v.literal("ai_photoshoot")),
+    feature: v.union(
+      v.literal("ai_model"),
+      v.literal("ai_photoshoot"),
+      v.literal("outfit_builder"),
+      v.literal("product_model"),
+      v.literal("video")
+    ),
   },
   handler: async (ctx, { secret, userId, feature }) => {
     requireBackendSecret(secret);
@@ -818,13 +824,7 @@ export const logAiGenerationUsage = mutation({
 });
 
 const aiModelParamsValidator = v.object({
-  gender: v.string(),
-  skinTone: v.string(),
-  pose: v.string(),
-  age: v.string(),
-  hair: v.string(),
-  background: v.string(),
-  fashionStyle: v.string(),
+  prompt: v.string(),
 });
 
 /** Saves a generated AI fashion model (Enterprise "Generate AI Model" library) after a successful Replicate run. */
@@ -963,19 +963,37 @@ export const getProductsForOutfit = query({
   args: { secret: v.string(), userId: v.string(), productIds: v.array(v.string()) },
   handler: async (ctx, { secret, userId, productIds }) => {
     requireBackendSecret(secret);
-    const wanted = new Set(productIds);
-    const rows = await ctx.db
-      .query("products")
-      .withIndex("by_userId", (q) => q.eq("user_id", userId))
-      .collect();
-    return rows
-      .filter((r) => wanted.has(r.legacy_id ?? String(r._id)))
-      .map((r) => ({
-        id: r.legacy_id ?? String(r._id),
-        name: r.name,
-        image_url: r.image_url ?? null,
-        category: r.category,
-      }));
+    // `products.user_id` is written as the raw (possibly compound "authAccountId|userDocId")
+    // ctx.auth identity.subject at creation time (see convex/products.ts createProduct), while
+    // `userId` here is the canonicalized single-segment id the Express backend derives via
+    // canonicalConvexProfileUserId. An exact `by_userId` index match between those two never
+    // hits for compound subjects — every product created through the normal UI would silently
+    // fail to resolve here. Fetch each product directly instead (same lookup `findOwnedProduct`
+    // in products.ts already uses) and verify ownership with the same subject-overlap tolerance
+    // profiles/tryons already rely on, rather than trusting an exact index match.
+    const found: Array<{ id: string; name: string; image_url: string | null; category: string }> = [];
+    for (const productId of productIds) {
+      const byLegacy = await ctx.db
+        .query("products")
+        .withIndex("by_legacyId", (q) => q.eq("legacy_id", productId))
+        .unique();
+      let row = byLegacy;
+      if (!row) {
+        try {
+          row = await ctx.db.get(productId as Id<"products">);
+        } catch {
+          row = null;
+        }
+      }
+      if (!row || !subjectsOverlap(row.user_id, userId)) continue;
+      found.push({
+        id: row.legacy_id ?? String(row._id),
+        name: row.name,
+        image_url: row.image_url ?? null,
+        category: row.category,
+      });
+    }
+    return found;
   },
 });
 

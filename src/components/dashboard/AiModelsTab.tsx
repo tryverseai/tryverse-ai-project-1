@@ -3,14 +3,7 @@ import { motion } from "framer-motion";
 import { Sparkles, Lock, Wand2, Trash2, RefreshCw, Users, Film, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   generateAiModel,
@@ -23,33 +16,8 @@ import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
 import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { posthogCapture } from "@/lib/posthog";
 
-const FIELDS: {
-  key: keyof typeof DEFAULT_FORM;
-  label: string;
-  options: string[];
-}[] = [
-  { key: "gender", label: "Gender", options: ["Female", "Male"] },
-  { key: "skinTone", label: "Skin tone", options: ["Fair", "Light", "Medium", "Tan", "Deep", "Dark"] },
-  { key: "pose", label: "Pose", options: ["Standing", "Walking", "Side profile", "Three-quarter"] },
-  { key: "age", label: "Age range", options: ["18–25", "26–35", "36–45", "46–55", "56+"] },
-  { key: "hair", label: "Hair", options: ["Straight", "Wavy", "Curly", "Coily", "Short / bald"] },
-  { key: "background", label: "Background", options: ["Studio white", "Neutral gray", "Outdoor", "Urban street"] },
-  {
-    key: "fashionStyle",
-    label: "Fashion style",
-    options: ["Casual", "Streetwear", "Formal", "Athletic", "Bohemian", "Minimalist"],
-  },
-];
-
-const DEFAULT_FORM = {
-  gender: "Female",
-  skinTone: "Medium",
-  pose: "Standing",
-  age: "26–35",
-  hair: "Straight",
-  background: "Studio white",
-  fashionStyle: "Casual",
-};
+const PROMPT_EXAMPLE =
+  "Professional African fashion model, female, age 28, dark skin, studio lighting, luxury editorial fashion campaign.";
 
 function LockedState({ onUpgradeClick }: { onUpgradeClick: () => void }) {
   return (
@@ -71,7 +39,7 @@ function LockedState({ onUpgradeClick }: { onUpgradeClick: () => void }) {
 export function AiModelsTab() {
   const isEnterprise = useIsEnterprisePlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [form, setForm] = useState(DEFAULT_FORM);
+  const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [models, setModels] = useState<AiModelResult[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
@@ -96,22 +64,15 @@ export function AiModelsTab() {
   };
 
   const handleGenerate = async () => {
+    if (!prompt.trim()) return;
     setGenerating(true);
-    posthogCapture("ai_model_generate_clicked", { ...form });
+    posthogCapture("ai_model_generate_clicked", { promptLength: prompt.trim().length });
     try {
-      const result = await generateAiModel({
-        gender: form.gender,
-        skinTone: form.skinTone,
-        pose: form.pose,
-        age: form.age,
-        hair: form.hair,
-        background: form.background,
-        fashionStyle: form.fashionStyle,
-      });
+      const result = await generateAiModel({ prompt: prompt.trim() });
       setModels((prev) => [result, ...prev]);
       toast.success("AI model generated");
     } catch (e) {
-      toast.message("AI model generation isn't wired up yet", {
+      toast.error("Could not generate the AI model right now", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {
@@ -172,34 +133,24 @@ export function AiModelsTab() {
         <div className="space-y-8">
           <div className="bg-card rounded-xl border border-border/50 shadow-card p-6">
             <h3 className="font-display text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-              <Wand2 className="h-4 w-4" /> Model attributes
+              <Wand2 className="h-4 w-4" /> Describe your model
             </h3>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {FIELDS.map((field) => (
-                <div key={field.key} className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">{field.label}</Label>
-                  <Select
-                    value={form[field.key]}
-                    onValueChange={(v) => setForm((f) => ({ ...f, [field.key]: v }))}
-                  >
-                    <SelectTrigger className="h-10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {field.options.map((opt) => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-            </div>
+            <Textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder={PROMPT_EXAMPLE}
+              rows={3}
+              maxLength={500}
+              className="resize-none"
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              Describe gender, age, skin tone, pose, style, and setting in plain language — the AI
+              interprets your prompt directly. e.g. "{PROMPT_EXAMPLE}"
+            </p>
 
             <Button
               onClick={() => void handleGenerate()}
-              disabled={generating}
+              disabled={generating || !prompt.trim()}
               className="mt-6 gradient-primary text-primary-foreground shadow-soft gap-2"
             >
               <Sparkles className="h-4 w-4" /> {generating ? "Generating…" : "Generate"}

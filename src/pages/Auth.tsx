@@ -271,7 +271,7 @@ const Auth = () => {
         <div className="relative z-10 max-w-md">
           <div className="flex justify-center mb-8">
             <Link to="/" className="inline-block">
-              <TryVerseLogo height={205} invert />
+              <TryVerseLogo height={56} invert />
             </Link>
           </div>
           <h2 className="font-display text-4xl font-bold text-primary-foreground mb-4 leading-tight">

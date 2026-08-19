@@ -18,9 +18,12 @@ import { generateProductPhotoshoot, resolveModelUrl } from '../services/ai/produ
 import { cxGetTryonForUser } from '../services/tryonConvexBridge';
 import { validateOutfitSlots, type OutfitSlots } from '../services/ai/outfitSlots';
 import { buildOutfitPrompt } from '../services/ai/outfitPrompt';
-import { enqueueOutfitJob } from '../services/queue/outfitProducer';
-import { enqueueProductModelJob } from '../services/queue/productModelProducer';
-import { enqueueVideoJob } from '../services/queue/videoProducer';
+import { enqueueOutfitJob, getOutfitQueue } from '../services/queue/outfitProducer';
+import { enqueueProductModelJob, getProductModelQueue } from '../services/queue/productModelProducer';
+import { enqueueVideoJob, getVideoQueue } from '../services/queue/videoProducer';
+import { executeOutfitPipeline } from '../services/ai/outfitPipeline';
+import { executeProductModelPipeline } from '../services/ai/productModelPipeline';
+import { executeVideoPipeline } from '../services/ai/videoPipeline';
 import type { OutfitJob, ProductModelJob, VideoJob } from '../types';
 
 const router = Router();
@@ -42,28 +45,12 @@ router.post(
   generalRateLimit,
   requireAuth,
   requirePlan('enterprise'),
-  [
-    body('gender').isString().trim().notEmpty(),
-    body('skinTone').isString().trim().notEmpty(),
-    body('pose').isString().trim().notEmpty(),
-    body('age').isString().trim().notEmpty(),
-    body('hair').isString().trim().notEmpty(),
-    body('background').isString().trim().notEmpty(),
-    body('fashionStyle').isString().trim().notEmpty(),
-  ],
+  [body('prompt').isString().trim().notEmpty().isLength({ max: 500 })],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user!.id;
-      const params = matchedData(req) as {
-        gender: string;
-        skinTone: string;
-        pose: string;
-        age: string;
-        hair: string;
-        background: string;
-        fashionStyle: string;
-      };
+      const params = matchedData(req) as { prompt: string };
       const result = await generateAndSaveAiModel(userId, params);
       res.json(result);
     } catch (err) {
@@ -218,9 +205,31 @@ router.post(
         slotImageUrls,
         slotLabels,
       };
-      await enqueueOutfitJob(job);
 
-      res.status(202).json({ outfitId: outfitDbId, jobId, status: 'processing' });
+      // Same graceful degradation as the main try-on flow (tryOnOrchestrator.ts): if Redis/Bull
+      // isn't available, run the pipeline inline rather than 502ing the request. Outfit
+      // generation self-persists its own Convex state either way (see outfitPipeline.ts), so
+      // running it here vs. in the worker is otherwise identical.
+      if (getOutfitQueue()) {
+        try {
+          await enqueueOutfitJob(job);
+          res.status(202).json({ outfitId: outfitDbId, jobId, status: 'processing' });
+          return;
+        } catch (enqueueErr) {
+          logger.warn('Outfit generation: enqueue failed, falling back to sync', {
+            jobId,
+            outfitDbId,
+            error: enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr),
+          });
+        }
+      }
+
+      logger.info('Outfit generation: processing synchronously (queue unavailable)', { jobId, outfitDbId });
+      const result = await executeOutfitPipeline(job);
+      const resultUrl = result.status === 'completed' && result.resultUrl
+        ? await getSignedUrl(RESULT_BUCKET, result.resultUrl)
+        : undefined;
+      res.json({ outfitId: outfitDbId, jobId, status: result.status, resultUrl, error: result.error });
     } catch (err) {
       logger.error('Outfit generation failed', { error: err instanceof Error ? err.message : String(err) });
       next(err instanceof AppError ? err : new AppError('Could not start the outfit generation right now', 502));
@@ -328,9 +337,29 @@ router.post(
         faceReferenceUrl,
         prompt: params.prompt,
       };
-      await enqueueProductModelJob(job);
 
-      res.status(202).json({ generationId: generationDbId, jobId, status: 'processing' });
+      // Same graceful degradation as the main try-on flow — run inline when Redis/Bull isn't
+      // available instead of failing the request. See outfit route above for the full rationale.
+      if (getProductModelQueue()) {
+        try {
+          await enqueueProductModelJob(job);
+          res.status(202).json({ generationId: generationDbId, jobId, status: 'processing' });
+          return;
+        } catch (enqueueErr) {
+          logger.warn('AI Model Studio: enqueue failed, falling back to sync', {
+            jobId,
+            generationDbId,
+            error: enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr),
+          });
+        }
+      }
+
+      logger.info('AI Model Studio: processing synchronously (queue unavailable)', { jobId, generationDbId });
+      const result = await executeProductModelPipeline(job);
+      const resultUrl = result.status === 'completed' && result.resultUrl
+        ? await getSignedUrl(RESULT_BUCKET, result.resultUrl)
+        : undefined;
+      res.json({ generationId: generationDbId, jobId, status: result.status, resultUrl, error: result.error });
     } catch (err) {
       logger.error('AI Model Studio generation failed', { error: err instanceof Error ? err.message : String(err) });
       next(err instanceof AppError ? err : new AppError('Could not start generation right now', 502));
@@ -470,9 +499,29 @@ router.post(
         duration,
         resolution,
       };
-      await enqueueVideoJob(job);
 
-      res.status(202).json({ generationId: generationDbId, jobId, status: 'processing' });
+      // Same graceful degradation as the main try-on flow — run inline when Redis/Bull isn't
+      // available instead of failing the request. See outfit route above for the full rationale.
+      if (getVideoQueue()) {
+        try {
+          await enqueueVideoJob(job);
+          res.status(202).json({ generationId: generationDbId, jobId, status: 'processing' });
+          return;
+        } catch (enqueueErr) {
+          logger.warn('AI Video: enqueue failed, falling back to sync', {
+            jobId,
+            generationDbId,
+            error: enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr),
+          });
+        }
+      }
+
+      logger.info('AI Video: processing synchronously (queue unavailable)', { jobId, generationDbId });
+      const result = await executeVideoPipeline(job);
+      const resultUrl = result.status === 'completed' && result.resultUrl
+        ? await getSignedUrl(RESULT_BUCKET, result.resultUrl)
+        : undefined;
+      res.json({ generationId: generationDbId, jobId, status: result.status, resultUrl, error: result.error });
     } catch (err) {
       logger.error('AI Video generation failed', { error: err instanceof Error ? err.message : String(err) });
       next(err instanceof AppError ? err : new AppError('Could not start video generation right now', 502));
