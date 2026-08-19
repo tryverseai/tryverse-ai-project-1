@@ -57,6 +57,9 @@ export async function generateAndSaveAiModel(
   });
 
   const urlHolder = Array.isArray(output) ? output[0] : output;
+  if (urlHolder === null || urlHolder === undefined) {
+    throw new Error('Replicate returned no output for this generation — please try again.');
+  }
   const imageUrl =
     typeof urlHolder === 'string'
       ? urlHolder
