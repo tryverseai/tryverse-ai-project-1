@@ -47,7 +47,7 @@ const TIPS = [
   { icon: Sun, label: "Good, even lighting" },
 ];
 
-type Step = "guidance" | "consent";
+type Step = "consent" | "guidance";
 
 interface TryOnGuidelinesModalProps {
   open: boolean;
@@ -58,28 +58,29 @@ interface TryOnGuidelinesModalProps {
   source?: string;
 }
 
+/** Consent screen first, then photo-quality guidance — required flow order. */
 export function TryOnGuidelinesModal({ open, onOpenChange, onAcknowledge, source }: TryOnGuidelinesModalProps) {
-  const [step, setStep] = useState<Step>("guidance");
+  const [step, setStep] = useState<Step>("consent");
   const [ownPhotoConfirmed, setOwnPhotoConfirmed] = useState(false);
   const [policyAgreed, setPolicyAgreed] = useState(false);
 
   const resetAndClose = (next: boolean) => {
     if (!next) {
-      // Reset internal state on close so a re-open always starts from guidance, not
+      // Reset internal state on close so a re-open always starts from consent, not
       // wherever the user last left off mid-flow.
-      setStep("guidance");
+      setStep("consent");
       setOwnPhotoConfirmed(false);
       setPolicyAgreed(false);
     }
     onOpenChange(next);
   };
 
-  const handleContinueToConsent = () => {
-    posthogCapture("tryon_guidelines_continue", { source });
-    setStep("consent");
+  const handleContinueToGuidance = () => {
+    posthogCapture("tryon_guidelines_consent_given", { source });
+    setStep("guidance");
   };
 
-  const handleAgreeAndContinue = () => {
+  const handleGetStarted = () => {
     markTryOnGuidelinesSeen();
     posthogCapture("tryon_guidelines_acknowledged", { source });
     resetAndClose(false);
@@ -90,36 +91,7 @@ export function TryOnGuidelinesModal({ open, onOpenChange, onAcknowledge, source
   return (
     <Dialog open={open} onOpenChange={resetAndClose}>
       <DialogContent className="sm:max-w-lg">
-        {step === "guidance" ? (
-          <>
-            <DialogHeader>
-              <DialogTitle className="font-display text-xl">For best results</DialogTitle>
-              <DialogDescription>
-                Upload a high-quality photo with:
-              </DialogDescription>
-            </DialogHeader>
-
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
-              {TIPS.map((tip) => (
-                <li
-                  key={tip.label}
-                  className="flex items-center gap-3 rounded-xl border border-border/50 bg-card px-3 py-2.5"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
-                    <tip.icon className="h-4 w-4 text-foreground" />
-                  </div>
-                  <p className="text-sm text-foreground/90 leading-snug">{tip.label}</p>
-                </li>
-              ))}
-            </ul>
-
-            <DialogFooter>
-              <Button onClick={handleContinueToConsent} className="w-full gradient-primary text-primary-foreground shadow-soft gap-2">
-                <CheckCircle2 className="h-4 w-4" /> Continue
-              </Button>
-            </DialogFooter>
-          </>
-        ) : (
+        {step === "consent" ? (
           <>
             <DialogHeader>
               <DialogTitle className="font-display text-xl flex items-center gap-2">
@@ -163,11 +135,40 @@ export function TryOnGuidelinesModal({ open, onOpenChange, onAcknowledge, source
 
             <DialogFooter>
               <Button
-                onClick={handleAgreeAndContinue}
+                onClick={handleContinueToGuidance}
                 disabled={!ownPhotoConfirmed || !policyAgreed}
                 className="w-full gradient-primary text-primary-foreground shadow-soft gap-2"
               >
-                <CheckCircle2 className="h-4 w-4" /> Agree and continue
+                <CheckCircle2 className="h-4 w-4" /> Continue
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle className="font-display text-xl">For best results</DialogTitle>
+              <DialogDescription>
+                Upload a high-quality photo with:
+              </DialogDescription>
+            </DialogHeader>
+
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
+              {TIPS.map((tip) => (
+                <li
+                  key={tip.label}
+                  className="flex items-center gap-3 rounded-xl border border-border/50 bg-card px-3 py-2.5"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
+                    <tip.icon className="h-4 w-4 text-foreground" />
+                  </div>
+                  <p className="text-sm text-foreground/90 leading-snug">{tip.label}</p>
+                </li>
+              ))}
+            </ul>
+
+            <DialogFooter>
+              <Button onClick={handleGetStarted} className="w-full gradient-primary text-primary-foreground shadow-soft gap-2">
+                <CheckCircle2 className="h-4 w-4" /> Get started
               </Button>
             </DialogFooter>
           </>
