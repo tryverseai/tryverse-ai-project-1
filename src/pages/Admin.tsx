@@ -18,9 +18,16 @@ import {
   ScrollText,
   BarChart3,
   Images,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   getStoredAdminKey,
   clearStoredAdminKey,
@@ -61,6 +68,7 @@ const Admin = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("Overview");
+  const ActiveIcon = sidebarItems.find((i) => i.label === activeTab)?.icon;
 
   useEffect(() => {
     // On mount: verify the HttpOnly session cookie is still valid without
@@ -226,35 +234,41 @@ const Admin = () => {
             </nav>
           </aside>
 
-          {/* Mobile: header + tabs (fixed below navbar) */}
+          {/* Mobile: header + tab dropdown (fixed below navbar) */}
           <div className="lg:hidden fixed top-20 left-0 right-0 z-20 bg-background border-b border-border">
-            <div className="flex items-center justify-between px-4 py-2">
-              <p className="text-sm font-semibold text-foreground">Platform Admin</p>
-              <Button variant="ghost" size="sm" onClick={handleLock} className="gap-1.5 h-8">
+            <div className="flex items-center justify-between px-4 py-2 gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex-1 flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-muted text-foreground min-w-0">
+                    <span className="flex items-center gap-2 min-w-0">
+                      {ActiveIcon && <ActiveIcon className="h-4 w-4 flex-shrink-0" />}
+                      <span className="truncate">{activeTab}</span>
+                    </span>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto">
+                  {sidebarItems.map((item) => (
+                    <DropdownMenuItem
+                      key={item.label}
+                      onSelect={() => setActiveTab(item.label)}
+                      className={activeTab === item.label ? "bg-muted font-medium" : ""}
+                    >
+                      <item.icon className="h-4 w-4 mr-2" />
+                      {item.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button variant="ghost" size="sm" onClick={handleLock} className="gap-1.5 h-8 flex-shrink-0">
                 <Lock className="h-3.5 w-3.5" />
                 Lock
               </Button>
             </div>
-            <div className="flex px-4 pb-2 gap-1 overflow-x-auto">
-              {sidebarItems.map((item) => (
-                <button
-                  key={item.label}
-                  onClick={() => setActiveTab(item.label)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                    activeTab === item.label
-                      ? "bg-foreground text-background"
-                      : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  <item.icon className="h-3.5 w-3.5" />
-                  {item.label}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Main content */}
-          <div className="flex-1 p-6 md:p-8 lg:pt-8 pt-[calc(var(--navbar-height)+4rem)]">
+          <div className="flex-1 p-6 md:p-8 lg:pt-8 pt-[calc(var(--navbar-height)+3rem)]">
             {renderContent()}
           </div>
         </div>

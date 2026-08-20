@@ -4,10 +4,18 @@ import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, BarChart3, Settings, Key, LayoutDashboard, CreditCard, BookOpen, FlaskConical, Sparkles,
-  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film,
+  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, ChevronDown,
 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Eagerly load the default tab — zero extra latency on first visit
 import { TryOnGuideTab } from "@/components/dashboard/TryOnGuideTab";
@@ -137,23 +145,59 @@ const GUIDE_TAB = "Try-On guide";
 const CONNECT_TAB = "Connect Store";
 const DEFAULT_TAB = GUIDE_TAB;
 
-const sidebarItems = [
-  { icon: BookOpen, label: GUIDE_TAB },
-  { icon: PlugZap, label: CONNECT_TAB },
-  { icon: LayoutDashboard, label: "Overview" },
-  { icon: BarChart3, label: "Analytics" },
-  { icon: Package, label: "Products" },
-  { icon: FlaskConical, label: "Personal Studio" },
-  { icon: Users, label: "AI Model Studio" },
-  { icon: Camera, label: "AI Photoshoot" },
-  { icon: Shirt, label: "Outfit Builder" },
-  { icon: Wand2, label: "Product Photography" },
-  { icon: Film, label: "AI Video" },
-  { icon: Key, label: "API Keys" },
-  { icon: CreditCard, label: "Billing" },
-  { icon: Settings, label: "Settings" },
-  { icon: Terminal, label: "Developers" },
+/** Grouped by workflow, not by feature-launch order — see platform navigation direction. */
+const sidebarGroups: { section: string; items: { icon: React.ElementType; label: string }[] }[] = [
+  {
+    section: "Visualization",
+    items: [
+      { icon: FlaskConical, label: "Personal Studio" },
+      { icon: Shirt, label: "Outfit Builder" },
+    ],
+  },
+  {
+    section: "Content",
+    items: [
+      { icon: Camera, label: "AI Photoshoot" },
+      { icon: Film, label: "AI Video" },
+    ],
+  },
+  {
+    section: "Models",
+    items: [
+      { icon: Users, label: "AI Model Studio" },
+      { icon: Wand2, label: "Product Photography" },
+    ],
+  },
+  {
+    section: "Catalog",
+    items: [{ icon: Package, label: "Products" }],
+  },
+  {
+    section: "Platform",
+    items: [
+      { icon: LayoutDashboard, label: "Overview" },
+      { icon: BarChart3, label: "Analytics" },
+      { icon: BookOpen, label: GUIDE_TAB },
+      { icon: PlugZap, label: CONNECT_TAB },
+    ],
+  },
+  {
+    section: "Developers",
+    items: [
+      { icon: Key, label: "API Keys" },
+      { icon: Terminal, label: "Developers" },
+    ],
+  },
+  {
+    section: "Admin",
+    items: [
+      { icon: CreditCard, label: "Billing" },
+      { icon: Settings, label: "Settings" },
+    ],
+  },
 ];
+
+const sidebarItems = sidebarGroups.flatMap((g) => g.items);
 
 const tabComponents: Record<string, React.ComponentType> = {
   [CONNECT_TAB]: WidgetTab,
@@ -208,6 +252,8 @@ const Dashboard = () => {
     setSearchParams({ tab: label }, { replace: true });
   };
 
+  const ActiveIcon = sidebarItems.find((i) => i.label === activeTab)?.icon;
+
   const renderContent = () => {
     const ActiveComponent = tabComponents[activeTab] || TryOnGuideTab;
     return (
@@ -231,41 +277,68 @@ const Dashboard = () => {
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Brand Dashboard</p>
               <p className="text-sm font-semibold text-foreground">{brandName}</p>
             </div>
-            <nav className="space-y-1">
-              {sidebarItems.map((item) => (
-                <button
-                  key={item.label}
-                  onClick={() => selectTab(item.label)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === item.label
-                      ? "bg-foreground text-background"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </button>
+            <nav className="space-y-5">
+              {sidebarGroups.map((group) => (
+                <div key={group.section}>
+                  <p className="px-3 mb-1.5 text-[0.6875rem] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+                    {group.section}
+                  </p>
+                  <div className="space-y-1">
+                    {group.items.map((item) => (
+                      <button
+                        key={item.label}
+                        onClick={() => selectTab(item.label)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                          activeTab === item.label
+                            ? "bg-foreground text-background"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </nav>
           </aside>
 
-          {/* Mobile tabs */}
-          <div className="lg:hidden fixed left-0 right-0 z-30 bg-background border-b border-border overflow-x-auto" style={{ top: 'var(--navbar-height)' }}>
-            <div className="flex px-4 py-2 gap-1">
-              {sidebarItems.map((item) => (
-                <button
-                  key={item.label}
-                  onClick={() => selectTab(item.label)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                    activeTab === item.label
-                      ? "bg-foreground text-background"
-                      : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  <item.icon className="h-3.5 w-3.5" />
-                  {item.label}
-                </button>
-              ))}
+          {/* Mobile tabs — dropdown instead of horizontal scroll, so all 7 groups/15 items are
+              reachable without sideways hunting; mirrors the desktop sidebar's grouped list. */}
+          <div className="lg:hidden fixed left-0 right-0 z-30 bg-background border-b border-border" style={{ top: 'var(--navbar-height)' }}>
+            <div className="px-4 py-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm font-medium bg-muted text-foreground">
+                    <span className="flex items-center gap-2">
+                      {ActiveIcon && <ActiveIcon className="h-4 w-4" />}
+                      {activeTab}
+                    </span>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto">
+                  {sidebarGroups.map((group, i) => (
+                    <div key={group.section}>
+                      {i > 0 && <DropdownMenuSeparator />}
+                      <DropdownMenuLabel className="text-[0.6875rem] text-muted-foreground/70 uppercase tracking-wider">
+                        {group.section}
+                      </DropdownMenuLabel>
+                      {group.items.map((item) => (
+                        <DropdownMenuItem
+                          key={item.label}
+                          onSelect={() => selectTab(item.label)}
+                          className={activeTab === item.label ? "bg-muted font-medium" : ""}
+                        >
+                          <item.icon className="h-4 w-4 mr-2" />
+                          {item.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </div>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
