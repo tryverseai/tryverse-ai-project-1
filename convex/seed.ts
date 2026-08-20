@@ -30,7 +30,7 @@ export const seedPlansIfEmpty = mutation({
         price_usd: 0,
         tryons_per_month: 5,
         features: [
-          "Free try-on pool (individuals: 5 · brands: 20 on signup)",
+          "Free try-on pool (individuals: 5 · brands: 10 on signup)",
           "Watermark on free tier",
           "Basic quality",
           "Upgrade anytime",

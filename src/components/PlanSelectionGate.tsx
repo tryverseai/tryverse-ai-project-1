@@ -23,7 +23,7 @@ const PLANS: PlanOption[] = [
     name: "Free",
     price: "$0",
     blurb: "Explore TryVerse with your own account.",
-    features: ["20 try-ons on signup", "Try-On Studio in your dashboard"],
+    features: ["10 try-ons on signup", "Try-On Studio in your dashboard"],
     cta: "Continue with Free",
   },
   {

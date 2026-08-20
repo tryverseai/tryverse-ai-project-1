@@ -65,7 +65,7 @@ const STATIC_PLAN_CATALOG: PlanRow[] = [
     price_usd: 0,
     tryons_per_month: 5,
     features: [
-      "5 try-ons/month on free pool (individual) · 20 on signup (brands)",
+      "5 try-ons/month on free pool (individual) · 10 on signup (brands)",
       "Watermark",
       "Basic quality",
     ],
@@ -221,7 +221,7 @@ function resolvePlansForAudience(all: PlanRow[], audience: PricingAudience): Pla
           price_usd: 0,
           tryons_per_month: 5,
           features: [
-            "5 try-ons/month on free pool (individual) · 20 on signup (brands)",
+            "5 try-ons/month on free pool (individual) · 10 on signup (brands)",
             "Watermark",
             "Basic quality",
           ],
@@ -366,7 +366,7 @@ const Pricing = () => {
               goodFor: "Virality · Fashion discovery",
             }
           : {
-              description: "20 try-ons on signup for your brand, watermark, basic quality — perfect for a pilot.",
+              description: "10 try-ons on signup for your brand, watermark, basic quality — perfect for a pilot.",
               goodFor: "Small brands testing fit AI",
             }
         : {};
@@ -376,7 +376,7 @@ const Pricing = () => {
     const features = isFreePlanId(plan.id)
       ? audience === "individual"
         ? ["5 try-ons", "Watermark", "Basic quality"]
-        : ["20 try-ons", "Watermark", "Basic quality"]
+        : ["10 try-ons", "Watermark", "Basic quality"]
       : parseFeatures(plan.features);
     const showUsd = displayCurrency === "USD";
     const free = isFreePlanId(plan.id);
@@ -488,7 +488,7 @@ const Pricing = () => {
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
               Scale fashion visualization for your storefront — virtual try-on, AI photography, and more — start
-              with 20 free try-ons, then upgrade when you&apos;re ready.
+              with 10 free try-ons, then upgrade when you&apos;re ready.
             </p>
 
             {(providers.flutterwave || providers.paystack) && (

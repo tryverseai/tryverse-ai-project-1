@@ -5,6 +5,7 @@ import {
   type TryverseModel,
   type AiModelResult,
 } from "@/lib/backendApi";
+import { ModelPortrait } from "@/components/ModelPortrait";
 
 export type PickedModel =
   | { source: "generated"; id: string; imageUrl: string; storagePath: string; label: string }
@@ -59,11 +60,11 @@ export function ModelPickerGrid({ selectedId, onSelect, className }: ModelPicker
               label: "Your model",
             })
           }
-          className={`aspect-[3/4] rounded-lg overflow-hidden border-2 transition-colors ${
+          className={`rounded-lg border-2 transition-colors ${
             selectedId === m.id ? "border-foreground" : "border-transparent"
           }`}
         >
-          <img src={m.imageUrl} alt="Your generated model" className="w-full h-full object-cover" />
+          <ModelPortrait src={m.imageUrl} alt="Your generated model" className="aspect-[3/4] rounded-md" />
         </button>
       ))}
       {libraryModels.map((m) => (
@@ -73,12 +74,12 @@ export function ModelPickerGrid({ selectedId, onSelect, className }: ModelPicker
           onClick={() =>
             onSelect({ source: "library", id: m.slug, imageUrl: m.image_url, label: m.display_name })
           }
-          className={`aspect-[3/4] rounded-lg overflow-hidden border-2 transition-colors ${
+          className={`rounded-lg border-2 transition-colors ${
             selectedId === m.slug ? "border-foreground" : "border-transparent"
           }`}
           title={m.display_name}
         >
-          <img src={m.image_url} alt={m.display_name} className="w-full h-full object-cover" />
+          <ModelPortrait src={m.image_url} alt={m.display_name} className="aspect-[3/4] rounded-md" />
         </button>
       ))}
     </div>

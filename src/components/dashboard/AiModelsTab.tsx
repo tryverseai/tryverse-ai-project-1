@@ -16,6 +16,7 @@ import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
 import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { posthogCapture } from "@/lib/posthog";
 import { EmptyState } from "@/components/EmptyState";
+import { ModelPortrait } from "@/components/ModelPortrait";
 
 const PROMPT_EXAMPLE =
   "Professional African fashion model, female, age 28, dark skin, studio lighting, luxury editorial fashion campaign.";
@@ -176,13 +177,13 @@ export function AiModelsTab() {
                   const video = videoByModel[m.id];
                   return (
                     <div key={m.id} className="rounded-xl overflow-hidden border border-border/50 bg-card group relative">
-                      <div className="aspect-[3/4] bg-muted">
-                        {video?.status === "done" && video.url ? (
+                      {video?.status === "done" && video.url ? (
+                        <div className="aspect-[3/4] bg-muted">
                           <video src={video.url} controls loop className="w-full h-full object-cover" />
-                        ) : (
-                          <img src={m.imageUrl} alt="Generated AI model" className="w-full h-full object-cover object-top" />
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <ModelPortrait src={m.imageUrl} alt="Generated AI model" className="aspect-[3/4]" />
+                      )}
                       {!(video?.status === "done" && video.url) && (
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <Button size="icon" variant="secondary" className="h-8 w-8" title="Reuse in a try-on">

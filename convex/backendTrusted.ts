@@ -1151,7 +1151,7 @@ export const ensurePlansSeeded = mutation({
     const rows = [
       {
         id: "free", name: "Free", is_active: true, max_products: 0, price_ngn: 0, price_usd: 0, tryons_per_month: 5,
-        features: ["Free try-on pool (individuals: 5 · brands: 20 on signup)", "Watermark on free tier", "Basic quality", "Upgrade anytime"],
+        features: ["Free try-on pool (individuals: 5 · brands: 10 on signup)", "Watermark on free tier", "Basic quality", "Upgrade anytime"],
         created_at: now,
       },
       {

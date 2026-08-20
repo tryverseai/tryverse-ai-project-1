@@ -13,6 +13,7 @@ import {
   type TryverseModel,
 } from "@/lib/backendApi";
 import { toast } from "sonner";
+import { ModelPortrait } from "@/components/ModelPortrait";
 
 type Row = TryverseModel & { is_active: boolean; free_tier_eligible: boolean; created_at: string };
 
@@ -164,13 +165,11 @@ export function AdminModelLibraryTab({ adminKey }: { adminKey: string }) {
               key={m.id}
               className="rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm hover:shadow-md transition-shadow"
             >
-              <div className="aspect-[4/5] bg-muted relative">
-                <img
-                  src={`${m.image_url}${m.image_url.includes("?") ? "&" : "?"}tryverse_slug=${encodeURIComponent(m.slug)}`}
-                  alt={m.display_name}
-                  className="w-full h-full object-cover object-top"
-                  loading="lazy"
-                />
+              <ModelPortrait
+                src={`${m.image_url}${m.image_url.includes("?") ? "&" : "?"}tryverse_slug=${encodeURIComponent(m.slug)}`}
+                alt={m.display_name}
+                className="aspect-[4/5]"
+              >
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                   <Badge variant={m.is_active ? "default" : "secondary"} className="text-[10px]">
                     {m.is_active ? "in catalog" : "hidden"}
@@ -184,7 +183,7 @@ export function AdminModelLibraryTab({ adminKey }: { adminKey: string }) {
                     <Loader2 className="h-8 w-8 animate-spin text-foreground" />
                   </div>
                 )}
-              </div>
+              </ModelPortrait>
               <div className="p-3 space-y-3 border-t border-border/60">
                 <div>
                   <p className="font-semibold text-foreground">{m.display_name}</p>
