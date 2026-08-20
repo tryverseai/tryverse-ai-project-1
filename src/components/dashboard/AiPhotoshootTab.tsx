@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Lock, Upload, ImagePlus, Camera, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,20 +12,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import {
-  uploadImage,
-  getTryverseModels,
-  getSavedAiModels,
-  generateProductPhotoshoot,
-  type TryverseModel,
-  type AiModelResult,
-} from "@/lib/backendApi";
+import { uploadImage, generateProductPhotoshoot } from "@/lib/backendApi";
 import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
 import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { posthogCapture } from "@/lib/posthog";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
+import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
+import { EmptyState } from "@/components/EmptyState";
+import { ModelPickerGrid, type PickedModel } from "@/components/dashboard/ModelPickerGrid";
 
-type PickedModel = { id: string; source: "library" | "generated"; imageUrl: string; label: string };
+const PHOTOSHOOT_STAGES = [
+  "Preparing your product photo",
+  "Placing it in scene",
+  "Applying lighting and theme",
+  "Finishing the shot",
+  "Almost ready",
+];
 
 const THEME_OPTIONS = ["Contemporary catalog", "Luxury editorial", "Streetwear", "Minimal studio", "Lifestyle outdoor"];
 const LIGHTING_OPTIONS = ["Soft studio", "Bright daylight", "Dramatic contrast", "Golden hour"];
@@ -58,9 +60,6 @@ export function AiPhotoshootTab() {
   const [uploading, setUploading] = useState(false);
   const [productStoragePath, setProductStoragePath] = useState<string | null>(null);
 
-  const [libraryModels, setLibraryModels] = useState<TryverseModel[]>([]);
-  const [savedModels, setSavedModels] = useState<AiModelResult[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState<PickedModel | null>(null);
 
   const [theme, setTheme] = useState(THEME_OPTIONS[0]);
@@ -69,20 +68,6 @@ export function AiPhotoshootTab() {
 
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<{ imageUrl: string; createdAt: string }[]>([]);
-
-  useEffect(() => {
-    if (!isEnterprise) return;
-    let cancelled = false;
-    setModelsLoading(true);
-    Promise.all([getTryverseModels().catch(() => []), getSavedAiModels().catch(() => [])])
-      .then(([library, saved]) => {
-        if (cancelled) return;
-        setLibraryModels(library);
-        setSavedModels(saved);
-      })
-      .finally(() => { if (!cancelled) setModelsLoading(false); });
-    return () => { cancelled = true; };
-  }, [isEnterprise]);
 
   const openUpgrade = () => {
     posthogCapture("enterprise_upgrade_modal_opened", { context: "photoshoot", source: "ai_photoshoot_tab" });
@@ -201,40 +186,7 @@ export function AiPhotoshootTab() {
               <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                 <Camera className="h-4 w-4" /> 2. Pick a model
               </h3>
-              {modelsLoading ? (
-                <p className="text-xs text-muted-foreground">Loading models…</p>
-              ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-3">
-                  {savedModels.map((m) => (
-                    <button
-                      key={`gen-${m.id}`}
-                      type="button"
-                      onClick={() => setSelectedModel({ id: m.id, source: "generated", imageUrl: m.imageUrl, label: "Your model" })}
-                      className={`aspect-[3/4] rounded-lg overflow-hidden border-2 transition-colors ${
-                        selectedModel?.id === m.id ? "border-foreground" : "border-transparent"
-                      }`}
-                    >
-                      <img src={m.imageUrl} alt="Your generated model" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                  {libraryModels.map((m) => (
-                    <button
-                      key={`lib-${m.slug}`}
-                      type="button"
-                      onClick={() => setSelectedModel({ id: m.slug, source: "library", imageUrl: m.image_url, label: m.display_name })}
-                      className={`aspect-[3/4] rounded-lg overflow-hidden border-2 transition-colors relative ${
-                        selectedModel?.id === m.slug ? "border-foreground" : "border-transparent"
-                      }`}
-                      title={m.display_name}
-                    >
-                      <img src={m.image_url} alt={m.display_name} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
-              {!modelsLoading && savedModels.length === 0 && libraryModels.length === 0 && (
-                <p className="text-xs text-muted-foreground">No models available yet.</p>
-              )}
+              <ModelPickerGrid selectedId={selectedModel?.id} onSelect={setSelectedModel} />
             </div>
 
             {/* Step 3: scene */}
@@ -280,7 +232,22 @@ export function AiPhotoshootTab() {
             </Button>
           </div>
 
-          {results.length > 0 && (
+          {generating ? (
+            <GenerationLoadingScreen
+              title="Creating your photoshoot"
+              stages={PHOTOSHOOT_STAGES}
+              previewItems={[
+                ...(productPreview ? [{ label: "Product", imageUrl: productPreview }] : []),
+                ...(selectedModel ? [{ label: selectedModel.label, imageUrl: selectedModel.imageUrl }] : []),
+              ]}
+            />
+          ) : results.length === 0 ? (
+            <EmptyState
+              icon={Camera}
+              title="No photoshoots yet"
+              description="Generated campaign imagery will appear here so you can reuse and download it."
+            />
+          ) : (
             <div>
               <h3 className="font-display text-sm font-semibold text-foreground mb-4">Results</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">

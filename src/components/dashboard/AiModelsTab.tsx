@@ -15,6 +15,7 @@ import {
 import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
 import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { posthogCapture } from "@/lib/posthog";
+import { EmptyState } from "@/components/EmptyState";
 
 const PROMPT_EXAMPLE =
   "Professional African fashion model, female, age 28, dark skin, studio lighting, luxury editorial fashion campaign.";
@@ -164,13 +165,11 @@ export function AiModelsTab() {
             {modelsLoading ? (
               <div className="flex justify-center py-16 text-sm text-muted-foreground">Loading models…</div>
             ) : models.length === 0 ? (
-              <div className="text-center py-16 bg-card rounded-xl border border-border/50">
-                <Users className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
-                <p className="text-sm font-medium text-foreground mb-1">No models yet</p>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  Generated models will appear here so you can reuse them across try-ons.
-                </p>
-              </div>
+              <EmptyState
+                icon={Users}
+                title="No models yet"
+                description="Generated models will appear here so you can reuse them across try-ons."
+              />
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {models.map((m) => {

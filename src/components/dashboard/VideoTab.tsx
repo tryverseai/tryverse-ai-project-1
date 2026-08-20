@@ -23,9 +23,19 @@ import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { posthogCapture } from "@/lib/posthog";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
+import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
+import { EmptyState } from "@/components/EmptyState";
 
 const MAX_POLL_ATTEMPTS = 40;
 const POLL_INTERVAL_MS = 5000;
+
+const VIDEO_STAGES = [
+  "Preparing your image",
+  "Mapping motion",
+  "Rendering frames",
+  "Encoding your clip",
+  "Almost ready",
+];
 
 const DURATION_OPTIONS: { value: "5" | "10"; label: string; credits: string }[] = [
   { value: "5", label: "5 seconds", credits: "1×" },
@@ -259,7 +269,19 @@ export function VideoTab() {
             </Button>
           </div>
 
-          {results.length > 0 && (
+          {generating ? (
+            <GenerationLoadingScreen
+              title="Creating your video"
+              stages={VIDEO_STAGES}
+              previewItems={sourcePreview ? [{ label: "Source", imageUrl: sourcePreview }] : []}
+            />
+          ) : results.length === 0 ? (
+            <EmptyState
+              icon={Film}
+              title="No videos yet"
+              description="Generated clips will appear here so you can reuse and download them."
+            />
+          ) : (
             <div>
               <h3 className="font-display text-sm font-semibold text-foreground mb-4">Results</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">

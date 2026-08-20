@@ -16,9 +16,19 @@ import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { posthogCapture } from "@/lib/posthog";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
+import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
+import { EmptyState } from "@/components/EmptyState";
 
 const MAX_POLL_ATTEMPTS = 30;
 const POLL_INTERVAL_MS = 3000;
+
+const PRODUCT_MODEL_STAGES = [
+  "Preparing your product photo",
+  "Placing it on a model",
+  "Matching lighting and pose",
+  "Finishing the shot",
+  "Almost ready",
+];
 
 function ComingSoonState() {
   return (
@@ -261,7 +271,22 @@ export function ProductModelTab() {
             </Button>
           </div>
 
-          {results.length > 0 && (
+          {generating ? (
+            <GenerationLoadingScreen
+              title="Creating your product photography"
+              stages={PRODUCT_MODEL_STAGES}
+              previewItems={[
+                ...(productPreview ? [{ label: "Product", imageUrl: productPreview }] : []),
+                ...(facePreview ? [{ label: "Face reference", imageUrl: facePreview }] : []),
+              ]}
+            />
+          ) : results.length === 0 ? (
+            <EmptyState
+              icon={Camera}
+              title="No photography yet"
+              description="Generated shots will appear here so you can reuse and download them."
+            />
+          ) : (
             <div>
               <h3 className="font-display text-sm font-semibold text-foreground mb-4">Results</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">

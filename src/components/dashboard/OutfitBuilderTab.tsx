@@ -6,13 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   getProducts,
-  getTryverseModels,
-  getSavedAiModels,
   generateOutfit,
   pollOutfitStatus,
   type Product,
-  type TryverseModel,
-  type AiModelResult,
 } from "@/lib/backendApi";
 import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
 import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
@@ -20,8 +16,18 @@ import { posthogCapture } from "@/lib/posthog";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
 import { safeImageSrcForDom } from "@/lib/safeUrl";
+import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
+import { EmptyState } from "@/components/EmptyState";
+import { ModelPickerGrid, type PickedModel } from "@/components/dashboard/ModelPickerGrid";
 
-type PickedModel = { id: string; source: "library" | "generated"; imageUrl: string; label: string };
+const OUTFIT_STAGES = [
+  "Preparing your pieces",
+  "Fitting the look on your model",
+  "Blending the outfit together",
+  "Finishing the shot",
+  "Almost ready",
+];
+
 type SlotKey = "top" | "bottom" | "one_piece" | "shoes";
 type Mode = "top_bottom" | "one_piece";
 
@@ -110,9 +116,6 @@ export function OutfitBuilderTab() {
   });
   const [productsLoading, setProductsLoading] = useState(true);
 
-  const [libraryModels, setLibraryModels] = useState<TryverseModel[]>([]);
-  const [savedModels, setSavedModels] = useState<AiModelResult[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState<PickedModel | null>(null);
 
   const [generating, setGenerating] = useState(false);
@@ -140,15 +143,6 @@ export function OutfitBuilderTab() {
         shoes: shoes.products,
       });
     }).finally(() => { if (!cancelled) setProductsLoading(false); });
-
-    setModelsLoading(true);
-    Promise.all([getTryverseModels().catch(() => []), getSavedAiModels().catch(() => [])])
-      .then(([library, saved]) => {
-        if (cancelled) return;
-        setLibraryModels(library);
-        setSavedModels(saved);
-      })
-      .finally(() => { if (!cancelled) setModelsLoading(false); });
 
     return () => { cancelled = true; };
   }, [active]);
@@ -341,40 +335,7 @@ export function OutfitBuilderTab() {
               <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                 <Camera className="h-4 w-4" /> 2. Pick a model
               </h3>
-              {modelsLoading ? (
-                <p className="text-xs text-muted-foreground">Loading models…</p>
-              ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-3">
-                  {savedModels.map((m) => (
-                    <button
-                      key={`gen-${m.id}`}
-                      type="button"
-                      onClick={() => setSelectedModel({ id: m.id, source: "generated", imageUrl: m.imageUrl, label: "Your model" })}
-                      className={`aspect-[3/4] rounded-lg overflow-hidden border-2 transition-colors ${
-                        selectedModel?.id === m.id ? "border-foreground" : "border-transparent"
-                      }`}
-                    >
-                      <img src={m.imageUrl} alt="Your generated model" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                  {libraryModels.map((m) => (
-                    <button
-                      key={`lib-${m.slug}`}
-                      type="button"
-                      onClick={() => setSelectedModel({ id: m.slug, source: "library", imageUrl: m.image_url, label: m.display_name })}
-                      className={`aspect-[3/4] rounded-lg overflow-hidden border-2 transition-colors ${
-                        selectedModel?.id === m.slug ? "border-foreground" : "border-transparent"
-                      }`}
-                      title={m.display_name}
-                    >
-                      <img src={m.image_url} alt={m.display_name} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
-              {!modelsLoading && savedModels.length === 0 && libraryModels.length === 0 && (
-                <p className="text-xs text-muted-foreground">No models available yet.</p>
-              )}
+              <ModelPickerGrid selectedId={selectedModel?.id} onSelect={setSelectedModel} />
             </div>
 
             <Button
@@ -386,7 +347,19 @@ export function OutfitBuilderTab() {
             </Button>
           </div>
 
-          {results.length > 0 && (
+          {generating ? (
+            <GenerationLoadingScreen
+              title="Creating your look"
+              stages={OUTFIT_STAGES}
+              previewItems={selectedModel ? [{ label: selectedModel.label, imageUrl: selectedModel.imageUrl }] : []}
+            />
+          ) : results.length === 0 ? (
+            <EmptyState
+              icon={Shirt}
+              title="No looks yet"
+              description="Generated outfits will appear here so you can reuse and download them."
+            />
+          ) : (
             <div>
               <h3 className="font-display text-sm font-semibold text-foreground mb-4">Results</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
