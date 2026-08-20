@@ -53,7 +53,7 @@ Why bare commands are unsafe here: `.env.local`'s `CONVEX_DEPLOYMENT` line is **
 - **`npm run convex:deploy:prod`** — the **only** command that reaches real production (`patient-axolotl-17`). Reads `.env.production-convex` (gitignored, pinned to `dev:patient-axolotl-17`).
 - **`npx convex deploy`** (bare) — do **not** use this expecting it to reach production. Convex's `deploy` command always targets the project's *officially-typed* prod deployment (`pastel-setter-205`), which is the empty sandbox, not the real one. `npm run convex:deploy` is kept only for completeness/parity — treat it as inert for this project.
 
-**After every `npm run convex:deploy:prod`, immediately run `npm run convex:dev:reset`** — the prod push leaves `.env.local` in that inconsistent, possibly-prod-pointing state described above, and the reset forces it cleanly back to the sandbox regardless of what it currently says.
+**`npm run convex:deploy:prod` now auto-resets `.env.local` back to the sandbox afterward** via a `postconvex:deploy:prod` npm hook (runs `convex:dev:reset` automatically) — you no longer have to remember this manually. This guardrail exists because relying on a human to remember it already caused a real incident: a local dev session's frontend was left pointed at production, its backend still pointed at the sandbox, and Convex Auth rejected every session with `NoAuthProvider` — reported to Sentry as if it were a real production outage. If you ever run a bare `npx convex dev`/`deploy` outside these npm scripts, run `npm run convex:dev:reset` immediately after by hand.
 
 ## Scripts
 

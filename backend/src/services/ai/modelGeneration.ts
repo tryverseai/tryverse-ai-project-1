@@ -3,6 +3,7 @@ import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 import { uploadResultBuffer } from '../storage/images';
 import { anyApi, convexMutationTrusted, convexQueryTrusted } from '../../config/convexHttp';
+import { AppError } from '../../middleware/errorHandler';
 
 const replicate = new Replicate({ auth: env.REPLICATE_API_TOKEN });
 
@@ -78,9 +79,19 @@ export async function generateAndSaveAiModel(
   }
 
   if (prediction.status !== 'succeeded') {
-    throw new Error(
-      `AI model generation failed: ${typeof prediction.error === 'string' ? prediction.error : prediction.status}`
-    );
+    const providerError = typeof prediction.error === 'string' ? prediction.error : prediction.status;
+    // Replicate's safety classifier rejects some entirely benign prompts (false positives are
+    // common for words like "model"/"fashion"). Surface this one specific, actionable case to the
+    // user instead of a dead-end generic error — everything else stays generic (no internal
+    // provider details leak to the client).
+    if (/nsfw/i.test(String(providerError))) {
+      throw new AppError(
+        'This prompt was flagged by the safety filter — try rephrasing it (this can happen even for ordinary fashion prompts).',
+        422,
+        'AI_MODEL_NSFW_FLAGGED'
+      );
+    }
+    throw new Error(`AI model generation failed: ${providerError}`);
   }
 
   const output = prediction.output as unknown;
