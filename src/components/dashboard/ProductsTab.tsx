@@ -233,7 +233,7 @@ export function ProductsTab() {
             Products
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage your product catalog for virtual try-on
+            Your brand's fashion assets, ready for visualization.
           </p>
         </div>
       </div>

@@ -25,9 +25,9 @@ function LockedState({ onUpgradeClick }: { onUpgradeClick: () => void }) {
       <div className="w-14 h-14 rounded-full bg-foreground/[0.06] flex items-center justify-center mx-auto mb-4">
         <Lock className="h-6 w-6 text-foreground" />
       </div>
-      <p className="text-sm font-medium text-foreground mb-1">Generate AI Model is an Enterprise feature</p>
+      <p className="text-sm font-medium text-foreground mb-1">AI Model Studio is an Enterprise feature</p>
       <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-5">
-        Build a diverse library of on-brand AI fashion models and reuse them across every try-on.
+        Create campaign-ready digital talent for your brand and reuse them across every try-on.
       </p>
       <Button onClick={onUpgradeClick} className="gradient-primary text-primary-foreground shadow-soft gap-2">
         <Sparkles className="h-4 w-4" /> Unlock Enterprise
@@ -114,7 +114,7 @@ export function AiModelsTab() {
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
-            Generate AI Model
+            AI Model Studio
             {!isEnterprise && (
               <Badge variant="secondary" className="gap-1">
                 <Sparkles className="h-3 w-3" /> Enterprise
@@ -122,7 +122,7 @@ export function AiModelsTab() {
             )}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Create diverse, on-brand AI fashion models for your catalog.
+            Build campaign-ready digital talent, on demand.
           </p>
         </div>
       </div>

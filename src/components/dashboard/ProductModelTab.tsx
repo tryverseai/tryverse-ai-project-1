@@ -26,7 +26,7 @@ function ComingSoonState() {
       <div className="w-14 h-14 rounded-full bg-foreground/[0.06] flex items-center justify-center mx-auto mb-4">
         <Clock className="h-6 w-6 text-foreground" />
       </div>
-      <p className="text-sm font-medium text-foreground mb-1">AI Model Studio is coming soon</p>
+      <p className="text-sm font-medium text-foreground mb-1">Product Photography is coming soon</p>
       <p className="text-xs text-muted-foreground max-w-sm mx-auto">
         We're finishing up quality testing before rolling this out.
       </p>
@@ -40,7 +40,7 @@ function LockedState({ onUpgradeClick }: { onUpgradeClick: () => void }) {
       <div className="w-14 h-14 rounded-full bg-foreground/[0.06] flex items-center justify-center mx-auto mb-4">
         <Lock className="h-6 w-6 text-foreground" />
       </div>
-      <p className="text-sm font-medium text-foreground mb-1">AI Model Studio is an Enterprise feature</p>
+      <p className="text-sm font-medium text-foreground mb-1">Product Photography is an Enterprise feature</p>
       <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-5">
         Turn a product photo into professional on-model photography, instantly.
       </p>
@@ -158,7 +158,7 @@ export function ProductModelTab() {
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
-            AI Model Studio
+            Product Photography
             {!isEnterprise && (
               <Badge variant="secondary" className="gap-1">
                 <Sparkles className="h-3 w-3" /> Enterprise

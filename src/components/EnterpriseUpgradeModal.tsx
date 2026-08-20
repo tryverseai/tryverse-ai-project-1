@@ -80,10 +80,10 @@ const COPY: Record<
     useCases: PHOTOSHOOT_USE_CASES,
   },
   models: {
-    eyebrow: "AI Model Generation",
-    title: "AI models are an Enterprise feature",
+    eyebrow: "AI Model Studio",
+    title: "AI Model Studio is an Enterprise feature",
     description:
-      "Generate a full library of diverse, on-brand AI fashion models for your catalog. Upgrade to Enterprise to unlock generation.",
+      "Build a full library of diverse, campaign-ready digital talent for your catalog. Upgrade to Enterprise to unlock generation.",
     useCases: MODEL_USE_CASES,
   },
   "outfit-builder": {
@@ -94,8 +94,8 @@ const COPY: Record<
     useCases: OUTFIT_BUILDER_USE_CASES,
   },
   "product-model": {
-    eyebrow: "AI Model Studio",
-    title: "AI Model Studio is an Enterprise feature",
+    eyebrow: "Product Photography",
+    title: "Product Photography is an Enterprise feature",
     description:
       "Turn a product photo into professional on-model photography, instantly. Upgrade to Enterprise to unlock generation.",
     useCases: PRODUCT_MODEL_USE_CASES,

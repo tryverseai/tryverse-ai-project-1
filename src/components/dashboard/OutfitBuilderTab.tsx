@@ -251,7 +251,7 @@ export function OutfitBuilderTab() {
             )}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Combine products from your catalog into one complete outfit, on one model.
+            Style a complete look — combine products from your catalog onto one model.
           </p>
         </div>
       </div>

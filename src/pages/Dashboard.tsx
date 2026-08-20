@@ -45,7 +45,7 @@ const PersonalizeTab = lazy(() =>
 function AiModelsTabUnavailable() {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
-      <p className="text-sm font-medium text-foreground mb-1">AI Models unavailable</p>
+      <p className="text-sm font-medium text-foreground mb-1">AI Model Studio unavailable</p>
       <p className="text-xs text-muted-foreground max-w-md text-center">
         This section could not be loaded. Refresh the page or try again in a moment.
       </p>
@@ -97,7 +97,7 @@ const OutfitBuilderTab = lazy(() =>
 function ProductModelTabUnavailable() {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
-      <p className="text-sm font-medium text-foreground mb-1">AI Model Studio unavailable</p>
+      <p className="text-sm font-medium text-foreground mb-1">Product Photography unavailable</p>
       <p className="text-xs text-muted-foreground max-w-md text-center">
         This section could not be loaded. Refresh the page or try again in a moment.
       </p>
@@ -144,10 +144,10 @@ const sidebarItems = [
   { icon: BarChart3, label: "Analytics" },
   { icon: Package, label: "Products" },
   { icon: FlaskConical, label: "Personal Studio" },
-  { icon: Users, label: "AI Models" },
+  { icon: Users, label: "AI Model Studio" },
   { icon: Camera, label: "AI Photoshoot" },
   { icon: Shirt, label: "Outfit Builder" },
-  { icon: Wand2, label: "AI Model Studio" },
+  { icon: Wand2, label: "Product Photography" },
   { icon: Film, label: "AI Video" },
   { icon: Key, label: "API Keys" },
   { icon: CreditCard, label: "Billing" },
@@ -162,10 +162,10 @@ const tabComponents: Record<string, React.ComponentType> = {
   Analytics: AnalyticsTab,
   Products: ProductsTab,
   "Personal Studio": StudioTab,
-  "AI Models": AiModelsTab,
+  "AI Model Studio": AiModelsTab,
   "AI Photoshoot": AiPhotoshootTab,
   "Outfit Builder": OutfitBuilderTab,
-  "AI Model Studio": ProductModelTab,
+  "Product Photography": ProductModelTab,
   "AI Video": VideoTab,
   "API Keys": ApiKeysTab,
   Billing: BillingTab,

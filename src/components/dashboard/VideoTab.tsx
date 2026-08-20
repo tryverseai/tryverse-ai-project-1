@@ -170,7 +170,7 @@ export function VideoTab() {
             )}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Animate a still image into a short clip.
+            Motion Studio — turn a still image into a short clip for social and ads.
           </p>
         </div>
       </div>

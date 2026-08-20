@@ -147,7 +147,7 @@ export function AiPhotoshootTab() {
             )}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Upload a product photo, pick a model, generate catalog-ready photography.
+            Create campaign-ready imagery — upload a product, pick a model, set the scene.
           </p>
         </div>
       </div>
