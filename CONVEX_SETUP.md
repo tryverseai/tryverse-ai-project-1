@@ -5,18 +5,13 @@ The web app and Convex backend use **Convex Auth** (password) with **`@convex-de
 ## Local setup
 
 ```bash
-cd tryverse-ai-virtual-fashion
 npm install
 npm run convex:dev
 ```
 
-Link the deployment when prompted. Ensure **`tryverse-ai-virtual-fashion/.env`** (or `.env.local`) includes:
+This pushes to the local dev sandbox deployment (`pastel-setter-205` — see **`convex/README.md`**'s "Dev vs production" section for why that's the dev deployment and not, confusingly, `patient-axolotl-17` which is the real production one). Restart Vite after changes.
 
-```env
-VITE_CONVEX_URL=https://<your-deployment>.convex.cloud
-```
-
-Restart Vite after changes.
+**Never run `npx convex deploy` expecting it to reach production** — it targets `pastel-setter-205` (empty), not the real production data. Use `npm run convex:deploy:prod` for that, then `npm run convex:dev:reset` immediately after.
 
 ## Convex dashboard — environment variables
 
@@ -34,7 +29,9 @@ Optional / email:
 
 ## Scripts
 
-- `npm run convex:dev` — push schema, watch, codegen
-- `npm run convex:deploy` — production deploy
+- `npm run convex:dev` — push schema, watch, codegen (dev sandbox)
+- `npm run convex:dev:reset` — one-shot push to the dev sandbox; also fixes `.env.local` after a prod push
+- `npm run convex:deploy:prod` — the only command that reaches real production
+- `npm run convex:deploy` — inert for this project, kept for parity only (see `convex/README.md`)
 
-See **`convex/README.md`** for function layout and CLI notes.
+See **`convex/README.md`** for function layout, the full dev/prod explanation, and CLI notes.

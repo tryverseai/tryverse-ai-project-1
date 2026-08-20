@@ -1,6 +1,8 @@
 # Deploy TryVerse on **Vercel** (frontend) + **Railway** (API)
 
-Convex stays on **Convex Cloud** (deploy from the `tryverse-ai-virtual-fashion` app). This guide wires the three pieces: **Vercel UI → Railway API → Convex**.
+Convex stays on **Convex Cloud** (deploy from the repo root — the frontend/Convex code lives there directly, not in a subdirectory). This guide wires the three pieces: **Vercel UI → Railway API → Convex**.
+
+**Read `convex/README.md`'s "Dev vs production" section before touching any Convex deploy command in this project** — `npx convex deploy` does not reach real production here; use `npm run convex:deploy:prod`.
 
 ---
 
@@ -36,7 +38,7 @@ Copy from `backend/.env.example` and use **production** values:
 | `FRONTEND_URL` | Your Vercel URL, e.g. `https://tryverseai.com` |
 | `WIDGET_ALLOWED_ORIGINS` | Comma-separated, **no** `*` in prod. Include `https://tryverseai.com` and any merchant origins that embed the widget |
 | `PUBLIC_API_HOSTNAMES` | Optional; if API is on `api.tryverseai.com`, set `api.tryverseai.com` |
-| `CONVEX_URL` | Production Convex deployment URL |
+| `CONVEX_URL` | Production Convex deployment URL — `https://patient-axolotl-17.eu-west-1.convex.cloud` (see `convex/README.md` for why it's this one, not the Convex-labeled "production" deployment) |
 | `BACKEND_SHARED_SECRET` | Same secret as Convex `BACKEND_SHARED_SECRET` |
 | `REPLICATE_API_TOKEN` | Production token |
 | `FASHN_API_KEY` | If you use direct FASHN |
@@ -60,7 +62,7 @@ If you use the queue worker in production:
 ## 2. Vercel — frontend
 
 1. **Import project** from GitHub.
-2. **Root directory:** `tryverse-ai-virtual-fashion` (monorepo).
+2. **Root directory:** repo root (the frontend lives at the repo root, not a subdirectory).
 3. **Framework preset:** Vite (auto-detected).
 4. **Build command:** `npm run build` (default).
 5. **Output directory:** `dist` (Vite default).
@@ -73,7 +75,7 @@ Set these for **Production** (and Preview if you want previews to hit a staging 
 | Variable | Required | Example |
 |----------|----------|---------|
 | `VITE_BACKEND_URL` | **Yes** in production | `https://api.tryverseai.com` (no trailing slash) |
-| `VITE_CONVEX_URL` | **Yes** | Your **production** Convex URL (`npx convex deploy` target) |
+| `VITE_CONVEX_URL` | **Yes** | `https://patient-axolotl-17.eu-west-1.convex.cloud` — the real production deployment (NOT what `npx convex deploy` targets in this project; see `convex/README.md`) |
 
 **Important:** The app resolves the API URL at build time for production. If `VITE_BACKEND_URL` is missing, the built bundle can fall back to `http://localhost:3001`, which will **not** work on Vercel. Always set `VITE_BACKEND_URL` to your Railway API origin.
 
@@ -84,9 +86,9 @@ Convex Auth / `SITE_URL` are configured on **Convex** (see below), not only in V
 - With **Git connected** on the Vercel project, every **`git push` to `main`** triggers a Production deploy — no CLI or dashboard clicks on each release.
 - **Optional GitHub Actions** (`.github/workflows/vercel-frontend-deploy.yml`): add GitHub Secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`. If Vercel is *also* set to deploy on Git push, you may get **two builds** per push; disable one side if that bothers you.
 
-### Cursor terminal (local CLI deploy)
+### Local CLI deploy
 
-From `tryverse-ai-virtual-fashion`, run **`npx vercel login`** once, then **`npx vercel link`** → **`npx vercel deploy --prod`**. Alternatively set env var **`VERCEL_TOKEN`** locally (never commit it).
+From the repo root, run **`npx vercel login`** once, then **`npx vercel link`** → **`npx vercel deploy --prod`**. Alternatively set env var **`VERCEL_TOKEN`** locally (never commit it).
 
 ### Custom domain
 
@@ -96,13 +98,14 @@ In Vercel: **Domains** → add `tryverseai.com` / `www` per your DNS plan.
 
 ## 3. Convex — production deployment
 
-From `tryverse-ai-virtual-fashion`:
+**Do not run `npx convex deploy`** — in this project it targets an empty, unused deployment, not real production. From the repo root:
 
 ```bash
-npx convex deploy
+npm run convex:deploy:prod
+npm run convex:dev:reset   # always run immediately after, or .env.local is left pointing at prod
 ```
 
-Use a **production** Convex project (or promote dev → prod per Convex docs). In the **Convex dashboard → Settings → Environment variables**, set at least:
+See `convex/README.md`'s "Dev vs production" section for the full explanation. In the **Convex dashboard → Settings → Environment variables** (on the `patient-axolotl-17` deployment specifically), set at least:
 
 - `SITE_URL` — `https://tryverseai.com` (matches the live app)
 - `AUTH_RESEND_KEY` — same Resend API key pattern as backend mail

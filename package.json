@@ -9,8 +9,10 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "convex:dev": "convex dev",
+    "convex:dev": "convex dev --env-file .env.dev-sandbox",
     "convex:deploy": "convex deploy",
+    "convex:deploy:prod": "convex dev --once --env-file .env.production-convex",
+    "convex:dev:reset": "convex dev --once --env-file .env.dev-sandbox",
     "test": "vitest run",
     "test:watch": "vitest"
   },

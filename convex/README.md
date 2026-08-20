@@ -4,7 +4,7 @@ This folder is the Convex project: **`schema.ts`** defines tables; **`auth.ts`**
 
 ## One-time link
 
-From **`tryverse-ai-virtual-fashion/`**:
+From the repo root (the frontend/Convex code lives here directly, not in a subdirectory):
 
 ```bash
 npm install
@@ -32,17 +32,35 @@ Frontend **`.env`**:
 VITE_CONVEX_URL=https://<your-deployment>.convex.cloud
 ```
 
-## Dev vs production pushes
+## ⚠️ Dev vs production — read this before running any convex command
 
-- **`npx convex dev --once`** (or `npx convex dev`) pushes functions + schema to the **development** deployment in `.env.local` (`CONVEX_DEPLOYMENT=dev:…`), e.g. **patient-axolotl-17**. Use this when that’s the deployment you open in the Convex dashboard.
-- **`npx convex deploy`** pushes to your linked **production** deployment (often a different `*.convex.cloud` URL). Only use it when you intend to update prod.
+This project has an unusual, deliberate setup because of a naming mixup that happened twice (see git history). **Read this whole section before assuming what `npx convex dev` or `npx convex deploy` will do.**
 
-Keep **`backend/.env`** `CONVEX_URL` and the app **`VITE_CONVEX_URL`** / **`.env.local`** pointed at the **same** deployment you care about. **Vercel:** set **`VITE_CONVEX_URL`** and your hosted API’s **`CONVEX_URL`** to that same URL (e.g. `https://patient-axolotl-17.eu-west-1.convex.cloud`).
+| Deployment | Convex's own label | What it actually is |
+|---|---|---|
+| **`patient-axolotl-17`** | `dev:` (personal dev deployment) | **The real production database.** Railway's `CONVEX_URL` and Vercel's `VITE_CONVEX_URL` both point here. Holds all real customer data. |
+| **`pastel-setter-205`** | `prod:` (the project's official production deployment) | **Empty, repurposed as the local dev/testing sandbox.** Nothing in the live app talks to it. |
+
+Why: `patient-axolotl-17` accumulated all the real data over time (Railway/Vercel were configured to point at it), while the Convex-provisioned "official" prod deployment (`pastel-setter-205`) sat unused. Migrating the real data into the correctly-labeled deployment was judged too risky (would require a live data + file-storage migration with a cutover window) versus just documenting reality clearly and adding guardrails — which is what this section is.
+
+**NEVER run bare `npx convex dev` or `npx convex deploy` in this repo.** Always use the npm scripts below — each pins its target deployment via its own `--env-file`, rather than trusting `.env.local`.
+
+Why bare commands are unsafe here: `.env.local`'s `CONVEX_DEPLOYMENT` line is **not reliable**. Convex's CLI rewrites `.env.local` after every `convex dev`/`deploy` run, but inconsistently — sometimes it updates `VITE_CONVEX_URL` while leaving `CONVEX_DEPLOYMENT` stale (pointed at whatever deployment a *previous* command used), producing a file where the two values contradict each other. A bare `npx convex dev` reads `CONVEX_DEPLOYMENT` from that file — if it's stale and says `dev:patient-axolotl-17`, you just pushed to real production without meaning to. The npm scripts below sidestep this entirely by never reading `.env.local`'s `CONVEX_DEPLOYMENT` — each passes its own dedicated env file instead.
+
+**Commands, given that setup:**
+
+- **`npm run convex:dev`** / **`npm run convex:dev:reset`** — pushes to the dev sandbox (`pastel-setter-205`), reading `.env.dev-sandbox` (gitignored, pinned to `prod:pastel-setter-205`). Safe to break, experiment, run test-account tooling, anything. `:reset` is the one-shot form — run it any time you're not sure what `.env.local` currently says, to force it back to the sandbox.
+- **`npm run convex:deploy:prod`** — the **only** command that reaches real production (`patient-axolotl-17`). Reads `.env.production-convex` (gitignored, pinned to `dev:patient-axolotl-17`).
+- **`npx convex deploy`** (bare) — do **not** use this expecting it to reach production. Convex's `deploy` command always targets the project's *officially-typed* prod deployment (`pastel-setter-205`), which is the empty sandbox, not the real one. `npm run convex:deploy` is kept only for completeness/parity — treat it as inert for this project.
+
+**After every `npm run convex:deploy:prod`, immediately run `npm run convex:dev:reset`** — the prod push leaves `.env.local` in that inconsistent, possibly-prod-pointing state described above, and the reset forces it cleanly back to the sandbox regardless of what it currently says.
 
 ## Scripts
 
-- `npm run convex:dev` — `convex dev`
-- `npm run convex:deploy` — `convex deploy` (production deployment only)
+- `npm run convex:dev` — dev sandbox, watch mode
+- `npm run convex:dev:reset` — dev sandbox, one-shot — run after any prod push, or whenever unsure of `.env.local`'s state
+- `npm run convex:deploy:prod` — pushes to **real production** (`patient-axolotl-17`) — see warning above
+- `npm run convex:deploy` — `convex deploy` — inert for this project (see above), kept for parity only
 
 ## Implemented surface (high level)
 
