@@ -5,6 +5,7 @@ import { uploadResultBuffer, storeResultImage, getSignedUrl, RESULT_BUCKET } fro
 import { buildOutfitFlatLay } from './outfitComposite';
 import { buildOutfitPrompt } from './outfitPrompt';
 import { runFashnOutfit } from './fashn';
+import { restoreCredits } from '../credits';
 import type { OutfitJob, OutfitResult } from '../../types';
 
 /**
@@ -63,6 +64,8 @@ export async function executeOutfitPipeline(job: OutfitJob): Promise<OutfitResul
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error('Outfit pipeline failed', { jobId: job.jobId, outfitDbId: job.outfitDbId, error: message });
+
+    await restoreCredits(job.userId, job.creditAmount);
 
     try {
       await convexMutationTrusted(anyApi.backendTrusted.patchOutfitGeneration, {

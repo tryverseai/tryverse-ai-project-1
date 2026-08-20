@@ -1,8 +1,7 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Lock, ImagePlus, Download, Camera, Clock } from "lucide-react";
+import { Sparkles, ImagePlus, Download, Camera, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -11,8 +10,6 @@ import {
   generateProductModel,
   pollProductModelStatus,
 } from "@/lib/backendApi";
-import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
-import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { posthogCapture } from "@/lib/posthog";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
@@ -44,27 +41,8 @@ function ComingSoonState() {
   );
 }
 
-function LockedState({ onUpgradeClick }: { onUpgradeClick: () => void }) {
-  return (
-    <div className="text-center py-16 bg-card rounded-xl border border-border/50">
-      <div className="w-14 h-14 rounded-full bg-foreground/[0.06] flex items-center justify-center mx-auto mb-4">
-        <Lock className="h-6 w-6 text-foreground" />
-      </div>
-      <p className="text-sm font-medium text-foreground mb-1">Product Photography is an Enterprise feature</p>
-      <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-5">
-        Turn a product photo into professional on-model photography, instantly.
-      </p>
-      <Button onClick={onUpgradeClick} className="gradient-primary text-primary-foreground shadow-soft gap-2">
-        <Sparkles className="h-4 w-4" /> Unlock Enterprise
-      </Button>
-    </div>
-  );
-}
-
 export function ProductModelTab() {
-  const isEnterprise = useIsEnterprisePlan();
   const enabled = FEATURE_FLAGS.PRODUCT_MODEL_ENABLED;
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const productInputRef = useRef<HTMLInputElement>(null);
   const faceInputRef = useRef<HTMLInputElement>(null);
@@ -80,13 +58,6 @@ export function ProductModelTab() {
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<{ imageUrl: string; createdAt: string }[]>([]);
-
-  const active = enabled && isEnterprise;
-
-  const openUpgrade = () => {
-    posthogCapture("enterprise_upgrade_modal_opened", { context: "product-model", source: "product_model_tab" });
-    setUpgradeOpen(true);
-  };
 
   const handleProductFile = async (file: File | null) => {
     if (!file) return;
@@ -169,11 +140,6 @@ export function ProductModelTab() {
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
             Product Photography
-            {!isEnterprise && (
-              <Badge variant="secondary" className="gap-1">
-                <Sparkles className="h-3 w-3" /> Enterprise
-              </Badge>
-            )}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Turn a product photo into professional on-model photography — no model library needed.
@@ -183,8 +149,6 @@ export function ProductModelTab() {
 
       {!enabled ? (
         <ComingSoonState />
-      ) : !isEnterprise ? (
-        <LockedState onUpgradeClick={openUpgrade} />
       ) : (
         <div className="space-y-8">
           <div className="bg-card rounded-xl border border-border/50 shadow-card p-6 space-y-6">
@@ -315,8 +279,6 @@ export function ProductModelTab() {
           )}
         </div>
       )}
-
-      <EnterpriseUpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} context="product-model" />
     </motion.div>
   );
 }

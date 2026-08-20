@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Lock, Camera, Download, Shirt, Footprints, Clock } from "lucide-react";
+import { Sparkles, Camera, Download, Shirt, Footprints, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   getProducts,
@@ -10,8 +9,6 @@ import {
   pollOutfitStatus,
   type Product,
 } from "@/lib/backendApi";
-import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
-import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { posthogCapture } from "@/lib/posthog";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
@@ -44,23 +41,6 @@ function ComingSoonState() {
       <p className="text-xs text-muted-foreground max-w-sm mx-auto">
         We're finishing up quality testing before rolling this out.
       </p>
-    </div>
-  );
-}
-
-function LockedState({ onUpgradeClick }: { onUpgradeClick: () => void }) {
-  return (
-    <div className="text-center py-16 bg-card rounded-xl border border-border/50">
-      <div className="w-14 h-14 rounded-full bg-foreground/[0.06] flex items-center justify-center mx-auto mb-4">
-        <Lock className="h-6 w-6 text-foreground" />
-      </div>
-      <p className="text-sm font-medium text-foreground mb-1">Outfit Builder is an Enterprise feature</p>
-      <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-5">
-        Combine a top, bottom, and shoes into one complete look on a single model.
-      </p>
-      <Button onClick={onUpgradeClick} className="gradient-primary text-primary-foreground shadow-soft gap-2">
-        <Sparkles className="h-4 w-4" /> Unlock Enterprise
-      </Button>
     </div>
   );
 }
@@ -102,9 +82,7 @@ function ProductPickerGrid({
 }
 
 export function OutfitBuilderTab() {
-  const isEnterprise = useIsEnterprisePlan();
   const enabled = FEATURE_FLAGS.OUTFIT_BUILDER_ENABLED;
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const [mode, setMode] = useState<Mode>("top_bottom");
   const [selected, setSelected] = useState<Partial<Record<SlotKey, Product>>>({});
@@ -121,7 +99,7 @@ export function OutfitBuilderTab() {
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<{ imageUrl: string; createdAt: string }[]>([]);
 
-  const active = enabled && isEnterprise;
+  const active = enabled;
 
   useEffect(() => {
     if (!active) return;
@@ -146,11 +124,6 @@ export function OutfitBuilderTab() {
 
     return () => { cancelled = true; };
   }, [active]);
-
-  const openUpgrade = () => {
-    posthogCapture("enterprise_upgrade_modal_opened", { context: "outfit-builder", source: "outfit_builder_tab" });
-    setUpgradeOpen(true);
-  };
 
   const setSlot = (key: SlotKey) => (product: Product | undefined) => {
     setSelected((prev) => {
@@ -238,11 +211,6 @@ export function OutfitBuilderTab() {
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
             Outfit Builder
-            {!isEnterprise && (
-              <Badge variant="secondary" className="gap-1">
-                <Sparkles className="h-3 w-3" /> Enterprise
-              </Badge>
-            )}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Style a complete look — combine products from your catalog onto one model.
@@ -252,8 +220,6 @@ export function OutfitBuilderTab() {
 
       {!enabled ? (
         <ComingSoonState />
-      ) : !isEnterprise ? (
-        <LockedState onUpgradeClick={openUpgrade} />
       ) : (
         <div className="space-y-8">
           <div className="bg-card rounded-xl border border-border/50 shadow-card p-6 space-y-6">
@@ -388,8 +354,6 @@ export function OutfitBuilderTab() {
           )}
         </div>
       )}
-
-      <EnterpriseUpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} context="outfit-builder" />
     </motion.div>
   );
 }

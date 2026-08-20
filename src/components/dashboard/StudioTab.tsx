@@ -31,8 +31,7 @@ import {
 } from "@/lib/backendApi";
 import { TryOnGuidelinesModal, hasSeenTryOnGuidelines } from "@/components/TryOnGuidelinesModal";
 import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
-import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
-import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
+import { useIsFreePlan } from "@/hooks/useIsFreePlan";
 import { Film } from "lucide-react";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
 import { StudioEntry } from "@/components/dashboard/studio/StudioEntry";
@@ -186,8 +185,7 @@ export function StudioTab() {
   const [resultTryonId, setResultTryonId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
-  const isEnterprise = useIsEnterprisePlan();
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const isFreePlan = useIsFreePlan();
   const [videoStatus, setVideoStatus] = useState<"idle" | "generating" | "done" | "error">("idle");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
@@ -330,8 +328,8 @@ export function StudioTab() {
   };
 
   const handleGenerateVideo = async () => {
-    if (!isEnterprise) {
-      setUpgradeOpen(true);
+    if (isFreePlan) {
+      toast.error("AI Video requires a paid plan.", { description: "Upgrade in Billing to unlock video generation." });
       return;
     }
     if (!resultTryonId) return;
@@ -606,7 +604,6 @@ export function StudioTab() {
         }}
         source="studio_tab"
       />
-      <EnterpriseUpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} context="video" />
     </div>
   );
 }

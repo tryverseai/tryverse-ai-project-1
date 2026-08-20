@@ -10,8 +10,33 @@ import {
   cxGetUserRow,
   cxGetPlan,
   cxReserveCredit,
+  cxRestoreCredit,
   type ConvexProfileRow,
 } from './creditsConvexBridge';
+
+/**
+ * TryVerse-credit cost per AI operation. Derived from FASHN's real per-operation credit costs
+ * (confirmed against docs.fashn.ai, Aug 2026) at ~$0.07/FASHN-credit blended, sized so existing
+ * plan pools (Free 10, Starter 150, Growth 750) carry healthy margin without needing to be
+ * inflated: Starter's 150-credit pool costs ~$10.50 in FASHN COGS against $150 revenue.
+ */
+export const CREDIT_COSTS = {
+  tryOn: 1,
+  outfit: 2,
+  aiModel: 2,
+  aiModelFaceRef: 4,
+  photoshoot: 2,
+  photoshootFaceRef: 4,
+  video: {
+    '480p': { 5: 1, 10: 2 },
+    '720p': { 5: 2, 10: 4 },
+    '1080p': { 5: 3, 10: 6 },
+  } as Record<'480p' | '720p' | '1080p', Record<5 | 10, number>>,
+} as const;
+
+export function videoCreditCost(resolution: '480p' | '720p' | '1080p', duration: 5 | 10): number {
+  return CREDIT_COSTS.video[resolution][duration];
+}
 
 const LOW_CREDITS_THRESHOLD = 5;
 
@@ -41,7 +66,7 @@ export const SHOPPER_TRYON_UNAVAILABLE_MESSAGE =
 export const DEFAULT_FREE_CREDITS_INDIVIDUAL = 5;
 
 /** B2B / brand free try-on pool on free plan. */
-export const DEFAULT_FREE_CREDITS_BUSINESS = 20;
+export const DEFAULT_FREE_CREDITS_BUSINESS = 10;
 
 /**
  * @deprecated Use {@link DEFAULT_FREE_CREDITS_BUSINESS} or {@link freePoolCapForAccountType}.
@@ -299,7 +324,7 @@ async function buildCreditProfile(userId: string): Promise<ConvexProfileRow | nu
  * Priority: monthly credits (paid plan) > free credits.
  * Enterprise bypasses all checks.
  */
-export async function checkCredits(userId: string): Promise<CreditCheckResult> {
+export async function checkCredits(userId: string, amount = 1): Promise<CreditCheckResult> {
   if (env.NODE_ENV !== 'production' && env.TRYON_SKIP_CREDIT_CHECK) {
     logger.warn('Try-on credit check skipped (TRYON_SKIP_CREDIT_CHECK)', { userId });
     return { allowed: true, creditsRemaining: 999999, creditType: 'monthly' };
@@ -324,44 +349,42 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
   }
 
   // Fast-path: credits already exhausted — skip the reservation mutation
-  const hasPaidCredits = Boolean(pf.plan_id && pf.plan_id !== 'free' && pf.monthly_credits_remaining > 0);
-  const hasFreeCredits = pf.free_credits_remaining > 0;
+  const hasPaidCredits = Boolean(pf.plan_id && pf.plan_id !== 'free' && pf.monthly_credits_remaining >= amount);
+  const hasFreeCredits = pf.free_credits_remaining >= amount;
 
   if (!hasPaidCredits && !hasFreeCredits) {
     if (pf.plan_id && pf.plan_id !== 'free') {
       return {
         allowed: false,
-        creditsRemaining: 0,
+        creditsRemaining: pf.monthly_credits_remaining,
         creditType: 'monthly',
-        reason:
-          'Your plan try-on credits are used up. Add more in Billing, or wait for your monthly reset. (This is separate from your Replicate account balance.)',
+        reason: 'Your plan credits are used up. Add more in Billing, or wait for your monthly reset.',
       };
     }
     return {
       allowed: false,
-      creditsRemaining: 0,
+      creditsRemaining: pf.free_credits_remaining,
       creditType: 'free',
-      reason:
-        'Your TryVerse try-on credits are used up (free tier is limited). Subscribe or upgrade in Billing for more. Note: your Replicate API wallet is separate and does not refill TryVerse credits.',
+      reason: 'Your free credits are used up. Upgrade in Billing for more.',
     };
   }
 
   // M-5: Atomically reserve (decrement) the credit inside a Convex mutation.
   // Because Convex mutations are serialized at the document level, two concurrent
-  // requests cannot both succeed when only one credit remains — eliminating the
-  // read-then-check overdraft race.
+  // requests cannot both succeed when only `amount` or fewer credits remain — eliminating
+  // the read-then-check overdraft race.
   // NOTE: The credit is now decremented here. Do NOT call decrementCredits in the
   // pipeline for requests that go through this path; only restoreCredits on failure.
   let reservation: Awaited<ReturnType<typeof cxReserveCredit>>;
   try {
-    reservation = await cxReserveCredit(userId);
+    reservation = await cxReserveCredit(userId, amount);
   } catch (e) {
-    logger.error('Atomic credit reservation failed', { userId, error: String(e) });
+    logger.error('Atomic credit reservation failed', { userId, amount, error: String(e) });
     return { allowed: false, creditsRemaining: 0, creditType: hasPaidCredits ? 'monthly' : 'free', reason: 'Credit reservation error' };
   }
 
   if (!reservation.ok) {
-    // Another concurrent request grabbed the last credit between our fast-path check and the mutation
+    // Another concurrent request grabbed the credits between our fast-path check and the mutation
     return {
       allowed: false,
       creditsRemaining: 0,
@@ -371,8 +394,8 @@ export async function checkCredits(userId: string): Promise<CreditCheckResult> {
   }
 
   const creditsAfterReserve = hasPaidCredits
-    ? pf.monthly_credits_remaining - 1
-    : pf.free_credits_remaining - 1;
+    ? pf.monthly_credits_remaining - amount
+    : pf.free_credits_remaining - amount;
 
   return {
     allowed: true,
@@ -436,33 +459,15 @@ export async function decrementCredits(userId: string): Promise<void> {
 }
 
 /**
- * Restores a credit after AI inference failure.
- * Only call when a credit was incorrectly deducted or to undo a deduction.
+ * Restores `amount` credits after AI inference failure (atomic — mirrors the reservation).
+ * Only call when credits were reserved by `checkCredits` and the generation then failed.
  */
-export async function restoreCredits(userId: string): Promise<void> {
-  const profile = await cxGetProfile(userId);
-
-  if (!profile || profile.monthly_credits_total === -1) return;
-
-  let updatePayload: Record<string, number> = {};
-  const planId = String(profile.plan_id ?? '');
-  const monthlyRem = Number(profile.monthly_credits_remaining ?? 0);
-  const monthlyTot = Number(profile.monthly_credits_total ?? 0);
-  const freeRem = Number(profile.free_credits_remaining ?? 0);
-  const freeTot = Number(profile.free_credits_total ?? 0);
-  if (planId && planId !== 'free' && monthlyRem < monthlyTot) {
-    updatePayload = { monthly_credits_remaining: monthlyRem + 1 };
-  } else if (freeRem < freeTot) {
-    updatePayload = { free_credits_remaining: freeRem + 1 };
-  }
-
-  if (Object.keys(updatePayload).length > 0) {
-    try {
-      await cxPatchProfile(userId, updatePayload);
-      logger.info('Credit restored (AI failure)', { userId });
-    } catch {
-      /* ignore */
-    }
+export async function restoreCredits(userId: string, amount = 1): Promise<void> {
+  try {
+    await cxRestoreCredit(userId, amount);
+    logger.info('Credit restored (AI failure)', { userId, amount });
+  } catch (e) {
+    logger.warn('Credit restore failed', { userId, amount, error: String(e) });
   }
 }
 

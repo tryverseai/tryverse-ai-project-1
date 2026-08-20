@@ -85,6 +85,8 @@ export interface OutfitJob {
   jobId: string;
   userId: string;
   outfitDbId: string;
+  /** TryVerse credits reserved for this job — restored via restoreCredits() on failure. */
+  creditAmount: number;
   modelImageUrl: string;
   slotImageUrls: {
     top?: string;
@@ -119,6 +121,8 @@ export interface ProductModelJob {
   jobId: string;
   userId: string;
   generationDbId: string;
+  /** TryVerse credits reserved for this job — restored via restoreCredits() on failure. */
+  creditAmount: number;
   productImageUrl: string;
   faceReferenceUrl?: string;
   prompt?: string;
@@ -140,6 +144,8 @@ export interface VideoJob {
   jobId: string;
   userId: string;
   generationDbId: string;
+  /** TryVerse credits reserved for this job — restored via restoreCredits() on failure. */
+  creditAmount: number;
   sourceImageUrl: string;
   prompt?: string;
   duration: 5 | 10;

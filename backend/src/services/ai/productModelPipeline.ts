@@ -3,6 +3,7 @@ import { logger } from '../../config/logger';
 import { anyApi, convexMutationTrusted } from '../../config/convexHttp';
 import { storeResultImage } from '../storage/images';
 import { runFashnProductToModel } from './fashn';
+import { restoreCredits } from '../credits';
 import type { ProductModelJob, ProductModelResult } from '../../types';
 
 /**
@@ -49,6 +50,8 @@ export async function executeProductModelPipeline(job: ProductModelJob): Promise
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error('Product-model pipeline failed', { jobId: job.jobId, generationDbId: job.generationDbId, error: message });
+
+    await restoreCredits(job.userId, job.creditAmount);
 
     try {
       await convexMutationTrusted(anyApi.backendTrusted.patchProductModelGeneration, {

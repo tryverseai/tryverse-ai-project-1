@@ -1,8 +1,7 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Lock, ImagePlus, Download, Film, Clock } from "lucide-react";
+import { Sparkles, ImagePlus, Download, Film, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,8 +17,7 @@ import {
   generateVideo,
   pollVideoStatus,
 } from "@/lib/backendApi";
-import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
-import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
+import { useIsFreePlan } from "@/hooks/useIsFreePlan";
 import { posthogCapture } from "@/lib/posthog";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
@@ -62,27 +60,9 @@ function ComingSoonState() {
   );
 }
 
-function LockedState({ onUpgradeClick }: { onUpgradeClick: () => void }) {
-  return (
-    <div className="text-center py-16 bg-card rounded-xl border border-border/50">
-      <div className="w-14 h-14 rounded-full bg-foreground/[0.06] flex items-center justify-center mx-auto mb-4">
-        <Lock className="h-6 w-6 text-foreground" />
-      </div>
-      <p className="text-sm font-medium text-foreground mb-1">AI Video is an Enterprise feature</p>
-      <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-5">
-        Animate a still image into a short clip for social and ads.
-      </p>
-      <Button onClick={onUpgradeClick} className="gradient-primary text-primary-foreground shadow-soft gap-2">
-        <Sparkles className="h-4 w-4" /> Unlock Enterprise
-      </Button>
-    </div>
-  );
-}
-
 export function VideoTab() {
-  const isEnterprise = useIsEnterprisePlan();
+  const isFreePlan = useIsFreePlan();
   const enabled = FEATURE_FLAGS.VIDEO_ENABLED;
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sourcePreview, setSourcePreview] = useState<string | null>(null);
@@ -95,13 +75,6 @@ export function VideoTab() {
 
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<{ videoUrl: string; createdAt: string }[]>([]);
-
-  const active = enabled && isEnterprise;
-
-  const openUpgrade = () => {
-    posthogCapture("enterprise_upgrade_modal_opened", { context: "video", source: "video_tab" });
-    setUpgradeOpen(true);
-  };
 
   const handleFile = async (file: File | null) => {
     if (!file) return;
@@ -121,6 +94,10 @@ export function VideoTab() {
   const handleGenerate = async () => {
     if (!sourcePath) {
       toast.error("Upload a source image first");
+      return;
+    }
+    if (isFreePlan) {
+      toast.error("AI Video requires a paid plan.", { description: "Upgrade in Billing to unlock video generation." });
       return;
     }
     setGenerating(true);
@@ -173,22 +150,16 @@ export function VideoTab() {
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
             AI Video
-            {!isEnterprise && (
-              <Badge variant="secondary" className="gap-1">
-                <Sparkles className="h-3 w-3" /> Enterprise
-              </Badge>
-            )}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Motion Studio — turn a still image into a short clip for social and ads.
+            {isFreePlan && " Requires a paid plan."}
           </p>
         </div>
       </div>
 
       {!enabled ? (
         <ComingSoonState />
-      ) : !isEnterprise ? (
-        <LockedState onUpgradeClick={openUpgrade} />
       ) : (
         <div className="space-y-8">
           <div className="bg-card rounded-xl border border-border/50 shadow-card p-6 space-y-6">
@@ -307,8 +278,6 @@ export function VideoTab() {
           )}
         </div>
       )}
-
-      <EnterpriseUpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} context="video" />
     </motion.div>
   );
 }

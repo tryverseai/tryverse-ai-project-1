@@ -1,8 +1,7 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Lock, Upload, ImagePlus, Camera, Download } from "lucide-react";
+import { Sparkles, Upload, ImagePlus, Camera, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -13,8 +12,6 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { uploadImage, generateProductPhotoshoot } from "@/lib/backendApi";
-import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
-import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { posthogCapture } from "@/lib/posthog";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
 import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
@@ -33,26 +30,7 @@ const THEME_OPTIONS = ["Contemporary catalog", "Luxury editorial", "Streetwear",
 const LIGHTING_OPTIONS = ["Soft studio", "Bright daylight", "Dramatic contrast", "Golden hour"];
 const BACKGROUND_OPTIONS = ["Clean neutral", "Studio white", "Textured backdrop", "Urban street", "Outdoor"];
 
-function LockedState({ onUpgradeClick }: { onUpgradeClick: () => void }) {
-  return (
-    <div className="text-center py-16 bg-card rounded-xl border border-border/50">
-      <div className="w-14 h-14 rounded-full bg-foreground/[0.06] flex items-center justify-center mx-auto mb-4">
-        <Lock className="h-6 w-6 text-foreground" />
-      </div>
-      <p className="text-sm font-medium text-foreground mb-1">AI Product Photoshoot is an Enterprise feature</p>
-      <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-5">
-        Upload a product photo and shoot it on any model in your library — no studio required.
-      </p>
-      <Button onClick={onUpgradeClick} className="gradient-primary text-primary-foreground shadow-soft gap-2">
-        <Sparkles className="h-4 w-4" /> Unlock Enterprise
-      </Button>
-    </div>
-  );
-}
-
 export function AiPhotoshootTab() {
-  const isEnterprise = useIsEnterprisePlan();
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [productFile, setProductFile] = useState<File | null>(null);
@@ -68,11 +46,6 @@ export function AiPhotoshootTab() {
 
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<{ imageUrl: string; createdAt: string }[]>([]);
-
-  const openUpgrade = () => {
-    posthogCapture("enterprise_upgrade_modal_opened", { context: "photoshoot", source: "ai_photoshoot_tab" });
-    setUpgradeOpen(true);
-  };
 
   const handleFileChange = async (file: File | null) => {
     if (!file) return;
@@ -125,11 +98,6 @@ export function AiPhotoshootTab() {
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
             AI Product Photoshoot
-            {!isEnterprise && (
-              <Badge variant="secondary" className="gap-1">
-                <Sparkles className="h-3 w-3" /> Enterprise
-              </Badge>
-            )}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Create campaign-ready imagery — upload a product, pick a model, set the scene.
@@ -137,10 +105,7 @@ export function AiPhotoshootTab() {
         </div>
       </div>
 
-      {!isEnterprise ? (
-        <LockedState onUpgradeClick={openUpgrade} />
-      ) : (
-        <div className="space-y-8">
+      <div className="space-y-8">
           <div className="bg-card rounded-xl border border-border/50 shadow-card p-6 space-y-6">
             {/* Step 1: product upload */}
             <div>
@@ -274,10 +239,7 @@ export function AiPhotoshootTab() {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      <EnterpriseUpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} context="photoshoot" />
+      </div>
     </motion.div>
   );
 }

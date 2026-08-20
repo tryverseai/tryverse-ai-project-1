@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Lock, Wand2, Trash2, RefreshCw, Users, Film, Loader2 } from "lucide-react";
+import { Sparkles, Wand2, Trash2, RefreshCw, Users, Film, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
@@ -12,8 +11,7 @@ import {
   pollVideoStatus,
   type AiModelResult,
 } from "@/lib/backendApi";
-import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
-import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
+import { useIsFreePlan } from "@/hooks/useIsFreePlan";
 import { posthogCapture } from "@/lib/posthog";
 import { EmptyState } from "@/components/EmptyState";
 import { ModelPortrait } from "@/components/ModelPortrait";
@@ -21,26 +19,8 @@ import { ModelPortrait } from "@/components/ModelPortrait";
 const PROMPT_EXAMPLE =
   "Professional African fashion model, female, age 28, dark skin, studio lighting, luxury editorial fashion campaign.";
 
-function LockedState({ onUpgradeClick }: { onUpgradeClick: () => void }) {
-  return (
-    <div className="text-center py-16 bg-card rounded-xl border border-border/50">
-      <div className="w-14 h-14 rounded-full bg-foreground/[0.06] flex items-center justify-center mx-auto mb-4">
-        <Lock className="h-6 w-6 text-foreground" />
-      </div>
-      <p className="text-sm font-medium text-foreground mb-1">AI Model Studio is an Enterprise feature</p>
-      <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-5">
-        Create campaign-ready digital talent for your brand and reuse them across every try-on.
-      </p>
-      <Button onClick={onUpgradeClick} className="gradient-primary text-primary-foreground shadow-soft gap-2">
-        <Sparkles className="h-4 w-4" /> Unlock Enterprise
-      </Button>
-    </div>
-  );
-}
-
 export function AiModelsTab() {
-  const isEnterprise = useIsEnterprisePlan();
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const isFreePlan = useIsFreePlan();
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [models, setModels] = useState<AiModelResult[]>([]);
@@ -50,7 +30,6 @@ export function AiModelsTab() {
   >({});
 
   useEffect(() => {
-    if (!isEnterprise) return;
     let cancelled = false;
     setModelsLoading(true);
     getSavedAiModels()
@@ -58,12 +37,7 @@ export function AiModelsTab() {
       .catch(() => { if (!cancelled) setModels([]); })
       .finally(() => { if (!cancelled) setModelsLoading(false); });
     return () => { cancelled = true; };
-  }, [isEnterprise]);
-
-  const openUpgrade = () => {
-    posthogCapture("enterprise_upgrade_modal_opened", { context: "models", source: "ai_models_tab" });
-    setUpgradeOpen(true);
-  };
+  }, []);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -83,6 +57,10 @@ export function AiModelsTab() {
   };
 
   const handleGenerateVideo = async (modelId: string) => {
+    if (isFreePlan) {
+      toast.error("AI Video requires a paid plan.", { description: "Upgrade in Billing to unlock video generation." });
+      return;
+    }
     setVideoByModel((prev) => ({ ...prev, [modelId]: { status: "generating" } }));
     try {
       const started = await generateVideo({ modelId, modelSource: "generated" });
@@ -117,11 +95,6 @@ export function AiModelsTab() {
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
             AI Model Studio
-            {!isEnterprise && (
-              <Badge variant="secondary" className="gap-1">
-                <Sparkles className="h-3 w-3" /> Enterprise
-              </Badge>
-            )}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Build campaign-ready digital talent, on demand.
@@ -129,10 +102,7 @@ export function AiModelsTab() {
         </div>
       </div>
 
-      {!isEnterprise ? (
-        <LockedState onUpgradeClick={openUpgrade} />
-      ) : (
-        <div className="space-y-8">
+      <div className="space-y-8">
           <div className="bg-card rounded-xl border border-border/50 shadow-card p-6">
             <h3 className="font-display text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
               <Wand2 className="h-4 w-4" /> Describe your model
@@ -220,10 +190,7 @@ export function AiModelsTab() {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      <EnterpriseUpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} context="models" />
+      </div>
     </motion.div>
   );
 }

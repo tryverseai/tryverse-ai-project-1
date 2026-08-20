@@ -1,7 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { body, matchedData } from 'express-validator';
-import { requireAuth } from '../middleware/auth';
-import { requirePlan } from '../middleware/requirePlan';
+import { requireAuth, convexProfileCreditLookupKey } from '../middleware/auth';
 import { handleValidationErrors } from '../middleware/validate';
 import { generalRateLimit } from '../middleware/rateLimiter';
 import { AppError } from '../middleware/errorHandler';
@@ -24,9 +23,37 @@ import { enqueueVideoJob, getVideoQueue } from '../services/queue/videoProducer'
 import { executeOutfitPipeline } from '../services/ai/outfitPipeline';
 import { executeProductModelPipeline } from '../services/ai/productModelPipeline';
 import { executeVideoPipeline } from '../services/ai/videoPipeline';
+import { checkCredits, restoreCredits, getPlanId, CREDIT_COSTS, videoCreditCost } from '../services/credits';
 import type { OutfitJob, ProductModelJob, VideoJob } from '../types';
 
 const router = Router();
+
+/**
+ * Reserves `amount` TryVerse credits for an AI-generation request. All four generators here
+ * (Model Studio, Photoshoot, Outfit, Video) share this gate instead of the old Enterprise-only
+ * plan check — access is now metered by credits (available on every plan, including Free) rather
+ * than locked to one tier. Throws a 402 AppError with the reason on insufficient credits.
+ */
+async function reserveGenerationCredits(req: Request, amount: number): Promise<void> {
+  const userId = convexProfileCreditLookupKey(req);
+  const result = await checkCredits(userId, amount);
+  if (!result.allowed) {
+    throw new AppError(result.reason || 'Not enough credits for this generation', 402, 'INSUFFICIENT_CREDITS');
+  }
+}
+
+/** AI Video is not available on the Free plan (enforced server-side, not just hidden in the UI). */
+async function blockFreePlanVideo(req: Request): Promise<void> {
+  const userId = convexProfileCreditLookupKey(req);
+  const planId = await getPlanId(userId);
+  if (planId === 'free') {
+    throw new AppError(
+      'AI Video requires a paid plan. Upgrade in Billing to unlock video generation.',
+      403,
+      'VIDEO_REQUIRES_UPGRADE'
+    );
+  }
+}
 
 /** Resolves a product's `image_url` (may be an external URL or an internal storage path) to a fetchable HTTPS URL. */
 async function resolveProductImageUrl(imageUrl: string): Promise<string> {
@@ -34,28 +61,33 @@ async function resolveProductImageUrl(imageUrl: string): Promise<string> {
   return getSignedUrl(INPUT_BUCKET, imageUrl);
 }
 
-// ─── Generate AI Model (Enterprise) ─────────────────────────────────────────
-// Real Replicate wiring, gated end-to-end: requireAuth + requirePlan('enterprise') runs on the
-// server regardless of what the frontend shows, matching backend/src/middleware/requirePlan.ts's
-// documented pattern. Generation is deliberately NOT invoked in bulk anywhere in this codebase —
-// each call is a paying Enterprise customer's own action and consumes real Replicate credits.
+// ─── Generate AI Model ───────────────────────────────────────────────────────
+// Metered by credits (CREDIT_COSTS.aiModel) rather than plan-gated — available on every plan,
+// including Free, self-limited by each plan's credit pool. Server-side credit check runs
+// regardless of what the frontend shows.
 
 router.post(
   '/models/generate',
   generalRateLimit,
   requireAuth,
-  requirePlan('enterprise'),
   [body('prompt').isString().trim().notEmpty().isLength({ max: 500 })],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const userId = req.user!.id;
     try {
-      const userId = req.user!.id;
+      await reserveGenerationCredits(req, CREDIT_COSTS.aiModel);
       const params = matchedData(req) as { prompt: string };
       const result = await generateAndSaveAiModel(userId, params);
       res.json(result);
     } catch (err) {
       logger.error('AI model generation failed', { error: err instanceof Error ? err.message : String(err) });
-      next(err instanceof AppError ? err : new AppError('Could not generate the AI model right now', 502));
+      if (err instanceof AppError) {
+        if (err.code !== 'INSUFFICIENT_CREDITS') await restoreCredits(userId, CREDIT_COSTS.aiModel);
+        next(err);
+        return;
+      }
+      await restoreCredits(userId, CREDIT_COSTS.aiModel);
+      next(new AppError('Could not generate the AI model right now', 502));
     }
   }
 );
@@ -63,7 +95,6 @@ router.post(
 router.get(
   '/models',
   requireAuth,
-  requirePlan('enterprise'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const models = await listSavedAiModels(req.user!.id);
@@ -77,7 +108,6 @@ router.get(
 router.delete(
   '/models/:id',
   requireAuth,
-  requirePlan('enterprise'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       await archiveSavedAiModel(req.user!.id, String(req.params.id));
@@ -88,15 +118,15 @@ router.delete(
   }
 );
 
-// ─── AI Product Photoshoot (Enterprise) ─────────────────────────────────────
+// ─── AI Product Photoshoot ───────────────────────────────────────────────────
 // Flow: brand uploads a product photo (via the existing /api/upload), then picks a model from
-// the stock library or their own saved AI-generated models to shoot it on.
+// the stock library or their own saved AI-generated models to shoot it on. Metered by credits,
+// available on every plan.
 
 router.post(
   '/photoshoot/generate',
   generalRateLimit,
   requireAuth,
-  requirePlan('enterprise'),
   [
     body('productStoragePath').isString().trim().notEmpty(),
     body('modelId').isString().trim().notEmpty(),
@@ -107,8 +137,9 @@ router.post(
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const userId = req.user!.id;
     try {
-      const userId = req.user!.id;
+      await reserveGenerationCredits(req, CREDIT_COSTS.photoshoot);
       const params = matchedData(req) as {
         productStoragePath: string;
         modelId: string;
@@ -124,18 +155,25 @@ router.post(
       res.json(result);
     } catch (err) {
       logger.error('Product photoshoot failed', { error: err instanceof Error ? err.message : String(err) });
-      next(err instanceof AppError ? err : new AppError('Could not generate the photoshoot right now', 502));
+      if (err instanceof AppError) {
+        if (err.code !== 'INSUFFICIENT_CREDITS') await restoreCredits(userId, CREDIT_COSTS.photoshoot);
+        next(err);
+        return;
+      }
+      await restoreCredits(userId, CREDIT_COSTS.photoshoot);
+      next(new AppError('Could not generate the photoshoot right now', 502));
     }
   }
 );
 
-// ─── Outfit Builder (Enterprise) ────────────────────────────────────────────
+// ─── Outfit Builder ──────────────────────────────────────────────────────────
 // Composites the brand's selected products (top+bottom-or-one-piece, optional shoes/outerwear)
 // into one flat-lay image, then runs FASHN Try-On Max on it — the same mechanism proven by hand
 // (multiple garments combined into one picture-frame image + a prompt), not multiple API inputs.
 // Async/queued (its own `outfit-jobs` Bull queue, isolated from `tryon-jobs`) since Try-On Max can
 // take as long as the existing single-garment FASHN path (up to POLL_TIMEOUT_MS), which is too
-// long to hold open a synchronous HTTP request/proxy connection for.
+// long to hold open a synchronous HTTP request/proxy connection for. Metered by credits, available
+// on every plan.
 
 const OUTFIT_SLOT_FIELDS = ['top', 'bottom', 'one_piece', 'shoes', 'outerwear'] as const;
 
@@ -143,7 +181,6 @@ router.post(
   '/outfit/generate',
   generalRateLimit,
   requireAuth,
-  requirePlan('enterprise'),
   [
     body('modelId').isString().trim().notEmpty(),
     body('modelSource').isIn(['library', 'generated']),
@@ -152,8 +189,13 @@ router.post(
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const userId = req.user!.id;
+    const creditAmount = CREDIT_COSTS.outfit;
+    let creditsReserved = false;
     try {
-      const userId = req.user!.id;
+      await reserveGenerationCredits(req, creditAmount);
+      creditsReserved = true;
+
       const params = matchedData(req) as {
         modelId: string;
         modelSource: 'library' | 'generated';
@@ -201,6 +243,7 @@ router.post(
         jobId,
         userId,
         outfitDbId,
+        creditAmount,
         modelImageUrl,
         slotImageUrls,
         slotLabels,
@@ -232,6 +275,9 @@ router.post(
       res.json({ outfitId: outfitDbId, jobId, status: result.status, resultUrl, error: result.error });
     } catch (err) {
       logger.error('Outfit generation failed', { error: err instanceof Error ? err.message : String(err) });
+      // Job was never queued/run (failed before reaching the pipeline) — the pipeline handles
+      // its own restore once a job actually starts running, so only restore here.
+      if (creditsReserved) await restoreCredits(userId, creditAmount);
       next(err instanceof AppError ? err : new AppError('Could not start the outfit generation right now', 502));
     }
   }
@@ -240,7 +286,6 @@ router.post(
 router.get(
   '/outfit/:outfitId',
   requireAuth,
-  requirePlan('enterprise'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user!.id;
@@ -283,17 +328,17 @@ router.get(
   }
 );
 
-// ─── AI Model Studio (Enterprise) ───────────────────────────────────────────
+// ─── AI Model Studio ─────────────────────────────────────────────────────────
 // Uploads a flat-lay/ghost-mannequin product photo and generates a professional on-model shot via
 // FASHN product-to-model. Unlike AI Product Photoshoot (product + a specific saved model photo),
 // this generates the person itself — optionally guided by a face reference for identity. Async/
-// queued (its own `product-model-jobs` queue), same reasoning as the Outfit Builder above.
+// queued (its own `product-model-jobs` queue), same reasoning as the Outfit Builder above. Metered
+// by credits; face reference costs more (matches FASHN's own +3-credit identity-lock surcharge).
 
 router.post(
   '/product-model/generate',
   generalRateLimit,
   requireAuth,
-  requirePlan('enterprise'),
   [
     body('productStoragePath').isString().trim().notEmpty(),
     body('faceReferenceStoragePath').optional().isString().trim().notEmpty(),
@@ -301,13 +346,20 @@ router.post(
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const userId = req.user!.id;
+    const params = matchedData(req) as {
+      productStoragePath: string;
+      faceReferenceStoragePath?: string;
+      prompt?: string;
+    };
+    const creditAmount = params.faceReferenceStoragePath
+      ? CREDIT_COSTS.photoshootFaceRef
+      : CREDIT_COSTS.photoshoot;
+    let creditsReserved = false;
     try {
-      const userId = req.user!.id;
-      const params = matchedData(req) as {
-        productStoragePath: string;
-        faceReferenceStoragePath?: string;
-        prompt?: string;
-      };
+      await reserveGenerationCredits(req, creditAmount);
+      creditsReserved = true;
+
       if (!params.productStoragePath.startsWith(`${userId}/`)) {
         throw new AppError('Product image does not belong to this account', 403);
       }
@@ -332,6 +384,7 @@ router.post(
       const job: ProductModelJob = {
         jobId,
         userId,
+        creditAmount,
         generationDbId,
         productImageUrl,
         faceReferenceUrl,
@@ -362,6 +415,7 @@ router.post(
       res.json({ generationId: generationDbId, jobId, status: result.status, resultUrl, error: result.error });
     } catch (err) {
       logger.error('AI Model Studio generation failed', { error: err instanceof Error ? err.message : String(err) });
+      if (creditsReserved) await restoreCredits(userId, creditAmount);
       next(err instanceof AppError ? err : new AppError('Could not start generation right now', 502));
     }
   }
@@ -370,7 +424,6 @@ router.post(
 router.get(
   '/product-model/:id',
   requireAuth,
-  requirePlan('enterprise'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user!.id;
@@ -413,17 +466,16 @@ router.get(
   }
 );
 
-// ─── AI Video (Enterprise) ───────────────────────────────────────────────────
+// ─── AI Video ─────────────────────────────────────────────────────────────────
 // Animates a still image (any upload — a try-on result, a photoshoot/outfit result the brand
 // downloaded and re-uploaded, or any product image) into a short clip via FASHN image-to-video.
-// Real per-credit cost (480p=1, 720p=3, 1080p=6, x2 for 10s) — same Enterprise gate + dark-ship
-// flag as every other feature here, own isolated `video-jobs` queue.
+// Not available on the Free plan (enforced server-side below, not just hidden in the UI). Real
+// per-credit cost (480p=1, 720p=2, 1080p=3 at 5s; x2 at 10s) — own isolated `video-jobs` queue.
 
 router.post(
   '/video/generate',
   generalRateLimit,
   requireAuth,
-  requirePlan('enterprise'),
   [
     // Exactly one source: a fresh upload, an existing try-on result, or a saved/library AI model.
     body('sourceStoragePath').optional().isString().trim().notEmpty(),
@@ -436,17 +488,24 @@ router.post(
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const userId = req.user!.id;
+    const params = matchedData(req) as {
+      sourceStoragePath?: string;
+      tryonId?: string;
+      modelId?: string;
+      modelSource?: 'library' | 'generated';
+      prompt?: string;
+      duration?: 5 | 10;
+      resolution?: '480p' | '720p' | '1080p';
+    };
+    const duration = params.duration ?? 5;
+    const resolution = params.resolution ?? '1080p';
+    const creditAmount = videoCreditCost(resolution, duration);
+    let creditsReserved = false;
     try {
-      const userId = req.user!.id;
-      const params = matchedData(req) as {
-        sourceStoragePath?: string;
-        tryonId?: string;
-        modelId?: string;
-        modelSource?: 'library' | 'generated';
-        prompt?: string;
-        duration?: 5 | 10;
-        resolution?: '480p' | '720p' | '1080p';
-      };
+      await blockFreePlanVideo(req);
+      await reserveGenerationCredits(req, creditAmount);
+      creditsReserved = true;
 
       const sourceCount = [params.sourceStoragePath, params.tryonId, params.modelId].filter(Boolean).length;
       if (sourceCount !== 1) {
@@ -477,9 +536,6 @@ router.post(
         sourceImageUrl = await resolveModelUrl(userId, params.modelId!, params.modelSource);
       }
 
-      const duration = params.duration ?? 5;
-      const resolution = params.resolution ?? '1080p';
-
       const { id: generationDbId } = (await convexMutationTrusted(anyApi.backendTrusted.insertVideoGeneration, {
         secret: env.BACKEND_SHARED_SECRET,
         userId,
@@ -494,6 +550,7 @@ router.post(
         jobId,
         userId,
         generationDbId,
+        creditAmount,
         sourceImageUrl,
         prompt: params.prompt,
         duration,
@@ -524,6 +581,7 @@ router.post(
       res.json({ generationId: generationDbId, jobId, status: result.status, resultUrl, error: result.error });
     } catch (err) {
       logger.error('AI Video generation failed', { error: err instanceof Error ? err.message : String(err) });
+      if (creditsReserved) await restoreCredits(userId, creditAmount);
       next(err instanceof AppError ? err : new AppError('Could not start video generation right now', 502));
     }
   }
@@ -532,7 +590,6 @@ router.post(
 router.get(
   '/video/:id',
   requireAuth,
-  requirePlan('enterprise'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user!.id;

@@ -6,6 +6,8 @@ import { Check, ArrowRight, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import {
   initializePaystackPayment,
   initializeFlutterwavePayment,
@@ -244,13 +246,20 @@ const Pricing = () => {
   const navigate = useNavigate();
   const [audience] = useState<PricingAudience>("business");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
-  const [plansLoading, setPlansLoading] = useState(true);
-  const [dbPlans, setDbPlans] = useState<PlanRow[]>([]);
   const [providers, setProviders] = useState({
     paystack: false,
     flutterwave: false,
   });
   const [checkoutCurrency, setCheckoutCurrency] = useState<"USD" | "NGN">("USD");
+
+  // Single source of truth for pricing — the same `plans` table the backend charges from
+  // (see backend/src/routes/payment.ts). STATIC_PLAN_CATALOG is only a display fallback for
+  // the brief moment before this query resolves (or if it ever returns empty), never a second
+  // copy of the actual prices — those must never be able to drift apart again.
+  const livePlans = useQuery(api.plans.listActivePlans);
+  const plansLoading = livePlans === undefined;
+  const dbPlans: PlanRow[] =
+    livePlans && livePlans.length > 0 ? (livePlans as unknown as PlanRow[]) : STATIC_PLAN_CATALOG;
 
   useEffect(() => {
     let cancelled = false;
@@ -261,13 +270,9 @@ const Pricing = () => {
         setProviders(p);
         if (p.flutterwave) setCheckoutCurrency("USD");
         else if (p.paystack) setCheckoutCurrency("NGN");
-        setDbPlans(STATIC_PLAN_CATALOG);
-        setPlansLoading(false);
       } catch {
         if (!cancelled) {
           toast.error("Could not load payment providers");
-          setDbPlans(STATIC_PLAN_CATALOG);
-          setPlansLoading(false);
         }
       }
     })();

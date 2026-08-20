@@ -3,6 +3,7 @@ import { logger } from '../../config/logger';
 import { anyApi, convexMutationTrusted } from '../../config/convexHttp';
 import { storeResultVideo } from '../storage/images';
 import { runFashnImageToVideo } from './fashn';
+import { restoreCredits } from '../credits';
 import type { VideoJob, VideoResult } from '../../types';
 
 /**
@@ -49,6 +50,8 @@ export async function executeVideoPipeline(job: VideoJob): Promise<VideoResult> 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error('Video pipeline failed', { jobId: job.jobId, generationDbId: job.generationDbId, error: message });
+
+    await restoreCredits(job.userId, job.creditAmount);
 
     try {
       await convexMutationTrusted(anyApi.backendTrusted.patchVideoGeneration, {

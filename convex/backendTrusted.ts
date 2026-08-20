@@ -1507,9 +1507,10 @@ export const getModelForResolvePath = query({
  * Returns { ok: false, reason } when no credits remain (no write is made).
  */
 export const reserveCredit = mutation({
-  args: { secret: v.string(), userId: v.string() },
-  handler: async (ctx, { secret, userId }) => {
+  args: { secret: v.string(), userId: v.string(), amount: v.optional(v.number()) },
+  handler: async (ctx, { secret, userId, amount }) => {
     requireBackendSecret(secret);
+    const cost = Math.max(1, Math.floor(amount ?? 1));
     const row = await profileRowForBackend(ctx, userId);
     if (!row) return { ok: false as const, reason: "Profile not found" };
 
@@ -1522,9 +1523,9 @@ export const reserveCredit = mutation({
     const monthlyRem = Number(row.monthly_credits_remaining ?? 0);
 
     // Paid plan with monthly credits remaining
-    if (planId !== "free" && monthlyRem > 0) {
+    if (planId !== "free" && monthlyRem >= cost) {
       await ctx.db.patch(row._id, {
-        monthly_credits_remaining: monthlyRem - 1,
+        monthly_credits_remaining: monthlyRem - cost,
         updated_at: new Date().toISOString(),
       } as never);
       return { ok: true as const, creditType: "monthly" as const };
@@ -1532,15 +1533,48 @@ export const reserveCredit = mutation({
 
     // Free tier credits
     const freeRem = Number(row.free_credits_remaining ?? 0);
-    if (freeRem > 0) {
+    if (freeRem >= cost) {
       await ctx.db.patch(row._id, {
-        free_credits_remaining: freeRem - 1,
+        free_credits_remaining: freeRem - cost,
         updated_at: new Date().toISOString(),
       } as never);
       return { ok: true as const, creditType: "free" as const };
     }
 
     return { ok: false as const, reason: "No credits remaining" };
+  },
+});
+
+export const restoreCredit = mutation({
+  args: { secret: v.string(), userId: v.string(), amount: v.optional(v.number()) },
+  handler: async (ctx, { secret, userId, amount }) => {
+    requireBackendSecret(secret);
+    const cost = Math.max(1, Math.floor(amount ?? 1));
+    const row = await profileRowForBackend(ctx, userId);
+    if (!row) return { ok: false as const };
+    if (Number(row.monthly_credits_total) === -1) return { ok: true as const };
+
+    const planId = typeof row.plan_id === "string" ? row.plan_id : "free";
+    const monthlyRem = Number(row.monthly_credits_remaining ?? 0);
+    const monthlyTot = Number(row.monthly_credits_total ?? 0);
+    const freeRem = Number(row.free_credits_remaining ?? 0);
+    const freeTot = Number(row.free_credits_total ?? 0);
+
+    if (planId !== "free" && monthlyRem < monthlyTot) {
+      await ctx.db.patch(row._id, {
+        monthly_credits_remaining: Math.min(monthlyTot, monthlyRem + cost),
+        updated_at: new Date().toISOString(),
+      } as never);
+      return { ok: true as const };
+    }
+    if (freeRem < freeTot) {
+      await ctx.db.patch(row._id, {
+        free_credits_remaining: Math.min(freeTot, freeRem + cost),
+        updated_at: new Date().toISOString(),
+      } as never);
+      return { ok: true as const };
+    }
+    return { ok: true as const };
   },
 });
 

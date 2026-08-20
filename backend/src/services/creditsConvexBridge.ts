@@ -136,7 +136,7 @@ export async function cxGetUserRow(userId: string): Promise<{ account_type?: str
  * On success the credit is already decremented; do NOT call decrementCredits afterward.
  * On failure call restoreCredits is NOT needed (no write occurred).
  */
-export async function cxReserveCredit(userId: string): Promise<{
+export async function cxReserveCredit(userId: string, amount = 1): Promise<{
   ok: boolean;
   creditType?: 'monthly' | 'free';
   reason?: string;
@@ -144,6 +144,17 @@ export async function cxReserveCredit(userId: string): Promise<{
   const result = await convexMutationTrusted(anyApi.backendTrusted.reserveCredit, {
     ...trusted(),
     userId,
+    amount,
   });
   return result as { ok: boolean; creditType?: 'monthly' | 'free'; reason?: string };
+}
+
+/** Atomically restores `amount` credits (undoes a reservation after a failed generation). */
+export async function cxRestoreCredit(userId: string, amount = 1): Promise<{ ok: boolean }> {
+  const result = await convexMutationTrusted(anyApi.backendTrusted.restoreCredit, {
+    ...trusted(),
+    userId,
+    amount,
+  });
+  return result as { ok: boolean };
 }
