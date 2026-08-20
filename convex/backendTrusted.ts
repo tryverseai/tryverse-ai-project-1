@@ -1165,12 +1165,12 @@ export const ensurePlansSeeded = mutation({
         created_at: now,
       },
       {
-        id: "starter", name: "Starter", is_active: true, max_products: 100, price_ngn: 65000, price_usd: 45, tryons_per_month: 150,
+        id: "starter", name: "Starter", is_active: true, max_products: 100, price_ngn: 150000, price_usd: 150, tryons_per_month: 150,
         features: ["100–200 try-ons / month (quota)", "50–100 products", "Basic fit prediction", "Download images"],
         created_at: now,
       },
       {
-        id: "growth", name: "Growth", is_active: true, max_products: 750, price_ngn: 200000, price_usd: 140, tryons_per_month: 750,
+        id: "growth", name: "Growth", is_active: true, max_products: 750, price_ngn: 200000, price_usd: 250, tryons_per_month: 750,
         features: ["500–1000 try-ons / month (quota)", "100–500 products", "Analytics", "API access", "Marketing content"],
         created_at: now,
       },

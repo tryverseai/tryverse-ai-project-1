@@ -75,8 +75,8 @@ const STATIC_PLAN_CATALOG: PlanRow[] = [
   {
     id: "starter",
     name: "Starter",
-    price_ngn: 80000,
-    price_usd: 60,
+    price_ngn: 150000,
+    price_usd: 150,
     tryons_per_month: 150,
     features: [
       "100–200 try-ons",
@@ -88,8 +88,8 @@ const STATIC_PLAN_CATALOG: PlanRow[] = [
   {
     id: "growth",
     name: "Growth",
-    price_ngn: 180000,
-    price_usd: 150,
+    price_ngn: 200000,
+    price_usd: 250,
     tryons_per_month: 750,
     features: [
       "500–1000 try-ons",
@@ -162,16 +162,16 @@ const PLAN_UI: Record<string, PlanUiEntry> = {
     goodFor: "Small brands · Pilot programmes",
     featured: false,
     cta: "Get Starter",
-    displayPriceNgn: "₦80,000",
-    displayPriceUsd: "~$60",
+    displayPriceNgn: "₦150,000",
+    displayPriceUsd: "$150",
   },
   growth: {
     description: "500–1000 try-ons, 100–500 products, analytics, API/widget, and marketing content at scale.",
     goodFor: "Growing brands · Performance teams",
     featured: true,
     cta: "Get Growth",
-    displayPriceNgn: "₦180,000",
-    displayPriceUsd: "~$150",
+    displayPriceNgn: "₦200,000",
+    displayPriceUsd: "$250",
   },
   enterprise: {
     description:

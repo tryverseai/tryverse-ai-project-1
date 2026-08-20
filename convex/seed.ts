@@ -74,8 +74,8 @@ export const seedPlansIfEmpty = mutation({
         name: "Starter",
         is_active: true,
         max_products: 100,
-        price_ngn: 65000,
-        price_usd: 45,
+        price_ngn: 150000,
+        price_usd: 150,
         tryons_per_month: 150,
         features: [
           "100–200 try-ons / month (quota)",
@@ -91,7 +91,7 @@ export const seedPlansIfEmpty = mutation({
         is_active: true,
         max_products: 750,
         price_ngn: 200000,
-        price_usd: 140,
+        price_usd: 250,
         tryons_per_month: 750,
         features: [
           "500–1000 try-ons / month (quota)",

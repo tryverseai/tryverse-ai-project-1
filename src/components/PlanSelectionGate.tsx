@@ -29,7 +29,7 @@ const PLANS: PlanOption[] = [
   {
     id: "starter",
     name: "Starter",
-    price: "~$60/mo",
+    price: "$150/mo",
     blurb: "Entry plan for small brands running a pilot.",
     features: ["100–200 try-ons", "50–100 products", "HD images"],
     cta: "Choose Starter",
@@ -37,7 +37,7 @@ const PLANS: PlanOption[] = [
   {
     id: "growth",
     name: "Growth",
-    price: "~$150/mo",
+    price: "$250/mo",
     blurb: "For growing brands ready to go live on their storefront.",
     features: ["500–1000 try-ons", "Analytics", "API access"],
     cta: "Choose Growth",
