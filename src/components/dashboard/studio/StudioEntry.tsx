@@ -13,13 +13,13 @@ export function StudioEntry({ onUploadPhoto, onChooseModel }: StudioEntryProps) 
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-2xl border border-border bg-[hsl(var(--studio))] px-6 py-16 text-center sm:py-24"
+      className="relative overflow-hidden rounded-2xl border border-border bg-[hsl(var(--ink))] px-6 py-16 text-center sm:py-24"
     >
       <div className="relative mx-auto max-w-md space-y-6">
-        <h2 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl text-balance">
-          See it on you
+        <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl text-balance">
+          Experience it on You
         </h2>
-        <p className="text-sm text-muted-foreground sm:text-base">
+        <p className="text-sm text-white/60 sm:text-base">
           Upload a photo or pick a model, then see any garment on them in seconds.
         </p>
         <div className="flex flex-col items-center gap-3 pt-2 sm:flex-row sm:justify-center">
@@ -33,7 +33,7 @@ export function StudioEntry({ onUploadPhoto, onChooseModel }: StudioEntryProps) 
           </Button>
           <Button
             size="lg"
-            variant="outline"
+            variant="onInk"
             className="w-full gap-2 rounded-full sm:w-auto"
             onClick={onChooseModel}
           >
