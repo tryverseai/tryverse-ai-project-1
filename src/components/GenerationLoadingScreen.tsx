@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { TryVerseLogo } from "@/components/TryVerseLogo";
 
-const STAGES = [
+const DEFAULT_STAGES = [
   "Analyzing your photo",
   "Detecting body shape and pose",
   "Preparing garment fit",
@@ -26,17 +26,20 @@ interface GenerationLoadingScreenProps {
   previewItems?: GenerationPreviewItem[];
   /** Overrides the default "Creating your virtual try-on" headline. */
   title?: string;
+  /** Rotating status captions shown below the headline. Defaults to the try-on pipeline's stages. */
+  stages?: string[];
   className?: string;
 }
 
-export function GenerationLoadingScreen({ previewItems, title, className }: GenerationLoadingScreenProps) {
+export function GenerationLoadingScreen({ previewItems, title, stages, className }: GenerationLoadingScreenProps) {
+  const activeStages = stages && stages.length > 0 ? stages : DEFAULT_STAGES;
   const [stageIndex, setStageIndex] = useState(0);
   const [progress, setProgress] = useState(4);
   const startRef = useRef(Date.now());
 
   useEffect(() => {
     const stageTimer = setInterval(() => {
-      setStageIndex((i) => Math.min(i + 1, STAGES.length - 1));
+      setStageIndex((i) => Math.min(i + 1, activeStages.length - 1));
     }, STAGE_INTERVAL_MS);
 
     // Ease-out curve toward the ceiling — fast at first (feels responsive), slows down the
@@ -78,7 +81,7 @@ export function GenerationLoadingScreen({ previewItems, title, className }: Gene
               transition={{ duration: 0.35 }}
               className="text-sm text-white/60"
             >
-              {STAGES[stageIndex]}…
+              {activeStages[stageIndex]}…
             </motion.p>
           </AnimatePresence>
         </div>

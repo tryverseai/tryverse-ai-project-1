@@ -1,15 +1,14 @@
-import { useState, useRef, useCallback, useEffect, type ChangeEvent } from "react";
+import { useState, useRef, useCallback, type ChangeEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
   Shirt,
-  User,
   Sparkles,
-  ImageIcon,
   Loader2,
   RotateCcw,
   Download,
   ChevronDown,
+  ChevronLeft,
   CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +26,7 @@ import {
   pollTryOnStatus,
   generateVideo,
   pollVideoStatus,
+  createPersonPathFromModel,
   type TryOnCategory,
 } from "@/lib/backendApi";
 import { TryOnGuidelinesModal, hasSeenTryOnGuidelines } from "@/components/TryOnGuidelinesModal";
@@ -35,6 +35,8 @@ import { useIsEnterprisePlan } from "@/hooks/useIsEnterprisePlan";
 import { EnterpriseUpgradeModal } from "@/components/EnterpriseUpgradeModal";
 import { Film } from "lucide-react";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
+import { StudioEntry } from "@/components/dashboard/studio/StudioEntry";
+import { ModelPickerGrid, type PickedModel } from "@/components/dashboard/ModelPickerGrid";
 
 const VIDEO_MAX_POLL_ATTEMPTS = 60;
 const VIDEO_POLL_INTERVAL_MS = 5000;
@@ -50,13 +52,25 @@ const CATEGORIES: { id: TryOnCategory; label: string }[] = [
 const MAX_POLL_ATTEMPTS = 30;
 const POLL_INTERVAL_MS = 3000;
 
+const LOADING_STAGES = [
+  "Preparing your image",
+  "Analyzing garment",
+  "Building your look",
+  "Rendering final result",
+  "Almost ready",
+];
+
 type Status = "idle" | "uploading" | "processing" | "done" | "error";
+type StudioStep = "entry" | "upload" | "choose-model" | "garment";
+type EntryMode = "upload" | "model" | null;
 
 interface ImageSlot {
   file: File | null;
   preview: string | null;
   path: string | null;
 }
+
+const EMPTY_SLOT: ImageSlot = { file: null, preview: null, path: null };
 
 function DropZone({
   slot,
@@ -147,32 +161,37 @@ function DropZone({
   );
 }
 
+function BackLink({ onClick, label = "Back" }: { onClick: () => void; label?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors -ml-1"
+    >
+      <ChevronLeft className="h-4 w-4" />
+      {label}
+    </button>
+  );
+}
+
 export function StudioTab() {
-  const [model, setModel] = useState<ImageSlot>({ file: null, preview: null, path: null });
-  const [garment, setGarment] = useState<ImageSlot>({ file: null, preview: null, path: null });
+  const [step, setStep] = useState<StudioStep>("entry");
+  const [entryMode, setEntryMode] = useState<EntryMode>(null);
+  const [model, setModel] = useState<ImageSlot>(EMPTY_SLOT);
+  const [pickedModel, setPickedModel] = useState<PickedModel | null>(null);
+  const [garment, setGarment] = useState<ImageSlot>(EMPTY_SLOT);
   const [category, setCategory] = useState<TryOnCategory>("clothing");
   const [status, setStatus] = useState<Status>("idle");
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultTryonId, setResultTryonId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
-
-  // First-time visitors see consent immediately on entering Personal Studio, not only when
-  // they click Generate — the upload UI itself was reachable/usable before consent otherwise.
-  useEffect(() => {
-    if (!hasSeenTryOnGuidelines()) {
-      setGuidelinesOpen(true);
-    }
-  }, []);
   const isEnterprise = useIsEnterprisePlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [videoStatus, setVideoStatus] = useState<"idle" | "generating" | "done" | "error">("idle");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
-  const handleFile = useCallback((
-    slot: "model" | "garment",
-    file: File
-  ) => {
+  const handleFile = useCallback((slot: "model" | "garment", file: File) => {
     if (!file.type.startsWith("image/")) {
       toast.error("Please upload an image file.");
       return;
@@ -186,8 +205,11 @@ export function StudioTab() {
   }, []);
 
   const reset = () => {
-    setModel({ file: null, preview: null, path: null });
-    setGarment({ file: null, preview: null, path: null });
+    setStep("entry");
+    setEntryMode(null);
+    setModel(EMPTY_SLOT);
+    setPickedModel(null);
+    setGarment(EMPTY_SLOT);
     setCategory("clothing");
     setStatus("idle");
     setResultUrl(null);
@@ -197,25 +219,64 @@ export function StudioTab() {
     setVideoUrl(null);
   };
 
-  const run = async () => {
-    if (!model.file || !garment.file) {
-      toast.error("Upload both a model photo and a garment photo.");
+  const goToUploadStep = () => {
+    setEntryMode("upload");
+    setStep("upload");
+  };
+
+  const handleUploadPhotoClick = () => {
+    if (!hasSeenTryOnGuidelines()) {
+      setGuidelinesOpen(true);
       return;
     }
+    goToUploadStep();
+  };
+
+  const handleChooseModelClick = () => {
+    setEntryMode("model");
+    setStep("choose-model");
+  };
+
+  const handlePickModel = (m: PickedModel) => {
+    setPickedModel(m);
+    setStep("garment");
+  };
+
+  const run = async () => {
+    if (!garment.file) {
+      toast.error("Upload a garment photo.");
+      return;
+    }
+    if (entryMode === "upload" && !model.file) {
+      toast.error("Upload a photo first.");
+      return;
+    }
+    if (entryMode === "model" && !pickedModel) {
+      toast.error("Choose a virtual model first.");
+      return;
+    }
+
     setStatus("uploading");
     setErrorMsg(null);
     setResultUrl(null);
 
     try {
-      const [modelUpload, garmentUpload] = await Promise.all([
-        uploadImage(model.file, "person"),
+      const personImagePathPromise: Promise<string> =
+        entryMode === "upload"
+          ? uploadImage(model.file!, "person").then((r) => r.filePath)
+          : pickedModel!.source === "generated"
+            ? Promise.resolve(pickedModel!.storagePath)
+            : createPersonPathFromModel(pickedModel!.id);
+
+      const [personImagePath, garmentUpload] = await Promise.all([
+        personImagePathPromise,
         uploadImage(garment.file, "product"),
       ]);
 
       setStatus("processing");
 
       const job = await startTryOn({
-        personImagePath: modelUpload.filePath,
+        personImagePath,
         productImagePath: garmentUpload.filePath,
         category,
       });
@@ -255,10 +316,13 @@ export function StudioTab() {
   };
 
   const isRunning = status === "uploading" || status === "processing";
-  const canRun = Boolean(model.file && garment.file) && !isRunning;
+  const canRun =
+    Boolean(garment.file) &&
+    (entryMode === "upload" ? Boolean(model.file) : Boolean(pickedModel)) &&
+    !isRunning;
 
   const handleGenerateClick = () => {
-    if (!hasSeenTryOnGuidelines()) {
+    if (entryMode === "upload" && !hasSeenTryOnGuidelines()) {
       setGuidelinesOpen(true);
       return;
     }
@@ -304,208 +368,241 @@ export function StudioTab() {
     }
   };
 
+  const chosenPreview = entryMode === "upload" ? model.preview : pickedModel?.imageUrl ?? null;
+  const chosenLabel = entryMode === "upload" ? "Your photo" : pickedModel?.label ?? "Model";
+  const showingGenerationUi = isRunning || status === "done" || status === "error";
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Header */}
       <div className="space-y-1">
         <h2 className="text-2xl font-bold text-foreground tracking-tight">Personal Studio</h2>
         <p className="text-sm text-muted-foreground">
-          Test TryVerse try-on privately — upload a model photo and a garment to see the result instantly.
+          Try any garment on yourself or a virtual model, privately.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left — Inputs */}
-        <div className="space-y-6">
-          <DropZone
-            slot={model}
-            label="Model photo"
-            hint="Front-facing photo of the person wearing neutral clothing"
-            icon={User}
-            onFile={(f) => handleFile("model", f)}
-          />
+      <AnimatePresence mode="wait">
+        {step === "entry" && (
+          <motion.div key="entry" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <StudioEntry onUploadPhoto={handleUploadPhotoClick} onChooseModel={handleChooseModelClick} />
+          </motion.div>
+        )}
 
-          <DropZone
-            slot={garment}
-            label="Garment photo"
-            hint="Clear product photo on white or transparent background"
-            icon={Shirt}
-            onFile={(f) => handleFile("garment", f)}
-          />
-
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-foreground flex items-center gap-2">
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              Garment category
-            </p>
-            <Select value={category} onValueChange={(v) => setCategory(v as TryOnCategory)}>
-              <SelectTrigger className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {category === "clothing" && (
-              <p className="text-xs text-muted-foreground">
-                Best for a single reference photo already showing the full look. For combining
-                separate top + bottom (or shoe) product photos into one outfit, use{" "}
-                <span className="font-medium text-foreground">Outfit Builder</span> instead —
-                it composites each piece before generating, which preserves multi-garment
-                fidelity better than a single photo can.
-              </p>
-            )}
-          </div>
-
-          <div className="flex gap-3">
+        {step === "upload" && (
+          <motion.div
+            key="upload"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="max-w-md mx-auto space-y-4"
+          >
+            <BackLink onClick={reset} label="Back to start" />
+            <DropZone
+              slot={model}
+              label="Your photo"
+              hint="Front-facing, full-body photo works best"
+              icon={Upload}
+              onFile={(f) => handleFile("model", f)}
+            />
             <Button
-              className="flex-1 h-11 gradient-primary text-primary-foreground shadow-soft"
-              disabled={!canRun}
-              onClick={handleGenerateClick}
+              className="w-full h-11 gradient-primary text-primary-foreground shadow-soft"
+              disabled={!model.file}
+              onClick={() => setStep("garment")}
             >
-              {isRunning ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {status === "uploading" ? "Uploading…" : "Generating…"}
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Generate try-on
-                </>
-              )}
+              Continue
             </Button>
+          </motion.div>
+        )}
 
-            {(status === "done" || status === "error") && (
-              <Button variant="outline" className="h-11 px-4" onClick={reset}>
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+        {step === "choose-model" && (
+          <motion.div
+            key="choose-model"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="space-y-4"
+          >
+            <BackLink onClick={reset} label="Back to start" />
+            <p className="text-sm font-medium text-foreground">Choose a virtual model</p>
+            <ModelPickerGrid selectedId={pickedModel?.id} onSelect={handlePickModel} />
+          </motion.div>
+        )}
 
-        </div>
-
-        {/* Right — Result */}
-        <div className="space-y-3">
-          <p className="text-sm font-medium text-foreground flex items-center gap-2">
-            <ImageIcon className="h-4 w-4 text-muted-foreground" />
-            Result
-          </p>
-
-          <AnimatePresence mode="wait">
-            {status === "done" && resultUrl ? (
-              <motion.div
-                key="result"
-                initial={{ opacity: 0, scale: 0.97 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                className="relative rounded-lg overflow-hidden"
-              >
-                <img
-                  src={resultUrl}
-                  alt="Try-on result"
-                  className="w-full object-contain max-h-[640px]"
-                />
-                <div className="absolute bottom-3 right-3 flex gap-2">
-                  {videoStatus === "done" && videoUrl ? null : (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="rounded-full shadow-md"
-                      disabled={videoStatus === "generating"}
-                      onClick={() => void handleGenerateVideo()}
-                    >
-                      {videoStatus === "generating" ? (
-                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      ) : (
-                        <Film className="h-3.5 w-3.5 mr-1.5" />
-                      )}
-                      {videoStatus === "generating" ? "Animating…" : "Generate video"}
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="rounded-full shadow-md"
-                    onClick={() => {
-                      void downloadFile(resultUrl, dateStampedFilename("tryverse-result")).catch(() =>
-                        toast.error("Download failed")
-                      );
-                    }}
-                  >
-                    <Download className="h-3.5 w-3.5 mr-1.5" />
-                    Download
-                  </Button>
-                </div>
-              </motion.div>
-            ) : status === "error" ? (
-              <motion.div
-                key="error"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center rounded-xl border border-destructive/30 bg-destructive/5 min-h-[220px] p-6 text-center gap-3"
-              >
-                <p className="text-sm font-medium text-destructive">Try-on failed</p>
-                <p className="text-xs text-muted-foreground">{errorMsg}</p>
-                <Button size="sm" variant="outline" onClick={reset} className="mt-2">
-                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                  Start over
-                </Button>
-              </motion.div>
-            ) : isRunning ? (
-              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        {step === "garment" && (
+          <motion.div
+            key="garment"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className={showingGenerationUi ? "" : "max-w-md mx-auto space-y-4"}
+          >
+            {showingGenerationUi ? (
+              isRunning ? (
                 <GenerationLoadingScreen
+                  title="Creating your virtual try-on"
+                  stages={LOADING_STAGES}
                   previewItems={[
-                    ...(model.preview ? [{ label: "Model", imageUrl: model.preview }] : []),
+                    ...(chosenPreview ? [{ label: chosenLabel, imageUrl: chosenPreview }] : []),
                     ...(garment.preview ? [{ label: "Garment", imageUrl: garment.preview }] : []),
                   ]}
                 />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-transparent min-h-[320px] gap-3 text-center px-6"
-              >
-                <div className="rounded-full bg-muted p-4">
-                  <Sparkles className="h-6 w-6 text-muted-foreground" />
+              ) : status === "done" && resultUrl ? (
+                <div className="space-y-3">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="rounded-2xl overflow-hidden bg-muted"
+                  >
+                    <img
+                      src={resultUrl}
+                      alt="Try-on result"
+                      className="w-full max-h-[75vh] object-contain"
+                    />
+                  </motion.div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                    <Button variant="outline" size="sm" onClick={reset} className="gap-1.5">
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Start over
+                    </Button>
+                    <div className="flex gap-2">
+                      {!(videoStatus === "done" && videoUrl) && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={videoStatus === "generating"}
+                          onClick={() => void handleGenerateVideo()}
+                          className="gap-1.5"
+                        >
+                          {videoStatus === "generating" ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Film className="h-3.5 w-3.5" />
+                          )}
+                          {videoStatus === "generating" ? "Animating…" : "Generate video"}
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="gap-1.5"
+                        onClick={() => {
+                          void downloadFile(resultUrl, dateStampedFilename("tryverse-result")).catch(() =>
+                            toast.error("Download failed")
+                          );
+                        }}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Download
+                      </Button>
+                    </div>
+                  </div>
+                  {videoStatus === "done" && videoUrl && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-2 rounded-xl border border-border bg-muted p-3"
+                    >
+                      <p className="text-xs font-medium text-muted-foreground">Animated from this result</p>
+                      <video src={videoUrl} controls loop className="w-full rounded-lg" />
+                    </motion.div>
+                  )}
+                  {videoStatus === "error" && (
+                    <p className="text-xs text-destructive">Could not generate the video. Please try again.</p>
+                  )}
                 </div>
-                <p className="text-sm font-medium text-foreground">Your try-on will appear here</p>
-                <p className="text-xs text-muted-foreground">
-                  Upload a model photo and garment, then tap "Generate try-on"
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              ) : (
+                <div className="max-w-md mx-auto flex flex-col items-center justify-center rounded-xl border border-destructive/30 bg-destructive/5 min-h-[220px] p-6 text-center gap-3">
+                  <p className="text-sm font-medium text-destructive">Try-on failed</p>
+                  <p className="text-xs text-muted-foreground">{errorMsg}</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={reset}>
+                      <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                      Start over
+                    </Button>
+                    <Button size="sm" onClick={() => void run()}>
+                      Try again
+                    </Button>
+                  </div>
+                </div>
+              )
+            ) : (
+              <>
+                <BackLink
+                  onClick={() => setStep(entryMode === "upload" ? "upload" : "choose-model")}
+                />
 
-          {videoStatus === "done" && videoUrl && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-2 rounded-xl border border-border bg-muted p-3"
-            >
-              <p className="text-xs font-medium text-muted-foreground">Animated from this result</p>
-              <video src={videoUrl} controls loop className="w-full rounded-lg" />
-            </motion.div>
-          )}
-          {videoStatus === "error" && (
-            <p className="text-xs text-destructive">Could not generate the video. Please try again.</p>
-          )}
-        </div>
-      </div>
+                {chosenPreview && (
+                  <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                    <img
+                      src={chosenPreview}
+                      alt={chosenLabel}
+                      className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
+                    />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Using</p>
+                      <p className="text-sm font-medium text-foreground">{chosenLabel}</p>
+                    </div>
+                  </div>
+                )}
+
+                <DropZone
+                  slot={garment}
+                  label="Garment photo"
+                  hint="Clear product photo on white or transparent background"
+                  icon={Shirt}
+                  onFile={(f) => handleFile("garment", f)}
+                />
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    Garment category
+                  </p>
+                  <Select value={category} onValueChange={(v) => setCategory(v as TryOnCategory)}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {category === "clothing" && (
+                    <p className="text-xs text-muted-foreground">
+                      Best for a single reference photo already showing the full look. For combining
+                      separate top + bottom (or shoe) product photos into one outfit, use{" "}
+                      <span className="font-medium text-foreground">Outfit Builder</span> instead.
+                    </p>
+                  )}
+                </div>
+
+                <Button
+                  className="w-full h-11 gradient-primary text-primary-foreground shadow-soft"
+                  disabled={!canRun}
+                  onClick={handleGenerateClick}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate try-on
+                </Button>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <TryOnGuidelinesModal
         open={guidelinesOpen}
         onOpenChange={setGuidelinesOpen}
         onAcknowledge={() => {
-          // Consent can now open on mount too, before any photo is uploaded — only
-          // auto-run when the user was actually mid-generate when it opened.
-          if (model.file && garment.file) void run();
+          if (step === "entry") {
+            goToUploadStep();
+          } else if (model.file && garment.file) {
+            void run();
+          }
         }}
         source="studio_tab"
       />

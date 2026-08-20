@@ -1664,6 +1664,8 @@ export interface AiModelGenerationParams {
 export interface AiModelResult {
   id: string;
   imageUrl: string;
+  /** Backend storage path — reusable directly as a try-on `personImagePath` (same storage layer). */
+  storagePath: string;
   createdAt: string;
 }
 
@@ -1676,7 +1678,7 @@ export async function generateAiModel(params: AiModelGenerationParams): Promise<
   });
   const data = await handleResponse<{ id: string; storagePath: string; createdAt: string }>(res);
   const imageUrl = await getSignedImageUrl(data.storagePath);
-  return { id: data.id, imageUrl, createdAt: data.createdAt };
+  return { id: data.id, imageUrl, storagePath: data.storagePath, createdAt: data.createdAt };
 }
 
 export async function getSavedAiModels(): Promise<AiModelResult[]> {
@@ -1689,6 +1691,7 @@ export async function getSavedAiModels(): Promise<AiModelResult[]> {
     data.models.map(async (m) => ({
       id: m.id,
       imageUrl: await getSignedImageUrl(m.storagePath),
+      storagePath: m.storagePath,
       createdAt: m.createdAt,
     }))
   );
