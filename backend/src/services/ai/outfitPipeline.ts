@@ -4,7 +4,7 @@ import { anyApi, convexMutationTrusted } from '../../config/convexHttp';
 import { uploadResultBuffer, storeResultImage, getSignedUrl, RESULT_BUCKET } from '../storage/images';
 import { buildOutfitFlatLay } from './outfitComposite';
 import { buildOutfitPrompt } from './outfitPrompt';
-import { runFashnOutfit } from './fashn';
+import { FashionGenerationProvider } from './fashionGenerationProvider';
 import { restoreCredits } from '../credits';
 import type { OutfitJob, OutfitResult } from '../../types';
 
@@ -36,7 +36,7 @@ export async function executeOutfitPipeline(job: OutfitJob): Promise<OutfitResul
 
     logger.info('Outfit pipeline: calling FASHN', { jobId: job.jobId, outfitDbId: job.outfitDbId });
 
-    const fashnResult = await runFashnOutfit(compositeUrl, job.modelImageUrl, prompt);
+    const fashnResult = await FashionGenerationProvider.outfitTryOn(compositeUrl, job.modelImageUrl, prompt);
 
     const resultStoragePath = await storeResultImage(fashnResult.resultUrl, job.outfitDbId, job.userId);
 

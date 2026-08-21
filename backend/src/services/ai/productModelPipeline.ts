@@ -2,7 +2,7 @@ import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 import { anyApi, convexMutationTrusted } from '../../config/convexHttp';
 import { storeResultImage } from '../storage/images';
-import { runFashnProductToModel } from './fashn';
+import { FashionGenerationProvider } from './fashionGenerationProvider';
 import { restoreCredits } from '../credits';
 import type { ProductModelJob, ProductModelResult } from '../../types';
 
@@ -18,7 +18,7 @@ export async function executeProductModelPipeline(job: ProductModelJob): Promise
   try {
     logger.info('Product-model pipeline: calling FASHN', { jobId: job.jobId, generationDbId: job.generationDbId });
 
-    const fashnResult = await runFashnProductToModel({
+    const fashnResult = await FashionGenerationProvider.productToModel({
       productImageUrl: job.productImageUrl,
       faceReferenceUrl: job.faceReferenceUrl,
       prompt: job.prompt,

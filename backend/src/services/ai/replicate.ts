@@ -48,7 +48,7 @@ function clothingModelInputKind(modelRef: string): 'idm_vton' | 'oot_style' {
 }
 
 /** All active categories use the clothing try-on pipeline. */
-function isClothingCategory(category: ProductCategory): boolean {
+export function isClothingCategory(category: ProductCategory): boolean {
   return (
     category === 'clothing' ||
     category === 'tops' ||

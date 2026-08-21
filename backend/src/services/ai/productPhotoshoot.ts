@@ -51,7 +51,12 @@ export async function resolveModelUrl(userId: string, modelId: string, source: P
 /**
  * Generates a professional product-photography composite: the brand's own uploaded product photo,
  * shown on a model they picked (from the stock library or their saved AI-generated models).
- * Enterprise-only — caller must already have enforced `requirePlan('enterprise')`.
+ * Credit-metered on every plan — see `reserveGenerationCredits` in routes/aiStudio.ts.
+ *
+ * Still on Replicate, not FASHN: FASHN's `product-to-model` (see `fashn.ts`) generates a new
+ * person from the product photo, with only a loose optional `face_reference` — there is no FASHN
+ * capability for "composite this product onto this exact pre-chosen saved model photo," which is
+ * this feature's whole premise. Revisit if/when FASHN adds a model-conditioned endpoint.
  */
 export async function generateProductPhotoshoot(
   userId: string,

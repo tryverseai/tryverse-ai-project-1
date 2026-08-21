@@ -1,5 +1,6 @@
 import type { ProductCategory } from '../../../types';
 import { inferIsLongGarment } from '../garmentDescriptor';
+import { isClothingCategory } from '../replicate';
 
 /** Topology used to route clothing try-on (VTON vs diffusion-friendly full-body). */
 export type GarmentTopology = 'upper' | 'lower' | 'full_body' | 'unspecified';
@@ -13,7 +14,12 @@ export function classifyGarmentTopology(
   productDescription?: string | null,
   productHeightOverWidth?: number
 ): GarmentTopology {
-  if (category !== 'clothing') return 'unspecified';
+  if (!isClothingCategory(category)) return 'unspecified';
+
+  // An explicit category already tells us the topology directly — no need to infer.
+  if (category === 'dresses' || category === 'one-pieces') return 'full_body';
+  if (category === 'tops') return 'upper';
+  if (category === 'bottoms') return 'lower';
 
   if (inferIsLongGarment(productHeightOverWidth, productDescription)) {
     return 'full_body';

@@ -1,3 +1,8 @@
+/**
+ * Still on Replicate, not FASHN: this is pure prompt → model-image generation, and every FASHN
+ * endpoint in `fashn.ts` is image-conditioned (try-on, product-to-model, image-to-video) — there
+ * is no FASHN text-to-image capability to migrate to. Revisit if FASHN adds one.
+ */
 import Replicate from 'replicate';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';

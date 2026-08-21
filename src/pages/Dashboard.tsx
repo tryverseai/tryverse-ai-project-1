@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -9,6 +9,7 @@ import {
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { MobileNavSheet } from "@/components/dashboard/MobileNavSheet";
+import { GUIDE_TAB, CONNECT_TAB } from "@/lib/dashboardTabs";
 
 // Eagerly load the default tab — zero extra latency on first visit
 import { TryOnGuideTab } from "@/components/dashboard/TryOnGuideTab";
@@ -134,8 +135,6 @@ const DeveloperDocsTab = lazyWithRetry(
   "developer-docs"
 );
 
-const GUIDE_TAB = "Try-On guide";
-const CONNECT_TAB = "Connect Store";
 const DEFAULT_TAB = GUIDE_TAB;
 
 /** Grouped by workflow, not by feature-launch order — see platform navigation direction. */
@@ -222,7 +221,8 @@ const Dashboard = () => {
   const tabParam = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(DEFAULT_TAB);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const brandName = user?.user_metadata?.brand_name || "Your Brand";
 
   // Depend on the primitive string `tabParam` rather than the full URLSearchParams
@@ -247,6 +247,12 @@ const Dashboard = () => {
     setMobileNavOpen(false);
   };
 
+  const handleMobileSignOut = async () => {
+    setMobileNavOpen(false);
+    await signOut();
+    navigate("/");
+  };
+
   const ActiveIcon = sidebarItems.find((i) => i.label === activeTab)?.icon;
 
   const renderContent = () => {
@@ -263,7 +269,7 @@ const Dashboard = () => {
   return (
     <>
       <div className="min-h-screen bg-background">
-        <Navbar />
+        <Navbar mobileMenuHidden />
         <main className="pt-[var(--navbar-height)]">
           <div className="flex">
           {/* Sidebar */}
@@ -325,6 +331,15 @@ const Dashboard = () => {
             groups={sidebarGroups}
             activeLabel={activeTab}
             onSelect={selectTab}
+            footer={
+              <button
+                type="button"
+                onClick={() => void handleMobileSignOut()}
+                className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                Sign out
+              </button>
+            }
           />
 
           {/* Main content */}

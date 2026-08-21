@@ -1,4 +1,4 @@
-import { runVtonInference, type ClothingTryOnEngine } from './replicate';
+import { runVtonInference, isClothingCategory, type ClothingTryOnEngine } from './replicate';
 import { inferPoseType } from './promptBuilder';
 import { preprocessPersonImage, preprocessProductImage } from './preprocessing';
 import { applyFaceLockFromPersonInput } from './facePreservation';
@@ -199,7 +199,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
     let personW = personOptimized.width;
     let personH = personOptimized.height;
 
-    if (category === 'clothing' && env.TRYON_CLOTHING_SMART_FRAME) {
+    if (isClothingCategory(category) && env.TRYON_CLOTHING_SMART_FRAME) {
       personBuffer = await prepareClothingPersonForIdmVton(personBuffer);
       const meta = await sharp(personBuffer).metadata();
       personW = meta.width ?? personW;
@@ -210,7 +210,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
     const productHeightOverWidth =
       productOptimized.width > 0 ? productOptimized.height / productOptimized.width : undefined;
 
-    if (category === 'clothing') {
+    if (isClothingCategory(category)) {
       const accept = await validatePersonForTryOn(personBuffer);
       if (!accept.ok) {
         await cxPatchTryon(tryonDbId, { status: 'failed' });
@@ -241,7 +241,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
     }
 
     const cacheVariant =
-      category === 'clothing'
+      isClothingCategory(category)
         ? clothingEngine === 'flux_kontext'
           ? 'flux'
           : clothingEngine === 'fashn'
@@ -345,7 +345,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
     });
 
     const skipProductRembg =
-      category === 'clothing' &&
+      isClothingCategory(category) &&
       clothingEngine === 'fashn' &&
       env.TRYON_FASHN_SKIP_PRODUCT_BG_REMOVAL;
 
@@ -360,10 +360,15 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       logger.warn('Body not clearly detected in person image', { tryonDbId });
     }
 
+    // IDM-VTON only distinguishes 'dresses' (full-body) vs 'upper_body' (everything else) — an
+    // explicit tops/bottoms/dresses/one-pieces category maps directly; only the generic 'clothing'
+    // (full-outfit, unknown piece) bucket needs the description/aspect-ratio inference.
     const idmGarmentSlot =
-      category === 'clothing'
-        ? inferIdmVtonGarmentCategory(productHeightOverWidth, productDescription)
-        : 'upper_body';
+      category === 'dresses' || category === 'one-pieces'
+        ? 'dresses'
+        : category === 'clothing'
+          ? inferIdmVtonGarmentCategory(productHeightOverWidth, productDescription)
+          : 'upper_body';
 
     // ── STEP 5–7: Inference → optional face lock → post — retry if model returns a stitched/collage frame ──
     const MAX_LAYOUT_RETRIES = 3;
@@ -386,7 +391,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       // Near-identical output retry uses mean abs diff vs the input person — tuned for IDM-VTON + new seed.
       // FASHN (direct API) has no seed; subtle swaps can still score below the threshold at 72×72 → false failures.
       const maxVtonAttempts =
-        category === 'clothing' && clothingEngine === 'idm_vton' ? 2 : 1;
+        isClothingCategory(category) && clothingEngine === 'idm_vton' ? 2 : 1;
       for (let vtonAttempt = 0; vtonAttempt < maxVtonAttempts; vtonAttempt++) {
         const inf = await runVtonInference(
           {
@@ -398,7 +403,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
             bodyDetected: personPreprocessed.bodyDetected,
             poseType,
           },
-          category === 'clothing' && clothingEngine ? { clothingEngine } : undefined
+          isClothingCategory(category) && clothingEngine ? { clothingEngine } : undefined
         );
         rawResultUrl = inf.resultUrl;
         processingTimeMs = inf.processingTimeMs;
@@ -406,7 +411,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
 
         compositeBuffer = await fetchUrlBufferWithRetry(rawResultUrl, 'try-on result image');
 
-        if (category !== 'clothing' || maxVtonAttempts < 2) break;
+        if (!isClothingCategory(category) || maxVtonAttempts < 2) break;
 
         const mad = await meanAbsDiffDownscaled(personBuffer, compositeBuffer);
         logger.info('tryon.vton.diff', {
@@ -430,7 +435,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
 
       faceLockApplied = false;
       const useFaceLock =
-        category === 'clothing' &&
+        isClothingCategory(category) &&
         env.ENABLE_FACE_LOCK &&
         (clothingEngine !== 'fashn' || env.TRYON_FASHN_FACE_LOCK);
 
@@ -449,7 +454,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
       const postInputBuffer = compositeBuffer;
       postProcessedApplied = false;
 
-      if (category === 'clothing' && clothingEngine === 'fashn') {
+      if (isClothingCategory(category) && clothingEngine === 'fashn') {
         if (env.TRYON_FASHN_LIGHT_POST) {
           const postResult = await postProcessResultBufferMinimal(postInputBuffer);
           finalBuffer = await addGarmentShadow(postResult.buffer);

@@ -15,7 +15,17 @@ const publicLinks = [
   { label: "About", href: "/about" },
 ];
 
-export function Navbar() {
+interface NavbarProps {
+  /**
+   * Dashboard/Admin already render their own single mobile nav trigger (a left-side drawer with
+   * the actual app navigation). Without this, that trigger and this component's own full-screen
+   * marketing-nav hamburger both render on mobile at once — two competing "menu" buttons for two
+   * different navigations. Hides just the mobile button + overlay; desktop chrome is unaffected.
+   */
+  mobileMenuHidden?: boolean;
+}
+
+export function Navbar({ mobileMenuHidden = false }: NavbarProps = {}) {
   const [open, setOpen] = useState(false);
   /** Solid chrome once the hero has scrolled past; transparent over the hero film. */
   const [scrolled, setScrolled] = useState(false);
@@ -150,21 +160,23 @@ export function Navbar() {
             )}
           </div>
 
-          <button
-            type="button"
-            className="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent md:hidden"
-            aria-expanded={open}
-            aria-controls="mobile-nav"
-            aria-label={open ? "Close menu" : "Open menu"}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          {!mobileMenuHidden && (
+            <button
+              type="button"
+              className="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent md:hidden"
+              aria-expanded={open}
+              aria-controls="mobile-nav"
+              aria-label={open ? "Close menu" : "Open menu"}
+              onClick={() => setOpen((v) => !v)}
+            >
+              {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          )}
         </nav>
       </motion.header>
 
       <AnimatePresence>
-        {open && (
+        {!mobileMenuHidden && open && (
           <motion.div
             id="mobile-nav"
             className="fixed inset-0 z-40 flex flex-col bg-background pt-[var(--navbar-height)] md:hidden"

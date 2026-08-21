@@ -197,7 +197,7 @@ const Admin = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      <Navbar mobileMenuHidden />
       <main className="pt-[var(--navbar-height)]">
         <div className="flex">
           {/* Sidebar */}

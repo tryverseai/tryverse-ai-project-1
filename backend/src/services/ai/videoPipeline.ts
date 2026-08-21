@@ -2,7 +2,7 @@ import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 import { anyApi, convexMutationTrusted } from '../../config/convexHttp';
 import { storeResultVideo } from '../storage/images';
-import { runFashnImageToVideo } from './fashn';
+import { FashionGenerationProvider } from './fashionGenerationProvider';
 import { restoreCredits } from '../credits';
 import type { VideoJob, VideoResult } from '../../types';
 
@@ -17,7 +17,7 @@ export async function executeVideoPipeline(job: VideoJob): Promise<VideoResult> 
   try {
     logger.info('Video pipeline: calling FASHN', { jobId: job.jobId, generationDbId: job.generationDbId });
 
-    const fashnResult = await runFashnImageToVideo({
+    const fashnResult = await FashionGenerationProvider.imageToVideo({
       imageUrl: job.sourceImageUrl,
       prompt: job.prompt,
       duration: job.duration,
