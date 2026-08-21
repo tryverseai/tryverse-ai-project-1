@@ -138,11 +138,6 @@ export const env = {
     'REPLICATE_MODEL_ACCESSORIES',
     'fashn/tryon:54bb2780ade1e2584e29a1b634a59571e59ddc65958fcfad8514a30c7d5d4ea5'
   ),
-  // Enterprise "Generate AI Model" — text-to-image model for consistent fashion-model generation.
-  REPLICATE_MODEL_AI_MODEL_GENERATION: optionalEnv(
-    'REPLICATE_MODEL_AI_MODEL_GENERATION',
-    'black-forest-labs/flux-schnell'
-  ),
   // Optional: flux-kontext for dynamic prompt-based try-on (set to enable)
   REPLICATE_MODEL_FLUX_KONTEXT: optionalEnv(
     'REPLICATE_MODEL_FLUX_KONTEXT',
@@ -207,6 +202,10 @@ export const env = {
   FASHN_PRODUCT_MODEL_MODEL_NAME: optionalEnv('FASHN_PRODUCT_MODEL_MODEL_NAME', 'product-to-model'),
   /** FASHN model used by AI Video (`services/ai/fashn.ts::runFashnImageToVideo`). */
   FASHN_VIDEO_MODEL_NAME: optionalEnv('FASHN_VIDEO_MODEL_NAME', 'image-to-video'),
+  /** FASHN model used by AI Model Generation (`services/ai/fashn.ts::runFashnModelCreate`). */
+  FASHN_MODEL_CREATE_MODEL_NAME: optionalEnv('FASHN_MODEL_CREATE_MODEL_NAME', 'model-create'),
+  /** FASHN model used for identity swaps (`services/ai/fashn.ts::runFashnModelSwap`). */
+  FASHN_MODEL_SWAP_MODEL_NAME: optionalEnv('FASHN_MODEL_SWAP_MODEL_NAME', 'model-swap'),
   /**
    * Poll timeout specifically for video predictions (ms) — longer than the shared
    * POLL_TIMEOUT_MS below, since video rendering can take longer than a still image.

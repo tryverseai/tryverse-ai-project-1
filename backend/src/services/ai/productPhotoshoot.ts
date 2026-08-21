@@ -1,12 +1,10 @@
-import Replicate from 'replicate';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 import { getSignedUrl, uploadResultBuffer, INPUT_BUCKET, RESULT_BUCKET } from '../storage/images';
 import { anyApi, convexMutationTrusted, convexQueryTrusted } from '../../config/convexHttp';
 import { resolveModelImageUrl } from '../models/modelLibrary';
 import { AppError } from '../../middleware/errorHandler';
-
-const replicate = new Replicate({ auth: env.REPLICATE_API_TOKEN });
+import { FashionGenerationProvider } from './fashionGenerationProvider';
 
 export type PhotoshootModelSource = 'library' | 'generated';
 
@@ -53,20 +51,23 @@ export async function resolveModelUrl(userId: string, modelId: string, source: P
  * shown on a model they picked (from the stock library or their saved AI-generated models).
  * Credit-metered on every plan — see `reserveGenerationCredits` in routes/aiStudio.ts.
  *
- * Still on Replicate, not FASHN: FASHN's `product-to-model` (see `fashn.ts`) generates a new
- * person from the product photo, with only a loose optional `face_reference` — there is no FASHN
- * capability for "composite this product onto this exact pre-chosen saved model photo," which is
- * this feature's whole premise. Revisit if/when FASHN adds a model-conditioned endpoint.
+ * FASHN has no single endpoint for "composite this product onto this exact pre-chosen model
+ * photo" — `product-to-model` (see fashn.ts) generates a new person from the product photo, it
+ * doesn't accept a full pre-chosen model image. So this chains two real FASHN endpoints:
+ *   1. product-to-model — the product photo becomes a photorealistic on-model shot in the
+ *      requested scene (FASHN generates the person).
+ *   2. model-swap, with `face_reference` set to the brand's actual chosen model photo — pulls the
+ *      generated person's identity toward the chosen model while preserving the garment from
+ *      step 1.
+ * This is an identity-guided approximation (FASHN's `face_reference` locks facial identity, not
+ * full body characteristics) — not a pixel-perfect reuse of the chosen model photo the way the
+ * previous Replicate Flux Kontext call was, but it's the correct FASHN-native way to approach this
+ * and needs no Replicate dependency. Costs 2 FASHN predictions instead of 1 — see CREDIT_COSTS.
  */
 export async function generateProductPhotoshoot(
   userId: string,
   params: ProductPhotoshootParams
 ): Promise<ProductPhotoshootResult> {
-  // Must be the multi-image-capable Flux Kontext variant — it's the only one that actually
-  // reads `input_image_1`/`input_image_2`. The single-image `black-forest-labs/flux-kontext-pro`
-  // this used to point at silently drops both image inputs and falls back to pure text-to-image
-  // generation, which is why results could show a random model wearing a different product.
-  const model = env.REPLICATE_MODEL_FLUX_KONTEXT;
   const [productUrl, modelUrl] = await Promise.all([
     getSignedUrl(INPUT_BUCKET, params.productStoragePath),
     resolveModelUrl(userId, params.modelId, params.modelSource),
@@ -83,37 +84,29 @@ export async function generateProductPhotoshoot(
     background: params.background,
   })) as { id: string };
 
-  const prompt = [
-    'Photorealistic e-commerce product photography. input_image_1 is the exact model — preserve',
-    "their identity, face, and body exactly. input_image_2 is the exact garment/product — dress the",
-    'model in this precise product, preserving its true color, pattern, cut, and details. Do not',
-    'substitute a different person or a different garment.',
-    `Scene: ${params.theme || 'contemporary catalog'} theme, ${params.lighting || 'soft studio'} lighting,`,
+  const scenePrompt = [
+    'Photorealistic e-commerce product photography.',
+    `${params.theme || 'contemporary catalog'} theme, ${params.lighting || 'soft studio'} lighting,`,
     `${params.background || 'clean neutral'} background.`,
     'Commercial fashion catalog quality, sharp focus, no visible AI artifacts.',
   ].join(' ');
 
-  logger.info('Generating product photoshoot', { userId, generationId, model: model.split('/')[1]?.split(':')[0] });
+  logger.info('Generating product photoshoot', { userId, generationId, provider: 'fashn' });
 
   try {
-    const output = await replicate.run(model as `${string}/${string}:${string}`, {
-      input: {
-        prompt,
-        input_image_1: modelUrl,
-        input_image_2: productUrl,
-        aspect_ratio: '4:5',
-      },
+    logger.info('Photoshoot step 1/2: product-to-model', { userId, generationId });
+    const onModel = await FashionGenerationProvider.productToModel({
+      productImageUrl: productUrl,
+      prompt: scenePrompt,
     });
 
-    const urlHolder = Array.isArray(output) ? output[0] : output;
-    const imageUrl =
-      typeof urlHolder === 'string'
-        ? urlHolder
-        : typeof (urlHolder as { url?: () => string })?.url === 'function'
-          ? (urlHolder as { url: () => string }).url()
-          : String(urlHolder);
+    logger.info('Photoshoot step 2/2: model-swap to chosen model', { userId, generationId });
+    const swapped = await FashionGenerationProvider.swapModel({
+      modelImageUrl: onModel.resultUrl,
+      faceReferenceUrl: modelUrl,
+    });
 
-    const res = await fetch(imageUrl);
+    const res = await fetch(swapped.resultUrl);
     if (!res.ok) throw new Error(`Failed to download photoshoot image (${res.status})`);
     const buffer = Buffer.from(await res.arrayBuffer());
     const storagePath = await uploadResultBuffer(buffer, userId);

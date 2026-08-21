@@ -1,24 +1,9 @@
-/**
- * Still on Replicate, not FASHN: this is pure prompt → model-image generation, and every FASHN
- * endpoint in `fashn.ts` is image-conditioned (try-on, product-to-model, image-to-video) — there
- * is no FASHN text-to-image capability to migrate to. Revisit if FASHN adds one.
- */
-import Replicate from 'replicate';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 import { uploadResultBuffer } from '../storage/images';
 import { anyApi, convexMutationTrusted, convexQueryTrusted } from '../../config/convexHttp';
 import { AppError } from '../../middleware/errorHandler';
-
-const replicate = new Replicate({ auth: env.REPLICATE_API_TOKEN });
-
-/** Mirrors fashn.ts's poll cadence — flux-schnell generations here have run 60-90s under load. */
-const POLL_INTERVAL_MS = 3_000;
-const POLL_TIMEOUT_MS = 150_000;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { FashionGenerationProvider } from './fashionGenerationProvider';
 
 export interface AiModelGenerationParams {
   /** Free-text description of the model the brand wants — e.g. "professional African fashion
@@ -33,15 +18,6 @@ export interface SavedAiModel {
   createdAt: string;
 }
 
-function buildReplicateInput(prompt: string) {
-  return {
-    prompt,
-    aspect_ratio: '3:4',
-    output_format: 'jpg',
-    num_outputs: 1,
-  };
-}
-
 export function buildPrompt(p: AiModelGenerationParams): string {
   return [
     p.prompt.trim(),
@@ -50,72 +26,39 @@ export function buildPrompt(p: AiModelGenerationParams): string {
 }
 
 /**
- * Generates a single consistent AI fashion model image via Replicate (Enterprise "Generate AI
- * Model" feature) and stores it in Convex, then saves the library entry. Caller must already
- * have enforced `requirePlan('enterprise')` — this function does not check plan itself.
+ * Generates a single consistent AI fashion model image via FASHN's `model-create` (text prompt →
+ * model image, no input photo required — https://docs.fashn.ai/api-reference/model-create) and
+ * stores it in Convex, then saves the library entry. Credit-metered on every plan — see
+ * `reserveGenerationCredits` in routes/aiStudio.ts.
  */
 export async function generateAndSaveAiModel(
   userId: string,
   params: AiModelGenerationParams
 ): Promise<SavedAiModel> {
-  const model = env.REPLICATE_MODEL_AI_MODEL_GENERATION;
   const prompt = buildPrompt(params);
 
-  logger.info('Generating AI fashion model', { userId, model: model.split('/')[1]?.split(':')[0] });
+  logger.info('Generating AI fashion model', { userId, provider: 'fashn', model: 'model-create' });
 
-  // replicate.run()'s built-in synchronous wait gives up before this model's actual generation
-  // time under load (observed 60-90s) and returns a null/empty output even though the prediction
-  // goes on to succeed seconds later — confirmed against Replicate's own prediction records
-  // during QA. Explicit create-then-poll (same pattern fashn.ts already uses reliably) doesn't
-  // have that ceiling.
-  const [modelRef, versionHash] = model.split(':');
-  const createOptions = versionHash
-    ? { version: versionHash, input: buildReplicateInput(prompt) }
-    : { model: modelRef, input: buildReplicateInput(prompt) };
-  let prediction = await replicate.predictions.create(createOptions);
-
-  const deadline = Date.now() + POLL_TIMEOUT_MS;
-  while (prediction.status !== 'succeeded' && prediction.status !== 'failed' && prediction.status !== 'canceled') {
-    if (Date.now() > deadline) {
-      throw new Error('AI model generation timed out — please try again.');
-    }
-    await sleep(POLL_INTERVAL_MS);
-    prediction = await replicate.predictions.get(prediction.id);
-  }
-
-  if (prediction.status !== 'succeeded') {
-    const providerError = typeof prediction.error === 'string' ? prediction.error : prediction.status;
-    // Replicate's safety classifier rejects some entirely benign prompts (false positives are
-    // common for words like "model"/"fashion"). Surface this one specific, actionable case to the
-    // user instead of a dead-end generic error — everything else stays generic (no internal
-    // provider details leak to the client).
-    if (/nsfw/i.test(String(providerError))) {
+  let resultUrl: string;
+  try {
+    const result = await FashionGenerationProvider.createModel({ prompt, aspectRatio: '3:4' });
+    resultUrl = result.resultUrl;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    // FASHN's safety filter can flag entirely benign prompts (false positives are common for
+    // words like "model"/"fashion") — surface this one specific, actionable case instead of a
+    // dead-end generic error; everything else stays generic (no internal provider details leak).
+    if (/nsfw|safety|content policy/i.test(message)) {
       throw new AppError(
         'This prompt was flagged by the safety filter — try rephrasing it (this can happen even for ordinary fashion prompts).',
         422,
         'AI_MODEL_NSFW_FLAGGED'
       );
     }
-    throw new Error(`AI model generation failed: ${providerError}`);
+    throw new Error(`AI model generation failed: ${message}`);
   }
 
-  const output = prediction.output as unknown;
-  const urlHolder = Array.isArray(output) ? output[0] : output;
-  if (urlHolder === null || urlHolder === undefined) {
-    logger.error('AI model generation: succeeded prediction has no output', {
-      predictionId: prediction.id,
-      outputType: typeof output,
-    });
-    throw new Error('Replicate returned no output for this generation — please try again.');
-  }
-  const imageUrl =
-    typeof urlHolder === 'string'
-      ? urlHolder
-      : typeof (urlHolder as { url?: () => string })?.url === 'function'
-        ? (urlHolder as { url: () => string }).url()
-        : String(urlHolder);
-
-  const res = await fetch(imageUrl);
+  const res = await fetch(resultUrl);
   if (!res.ok) throw new Error(`Failed to download generated model image (${res.status})`);
   const buffer = Buffer.from(await res.arrayBuffer());
 

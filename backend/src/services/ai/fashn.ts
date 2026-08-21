@@ -395,3 +395,78 @@ export async function runFashnImageToVideo(input: FashnImageToVideoInput): Promi
 
   return { resultUrl, processingTimeMs };
 }
+
+/** FASHN model used for AI Model Generation (text prompt → a new fashion model image). */
+const MODEL_CREATE_MODEL_NAME = env.FASHN_MODEL_CREATE_MODEL_NAME;
+
+export interface FashnModelCreateInput {
+  prompt: string;
+  faceReferenceUrl?: string;
+  aspectRatio?: '21:9' | '16:9' | '9:16' | '4:3' | '3:4' | '3:2' | '2:3' | '4:5' | '5:4' | '1:1';
+  resolution?: '1k' | '2k' | '4k';
+}
+
+/**
+ * Runs FASHN's `model-create`: generates a fashion model image from a text prompt alone (no
+ * input photo required) — confirmed against the live FASHN docs
+ * (https://docs.fashn.ai/api-reference/model-create). `face_reference` is optional and locks a
+ * specific identity into the generated model.
+ */
+export async function runFashnModelCreate(input: FashnModelCreateInput): Promise<FashnOutfitOutput> {
+  const startTime = Date.now();
+
+  const payload: Record<string, unknown> = { prompt: input.prompt };
+  if (input.faceReferenceUrl) payload.face_reference = input.faceReferenceUrl;
+  if (input.aspectRatio) payload.aspect_ratio = input.aspectRatio;
+  if (input.resolution) payload.resolution = input.resolution;
+
+  logger.info('FASHN model-create: starting prediction', { modelName: MODEL_CREATE_MODEL_NAME });
+
+  const predictionId = await startFashnRun(payload, MODEL_CREATE_MODEL_NAME);
+
+  logger.info('FASHN model-create: prediction started', { predictionId });
+
+  const resultUrl = await pollFashnStatus(predictionId);
+
+  const processingTimeMs = Date.now() - startTime;
+
+  logger.info('FASHN model-create: prediction complete', { predictionId, processingTimeMs });
+
+  return { resultUrl, processingTimeMs };
+}
+
+/** FASHN model used for identity swaps (keep the clothing, change who's wearing it). */
+const MODEL_SWAP_MODEL_NAME = env.FASHN_MODEL_SWAP_MODEL_NAME;
+
+export interface FashnModelSwapInput {
+  modelImageUrl: string;
+  faceReferenceUrl?: string;
+  prompt?: string;
+}
+
+/**
+ * Runs FASHN's `model-swap`: preserves the clothing in `modelImageUrl` but changes who appears
+ * to be wearing it, optionally guided toward a specific identity via `faceReferenceUrl` —
+ * confirmed against the live FASHN docs (https://docs.fashn.ai/api-reference/model-swap).
+ */
+export async function runFashnModelSwap(input: FashnModelSwapInput): Promise<FashnOutfitOutput> {
+  const startTime = Date.now();
+
+  const payload: Record<string, unknown> = { model_image: input.modelImageUrl };
+  if (input.faceReferenceUrl) payload.face_reference = input.faceReferenceUrl;
+  if (input.prompt) payload.prompt = input.prompt;
+
+  logger.info('FASHN model-swap: starting prediction', { modelName: MODEL_SWAP_MODEL_NAME });
+
+  const predictionId = await startFashnRun(payload, MODEL_SWAP_MODEL_NAME);
+
+  logger.info('FASHN model-swap: prediction started', { predictionId });
+
+  const resultUrl = await pollFashnStatus(predictionId);
+
+  const processingTimeMs = Date.now() - startTime;
+
+  logger.info('FASHN model-swap: prediction complete', { predictionId, processingTimeMs });
+
+  return { resultUrl, processingTimeMs };
+}
