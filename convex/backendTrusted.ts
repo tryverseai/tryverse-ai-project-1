@@ -626,6 +626,27 @@ export const getTryonByLegacyIdForUser = query({
   },
 });
 
+/**
+ * Capability-URL lookup for the result-email link (`GET /api/results/tryon/:id` on the backend) —
+ * the legacy try-on ID itself is the access token, same trust model as any unguessable share link
+ * (it's a high-entropy generated ID, not a sequential/guessable one). No userId check by design:
+ * this is reached from an email client with no TryVerse session. Deliberately returns only the
+ * minimum needed to serve the image, and only once the generation actually succeeded — never a
+ * user_id or any other account-identifying field.
+ */
+export const getTryonResultForPublicLink = query({
+  args: { secret: v.string(), legacyId: v.string() },
+  handler: async (ctx, { secret, legacyId }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db
+      .query("tryons")
+      .withIndex("by_legacyId", (q) => q.eq("legacy_id", legacyId))
+      .unique();
+    if (!row || row.status !== "completed" || !row.result_image) return null;
+    return { result_image: row.result_image };
+  },
+});
+
 export const deleteTryonByLegacyIdForUser = mutation({
   args: { secret: v.string(), legacyId: v.string(), userId: v.string() },
   handler: async (ctx, { secret, legacyId, userId }) => {
@@ -1036,6 +1057,56 @@ export const patchProductModelGeneration = mutation({
     requireBackendSecret(secret);
     const row = await ctx.db.get(id);
     if (!row) throw new Error("Product model generation not found");
+    await ctx.db.patch(id, patch);
+    return { ok: true as const };
+  },
+});
+
+/** Inserts a new AI Product Photoshoot generation row in "processing" status. */
+export const insertPhotoshootGeneration = mutation({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    productStoragePath: v.string(),
+    modelId: v.string(),
+    modelSource: v.string(),
+    theme: v.optional(v.string()),
+    lighting: v.optional(v.string()),
+    background: v.optional(v.string()),
+  },
+  handler: async (ctx, { secret, userId, productStoragePath, modelId, modelSource, theme, lighting, background }) => {
+    requireBackendSecret(secret);
+    const id = await ctx.db.insert("photoshoot_generations", {
+      user_id: userId,
+      product_storage_path: productStoragePath,
+      model_id: modelId,
+      model_source: modelSource,
+      theme,
+      lighting,
+      background,
+      status: "processing",
+      created_at: new Date().toISOString(),
+    });
+    return { id: String(id) };
+  },
+});
+
+/** Patches an AI Product Photoshoot generation by its Convex `_id`. */
+export const patchPhotoshootGeneration = mutation({
+  args: {
+    secret: v.string(),
+    id: v.id("photoshoot_generations"),
+    patch: v.object({
+      status: v.optional(v.string()),
+      result_image: v.optional(v.string()),
+      error: v.optional(v.string()),
+      completed_at: v.optional(v.string()),
+    }),
+  },
+  handler: async (ctx, { secret, id, patch }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db.get(id);
+    if (!row) throw new Error("Photoshoot generation not found");
     await ctx.db.patch(id, patch);
     return { ok: true as const };
   },

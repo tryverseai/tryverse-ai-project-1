@@ -25,6 +25,7 @@ import Auth from "./pages/Auth";
 import AuthInvite from "./pages/AuthInvite";
 import AuthConfirm from "./pages/AuthConfirm";
 import BookDemo from "./pages/BookDemo";
+import EnterpriseContact from "./pages/EnterpriseContact";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -94,6 +95,7 @@ const App = () =>
             <Route path="/early-access" element={<Navigate to="/book-demo" replace />} />
             <Route path="/waitlist" element={<Navigate to="/book-demo" replace />} />
             <Route path="/book-demo" element={<BookDemo />} />
+            <Route path="/enterprise-contact" element={<EnterpriseContact />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/invite/:token" element={<AuthInvite />} />
             <Route path="/auth/confirm" element={<AuthConfirm />} />

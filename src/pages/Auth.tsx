@@ -282,7 +282,7 @@ const Auth = () => {
           </p>
           <div className="mt-12 grid grid-cols-3 gap-6">
             {[
-              { value: "20", label: "Free Try-Ons" },
+              { value: "10", label: "Free Try-Ons" },
               { value: "<1s", label: "Try-On Speed" },
               { value: "99%", label: "Uptime" },
             ].map((stat) => (
@@ -502,18 +502,18 @@ const Auth = () => {
                   Forgot your password?
                 </Link>
               </p>
+              <p className="text-sm text-muted-foreground text-center mt-5">
+                Need an account?{" "}
+                <button
+                  type="button"
+                  className="text-foreground font-medium hover:underline inline-block bg-transparent border-0 cursor-pointer p-0 font-[inherit]"
+                  onClick={() => openSignupChooser()}
+                >
+                  Get started
+                </button>
+              </p>
               {inviteOnly && (
-                <p className="text-sm text-muted-foreground text-center mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 items-center">
-                  <button
-                    type="button"
-                    className="text-foreground/80 font-medium hover:underline inline-block bg-transparent border-0 cursor-pointer p-0 font-[inherit]"
-                    onClick={() => openSignupChooser()}
-                  >
-                    Sign Up →
-                  </button>
-                  <span className="text-border hidden sm:inline" aria-hidden>
-                    |
-                  </span>
+                <p className="text-sm text-muted-foreground text-center mt-2">
                   <Link to="/book-demo" className="text-foreground/80 font-medium hover:underline inline-block">
                     Book a Demo →
                   </Link>

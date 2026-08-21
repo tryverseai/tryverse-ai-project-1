@@ -18,16 +18,11 @@ import {
   ScrollText,
   BarChart3,
   Images,
-  ChevronDown,
+  Menu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { MobileNavSheet } from "@/components/dashboard/MobileNavSheet";
 import {
   getStoredAdminKey,
   clearStoredAdminKey,
@@ -68,6 +63,7 @@ const Admin = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("Overview");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const ActiveIcon = sidebarItems.find((i) => i.label === activeTab)?.icon;
 
   useEffect(() => {
@@ -234,38 +230,36 @@ const Admin = () => {
             </nav>
           </aside>
 
-          {/* Mobile: header + tab dropdown (fixed below navbar) */}
+          {/* Mobile: header + left slide-in nav panel (fixed below navbar) */}
           <div className="lg:hidden fixed top-20 left-0 right-0 z-20 bg-background border-b border-border">
             <div className="flex items-center justify-between px-4 py-2 gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex-1 flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-muted text-foreground min-w-0">
-                    <span className="flex items-center gap-2 min-w-0">
-                      {ActiveIcon && <ActiveIcon className="h-4 w-4 flex-shrink-0" />}
-                      <span className="truncate">{activeTab}</span>
-                    </span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto">
-                  {sidebarItems.map((item) => (
-                    <DropdownMenuItem
-                      key={item.label}
-                      onSelect={() => setActiveTab(item.label)}
-                      className={activeTab === item.label ? "bg-muted font-medium" : ""}
-                    >
-                      <item.icon className="h-4 w-4 mr-2" />
-                      {item.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(true)}
+                className="flex-1 flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-muted text-foreground min-w-0"
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  {ActiveIcon && <ActiveIcon className="h-4 w-4 flex-shrink-0" />}
+                  <span className="truncate">{activeTab}</span>
+                </span>
+                <Menu className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              </button>
               <Button variant="ghost" size="sm" onClick={handleLock} className="gap-1.5 h-8 flex-shrink-0">
                 <Lock className="h-3.5 w-3.5" />
                 Lock
               </Button>
             </div>
           </div>
+
+          <MobileNavSheet
+            open={mobileNavOpen}
+            onOpenChange={setMobileNavOpen}
+            brandEyebrow="Platform Admin"
+            brandName="TryVerse"
+            groups={[{ section: "Admin", items: sidebarItems }]}
+            activeLabel={activeTab}
+            onSelect={(label) => { setActiveTab(label); setMobileNavOpen(false); }}
+          />
 
           {/* Main content */}
           <div className="flex-1 p-6 md:p-8 lg:pt-8 pt-[calc(var(--navbar-height)+3rem)]">

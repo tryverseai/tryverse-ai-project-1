@@ -15,10 +15,13 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import {
   uploadImage,
@@ -40,13 +43,58 @@ import { ModelPickerGrid, type PickedModel } from "@/components/dashboard/ModelP
 const VIDEO_MAX_POLL_ATTEMPTS = 60;
 const VIDEO_POLL_INTERVAL_MS = 5000;
 
-const CATEGORIES: { id: TryOnCategory; label: string }[] = [
-  { id: "clothing", label: "Full outfit" },
-  { id: "tops", label: "Tops" },
-  { id: "bottoms", label: "Bottoms" },
-  { id: "dresses", label: "Dresses" },
-  { id: "one-pieces", label: "One-pieces" },
+interface GarmentOption {
+  /** Unique picker key — several options can share the same underlying pipeline `category`. */
+  key: string;
+  label: string;
+  /** Pipeline routing category — unchanged 5-value set the backend already understands. */
+  category: TryOnCategory;
+  /**
+   * Sent as `productDescription` — real semantic context for the generation pipeline (garment
+   * topology classification, full-body/gown length preservation) beyond the coarse category.
+   * Without this, e.g. a floor-length gown gets no signal distinguishing it from a short dress.
+   */
+  description?: string;
+}
+
+const GARMENT_OPTIONS: { group: string; items: GarmentOption[] }[] = [
+  { group: "Full outfit", items: [{ key: "clothing", label: "Full outfit", category: "clothing" }] },
+  {
+    group: "Tops",
+    items: [
+      { key: "top", label: "Top", category: "tops" },
+      { key: "shirt", label: "Shirt", category: "tops", description: "shirt" },
+      { key: "blouse", label: "Blouse", category: "tops", description: "blouse" },
+      { key: "sweater", label: "Sweater", category: "tops", description: "sweater" },
+      { key: "jacket", label: "Jacket", category: "tops", description: "jacket" },
+      { key: "coat", label: "Coat / outerwear", category: "tops", description: "coat" },
+      { key: "blazer", label: "Blazer", category: "tops", description: "blazer" },
+    ],
+  },
+  {
+    group: "Bottoms",
+    items: [
+      { key: "bottom", label: "Bottom", category: "bottoms" },
+      { key: "skirt", label: "Skirt", category: "bottoms", description: "skirt" },
+      { key: "trousers", label: "Trousers", category: "bottoms", description: "trousers" },
+      { key: "jeans", label: "Jeans", category: "bottoms", description: "jeans" },
+      { key: "shorts", label: "Shorts", category: "bottoms", description: "shorts" },
+    ],
+  },
+  {
+    group: "Dresses & full-body",
+    items: [
+      { key: "dress", label: "Dress", category: "dresses", description: "dress" },
+      { key: "gown", label: "Gown / evening gown", category: "dresses", description: "floor-length evening gown" },
+      { key: "jumpsuit", label: "Jumpsuit", category: "one-pieces", description: "jumpsuit" },
+      { key: "romper", label: "Romper", category: "one-pieces", description: "romper" },
+      { key: "suit", label: "Suit", category: "one-pieces", description: "suit" },
+    ],
+  },
+  { group: "Other", items: [{ key: "other", label: "Other — describe it", category: "clothing" }] },
 ];
+
+const GARMENT_OPTIONS_FLAT = GARMENT_OPTIONS.flatMap((g) => g.items);
 
 const MAX_POLL_ATTEMPTS = 30;
 const POLL_INTERVAL_MS = 3000;
@@ -179,7 +227,12 @@ export function StudioTab() {
   const [model, setModel] = useState<ImageSlot>(EMPTY_SLOT);
   const [pickedModel, setPickedModel] = useState<PickedModel | null>(null);
   const [garment, setGarment] = useState<ImageSlot>(EMPTY_SLOT);
-  const [category, setCategory] = useState<TryOnCategory>("clothing");
+  const [garmentKey, setGarmentKey] = useState("clothing");
+  const [customGarmentDescription, setCustomGarmentDescription] = useState("");
+  const selectedGarment = GARMENT_OPTIONS_FLAT.find((o) => o.key === garmentKey) ?? GARMENT_OPTIONS_FLAT[0];
+  const category: TryOnCategory = selectedGarment.category;
+  const productDescription =
+    garmentKey === "other" ? customGarmentDescription.trim() || undefined : selectedGarment.description;
   const [status, setStatus] = useState<Status>("idle");
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultTryonId, setResultTryonId] = useState<string | null>(null);
@@ -208,7 +261,8 @@ export function StudioTab() {
     setModel(EMPTY_SLOT);
     setPickedModel(null);
     setGarment(EMPTY_SLOT);
-    setCategory("clothing");
+    setGarmentKey("clothing");
+    setCustomGarmentDescription("");
     setStatus("idle");
     setResultUrl(null);
     setResultTryonId(null);
@@ -277,6 +331,7 @@ export function StudioTab() {
         personImagePath,
         productImagePath: garmentUpload.filePath,
         category,
+        productDescription,
       });
 
       if (job.status === "completed" && job.resultUrl) {
@@ -557,24 +612,38 @@ export function StudioTab() {
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     Garment category
                   </p>
-                  <Select value={category} onValueChange={(v) => setCategory(v as TryOnCategory)}>
+                  <Select value={garmentKey} onValueChange={setGarmentKey}>
                     <SelectTrigger className="h-10">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CATEGORIES.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.label}
-                        </SelectItem>
+                      {GARMENT_OPTIONS.map((group) => (
+                        <SelectGroup key={group.group}>
+                          <SelectLabel>{group.group}</SelectLabel>
+                          {group.items.map((item) => (
+                            <SelectItem key={item.key} value={item.key}>
+                              {item.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
                       ))}
                     </SelectContent>
                   </Select>
-                  {category === "clothing" && (
+                  {garmentKey === "clothing" && (
                     <p className="text-xs text-muted-foreground">
                       Best for a single reference photo already showing the full look. For combining
                       separate top + bottom (or shoe) product photos into one outfit, use{" "}
                       <span className="font-medium text-foreground">Outfit Builder</span> instead.
                     </p>
+                  )}
+                  {garmentKey === "other" && (
+                    <Input
+                      value={customGarmentDescription}
+                      onChange={(e) => setCustomGarmentDescription(e.target.value)}
+                      placeholder="e.g. floor-length evening gown, cropped bolero jacket"
+                      maxLength={200}
+                      className="h-10"
+                    />
                   )}
                 </div>
 

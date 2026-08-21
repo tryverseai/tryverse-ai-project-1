@@ -372,6 +372,28 @@ export default defineSchema({
     .index("by_user_created", ["user_id", "created_at"]),
 
   /**
+   * AI Product Photoshoot (`AiPhotoshootTab.tsx`) — records which product and model a photoshoot
+   * result actually used, so results can be audited/associated after the fact. Previously this
+   * feature only logged an anonymous usage-count row with no product/model relationship.
+   */
+  photoshoot_generations: defineTable({
+    user_id: v.string(),
+    product_storage_path: v.string(),
+    model_id: v.string(),
+    model_source: v.string(),
+    theme: v.optional(v.string()),
+    lighting: v.optional(v.string()),
+    background: v.optional(v.string()),
+    result_image: v.optional(v.string()),
+    status: v.string(),
+    error: v.optional(v.string()),
+    created_at: v.string(),
+    completed_at: v.optional(v.string()),
+  })
+    .index("by_userId", ["user_id"])
+    .index("by_user_created", ["user_id", "created_at"]),
+
+  /**
    * Enterprise "AI Video" — animates a still image (any result the brand already generated, or a
    * fresh upload) via FASHN's `image-to-video` endpoint. Real per-credit cost (480p=1, 720p=3,
    * 1080p=6, x2 for 10s) — kept behind the same Enterprise gate + dark-ship flag as everything else

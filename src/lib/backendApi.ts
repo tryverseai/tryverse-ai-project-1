@@ -904,6 +904,28 @@ export async function submitDemoBooking(payload: {
   return handleResponse(res, { feature: 'demo_booking' });
 }
 
+export async function submitEnterpriseInquiry(payload: {
+  full_name: string;
+  email: string;
+  company_name: string;
+  company_website?: string;
+  role?: string;
+  country?: string;
+  catalogue_size?: string;
+  monthly_generation_volume?: string;
+  features_interested?: string[];
+  api_sdk_requirements?: string;
+  infrastructure_requirements?: string;
+  message?: string;
+}): Promise<{ ok: boolean }> {
+  const res = await fetchWithConnectivityHint(composeApiUrl('/api/demo/enterprise'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res, { feature: 'enterprise_inquiry' });
+}
+
 /** Contact / Support form — saved via backend to avoid PostgREST schema issues. */
 export interface SupportContactPayload {
   first_name: string;
@@ -1446,6 +1468,28 @@ export async function clearAdminLogs(adminKey: string): Promise<{ ok: boolean; m
 
 export async function clearAdminAudit(adminKey: string): Promise<{ ok: boolean; message?: string }> {
   return adminFetch('/api/admin/audit/clear', adminKey, { method: 'POST' });
+}
+
+export interface PostHogQueryResult<T = unknown> {
+  results?: T[][];
+  columns?: string[];
+  types?: string[];
+  hasMore?: boolean;
+}
+
+/**
+ * Proxies a HogQL query to PostHog through the backend (`/api/admin/analytics/posthog-query`),
+ * which holds the Personal API Key server-side — the browser never sees it.
+ */
+export async function postHogAdminQuery<T = unknown>(
+  adminKey: string,
+  query: { kind: string; query: string },
+  name: string
+): Promise<PostHogQueryResult<T>> {
+  return adminFetch<PostHogQueryResult<T>>('/api/admin/analytics/posthog-query', adminKey, {
+    method: 'POST',
+    body: JSON.stringify({ query, name }),
+  });
 }
 
 /** Pending closed-beta users (beta_approved is not true, not rejected). */

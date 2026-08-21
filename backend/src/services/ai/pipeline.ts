@@ -270,7 +270,8 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
 
       if (userId) {
         // Credit was already atomically reserved by checkCredits at request start — no decrement here.
-        sendTryOnCompletedEmail(userId, cachedResultUrl).catch((e) =>
+        // Email link is TryVerse's own domain, not the raw Convex storage URL — see routes/results.ts.
+        sendTryOnCompletedEmail(userId, `${env.PUBLIC_API_URL}/api/results/tryon/${tryonDbId}`).catch((e) =>
           logger.warn('Try-on completed email failed (cache hit)', { userId, error: String(e) })
         );
       }
@@ -525,8 +526,9 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
     // ── STEP 12: Credits already reserved atomically at request start — no decrement here.
 
     // ── STEP 12b: Send try-on completed email ──────────────────────────────
+    // Email link is TryVerse's own domain, not the raw Convex storage URL — see routes/results.ts.
     if (userId) {
-      sendTryOnCompletedEmail(userId, cdnUrl).catch((e) =>
+      sendTryOnCompletedEmail(userId, `${env.PUBLIC_API_URL}/api/results/tryon/${tryonDbId}`).catch((e) =>
         logger.warn('Try-on completed email failed', { userId, error: String(e) })
       );
     }

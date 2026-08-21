@@ -283,7 +283,7 @@ const Pricing = () => {
 
   const handleSubscribe = async (plan: PlanRow) => {
     if (plan.id === "enterprise") {
-      navigate("/book-demo");
+      navigate("/enterprise-contact");
       return;
     }
 

@@ -4,18 +4,11 @@ import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, BarChart3, Settings, Key, LayoutDashboard, CreditCard, BookOpen, FlaskConical, Sparkles,
-  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, ChevronDown,
+  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, Menu,
 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { MobileNavSheet } from "@/components/dashboard/MobileNavSheet";
 
 // Eagerly load the default tab — zero extra latency on first visit
 import { TryOnGuideTab } from "@/components/dashboard/TryOnGuideTab";
@@ -228,6 +221,7 @@ const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(DEFAULT_TAB);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { user } = useAuth();
   const brandName = user?.user_metadata?.brand_name || "Your Brand";
 
@@ -250,6 +244,7 @@ const Dashboard = () => {
   const selectTab = (label: string) => {
     setActiveTab(label);
     setSearchParams({ tab: label }, { replace: true });
+    setMobileNavOpen(false);
   };
 
   const ActiveIcon = sidebarItems.find((i) => i.label === activeTab)?.icon;
@@ -304,43 +299,33 @@ const Dashboard = () => {
             </nav>
           </aside>
 
-          {/* Mobile tabs — dropdown instead of horizontal scroll, so all 7 groups/15 items are
-              reachable without sideways hunting; mirrors the desktop sidebar's grouped list. */}
+          {/* Mobile tabs — left slide-in panel instead of a dropdown, mirrors the desktop
+              sidebar's grouped list one-for-one. */}
           <div className="lg:hidden fixed left-0 right-0 z-30 bg-background border-b border-border" style={{ top: 'var(--navbar-height)' }}>
             <div className="px-4 py-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm font-medium bg-muted text-foreground">
-                    <span className="flex items-center gap-2">
-                      {ActiveIcon && <ActiveIcon className="h-4 w-4" />}
-                      {activeTab}
-                    </span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto">
-                  {sidebarGroups.map((group, i) => (
-                    <div key={group.section}>
-                      {i > 0 && <DropdownMenuSeparator />}
-                      <DropdownMenuLabel className="text-[0.6875rem] text-muted-foreground/70 uppercase tracking-wider">
-                        {group.section}
-                      </DropdownMenuLabel>
-                      {group.items.map((item) => (
-                        <DropdownMenuItem
-                          key={item.label}
-                          onSelect={() => selectTab(item.label)}
-                          className={activeTab === item.label ? "bg-muted font-medium" : ""}
-                        >
-                          <item.icon className="h-4 w-4 mr-2" />
-                          {item.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </div>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(true)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm font-medium bg-muted text-foreground"
+              >
+                <span className="flex items-center gap-2">
+                  {ActiveIcon && <ActiveIcon className="h-4 w-4" />}
+                  {activeTab}
+                </span>
+                <Menu className="h-4 w-4 text-muted-foreground" />
+              </button>
             </div>
           </div>
+
+          <MobileNavSheet
+            open={mobileNavOpen}
+            onOpenChange={setMobileNavOpen}
+            brandEyebrow="Brand Dashboard"
+            brandName={brandName}
+            groups={sidebarGroups}
+            activeLabel={activeTab}
+            onSelect={selectTab}
+          />
 
           {/* Main content */}
           <div className="flex-1 min-h-0 p-6 md:p-8 lg:pt-8 pt-[calc(var(--navbar-height)+4rem)]">

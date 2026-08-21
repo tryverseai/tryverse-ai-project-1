@@ -13,11 +13,8 @@ import {
   Bar,
   Cell,
 } from "recharts";
-import {
-  postHogQuery,
-  isPostHogApiConfigured,
-  hogqlDateFilter,
-} from "@/lib/posthogApi";
+import { postHogQuery, hogqlDateFilter } from "@/lib/posthogApi";
+import { ApiError } from "@/lib/backendApi";
 
 interface AdminAnalyticsTabProps {
   adminKey: string;
@@ -43,9 +40,10 @@ const TRACKED_EVENTS = [
   "download_result_clicked",
 ];
 
-export function AdminAnalyticsTab({ adminKey: _adminKey }: AdminAnalyticsTabProps) {
+export function AdminAnalyticsTab({ adminKey }: AdminAnalyticsTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notConfigured, setNotConfigured] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>("30d");
   const [eventFilter, setEventFilter] = useState<string>("all");
 
@@ -65,16 +63,11 @@ export function AdminAnalyticsTab({ adminKey: _adminKey }: AdminAnalyticsTabProp
   const dateFilter = hogqlDateFilter(dateRange);
 
   const fetchData = useCallback(async () => {
-    if (!isPostHogApiConfigured()) {
-      setError(
-        "PostHog API not configured. Locally: add VITE_POSTHOG_PROJECT_ID and VITE_POSTHOG_PERSONAL_API_KEY to .env — for production (e.g. Vercel): set the same names as Environment Variables, then redeploy."
-      );
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
+      const q = <T,>(query: { kind: string; query: string }, name: string) =>
+        postHogQuery<T>(adminKey, query, name);
       const eventFilterSql =
         eventFilter === "all"
           ? ""
@@ -82,63 +75,63 @@ export function AdminAnalyticsTab({ adminKey: _adminKey }: AdminAnalyticsTabProp
 
       const [totalTryOnsRes, todayRes, completedRes, failedRes, signedUpRes, overTimeRes, funnelRes, hoursRes, eventsRes] =
         await Promise.all([
-          postHogQuery(
+          q(
             {
               kind: "HogQLQuery",
               query: `SELECT count() as cnt FROM events WHERE event IN ('try_on_started', 'try_on_completed')`,
             },
             "total_tryons"
           ),
-          postHogQuery(
+          q(
             {
               kind: "HogQLQuery",
               query: `SELECT count() as cnt FROM events WHERE event IN ('try_on_started', 'try_on_completed') AND ${dateFilter}`,
             },
             "tryons_today"
           ),
-          postHogQuery(
+          q(
             {
               kind: "HogQLQuery",
               query: `SELECT count() as cnt FROM events WHERE event = 'try_on_completed' AND ${dateFilter}`,
             },
             "completed"
           ),
-          postHogQuery(
+          q(
             {
               kind: "HogQLQuery",
               query: `SELECT count() as cnt FROM events WHERE event = 'try_on_failed' AND ${dateFilter}`,
             },
             "failed"
           ),
-          postHogQuery(
+          q(
             {
               kind: "HogQLQuery",
               query: `SELECT count() as cnt FROM events WHERE event = 'user_signed_up'`,
             },
             "signed_up"
           ),
-          postHogQuery(
+          q(
             {
               kind: "HogQLQuery",
               query: `SELECT toDate(timestamp) as d, count() as cnt FROM events WHERE event IN ('try_on_started', 'try_on_completed') AND timestamp >= now() - INTERVAL 30 DAY GROUP BY d ORDER BY d`,
             },
             "tryons_over_time"
           ),
-          postHogQuery(
+          q(
             {
               kind: "HogQLQuery",
               query: `SELECT event as e, count() as cnt FROM events WHERE event IN ('upload_photo_clicked', 'try_on_started', 'try_on_completed') AND ${dateFilter} GROUP BY e`,
             },
             "funnel"
           ),
-          postHogQuery(
+          q(
             {
               kind: "HogQLQuery",
               query: `SELECT toHour(timestamp) as h, count() as cnt FROM events WHERE event IN ('try_on_started', 'try_on_completed') AND ${dateFilter} GROUP BY h ORDER BY h`,
             },
             "active_hours"
           ),
-          postHogQuery(
+          q(
             {
               kind: "HogQLQuery",
               query: `SELECT event, distinct_id, timestamp, properties FROM events WHERE 1=1${eventFilterSql} ORDER BY timestamp DESC LIMIT 50`,
@@ -200,32 +193,38 @@ export function AdminAnalyticsTab({ adminKey: _adminKey }: AdminAnalyticsTabProp
       }));
       setRecentEvents(eventsData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load analytics");
+      if (err instanceof ApiError && err.status === 503) {
+        setNotConfigured(true);
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to load analytics");
+      }
     } finally {
       setLoading(false);
     }
-  }, [dateRange, eventFilter]);
+  }, [adminKey, dateRange, eventFilter]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  if (!isPostHogApiConfigured()) {
+  if (notConfigured) {
     return (
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 text-center">
           <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-            PostHog Analytics requires configuration. Add these to local <code className="bg-muted px-1 rounded">.env</code> or
-            your host&apos;s env (production: e.g. Vercel project settings — then redeploy):
+            PostHog Analytics isn&apos;t configured on the server yet.
           </p>
           <p className="text-xs text-muted-foreground mt-2 font-mono">
-            VITE_POSTHOG_PROJECT_ID=your_project_id
+            POSTHOG_PROJECT_ID=your_project_id
             <br />
-            VITE_POSTHOG_PERSONAL_API_KEY=your_personal_api_key
+            POSTHOG_PERSONAL_API_KEY=your_personal_api_key
+            <br />
+            POSTHOG_HOST=https://us.i.posthog.com (or https://eu.i.posthog.com for EU-hosted projects)
           </p>
           <p className="text-xs text-muted-foreground mt-2">
-            Use Profile → Personal API Keys (needs query/HogQL read access). Do not paste the browser <code className="font-mono">phc_*</code> project token — it returns 403. EU projects should set{" "}
-            <code className="font-mono">VITE_POSTHOG_HOST=https://eu.i.posthog.com</code>.
+            Set these on Railway (backend), not Vercel — a Personal API Key must never ship to the
+            browser. Use Profile → Personal API Keys in PostHog (needs query/HogQL read access), then
+            redeploy the backend.
           </p>
         </div>
       </motion.div>

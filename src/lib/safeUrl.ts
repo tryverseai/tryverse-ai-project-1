@@ -89,11 +89,16 @@ export function assignTrustedPaymentCheckoutUrl(rawUrl: string, rail: "paystack"
       throw new Error("Invalid payment redirect host");
     }
   } else {
+    // Test-mode checkout links come back from a *different* domain (dev-flutterwave.com), not a
+    // flutterwave.com subdomain — confirmed via a live test-mode /v3/payments call, which returned
+    // https://checkout-v2.dev-flutterwave.com/... This is what silently broke every USD checkout
+    // (Paystack doesn't support USD on this account, so USD always routes through Flutterwave).
     if (
       host !== "checkout.flutterwave.com" &&
       !host.endsWith(".flutterwave.com") &&
       host !== "rave.flutterwave.com" &&
-      !host.endsWith(".flwv.io")
+      !host.endsWith(".flwv.io") &&
+      !host.endsWith(".dev-flutterwave.com")
     ) {
       throw new Error("Invalid payment redirect host");
     }

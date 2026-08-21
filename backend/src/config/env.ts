@@ -143,11 +143,6 @@ export const env = {
     'REPLICATE_MODEL_AI_MODEL_GENERATION',
     'black-forest-labs/flux-schnell'
   ),
-  // Enterprise "AI Product Photoshoot" — garment + scene compositing model.
-  REPLICATE_MODEL_PRODUCT_PHOTOSHOOT: optionalEnv(
-    'REPLICATE_MODEL_PRODUCT_PHOTOSHOOT',
-    'black-forest-labs/flux-kontext-pro'
-  ),
   // Optional: flux-kontext for dynamic prompt-based try-on (set to enable)
   REPLICATE_MODEL_FLUX_KONTEXT: optionalEnv(
     'REPLICATE_MODEL_FLUX_KONTEXT',
@@ -302,6 +297,14 @@ export const env = {
   CLOUDFLARE_API_TOKEN: optionalEnv('CLOUDFLARE_API_TOKEN', ''),
   CLOUDFLARE_IMAGE_RESIZING_ENABLED: optionalBool('CLOUDFLARE_IMAGE_RESIZING_ENABLED', false),
 
+  // ── Analytics (PostHog) ────────────────────────────────────────────────────
+  // Server-only — a Personal API Key must never carry the VITE_ prefix (that ships it to the
+  // browser bundle). This proxies Admin Analytics' privileged HogQL queries; the public phc_*
+  // ingestion token used for client-side event capture stays as VITE_POSTHOG_KEY in the frontend.
+  POSTHOG_PROJECT_ID: optionalEnv('POSTHOG_PROJECT_ID', ''),
+  POSTHOG_PERSONAL_API_KEY: optionalEnv('POSTHOG_PERSONAL_API_KEY', ''),
+  POSTHOG_HOST: optionalEnv('POSTHOG_HOST', 'https://us.i.posthog.com'),
+
   // ── Monitoring (Sentry) ───────────────────────────────────────────────────
   SENTRY_DSN: optionalEnv('SENTRY_DSN', ''),
   SENTRY_ISSUES_URL: optionalEnv('SENTRY_ISSUES_URL', ''),
@@ -316,6 +319,12 @@ export const env = {
     process.env['PUBLIC_APP_URL'] || optionalEnv('FRONTEND_URL', 'http://localhost:8080'),
     'http://localhost:8080'
   ).replace(/\/$/, ''),
+  /**
+   * This API's own public origin — used to build TryVerse-controlled result links (e.g. in
+   * result-ready emails) instead of exposing the raw Convex storage host. Set
+   * PUBLIC_API_URL=https://api.tryverseai.com in production.
+   */
+  PUBLIC_API_URL: sanitizeEnvLine(process.env['PUBLIC_API_URL'], 'http://localhost:3001').replace(/\/$/, ''),
 
   // ── Email (Resend) ─────────────────────────────────────────────────────
   /** Trimmed — trailing newlines/quotes in .env break Resend with "API key is invalid". */

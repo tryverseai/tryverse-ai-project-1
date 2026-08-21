@@ -1,12 +1,23 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Wand2, Trash2, RefreshCw, Users, Film, Loader2 } from "lucide-react";
+import { Sparkles, Wand2, Trash2, RefreshCw, Users, Film, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
   generateAiModel,
   getSavedAiModels,
+  deleteAiModel,
   generateVideo,
   pollVideoStatus,
   type AiModelResult,
@@ -15,6 +26,7 @@ import { useIsFreePlan } from "@/hooks/useIsFreePlan";
 import { posthogCapture } from "@/lib/posthog";
 import { EmptyState } from "@/components/EmptyState";
 import { ModelPortrait } from "@/components/ModelPortrait";
+import { downloadFile, dateStampedFilename } from "@/lib/utils";
 
 const PROMPT_EXAMPLE =
   "Professional African fashion model, female, age 28, dark skin, studio lighting, luxury editorial fashion campaign.";
@@ -28,6 +40,8 @@ export function AiModelsTab() {
   const [videoByModel, setVideoByModel] = useState<
     Record<string, { status: "generating" | "done" | "error"; url?: string }>
   >({});
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +100,24 @@ export function AiModelsTab() {
     } catch (e) {
       setVideoByModel((prev) => ({ ...prev, [modelId]: { status: "error" } }));
       toast.error(e instanceof Error ? e.message : "Could not generate the video.");
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setDeleting(true);
+    try {
+      await deleteAiModel(id);
+      setModels((prev) => prev.filter((x) => x.id !== id));
+      toast.success("Model deleted");
+      setConfirmDeleteId(null);
+    } catch (e) {
+      toast.error("Could not delete this model", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -176,9 +208,22 @@ export function AiModelsTab() {
                           <Button
                             size="icon"
                             variant="secondary"
+                            className="h-8 w-8"
+                            title="Download"
+                            onClick={() =>
+                              void downloadFile(m.imageUrl, dateStampedFilename("tryverse-model")).catch(() =>
+                                toast.error("Download failed")
+                              )
+                            }
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="secondary"
                             className="h-8 w-8 text-destructive"
                             title="Delete"
-                            onClick={() => setModels((prev) => prev.filter((x) => x.id !== m.id))}
+                            onClick={() => setConfirmDeleteId(m.id)}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -191,6 +236,31 @@ export function AiModelsTab() {
             )}
           </div>
       </div>
+
+      <AlertDialog open={confirmDeleteId !== null} onOpenChange={(open) => !open && setConfirmDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this model?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes it from your model library. It won't affect results you've already generated with it.
+              This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmDelete();
+              }}
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }

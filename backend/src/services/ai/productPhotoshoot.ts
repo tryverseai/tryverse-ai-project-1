@@ -57,49 +57,81 @@ export async function generateProductPhotoshoot(
   userId: string,
   params: ProductPhotoshootParams
 ): Promise<ProductPhotoshootResult> {
-  const model = env.REPLICATE_MODEL_PRODUCT_PHOTOSHOOT;
+  // Must be the multi-image-capable Flux Kontext variant — it's the only one that actually
+  // reads `input_image_1`/`input_image_2`. The single-image `black-forest-labs/flux-kontext-pro`
+  // this used to point at silently drops both image inputs and falls back to pure text-to-image
+  // generation, which is why results could show a random model wearing a different product.
+  const model = env.REPLICATE_MODEL_FLUX_KONTEXT;
   const [productUrl, modelUrl] = await Promise.all([
     getSignedUrl(INPUT_BUCKET, params.productStoragePath),
     resolveModelUrl(userId, params.modelId, params.modelSource),
   ]);
 
-  const prompt = [
-    'Professional e-commerce product photography: dress the model in the provided product,',
-    `${params.theme || 'contemporary catalog'} theme, ${params.lighting || 'soft studio'} lighting,`,
-    `${params.background || 'clean neutral'} background,`,
-    'commercial fashion catalog quality, sharp focus, no visible AI artifacts, photorealistic, keep the model\'s identity consistent',
-  ].join(' ');
-
-  logger.info('Generating product photoshoot', { userId, model: model.split('/')[1]?.split(':')[0] });
-
-  const output = await replicate.run(model as `${string}/${string}:${string}`, {
-    input: {
-      prompt,
-      input_image_1: modelUrl,
-      input_image_2: productUrl,
-      aspect_ratio: '4:5',
-      output_format: 'jpg',
-    },
-  });
-
-  const urlHolder = Array.isArray(output) ? output[0] : output;
-  const imageUrl =
-    typeof urlHolder === 'string'
-      ? urlHolder
-      : typeof (urlHolder as { url?: () => string })?.url === 'function'
-        ? (urlHolder as { url: () => string }).url()
-        : String(urlHolder);
-
-  const res = await fetch(imageUrl);
-  if (!res.ok) throw new Error(`Failed to download photoshoot image (${res.status})`);
-  const buffer = Buffer.from(await res.arrayBuffer());
-  const storagePath = await uploadResultBuffer(buffer, userId);
-
-  await convexMutationTrusted(anyApi.backendTrusted.logAiGenerationUsage, {
+  const { id: generationId } = (await convexMutationTrusted(anyApi.backendTrusted.insertPhotoshootGeneration, {
     secret: env.BACKEND_SHARED_SECRET,
     userId,
-    feature: 'ai_photoshoot',
-  });
+    productStoragePath: params.productStoragePath,
+    modelId: params.modelId,
+    modelSource: params.modelSource,
+    theme: params.theme,
+    lighting: params.lighting,
+    background: params.background,
+  })) as { id: string };
 
-  return { storagePath, createdAt: new Date().toISOString() };
+  const prompt = [
+    'Photorealistic e-commerce product photography. input_image_1 is the exact model — preserve',
+    "their identity, face, and body exactly. input_image_2 is the exact garment/product — dress the",
+    'model in this precise product, preserving its true color, pattern, cut, and details. Do not',
+    'substitute a different person or a different garment.',
+    `Scene: ${params.theme || 'contemporary catalog'} theme, ${params.lighting || 'soft studio'} lighting,`,
+    `${params.background || 'clean neutral'} background.`,
+    'Commercial fashion catalog quality, sharp focus, no visible AI artifacts.',
+  ].join(' ');
+
+  logger.info('Generating product photoshoot', { userId, generationId, model: model.split('/')[1]?.split(':')[0] });
+
+  try {
+    const output = await replicate.run(model as `${string}/${string}:${string}`, {
+      input: {
+        prompt,
+        input_image_1: modelUrl,
+        input_image_2: productUrl,
+        aspect_ratio: '4:5',
+      },
+    });
+
+    const urlHolder = Array.isArray(output) ? output[0] : output;
+    const imageUrl =
+      typeof urlHolder === 'string'
+        ? urlHolder
+        : typeof (urlHolder as { url?: () => string })?.url === 'function'
+          ? (urlHolder as { url: () => string }).url()
+          : String(urlHolder);
+
+    const res = await fetch(imageUrl);
+    if (!res.ok) throw new Error(`Failed to download photoshoot image (${res.status})`);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const storagePath = await uploadResultBuffer(buffer, userId);
+
+    await convexMutationTrusted(anyApi.backendTrusted.patchPhotoshootGeneration, {
+      secret: env.BACKEND_SHARED_SECRET,
+      id: generationId,
+      patch: { status: 'completed', result_image: storagePath, completed_at: new Date().toISOString() },
+    });
+    await convexMutationTrusted(anyApi.backendTrusted.logAiGenerationUsage, {
+      secret: env.BACKEND_SHARED_SECRET,
+      userId,
+      feature: 'ai_photoshoot',
+    });
+
+    return { storagePath, createdAt: new Date().toISOString() };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await convexMutationTrusted(anyApi.backendTrusted.patchPhotoshootGeneration, {
+      secret: env.BACKEND_SHARED_SECRET,
+      id: generationId,
+      patch: { status: 'failed', error: message, completed_at: new Date().toISOString() },
+    });
+    throw err;
+  }
 }

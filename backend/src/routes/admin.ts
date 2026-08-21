@@ -1728,4 +1728,51 @@ router.delete(
   }
 );
 
+/**
+ * POST /api/admin/analytics/posthog-query
+ * Proxies a HogQL query to PostHog's Query API using the server-only Personal API Key.
+ * The key never reaches the browser — Admin Analytics calls this route instead of PostHog
+ * directly (a Personal API Key must not be bundled into frontend code with a VITE_ prefix).
+ */
+router.post(
+  '/analytics/posthog-query',
+  [
+    body('query').isObject(),
+    body('query.kind').isString().trim().notEmpty(),
+    body('query.query').isString().trim().notEmpty(),
+    body('name').optional().isString().trim(),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!env.POSTHOG_PROJECT_ID || !env.POSTHOG_PERSONAL_API_KEY) {
+        throw new AppError(
+          'PostHog is not configured on the server. Set POSTHOG_PROJECT_ID and POSTHOG_PERSONAL_API_KEY on Railway.',
+          503,
+          'POSTHOG_NOT_CONFIGURED'
+        );
+      }
+      const { query, name } = matchedData(req) as { query: { kind: string; query: string }; name?: string };
+      const host = env.POSTHOG_HOST.replace(/\/$/, '');
+      const resp = await fetch(`${host}/api/projects/${env.POSTHOG_PROJECT_ID}/query/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${env.POSTHOG_PERSONAL_API_KEY}`,
+        },
+        body: JSON.stringify({ query, name }),
+      });
+      const text = await resp.text();
+      if (!resp.ok) {
+        logger.warn('PostHog query proxy: upstream error', { status: resp.status, body: text.slice(0, 500) });
+        throw new AppError(`PostHog API error ${resp.status}`, 502, 'POSTHOG_UPSTREAM_ERROR');
+      }
+      res.set('Cache-Control', 'no-store');
+      res.type('application/json').send(text);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 export default router;
