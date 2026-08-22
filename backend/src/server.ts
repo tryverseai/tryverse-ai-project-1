@@ -33,6 +33,7 @@ import personalizeRouter from './routes/personalize';
 import bodyEstimateRouter from './routes/bodyEstimate';
 import aiStudioRouter from './routes/aiStudio';
 import resultsRouter from './routes/results';
+import creationsRouter from './routes/creations';
 
 // ─── Sentry (must init before everything else) ────────────────────────────────
 initSentry();
@@ -278,6 +279,7 @@ app.use('/api/personalize', personalizeRouter);
 app.use('/api/body-estimate', bodyEstimateRouter);
 app.use('/api/ai-studio', aiStudioRouter);
 app.use('/api/results',   resultsRouter);
+app.use('/api/creations', creationsRouter);
 
 // ─── Sentry error handler ────────────────────────────────────────────────────
 try {

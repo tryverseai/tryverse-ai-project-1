@@ -1905,6 +1905,40 @@ export async function pollVideoStatus(generationId: string): Promise<VideoGenera
   return handleResponse<VideoGenerationResponse>(res, { feature: 'video' });
 }
 
+// ─── My Creations ───────────────────────────────────────────────────────────
+// Unified, durable read across every generator (Try-On, Outfit Builder, AI Model Studio, AI
+// Product Photoshoot, AI Video, AI Models) — persists across refresh/logout/device change, unlike
+// each tool's own in-session results list.
+
+export type CreationType = "tryon" | "outfit" | "product_model" | "photoshoot" | "video" | "ai_model";
+
+export interface Creation {
+  id: string;
+  type: CreationType;
+  status: string;
+  resultUrl: string | null;
+  isVideo: boolean;
+  createdAt: string;
+  completedAt: string | null;
+  error: string | null;
+}
+
+export async function getMyCreations(): Promise<Creation[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/creations`, { headers });
+  const data = await handleResponse<{ creations: Creation[] }>(res);
+  return data.creations;
+}
+
+export async function deleteCreation(type: CreationType, id: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/creations/${type}/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers,
+  });
+  await handleResponse<{ ok: boolean }>(res);
+}
+
 // ─── Health ───────────────────────────────────────────────────────────────────
 
 export async function checkBackendHealth(): Promise<boolean> {

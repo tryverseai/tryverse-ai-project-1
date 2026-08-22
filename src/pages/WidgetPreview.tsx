@@ -53,6 +53,7 @@ const WidgetPreview = () => {
   const apiKeyParam = searchParams.get('apiKey');
   const productImageParam = searchParams.get('productImage');
   const productTypeParam = searchParams.get('productType') || 'clothing';
+  const productImg = (productImageParam && safeImageSrcForDom(productImageParam)) || String(shirtProduct);
 
   const [mode, setMode] = useState<WidgetMode>("popup");
   const [phase, setPhase] = useState<WidgetPhase>(isWidgetMode ? "open" : "idle");
@@ -103,8 +104,6 @@ const WidgetPreview = () => {
     const personImg = uploadedPersonImage || (selectedModel ? models.find(m => m.id === selectedModel)?.image : null);
     if (!personImg && !personUploadFile) return;
 
-    const productImg =
-      (productImageParam && safeImageSrcForDom(productImageParam)) || String(shirtProduct);
     const apiKey = apiKeyParam;
     const category = normalizeTryOnCategory(productTypeParam);
 

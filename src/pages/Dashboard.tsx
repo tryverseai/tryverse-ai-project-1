@@ -4,7 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, BarChart3, Settings, Key, LayoutDashboard, CreditCard, BookOpen, FlaskConical, Sparkles,
-  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, Menu,
+  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, Menu, LayoutGrid,
 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
@@ -130,6 +130,23 @@ const VideoTab = lazy(() =>
     .catch(() => ({ default: VideoTabUnavailable }))
 );
 
+function MyCreationsTabUnavailable() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <p className="text-sm font-medium text-foreground mb-1">My Creations unavailable</p>
+      <p className="text-xs text-muted-foreground max-w-md text-center">
+        This section could not be loaded. Refresh the page or try again in a moment.
+      </p>
+    </div>
+  );
+}
+
+const MyCreationsTab = lazy(() =>
+  import("@/components/dashboard/MyCreationsTab")
+    .then((m) => ({ default: m.MyCreationsTab }))
+    .catch(() => ({ default: MyCreationsTabUnavailable }))
+);
+
 const DeveloperDocsTab = lazyWithRetry(
   () => import("@/components/dashboard/DeveloperDocsTab").then((m) => ({ default: m.DeveloperDocsTab })),
   "developer-docs"
@@ -144,6 +161,7 @@ const sidebarGroups: { section: string; items: { icon: React.ElementType; label:
     items: [
       { icon: FlaskConical, label: "Personal Studio" },
       { icon: Shirt, label: "Outfit Builder" },
+      { icon: LayoutGrid, label: "My Creations" },
     ],
   },
   {
@@ -198,6 +216,7 @@ const tabComponents: Record<string, React.ComponentType> = {
   Analytics: AnalyticsTab,
   Products: ProductsTab,
   "Personal Studio": StudioTab,
+  "My Creations": MyCreationsTab,
   "AI Model Studio": AiModelsTab,
   "AI Photoshoot": AiPhotoshootTab,
   "Outfit Builder": OutfitBuilderTab,

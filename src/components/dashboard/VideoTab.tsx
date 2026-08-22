@@ -216,7 +216,7 @@ export function VideoTab() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Estimated cost: {selectedCredits * durationMultiplier} FASHN credits
+                Estimated usage: {selectedCredits * durationMultiplier} credits
               </p>
             </div>
 

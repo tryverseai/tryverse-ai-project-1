@@ -269,10 +269,24 @@ router.post(
 
       logger.info('Outfit generation: processing synchronously (queue unavailable)', { jobId, outfitDbId });
       const result = await executeOutfitPipeline(job);
-      const resultUrl = result.status === 'completed' && result.resultUrl
-        ? await getSignedUrl(RESULT_BUCKET, result.resultUrl)
-        : undefined;
-      res.json({ outfitId: outfitDbId, jobId, status: result.status, resultUrl, error: result.error });
+      if (result.status === 'completed' && result.resultUrl) {
+        try {
+          const resultUrl = await getSignedUrl(RESULT_BUCKET, result.resultUrl);
+          res.json({ outfitId: outfitDbId, jobId, status: 'completed', resultUrl });
+          return;
+        } catch (signErr) {
+          // Generation already succeeded and was already billed — a signing failure here must not
+          // fall into the catch block below and refund credits for completed work. The client can
+          // recover the result via GET /outfit/:outfitId, which re-signs on read.
+          logger.error('Outfit generation: completed but signing the result URL failed', {
+            outfitDbId,
+            error: signErr instanceof Error ? signErr.message : String(signErr),
+          });
+          res.json({ outfitId: outfitDbId, jobId, status: 'completed' });
+          return;
+        }
+      }
+      res.json({ outfitId: outfitDbId, jobId, status: result.status, error: result.error });
     } catch (err) {
       logger.error('Outfit generation failed', { error: err instanceof Error ? err.message : String(err) });
       // Job was never queued/run (failed before reaching the pipeline) — the pipeline handles
@@ -409,10 +423,24 @@ router.post(
 
       logger.info('AI Model Studio: processing synchronously (queue unavailable)', { jobId, generationDbId });
       const result = await executeProductModelPipeline(job);
-      const resultUrl = result.status === 'completed' && result.resultUrl
-        ? await getSignedUrl(RESULT_BUCKET, result.resultUrl)
-        : undefined;
-      res.json({ generationId: generationDbId, jobId, status: result.status, resultUrl, error: result.error });
+      if (result.status === 'completed' && result.resultUrl) {
+        try {
+          const resultUrl = await getSignedUrl(RESULT_BUCKET, result.resultUrl);
+          res.json({ generationId: generationDbId, jobId, status: 'completed', resultUrl });
+          return;
+        } catch (signErr) {
+          // Generation already succeeded and was already billed — a signing failure here must not
+          // fall into the catch block below and refund credits for completed work. The client can
+          // recover the result via GET /product-model/:id, which re-signs on read.
+          logger.error('AI Model Studio: completed but signing the result URL failed', {
+            generationDbId,
+            error: signErr instanceof Error ? signErr.message : String(signErr),
+          });
+          res.json({ generationId: generationDbId, jobId, status: 'completed' });
+          return;
+        }
+      }
+      res.json({ generationId: generationDbId, jobId, status: result.status, error: result.error });
     } catch (err) {
       logger.error('AI Model Studio generation failed', { error: err instanceof Error ? err.message : String(err) });
       if (creditsReserved) await restoreCredits(userId, creditAmount);
@@ -575,10 +603,24 @@ router.post(
 
       logger.info('AI Video: processing synchronously (queue unavailable)', { jobId, generationDbId });
       const result = await executeVideoPipeline(job);
-      const resultUrl = result.status === 'completed' && result.resultUrl
-        ? await getSignedUrl(RESULT_BUCKET, result.resultUrl)
-        : undefined;
-      res.json({ generationId: generationDbId, jobId, status: result.status, resultUrl, error: result.error });
+      if (result.status === 'completed' && result.resultUrl) {
+        try {
+          const resultUrl = await getSignedUrl(RESULT_BUCKET, result.resultUrl);
+          res.json({ generationId: generationDbId, jobId, status: 'completed', resultUrl });
+          return;
+        } catch (signErr) {
+          // Generation already succeeded and was already billed — a signing failure here must not
+          // fall into the catch block below and refund credits for completed work. The client can
+          // recover the result via GET /video/:id, which re-signs on read.
+          logger.error('AI Video: completed but signing the result URL failed', {
+            generationDbId,
+            error: signErr instanceof Error ? signErr.message : String(signErr),
+          });
+          res.json({ generationId: generationDbId, jobId, status: 'completed' });
+          return;
+        }
+      }
+      res.json({ generationId: generationDbId, jobId, status: result.status, error: result.error });
     } catch (err) {
       logger.error('AI Video generation failed', { error: err instanceof Error ? err.message : String(err) });
       if (creditsReserved) await restoreCredits(userId, creditAmount);

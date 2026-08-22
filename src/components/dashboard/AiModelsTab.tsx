@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Wand2, Trash2, RefreshCw, Users, Film, Loader2, Download } from "lucide-react";
+import { Sparkles, Wand2, Trash2, RefreshCw, Users, Film, Loader2, Download, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -26,6 +26,7 @@ import { useIsFreePlan } from "@/hooks/useIsFreePlan";
 import { posthogCapture } from "@/lib/posthog";
 import { EmptyState } from "@/components/EmptyState";
 import { ModelPortrait } from "@/components/ModelPortrait";
+import { Lightbox } from "@/components/Lightbox";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
 
 const PROMPT_EXAMPLE =
@@ -42,6 +43,7 @@ export function AiModelsTab() {
   >({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [viewingModel, setViewingModel] = useState<AiModelResult | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,6 +190,15 @@ export function AiModelsTab() {
                       )}
                       {!(video?.status === "done" && video.url) && (
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-8 w-8"
+                            title="View full size"
+                            onClick={() => setViewingModel(m)}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
                           <Button size="icon" variant="secondary" className="h-8 w-8" title="Reuse in a try-on">
                             <RefreshCw className="h-3.5 w-3.5" />
                           </Button>
@@ -236,6 +247,14 @@ export function AiModelsTab() {
             )}
           </div>
       </div>
+
+      <Lightbox
+        open={viewingModel !== null}
+        onOpenChange={(open) => !open && setViewingModel(null)}
+        url={viewingModel?.imageUrl ?? null}
+        title="AI Model"
+        downloadFilename={viewingModel ? dateStampedFilename("tryverse-model") : undefined}
+      />
 
       <AlertDialog open={confirmDeleteId !== null} onOpenChange={(open) => !open && setConfirmDeleteId(null)}>
         <AlertDialogContent>

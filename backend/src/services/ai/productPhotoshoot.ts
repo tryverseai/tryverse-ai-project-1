@@ -125,10 +125,11 @@ export async function generateProductPhotoshoot(
     return { storagePath, createdAt: new Date().toISOString() };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    logger.error('Product photoshoot failed', { userId, generationId, error: message });
     await convexMutationTrusted(anyApi.backendTrusted.patchPhotoshootGeneration, {
       secret: env.BACKEND_SHARED_SECRET,
       id: generationId,
-      patch: { status: 'failed', error: message, completed_at: new Date().toISOString() },
+      patch: { status: 'failed', error: 'Could not generate this photoshoot right now', completed_at: new Date().toISOString() },
     });
     throw err;
   }

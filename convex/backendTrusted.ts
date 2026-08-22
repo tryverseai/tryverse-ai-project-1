@@ -973,6 +973,39 @@ export const getOutfitGenerationForUser = query({
   },
 });
 
+/** Lists a user's Outfit Builder generations (newest first) for the My Creations gallery. */
+export const listOutfitGenerationsForUser = query({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db
+      .query("outfit_generations")
+      .withIndex("by_user_created", (q) => q.eq("user_id", userId))
+      .order("desc")
+      .collect();
+    return rows.map((r) => ({
+      id: String(r._id),
+      status: r.status,
+      resultImage: r.result_image ?? null,
+      error: r.error ?? null,
+      createdAt: r.created_at,
+      completedAt: r.completed_at ?? null,
+    }));
+  },
+});
+
+/** Deletes an Outfit Builder generation — owner-checked. Returns the result asset path (if any) so the caller can clean up storage. */
+export const deleteOutfitGenerationForUser = mutation({
+  args: { secret: v.string(), userId: v.string(), id: v.id("outfit_generations") },
+  handler: async (ctx, { secret, userId, id }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db.get(id);
+    if (!row || row.user_id !== userId) return { deleted: false as const, resultPath: null };
+    await ctx.db.delete(id);
+    return { deleted: true as const, resultPath: row.result_image ?? null };
+  },
+});
+
 /**
  * Batch product lookup for the Outfit Builder — resolves a brand's own catalog products by ID,
  * ownership-scoped by `user_id` (mirrors `products.ts::getMyProduct`'s ownership check, but via
@@ -1062,6 +1095,39 @@ export const patchProductModelGeneration = mutation({
   },
 });
 
+/** Lists a user's AI Model Studio (product-model) generations (newest first) for the My Creations gallery. */
+export const listProductModelGenerationsForUser = query({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db
+      .query("product_model_generations")
+      .withIndex("by_user_created", (q) => q.eq("user_id", userId))
+      .order("desc")
+      .collect();
+    return rows.map((r) => ({
+      id: String(r._id),
+      status: r.status,
+      resultImage: r.result_image ?? null,
+      error: r.error ?? null,
+      createdAt: r.created_at,
+      completedAt: r.completed_at ?? null,
+    }));
+  },
+});
+
+/** Deletes an AI Model Studio generation — owner-checked. Returns the result asset path (if any) so the caller can clean up storage. */
+export const deleteProductModelGenerationForUser = mutation({
+  args: { secret: v.string(), userId: v.string(), id: v.id("product_model_generations") },
+  handler: async (ctx, { secret, userId, id }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db.get(id);
+    if (!row || row.user_id !== userId) return { deleted: false as const, resultPath: null };
+    await ctx.db.delete(id);
+    return { deleted: true as const, resultPath: row.result_image ?? null };
+  },
+});
+
 /** Inserts a new AI Product Photoshoot generation row in "processing" status. */
 export const insertPhotoshootGeneration = mutation({
   args: {
@@ -1109,6 +1175,39 @@ export const patchPhotoshootGeneration = mutation({
     if (!row) throw new Error("Photoshoot generation not found");
     await ctx.db.patch(id, patch);
     return { ok: true as const };
+  },
+});
+
+/** Lists a user's AI Product Photoshoot generations (newest first) for the My Creations gallery. */
+export const listPhotoshootGenerationsForUser = query({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db
+      .query("photoshoot_generations")
+      .withIndex("by_user_created", (q) => q.eq("user_id", userId))
+      .order("desc")
+      .collect();
+    return rows.map((r) => ({
+      id: String(r._id),
+      status: r.status,
+      resultImage: r.result_image ?? null,
+      error: r.error ?? null,
+      createdAt: r.created_at,
+      completedAt: r.completed_at ?? null,
+    }));
+  },
+});
+
+/** Deletes an AI Product Photoshoot generation — owner-checked. Returns the result asset path (if any) so the caller can clean up storage. */
+export const deletePhotoshootGenerationForUser = mutation({
+  args: { secret: v.string(), userId: v.string(), id: v.id("photoshoot_generations") },
+  handler: async (ctx, { secret, userId, id }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db.get(id);
+    if (!row || row.user_id !== userId) return { deleted: false as const, resultPath: null };
+    await ctx.db.delete(id);
+    return { deleted: true as const, resultPath: row.result_image ?? null };
   },
 });
 
@@ -1191,6 +1290,39 @@ export const getVideoGenerationForUser = query({
       createdAt: row.created_at,
       completedAt: row.completed_at ?? null,
     };
+  },
+});
+
+/** Lists a user's AI Video generations (newest first) for the My Creations gallery. */
+export const listVideoGenerationsForUser = query({
+  args: { secret: v.string(), userId: v.string() },
+  handler: async (ctx, { secret, userId }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db
+      .query("video_generations")
+      .withIndex("by_user_created", (q) => q.eq("user_id", userId))
+      .order("desc")
+      .collect();
+    return rows.map((r) => ({
+      id: String(r._id),
+      status: r.status,
+      resultVideo: r.result_video ?? null,
+      error: r.error ?? null,
+      createdAt: r.created_at,
+      completedAt: r.completed_at ?? null,
+    }));
+  },
+});
+
+/** Deletes an AI Video generation — owner-checked. Returns the result asset path (if any) so the caller can clean up storage. */
+export const deleteVideoGenerationForUser = mutation({
+  args: { secret: v.string(), userId: v.string(), id: v.id("video_generations") },
+  handler: async (ctx, { secret, userId, id }) => {
+    requireBackendSecret(secret);
+    const row = await ctx.db.get(id);
+    if (!row || row.user_id !== userId) return { deleted: false as const, resultPath: null };
+    await ctx.db.delete(id);
+    return { deleted: true as const, resultPath: row.result_video ?? null };
   },
 });
 
