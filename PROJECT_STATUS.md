@@ -3,6 +3,16 @@
 _Last updated: 2026-07-31_
 _Base commit: `1a8d77f` ("Fixed preview nesting issue") — all work below is uncommitted on top of this until the commit made alongside this file._
 
+> **Stale as of 2026-08-23 — read with caution.** Significant work has landed since this was last
+> updated (FASHN migration for Try-On/Outfit Builder/AI Photoshoot/AI Model Studio/AI Video/AI
+> Model Personalization; My Creations; credit-system hardening; and more) that this document does
+> not reflect. One specific correction: every "AI Model Generation" / "AI Product Photoshoot" /
+> "AI Model Personalization" claim below naming Replicate or OpenAI as the live provider
+> (`black-forest-labs/flux-schnell`, `flux-kontext-pro`, `gpt-image-1`) is **out of date** — all
+> three now run on FASHN's direct API (`model-create`, chained `product-to-model`+`model-swap`,
+> and `model-swap` respectively). Treat this file as a historical log of what was true on
+> 2026-07-31, not current architecture — check the code/`git log` for that.
+
 ---
 
 ## Completed
