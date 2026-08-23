@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useCredits } from "@/contexts/CreditsContext";
 import {
   uploadImage,
   generateVideo,
@@ -61,6 +62,7 @@ function ComingSoonState() {
 }
 
 export function VideoTab() {
+  const { refresh: refreshCredits } = useCredits();
   const isFreePlan = useIsFreePlan();
   const enabled = FEATURE_FLAGS.VIDEO_ENABLED;
 
@@ -113,6 +115,7 @@ export function VideoTab() {
       if (started.status === "completed" && started.resultUrl) {
         setResults((prev) => [{ videoUrl: started.resultUrl!, createdAt: started.createdAt ?? new Date().toISOString() }, ...prev]);
         toast.success("Video generated");
+        void refreshCredits();
         return;
       }
       if (started.status === "failed") {

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useCredits } from "@/contexts/CreditsContext";
 import {
   uploadImage,
   generateProductModel,
@@ -42,6 +43,7 @@ function ComingSoonState() {
 }
 
 export function ProductModelTab() {
+  const { refresh: refreshCredits } = useCredits();
   const enabled = FEATURE_FLAGS.PRODUCT_MODEL_ENABLED;
 
   const productInputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +108,7 @@ export function ProductModelTab() {
       if (started.status === "completed" && started.resultUrl) {
         setResults((prev) => [{ imageUrl: started.resultUrl!, createdAt: started.createdAt ?? new Date().toISOString() }, ...prev]);
         toast.success("Generated");
+        void refreshCredits();
         return;
       }
       if (started.status === "failed") {

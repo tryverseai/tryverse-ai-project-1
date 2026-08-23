@@ -30,6 +30,9 @@ const TYPE_LABELS: Record<CreationType, string> = {
 export function MyCreationsTab() {
   const [creations, setCreations] = useState<Creation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [filter, setFilter] = useState<CreationType | "all">("all");
   const [viewing, setViewing] = useState<Creation | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Creation | null>(null);
@@ -39,11 +42,30 @@ export function MyCreationsTab() {
     let cancelled = false;
     setLoading(true);
     getMyCreations()
-      .then((rows) => { if (!cancelled) setCreations(rows); })
+      .then((page) => {
+        if (cancelled) return;
+        setCreations(page.creations);
+        setCursor(page.nextCursor);
+        setHasMore(page.hasMore);
+      })
       .catch(() => { if (!cancelled) toast.error("Could not load your creations"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  const handleLoadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const page = await getMyCreations(cursor);
+      setCreations((prev) => [...prev, ...page.creations]);
+      setCursor(page.nextCursor);
+      setHasMore(page.hasMore);
+    } catch (e) {
+      toast.error("Could not load more", { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handleConfirmDelete = async () => {
     if (!confirmDelete) return;
@@ -167,6 +189,14 @@ export function MyCreationsTab() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {!loading && filter === "all" && hasMore && (
+        <div className="flex justify-center mt-8">
+          <Button variant="outline" onClick={() => void handleLoadMore()} disabled={loadingMore}>
+            {loadingMore ? "Loading…" : "Load more"}
+          </Button>
         </div>
       )}
 

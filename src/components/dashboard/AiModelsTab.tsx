@@ -23,6 +23,7 @@ import {
   type AiModelResult,
 } from "@/lib/backendApi";
 import { useIsFreePlan } from "@/hooks/useIsFreePlan";
+import { useCredits } from "@/contexts/CreditsContext";
 import { posthogCapture } from "@/lib/posthog";
 import { EmptyState } from "@/components/EmptyState";
 import { ModelPortrait } from "@/components/ModelPortrait";
@@ -33,6 +34,7 @@ const PROMPT_EXAMPLE =
   "Professional African fashion model, female, age 28, dark skin, studio lighting, luxury editorial fashion campaign.";
 
 export function AiModelsTab() {
+  const { refresh: refreshCredits } = useCredits();
   const isFreePlan = useIsFreePlan();
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -63,6 +65,7 @@ export function AiModelsTab() {
       const result = await generateAiModel({ prompt: prompt.trim() });
       setModels((prev) => [result, ...prev]);
       toast.success("AI model generated");
+      void refreshCredits();
     } catch (e) {
       toast.error("Could not generate the AI model right now", {
         description: e instanceof Error ? e.message : undefined,

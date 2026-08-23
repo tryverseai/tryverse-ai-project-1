@@ -1923,11 +1923,19 @@ export interface Creation {
   error: string | null;
 }
 
-export async function getMyCreations(): Promise<Creation[]> {
+export interface CreationsPage {
+  creations: Creation[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/** Pass the previous page's `nextCursor` to fetch the next 20 (or `limit`) — omit for the first page. */
+export async function getMyCreations(cursor?: string | null, limit = 20): Promise<CreationsPage> {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${BACKEND_URL}/api/creations`, { headers });
-  const data = await handleResponse<{ creations: Creation[] }>(res);
-  return data.creations;
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set("cursor", cursor);
+  const res = await fetch(`${BACKEND_URL}/api/creations?${params}`, { headers });
+  return handleResponse<CreationsPage>(res);
 }
 
 export async function deleteCreation(type: CreationType, id: string): Promise<void> {

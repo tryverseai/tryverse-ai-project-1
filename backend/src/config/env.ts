@@ -100,10 +100,6 @@ export const env = {
   // ── Redis ─────────────────────────────────────────────────────────────────
   REDIS_URL: optionalEnv('REDIS_URL', 'redis://localhost:6379'),
 
-  // ── OpenAI — GPT Image (AI Model Personalization) ─────────────────────────
-  /** OpenAI API key for gpt-image-1 model replacement. When set, /api/personalize/* is active. */
-  OPENAI_API_KEY: optionalEnv('OPENAI_API_KEY', ''),
-
   // ── FASHN AI — direct API (https://api.fashn.ai) ─────────────────────────
   /** Direct FASHN AI API key (fa-…). When set, FASHN try-ons bypass Replicate entirely. */
   FASHN_API_KEY: optionalEnv('FASHN_API_KEY', ''),

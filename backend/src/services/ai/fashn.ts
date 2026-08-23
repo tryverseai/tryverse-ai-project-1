@@ -290,6 +290,12 @@ export async function runFashnOutfit(
     model_image: modelImageUrl,
     product_image: compositeImageUrl,
     prompt,
+    // Confirmed real Try-On Max parameters (docs.fashn.ai/api-reference/tryon-max) — 'quality'
+    // mode and a higher resolution tier measurably reduce the garment-blending artifacts that
+    // 'fast'/default settings produce on a multi-item composite, where there's more for the model
+    // to get right than a single-garment photo.
+    generation_mode: 'quality',
+    resolution: '2k',
   };
 
   logger.info('FASHN outfit: starting prediction', { modelName: OUTFIT_MODEL_NAME });

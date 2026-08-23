@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useCredits } from "@/contexts/CreditsContext";
 import { uploadImage, generateProductPhotoshoot } from "@/lib/backendApi";
 import { posthogCapture } from "@/lib/posthog";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
@@ -31,6 +32,7 @@ const LIGHTING_OPTIONS = ["Soft studio", "Bright daylight", "Dramatic contrast",
 const BACKGROUND_OPTIONS = ["Clean neutral", "Studio white", "Textured backdrop", "Urban street", "Outdoor"];
 
 export function AiPhotoshootTab() {
+  const { refresh: refreshCredits } = useCredits();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [productFile, setProductFile] = useState<File | null>(null);
@@ -85,6 +87,7 @@ export function AiPhotoshootTab() {
       });
       setResults((prev) => [result, ...prev]);
       toast.success("Photoshoot generated");
+      void refreshCredits();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not generate the photoshoot");
     } finally {

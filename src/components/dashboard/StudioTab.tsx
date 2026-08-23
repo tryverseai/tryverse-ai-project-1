@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useCredits } from "@/contexts/CreditsContext";
 import {
   uploadImage,
   startTryOn,
@@ -222,6 +223,7 @@ function BackLink({ onClick, label = "Back" }: { onClick: () => void; label?: st
 }
 
 export function StudioTab() {
+  const { refresh: refreshCredits } = useCredits();
   const [step, setStep] = useState<StudioStep>("entry");
   const [entryMode, setEntryMode] = useState<EntryMode>(null);
   const [model, setModel] = useState<ImageSlot>(EMPTY_SLOT);
@@ -338,6 +340,7 @@ export function StudioTab() {
         setResultUrl(job.resultUrl);
         setResultTryonId(job.tryonId);
         setStatus("done");
+        void refreshCredits();
         return;
       }
 
@@ -352,6 +355,7 @@ export function StudioTab() {
           setResultUrl(update.resultUrl);
           setResultTryonId(id);
           setStatus("done");
+          void refreshCredits();
           return;
         }
         if (update.status === "failed") {
@@ -505,12 +509,12 @@ export function StudioTab() {
                   <motion.div
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="rounded-2xl overflow-hidden bg-muted"
+                    className="rounded-2xl overflow-hidden bg-muted w-fit max-w-full mx-auto"
                   >
                     <img
                       src={resultUrl}
                       alt="Try-on result"
-                      className="w-full max-h-[75vh] object-contain"
+                      className="block max-h-[75vh] max-w-full w-auto h-auto object-contain"
                     />
                   </motion.div>
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">

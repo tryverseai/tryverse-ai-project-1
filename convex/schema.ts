@@ -349,7 +349,9 @@ export default defineSchema({
     }),
     status: v.union(v.literal("active"), v.literal("archived")),
     created_at: v.string(),
-  }).index("by_userId", ["user_id"]),
+  })
+    .index("by_userId", ["user_id"])
+    .index("by_user_created", ["user_id", "created_at"]),
 
   /**
    * Enterprise "AI Model Studio" — a product photo generated onto an AI-created model via FASHN's

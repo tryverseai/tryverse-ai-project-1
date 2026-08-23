@@ -1,15 +1,20 @@
 import { lazy, Suspense, useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, BarChart3, Settings, Key, LayoutDashboard, CreditCard, BookOpen, FlaskConical, Sparkles,
-  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, Menu, LayoutGrid,
+  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, LayoutGrid, PanelLeftOpen,
 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { MobileNavSheet } from "@/components/dashboard/MobileNavSheet";
-import { GUIDE_TAB, CONNECT_TAB } from "@/lib/dashboardTabs";
+import { TryOnGuideGate } from "@/components/dashboard/TryOnGuideGate";
+import { CreditsBadge } from "@/components/dashboard/CreditsBadge";
+import { CreditsProvider } from "@/contexts/CreditsContext";
+import { GUIDE_TAB, CONNECT_TAB, hasAcknowledgedTryOnGuide } from "@/lib/dashboardTabs";
 
 // Eagerly load the default tab — zero extra latency on first visit
 import { TryOnGuideTab } from "@/components/dashboard/TryOnGuideTab";
@@ -240,7 +245,20 @@ const Dashboard = () => {
   const tabParam = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(DEFAULT_TAB);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [guideAcknowledged, setGuideAcknowledged] = useState(() => hasAcknowledgedTryOnGuide());
   const { user, signOut } = useAuth();
+  // BetaAccessOverlay (terms acceptance / plan selection) is a sibling overlay that mounts on top
+  // of this component rather than gating its render — Dashboard is always in the DOM underneath.
+  // Showing our own full-screen guide gate before that overlay clears would stack two competing
+  // full-screen modals at once, and whichever one's Radix portal mounts later wins the click
+  // fight — which starved BetaAccessOverlay's own "I agree" checkbox of pointer events entirely,
+  // locking a brand-new user out of onboarding. Wait for BetaAccessOverlay to finish first.
+  const dashboardProfile = useQuery(api.profiles.getMyProfile, user ? {} : "skip");
+  const betaGateClear = Boolean(
+    dashboardProfile &&
+      dashboardProfile.terms_of_service_accepted_at &&
+      (dashboardProfile.account_type !== "business" || dashboardProfile.plan_selected_at)
+  );
   const navigate = useNavigate();
   const brandName = user?.user_metadata?.brand_name || "Your Brand";
 
@@ -286,7 +304,10 @@ const Dashboard = () => {
   };
 
   return (
-    <>
+    <CreditsProvider>
+      {betaGateClear && !guideAcknowledged && (
+        <TryOnGuideGate onAcknowledge={() => setGuideAcknowledged(true)} />
+      )}
       <div className="min-h-screen bg-background">
         <Navbar mobileMenuHidden />
         <main className="pt-[var(--navbar-height)]">
@@ -295,7 +316,8 @@ const Dashboard = () => {
           <aside className="hidden lg:flex flex-col w-60 min-h-[calc(100vh-var(--navbar-height))] border-r border-border p-4 pt-6 sticky top-[var(--navbar-height)]">
             <div className="mb-6">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Brand Dashboard</p>
-              <p className="text-sm font-semibold text-foreground">{brandName}</p>
+              <p className="text-sm font-semibold text-foreground mb-3">{brandName}</p>
+              <CreditsBadge onClick={() => selectTab("Billing")} />
             </div>
             <nav className="space-y-5">
               {sidebarGroups.map((group) => (
@@ -327,18 +349,20 @@ const Dashboard = () => {
           {/* Mobile tabs — left slide-in panel instead of a dropdown, mirrors the desktop
               sidebar's grouped list one-for-one. */}
           <div className="lg:hidden fixed left-0 right-0 z-30 bg-background border-b border-border" style={{ top: 'var(--navbar-height)' }}>
-            <div className="px-4 py-2">
+            <div className="px-4 py-2 flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setMobileNavOpen(true)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm font-medium bg-muted text-foreground"
+                aria-label="Open navigation panel"
+                className="flex-1 min-w-0 flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium bg-muted text-foreground"
               >
-                <span className="flex items-center gap-2">
-                  {ActiveIcon && <ActiveIcon className="h-4 w-4" />}
-                  {activeTab}
+                <PanelLeftOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="flex items-center gap-2 min-w-0">
+                  {ActiveIcon && <ActiveIcon className="h-4 w-4 flex-shrink-0" />}
+                  <span className="truncate">{activeTab}</span>
                 </span>
-                <Menu className="h-4 w-4 text-muted-foreground" />
               </button>
+              <CreditsBadge onClick={() => selectTab("Billing")} className="flex-shrink-0" />
             </div>
           </div>
 
@@ -370,7 +394,7 @@ const Dashboard = () => {
           </div>
         </main>
       </div>
-    </>
+    </CreditsProvider>
   );
 };
 

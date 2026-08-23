@@ -314,7 +314,7 @@ export function PersonalizeTab() {
                 "The widget replaces marked product images on demand — only images the shopper actually views",
                 "Results are cached: the same product is never regenerated for the same session",
                 "Sessions and generated images expire automatically after 7 days",
-                "All AI generation happens server-side — your OpenAI key is never exposed",
+                "All AI generation happens server-side — your infrastructure is never exposed to shoppers",
                 "The shopper can toggle between original and personalized views at any time",
               ].map((item, i) => (
                 <li key={i} className="flex gap-2">
@@ -329,9 +329,8 @@ export function PersonalizeTab() {
           <div className="flex items-center gap-2 rounded-lg bg-muted/60 px-4 py-3">
             <Code className="h-4 w-4 text-muted-foreground shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Powered by{" "}
-              <span className="font-semibold text-foreground">GPT Image (gpt-image-1)</span> with an
-              abstraction layer for FLUX Kontext Pro and Seedream coming in future releases.
+              Powered by TryVerse's AI model-personalization engine — the same infrastructure behind
+              every generation on the platform.
             </p>
           </div>
         </motion.div>
@@ -391,12 +390,11 @@ export function PersonalizeTab() {
               <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
               <div className="space-y-1">
                 <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                  OPENAI_API_KEY not configured
+                  Not configured yet
                 </p>
                 <p className="text-xs text-amber-700 dark:text-amber-400">
-                  AI Model Personalization requires an OpenAI API key. Add{" "}
-                  <code className="font-mono">OPENAI_API_KEY</code> to your backend environment
-                  variables to activate this feature.
+                  AI Model Personalization isn't active on this account yet. Contact support to turn
+                  it on.
                 </p>
               </div>
             </div>

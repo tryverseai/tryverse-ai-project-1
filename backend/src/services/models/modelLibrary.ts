@@ -2,7 +2,6 @@ import { env } from '../../config/env';
 import { uploadImageBuffer } from '../storage/images';
 import { logger } from '../../config/logger';
 import { AppError } from '../../middleware/errorHandler';
-import { checkCredits, SHOPPER_TRYON_UNAVAILABLE_MESSAGE } from '../credits';
 import { cxGetProfile } from '../creditsConvexBridge';
 import { isFreeTierPlanId } from '../../lib/planTier';
 import { anyApi, convexQueryPublic, convexQueryTrusted } from '../../config/convexHttp';
@@ -198,11 +197,6 @@ export async function resolveModelToPersonPath(
 
   if (!row) {
     throw new Error('Model not found or inactive');
-  }
-
-  const creditCheck = await checkCredits(profileCreditUserId);
-  if (!creditCheck.allowed) {
-    throw new AppError(SHOPPER_TRYON_UNAVAILABLE_MESSAGE, 402, 'CREDITS_EXHAUSTED');
   }
 
   const profile = await cxGetProfile(profileCreditUserId);

@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Sparkles, Camera, Download, Shirt, Footprints, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useCredits } from "@/contexts/CreditsContext";
 import {
   getProducts,
   generateOutfit,
@@ -82,6 +83,7 @@ function ProductPickerGrid({
 }
 
 export function OutfitBuilderTab() {
+  const { refresh: refreshCredits } = useCredits();
   const enabled = FEATURE_FLAGS.OUTFIT_BUILDER_ENABLED;
 
   const [mode, setMode] = useState<Mode>("top_bottom");
@@ -191,6 +193,7 @@ export function OutfitBuilderTab() {
         if (update.status === "completed" && update.resultUrl) {
           setResults((prev) => [{ imageUrl: update.resultUrl!, createdAt: update.createdAt ?? new Date().toISOString() }, ...prev]);
           toast.success("Outfit generated");
+          void refreshCredits();
           return;
         }
         if (update.status === "failed") {

@@ -14,7 +14,7 @@ import { requireAuth } from '../middleware/auth';
 import { widgetRateLimit } from '../middleware/rateLimiter';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
-import { generatePersonalizedModel, isPersonalizationEnabled } from '../services/ai/gptImage';
+import { generatePersonalizedModel, isPersonalizationEnabled } from '../services/ai/personalization';
 import {
   createShopperSession,
   getShopperSession,
@@ -47,7 +47,7 @@ const upload = multer({
 function requirePersonalizationEnabled(res: Response): boolean {
   if (!isPersonalizationEnabled()) {
     res.status(503).json({
-      error: 'AI Model Personalization is not enabled on this server. Configure OPENAI_API_KEY.',
+      error: 'AI Model Personalization is not enabled on this server.',
     });
     return false;
   }
@@ -207,20 +207,13 @@ router.post(
         return;
       }
 
-      // Load reference image from storage
-      const { getSignedUrl: getUrl } = await import('../services/storage/images');
-      const referenceUrl = await getUrl(RESULT_BUCKET, session.referenceImagePath);
-      const referenceRes = await fetch(referenceUrl);
-      if (!referenceRes.ok) {
-        res.status(500).json({ error: 'Could not load reference image. Please re-upload your photo.' });
-        return;
-      }
-      const referenceBuffer = Buffer.from(await referenceRes.arrayBuffer());
+      // Reference image URL from storage
+      const referenceUrl = await getSignedUrl(RESULT_BUCKET, session.referenceImagePath);
 
       // Generate
       const output = await generatePersonalizedModel({
         productImageUrl,
-        referenceImageBuffer: referenceBuffer,
+        referenceImageUrl: referenceUrl,
         userId: session.apiKeyId,
       });
 
@@ -242,7 +235,6 @@ router.post(
       res.json({
         resultUrl,
         cached: false,
-        engine: output.engine,
         durationMs: output.durationMs,
       });
     } catch (err) {

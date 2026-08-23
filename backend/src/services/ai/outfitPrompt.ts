@@ -31,5 +31,5 @@ export function buildOutfitPrompt(items: OutfitPromptInputs): string {
   }
 
   const styling = parts.join(', ');
-  return `Full outfit: ${styling}. Natural fit and proportions, photorealistic, keep the model's identity, pose, and body shape unchanged.`;
+  return `The product image is a reference sheet showing separate garment photos on a plain white background — treat each photo as one distinct garment to dress the model in, not as a pattern, layout, or scene to reproduce. Combine them into one outfit: ${styling}. Garments should overlap and layer naturally as real clothing would (e.g. a top tucked or layered under a jacket, not floating separately), with realistic fabric drape, shadows, and proportions at the seams where pieces meet. Natural fit and proportions, photorealistic, keep the model's identity, pose, and body shape unchanged.`;
 }

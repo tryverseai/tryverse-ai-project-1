@@ -24,11 +24,11 @@ export function Lightbox({ open, onOpenChange, url, isVideo, title, downloadFile
         <DialogTitle className="sr-only">{title ?? "Full size view"}</DialogTitle>
         {url ? (
           <div className="flex flex-col items-center gap-3">
-            <div className="w-full max-h-[80vh] flex items-center justify-center bg-muted rounded-lg overflow-hidden">
+            <div className="w-fit max-w-full mx-auto max-h-[80vh] bg-muted rounded-lg overflow-hidden">
               {isVideo ? (
-                <video src={url} controls autoPlay loop className="max-h-[80vh] max-w-full" />
+                <video src={url} controls autoPlay loop className="block max-h-[80vh] max-w-full w-auto h-auto" />
               ) : (
-                <img src={url} alt={title ?? "Full size"} className="max-h-[80vh] max-w-full object-contain" />
+                <img src={url} alt={title ?? "Full size"} className="block max-h-[80vh] max-w-full w-auto h-auto object-contain" />
               )}
             </div>
             <Button

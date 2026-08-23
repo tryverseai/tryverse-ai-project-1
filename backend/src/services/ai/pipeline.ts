@@ -5,6 +5,7 @@ import { applyFaceLockFromPersonInput } from './facePreservation';
 import {
   validatePersonForTryOn,
   normalizePersonToTryOnCanvas,
+  cropToSubjectBoundingBox,
   classifyGarmentTopology,
   runHumanParsingStage,
   validateTryOnOutput,
@@ -502,6 +503,20 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
 
     if (!layoutOk) {
       throw new Error('Invalid output — model layout looks wrong; please try again.');
+    }
+
+    // FASHN renders onto a uniform studio background with a consistent margin around the subject
+    // baked into its own output style (confirmed by testing — this survives even when the input
+    // person canvas had zero letterbox padding, so it isn't something our input framing controls).
+    // Detect that margin here, after the layout/collage gates above have already run on the full
+    // frame, and crop it off so the stored/displayed result shows just the subject.
+    try {
+      finalBuffer = await cropToSubjectBoundingBox(finalBuffer);
+    } catch (cropErr) {
+      logger.warn('Try-on: subject crop failed, storing full-frame result', {
+        tryonDbId,
+        error: cropErr instanceof Error ? cropErr.message : String(cropErr),
+      });
     }
 
     // ── STEP 8: Store result (Convex file storage) ─────────────────────────

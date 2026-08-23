@@ -735,6 +735,36 @@ export const listTryonsForUserCursor = query({
   },
 });
 
+/**
+ * One bounded page of a user's try-ons, using the same `before`-date-cursor shape as the other
+ * five My Creations sources (listOutfitGenerationsForUserPage etc) so the aggregation endpoint
+ * can merge all six with a single cursor convention, rather than juggling Convex's own opaque
+ * `.paginate()` cursor (listTryonsForUserCursor, above) alongside five date-based ones.
+ */
+export const listTryonsForUserPage = query({
+  args: { secret: v.string(), userId: v.string(), before: v.union(v.string(), v.null()), limit: v.number() },
+  handler: async (ctx, { secret, userId, before, limit }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db
+      .query("tryons")
+      .withIndex("by_user_created", (q) =>
+        before === null
+          ? q.eq("user_id", userId)
+          : q.eq("user_id", userId).lt("created_at", before)
+      )
+      .order("desc")
+      .take(limit);
+    return rows.map((t) => ({
+      id: t.legacy_id ?? String(t._id),
+      status: t.status,
+      resultImage: t.result_image ?? null,
+      error: null,
+      createdAt: t.created_at ?? '',
+      completedAt: t.completed_at ?? null,
+    }));
+  },
+});
+
 export const insertUsageEvent = mutation({
   args: {
     secret: v.string(),
@@ -890,6 +920,35 @@ export const listGeneratedAiModels = query({
   },
 });
 
+/**
+ * One bounded page of a user's active AI-generated models (newest first), date-cursor shaped to
+ * match the other five My Creations sources for merging. Archived models are filtered out of the
+ * fetched page in-memory rather than via a second compound index — acceptable here since deletes
+ * are rare and pages are small; a page may occasionally return slightly under `limit` as a result.
+ */
+export const listGeneratedAiModelsForUserPage = query({
+  args: { secret: v.string(), userId: v.string(), before: v.union(v.string(), v.null()), limit: v.number() },
+  handler: async (ctx, { secret, userId, before, limit }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db
+      .query("ai_generated_models")
+      .withIndex("by_user_created", (q) =>
+        before === null
+          ? q.eq("user_id", userId)
+          : q.eq("user_id", userId).lt("created_at", before)
+      )
+      .order("desc")
+      .take(limit);
+    return rows
+      .filter((r) => r.status === "active")
+      .map((r) => ({
+        id: String(r._id),
+        storagePath: r.storage_path,
+        createdAt: r.created_at,
+      }));
+  },
+});
+
 /** Archives (soft-deletes) a saved AI-generated model — owner-checked. */
 export const archiveGeneratedAiModel = mutation({
   args: { secret: v.string(), userId: v.string(), modelId: v.id("ai_generated_models") },
@@ -973,16 +1032,24 @@ export const getOutfitGenerationForUser = query({
   },
 });
 
-/** Lists a user's Outfit Builder generations (newest first) for the My Creations gallery. */
-export const listOutfitGenerationsForUser = query({
-  args: { secret: v.string(), userId: v.string() },
-  handler: async (ctx, { secret, userId }) => {
+/**
+ * One bounded page of a user's Outfit Builder generations (newest first) for the My Creations
+ * gallery. `before` is an exclusive createdAt cursor (pass null for the first page) — scans only
+ * `limit` rows via the `by_user_created` index range, never the full history.
+ */
+export const listOutfitGenerationsForUserPage = query({
+  args: { secret: v.string(), userId: v.string(), before: v.union(v.string(), v.null()), limit: v.number() },
+  handler: async (ctx, { secret, userId, before, limit }) => {
     requireBackendSecret(secret);
     const rows = await ctx.db
       .query("outfit_generations")
-      .withIndex("by_user_created", (q) => q.eq("user_id", userId))
+      .withIndex("by_user_created", (q) =>
+        before === null
+          ? q.eq("user_id", userId)
+          : q.eq("user_id", userId).lt("created_at", before)
+      )
       .order("desc")
-      .collect();
+      .take(limit);
     return rows.map((r) => ({
       id: String(r._id),
       status: r.status,
@@ -1096,15 +1163,19 @@ export const patchProductModelGeneration = mutation({
 });
 
 /** Lists a user's AI Model Studio (product-model) generations (newest first) for the My Creations gallery. */
-export const listProductModelGenerationsForUser = query({
-  args: { secret: v.string(), userId: v.string() },
-  handler: async (ctx, { secret, userId }) => {
+export const listProductModelGenerationsForUserPage = query({
+  args: { secret: v.string(), userId: v.string(), before: v.union(v.string(), v.null()), limit: v.number() },
+  handler: async (ctx, { secret, userId, before, limit }) => {
     requireBackendSecret(secret);
     const rows = await ctx.db
       .query("product_model_generations")
-      .withIndex("by_user_created", (q) => q.eq("user_id", userId))
+      .withIndex("by_user_created", (q) =>
+        before === null
+          ? q.eq("user_id", userId)
+          : q.eq("user_id", userId).lt("created_at", before)
+      )
       .order("desc")
-      .collect();
+      .take(limit);
     return rows.map((r) => ({
       id: String(r._id),
       status: r.status,
@@ -1179,15 +1250,19 @@ export const patchPhotoshootGeneration = mutation({
 });
 
 /** Lists a user's AI Product Photoshoot generations (newest first) for the My Creations gallery. */
-export const listPhotoshootGenerationsForUser = query({
-  args: { secret: v.string(), userId: v.string() },
-  handler: async (ctx, { secret, userId }) => {
+export const listPhotoshootGenerationsForUserPage = query({
+  args: { secret: v.string(), userId: v.string(), before: v.union(v.string(), v.null()), limit: v.number() },
+  handler: async (ctx, { secret, userId, before, limit }) => {
     requireBackendSecret(secret);
     const rows = await ctx.db
       .query("photoshoot_generations")
-      .withIndex("by_user_created", (q) => q.eq("user_id", userId))
+      .withIndex("by_user_created", (q) =>
+        before === null
+          ? q.eq("user_id", userId)
+          : q.eq("user_id", userId).lt("created_at", before)
+      )
       .order("desc")
-      .collect();
+      .take(limit);
     return rows.map((r) => ({
       id: String(r._id),
       status: r.status,
@@ -1294,15 +1369,19 @@ export const getVideoGenerationForUser = query({
 });
 
 /** Lists a user's AI Video generations (newest first) for the My Creations gallery. */
-export const listVideoGenerationsForUser = query({
-  args: { secret: v.string(), userId: v.string() },
-  handler: async (ctx, { secret, userId }) => {
+export const listVideoGenerationsForUserPage = query({
+  args: { secret: v.string(), userId: v.string(), before: v.union(v.string(), v.null()), limit: v.number() },
+  handler: async (ctx, { secret, userId, before, limit }) => {
     requireBackendSecret(secret);
     const rows = await ctx.db
       .query("video_generations")
-      .withIndex("by_user_created", (q) => q.eq("user_id", userId))
+      .withIndex("by_user_created", (q) =>
+        before === null
+          ? q.eq("user_id", userId)
+          : q.eq("user_id", userId).lt("created_at", before)
+      )
       .order("desc")
-      .collect();
+      .take(limit);
     return rows.map((r) => ({
       id: String(r._id),
       status: r.status,

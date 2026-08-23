@@ -46,42 +46,60 @@ export function ModelPickerGrid({ selectedId, onSelect, className }: ModelPicker
   }
 
   return (
-    <div className={`grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-3 ${className ?? ""}`}>
-      {savedModels.map((m) => (
-        <button
-          key={`gen-${m.id}`}
-          type="button"
-          onClick={() =>
-            onSelect({
-              source: "generated",
-              id: m.id,
-              imageUrl: m.imageUrl,
-              storagePath: m.storagePath,
-              label: "Your model",
-            })
-          }
-          className={`rounded-lg border-2 transition-colors ${
-            selectedId === m.id ? "border-foreground" : "border-transparent"
-          }`}
-        >
-          <ModelPortrait src={m.imageUrl} alt="Your generated model" className="aspect-[3/4] rounded-md" />
-        </button>
-      ))}
-      {libraryModels.map((m) => (
-        <button
-          key={`lib-${m.slug}`}
-          type="button"
-          onClick={() =>
-            onSelect({ source: "library", id: m.slug, imageUrl: m.image_url, label: m.display_name })
-          }
-          className={`rounded-lg border-2 transition-colors ${
-            selectedId === m.slug ? "border-foreground" : "border-transparent"
-          }`}
-          title={m.display_name}
-        >
-          <ModelPortrait src={m.image_url} alt={m.display_name} className="aspect-[3/4] rounded-md" />
-        </button>
-      ))}
+    <div className={`space-y-5 ${className ?? ""}`}>
+      {savedModels.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            My Models
+          </p>
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-3">
+            {savedModels.map((m) => (
+              <button
+                key={`gen-${m.id}`}
+                type="button"
+                onClick={() =>
+                  onSelect({
+                    source: "generated",
+                    id: m.id,
+                    imageUrl: m.imageUrl,
+                    storagePath: m.storagePath,
+                    label: "Your model",
+                  })
+                }
+                className={`rounded-lg border-2 transition-colors ${
+                  selectedId === m.id ? "border-foreground" : "border-transparent"
+                }`}
+              >
+                <ModelPortrait src={m.imageUrl} alt="Your generated model" className="aspect-[3/4] rounded-md" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {libraryModels.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            TryVerse Models
+          </p>
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-3">
+            {libraryModels.map((m) => (
+              <button
+                key={`lib-${m.slug}`}
+                type="button"
+                onClick={() =>
+                  onSelect({ source: "library", id: m.slug, imageUrl: m.image_url, label: m.display_name })
+                }
+                className={`rounded-lg border-2 transition-colors ${
+                  selectedId === m.slug ? "border-foreground" : "border-transparent"
+                }`}
+                title={m.display_name}
+              >
+                <ModelPortrait src={m.image_url} alt={m.display_name} className="aspect-[3/4] rounded-md" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

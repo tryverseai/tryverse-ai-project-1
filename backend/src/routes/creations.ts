@@ -42,120 +42,129 @@ async function signOrNull(path: string | null): Promise<string | null> {
   }
 }
 
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 50;
+
+/**
+ * My Creations spans six independently-timestamped Convex tables. True cross-table cursor
+ * pagination fetches a bounded `limit` window from EACH source (via the `by_user_created` index
+ * range, never a full-table scan or fetch-everything-then-slice), merges the six already-sorted
+ * windows, and returns only the newest `limit` overall. The cursor returned to the client is the
+ * createdAt of the oldest item shown — passed back as `before` so every source's next fetch
+ * resumes exactly where it left off, regardless of how unevenly creations are distributed across
+ * types.
+ */
 router.get('/', requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user!.id;
+    const before = typeof req.query.cursor === 'string' && req.query.cursor ? req.query.cursor : null;
+    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(String(req.query.limit ?? DEFAULT_PAGE_SIZE), 10) || DEFAULT_PAGE_SIZE));
 
-    const [tryonsRes, outfits, productModels, photoshoots, videos, aiModels] = await Promise.all([
-      convexQueryTrusted<{ tryons: Array<{ id: string; status: string; result_image: string | null; created_at: string | null; completed_at: string | null }> }>(
-        anyApi.backendTrusted.listTryonsForUserCursor,
-        { secret: env.BACKEND_SHARED_SECRET, userId, numItems: 100, cursor: null }
+    const pageArgs = { secret: env.BACKEND_SHARED_SECRET, userId, before, limit };
+
+    const [tryons, outfits, productModels, photoshoots, videos, aiModels] = await Promise.all([
+      convexQueryTrusted<Array<{ id: string; status: string; resultImage: string | null; createdAt: string; completedAt: string | null }>>(
+        anyApi.backendTrusted.listTryonsForUserPage,
+        pageArgs
       ),
       convexQueryTrusted<Array<{ id: string; status: string; resultImage: string | null; error: string | null; createdAt: string; completedAt: string | null }>>(
-        anyApi.backendTrusted.listOutfitGenerationsForUser,
-        { secret: env.BACKEND_SHARED_SECRET, userId }
+        anyApi.backendTrusted.listOutfitGenerationsForUserPage,
+        pageArgs
       ),
       convexQueryTrusted<Array<{ id: string; status: string; resultImage: string | null; error: string | null; createdAt: string; completedAt: string | null }>>(
-        anyApi.backendTrusted.listProductModelGenerationsForUser,
-        { secret: env.BACKEND_SHARED_SECRET, userId }
+        anyApi.backendTrusted.listProductModelGenerationsForUserPage,
+        pageArgs
       ),
       convexQueryTrusted<Array<{ id: string; status: string; resultImage: string | null; error: string | null; createdAt: string; completedAt: string | null }>>(
-        anyApi.backendTrusted.listPhotoshootGenerationsForUser,
-        { secret: env.BACKEND_SHARED_SECRET, userId }
+        anyApi.backendTrusted.listPhotoshootGenerationsForUserPage,
+        pageArgs
       ),
       convexQueryTrusted<Array<{ id: string; status: string; resultVideo: string | null; error: string | null; createdAt: string; completedAt: string | null }>>(
-        anyApi.backendTrusted.listVideoGenerationsForUser,
-        { secret: env.BACKEND_SHARED_SECRET, userId }
+        anyApi.backendTrusted.listVideoGenerationsForUserPage,
+        pageArgs
       ),
       convexQueryTrusted<Array<{ id: string; storagePath: string; createdAt: string }>>(
-        anyApi.backendTrusted.listGeneratedAiModels,
-        { secret: env.BACKEND_SHARED_SECRET, userId }
+        anyApi.backendTrusted.listGeneratedAiModelsForUserPage,
+        pageArgs
       ),
     ]);
 
-    const items: CreationItem[] = [];
+    // A source is not yet exhausted if its bounded fetch came back completely full — there may be
+    // more beyond this window even if none of it makes the cut for the page we return below.
+    const sourceFetchCounts = [tryons.length, outfits.length, productModels.length, photoshoots.length, videos.length, aiModels.length];
+    const anySourceAtCap = sourceFetchCounts.some((n) => n === limit);
 
-    for (const t of tryonsRes.tryons) {
-      if (t.status !== 'completed' || !t.result_image) continue;
-      items.push({
-        id: t.id,
-        type: 'tryon',
-        status: t.status,
-        resultUrl: await signOrNull(t.result_image),
-        isVideo: false,
-        createdAt: t.created_at ?? '',
-        completedAt: t.completed_at ?? null,
-        error: null,
+    type Candidate = { createdAt: string; build: () => Promise<CreationItem> };
+    const candidates: Candidate[] = [];
+
+    for (const t of tryons) {
+      if (t.status !== 'completed' || !t.resultImage) continue;
+      candidates.push({
+        createdAt: t.createdAt,
+        build: async () => ({
+          id: t.id, type: 'tryon', status: t.status, resultUrl: await signOrNull(t.resultImage),
+          isVideo: false, createdAt: t.createdAt, completedAt: t.completedAt, error: null,
+        }),
       });
     }
     for (const o of outfits) {
       if (o.status !== 'completed' || !o.resultImage) continue;
-      items.push({
-        id: o.id,
-        type: 'outfit',
-        status: o.status,
-        resultUrl: await signOrNull(o.resultImage),
-        isVideo: false,
+      candidates.push({
         createdAt: o.createdAt,
-        completedAt: o.completedAt,
-        error: null,
+        build: async () => ({
+          id: o.id, type: 'outfit', status: o.status, resultUrl: await signOrNull(o.resultImage),
+          isVideo: false, createdAt: o.createdAt, completedAt: o.completedAt, error: null,
+        }),
       });
     }
     for (const p of productModels) {
       if (p.status !== 'completed' || !p.resultImage) continue;
-      items.push({
-        id: p.id,
-        type: 'product_model',
-        status: p.status,
-        resultUrl: await signOrNull(p.resultImage),
-        isVideo: false,
+      candidates.push({
         createdAt: p.createdAt,
-        completedAt: p.completedAt,
-        error: null,
+        build: async () => ({
+          id: p.id, type: 'product_model', status: p.status, resultUrl: await signOrNull(p.resultImage),
+          isVideo: false, createdAt: p.createdAt, completedAt: p.completedAt, error: null,
+        }),
       });
     }
     for (const ps of photoshoots) {
       if (ps.status !== 'completed' || !ps.resultImage) continue;
-      items.push({
-        id: ps.id,
-        type: 'photoshoot',
-        status: ps.status,
-        resultUrl: await signOrNull(ps.resultImage),
-        isVideo: false,
+      candidates.push({
         createdAt: ps.createdAt,
-        completedAt: ps.completedAt,
-        error: null,
+        build: async () => ({
+          id: ps.id, type: 'photoshoot', status: ps.status, resultUrl: await signOrNull(ps.resultImage),
+          isVideo: false, createdAt: ps.createdAt, completedAt: ps.completedAt, error: null,
+        }),
       });
     }
     for (const v of videos) {
       if (v.status !== 'completed' || !v.resultVideo) continue;
-      items.push({
-        id: v.id,
-        type: 'video',
-        status: v.status,
-        resultUrl: await signOrNull(v.resultVideo),
-        isVideo: true,
+      candidates.push({
         createdAt: v.createdAt,
-        completedAt: v.completedAt,
-        error: null,
+        build: async () => ({
+          id: v.id, type: 'video', status: v.status, resultUrl: await signOrNull(v.resultVideo),
+          isVideo: true, createdAt: v.createdAt, completedAt: v.completedAt, error: null,
+        }),
       });
     }
     for (const m of aiModels) {
-      items.push({
-        id: m.id,
-        type: 'ai_model',
-        status: 'completed',
-        resultUrl: await signOrNull(m.storagePath),
-        isVideo: false,
+      candidates.push({
         createdAt: m.createdAt,
-        completedAt: m.createdAt,
-        error: null,
+        build: async () => ({
+          id: m.id, type: 'ai_model', status: 'completed', resultUrl: await signOrNull(m.storagePath),
+          isVideo: false, createdAt: m.createdAt, completedAt: m.createdAt, error: null,
+        }),
       });
     }
 
-    items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    candidates.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const page = candidates.slice(0, limit);
+    const items = await Promise.all(page.map((c) => c.build()));
 
-    res.json({ creations: items });
+    const hasMore = candidates.length > limit || anySourceAtCap;
+    const nextCursor = items.length > 0 ? items[items.length - 1].createdAt : null;
+
+    res.json({ creations: items, nextCursor: hasMore ? nextCursor : null, hasMore });
   } catch (err) {
     logger.error('My Creations: list failed', { error: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined });
     next(err);

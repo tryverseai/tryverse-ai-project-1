@@ -1,6 +1,7 @@
 export { classifyGarmentTopology, type GarmentTopology } from './garmentClassify';
 export {
   normalizePersonToTryOnCanvas,
+  cropToSubjectBoundingBox,
   validatePersonForTryOn,
   TRYON_CANVAS_WIDTH,
   TRYON_CANVAS_HEIGHT,
