@@ -109,7 +109,7 @@ export async function generateProductPhotoshoot(
     const res = await fetch(swapped.resultUrl);
     if (!res.ok) throw new Error(`Failed to download photoshoot image (${res.status})`);
     const buffer = Buffer.from(await res.arrayBuffer());
-    const storagePath = await uploadResultBuffer(buffer, userId);
+    const storagePath = await uploadResultBuffer(buffer, userId, true);
 
     await convexMutationTrusted(anyApi.backendTrusted.patchPhotoshootGeneration, {
       secret: env.BACKEND_SHARED_SECRET,

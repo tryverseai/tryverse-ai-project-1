@@ -43,7 +43,7 @@ export async function generatePersonalizedModel(input: PersonalizeInput): Promis
   const res = await fetch(swapped.resultUrl);
   if (!res.ok) throw new Error(`Failed to download personalization result (${res.status})`);
   const buffer = Buffer.from(await res.arrayBuffer());
-  const resultPath = await uploadResultBuffer(buffer, input.userId);
+  const resultPath = await uploadResultBuffer(buffer, input.userId, true);
 
   const durationMs = Date.now() - startMs;
   logger.info('Personalization: complete', { durationMs, resultPath });

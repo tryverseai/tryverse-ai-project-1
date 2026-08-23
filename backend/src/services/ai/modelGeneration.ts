@@ -62,7 +62,7 @@ export async function generateAndSaveAiModel(
   if (!res.ok) throw new Error(`Failed to download generated model image (${res.status})`);
   const buffer = Buffer.from(await res.arrayBuffer());
 
-  const storagePath = await uploadResultBuffer(buffer, userId);
+  const storagePath = await uploadResultBuffer(buffer, userId, true);
 
   const saved = (await convexMutationTrusted(anyApi.backendTrusted.saveGeneratedAiModel, {
     secret: env.BACKEND_SHARED_SECRET,
