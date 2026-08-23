@@ -1,13 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-
-function requireBackendSecret(secret: string) {
-  const expected = process.env.BACKEND_SHARED_SECRET;
-  if (!expected || secret !== expected) {
-    throw new Error("Unauthorized");
-  }
-}
+import { requireBackendSecret } from "./security";
 
 /** Node uploads a buffer via POST to this URL; response JSON includes storageId. */
 export const storageGenerateUploadUrl = mutation({

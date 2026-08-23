@@ -3,6 +3,7 @@ import { logger } from '../../config/logger';
 import sharp from 'sharp';
 import { convexUploadBuffer, convexDeleteStorageIds, storagePathToConvexId } from '../convexStorageBridge';
 import { anyApi, convexQueryTrusted } from '../../config/convexHttp';
+import { isPrivateOrBlockedHost } from '../../lib/ssrfGuard';
 
 // ---------------------------------------------------------------------------
 // Signed-URL in-memory cache
@@ -238,8 +239,7 @@ export async function storeResultImage(
   if (parsedUrl.protocol !== 'https:') {
     throw new Error('storeResultImage: only HTTPS URLs are allowed');
   }
-  const PRIVATE_HOST = /^(localhost|127\.|0\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1)/i;
-  if (PRIVATE_HOST.test(parsedUrl.hostname)) {
+  if (isPrivateOrBlockedHost(parsedUrl.hostname)) {
     throw new Error('storeResultImage: URL host not allowed');
   }
 
@@ -287,8 +287,7 @@ export async function storeResultVideo(videoUrl: string, userId?: string): Promi
   if (parsedUrl.protocol !== 'https:') {
     throw new Error('storeResultVideo: only HTTPS URLs are allowed');
   }
-  const PRIVATE_HOST = /^(localhost|127\.|0\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1)/i;
-  if (PRIVATE_HOST.test(parsedUrl.hostname)) {
+  if (isPrivateOrBlockedHost(parsedUrl.hostname)) {
     throw new Error('storeResultVideo: URL host not allowed');
   }
 

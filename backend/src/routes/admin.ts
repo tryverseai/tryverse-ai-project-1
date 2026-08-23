@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { body, param, query, matchedData } from 'express-validator';
-import { normalizeAdminKeyInput } from '../lib/adminKey';
+import { normalizeAdminKeyInput, timingSafeStringEqual } from '../lib/adminKey';
 import { requireAdmin } from '../middleware/auth';
+import { authRateLimit } from '../middleware/rateLimiter';
 import { handleValidationErrors } from '../middleware/validate';
 import { logger } from '../config/logger';
 import { anyApi, convexQueryTrusted, convexMutationTrusted } from '../config/convexHttp';
@@ -192,6 +193,7 @@ function adminSessionCookieOptions(): {
  */
 router.post(
   '/session',
+  authRateLimit,
   [
     body('key')
       .customSanitizer((v) => normalizeAdminKeyInput(v))
@@ -203,7 +205,7 @@ router.post(
   handleValidationErrors,
   async (req: Request, res: Response): Promise<void> => {
     const submitted = normalizeAdminKeyInput((req.body as { key?: string }).key);
-    if (submitted !== env.ADMIN_SECRET_KEY) {
+    if (!timingSafeStringEqual(submitted, env.ADMIN_SECRET_KEY)) {
       logAudit({
         event_type: 'failed_login',
         actor: req.ip ? `ip:${req.ip}` : undefined,

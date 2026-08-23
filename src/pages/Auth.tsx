@@ -464,7 +464,7 @@ const Auth = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="pl-10 pr-10 h-12"
                 required
-                minLength={6}
+                minLength={10}
               />
               <button
                 type="button"

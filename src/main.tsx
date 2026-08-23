@@ -41,7 +41,7 @@ if (!rootEl) {
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        rootEl.innerHTML = `<p style="font-family:system-ui;padding:1.5rem;max-width:40rem;color:#111">TryVerse failed to start: ${msg}</p>`;
+        rootEl.innerHTML = `<p style="font-family:system-ui;padding:1.5rem;max-width:40rem;color:#111">TryVerse failed to start: ${escapeHtml(msg)}</p>`;
         console.error(e);
       }
     })

@@ -4,9 +4,9 @@ import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 import { AppError } from '../../middleware/errorHandler';
 import {
-  paymentSuccessExists,
-  insertPaymentRow,
+  insertPaymentIfNew,
   upsertSubscriptionRow,
+  cancelSubscriptionsForUserId,
 } from '../billingConvexBridge';
 import { cxGetPlan, cxGetProfile } from '../creditsConvexBridge';
 import { cxInsertUsageEvent } from '../tryonConvexBridge';
@@ -143,12 +143,7 @@ export async function handleFlutterwaveWebhook(event: FlutterwaveWebhookEvent): 
       return;
     }
 
-    if (await paymentSuccessExists(tx_ref)) {
-      logger.warn('Duplicate Flutterwave webhook — already processed', { tx_ref });
-      return;
-    }
-
-    await insertPaymentRow({
+    const inserted = await insertPaymentIfNew({
       user_id: meta.user_id,
       reference: tx_ref,
       amount,
@@ -156,6 +151,10 @@ export async function handleFlutterwaveWebhook(event: FlutterwaveWebhookEvent): 
       status: 'success',
       provider: 'flutterwave',
     });
+    if (!inserted) {
+      logger.warn('Duplicate Flutterwave webhook — already processed', { tx_ref });
+      return;
+    }
 
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
@@ -205,6 +204,26 @@ export async function handleFlutterwaveWebhook(event: FlutterwaveWebhookEvent): 
       userId: meta.user_id,
       planId: meta.plan_id,
     });
+  }
+
+  if (event.event === 'subscription.cancelled') {
+    // Flutterwave's cancellation payload isn't documented as carrying the merchant `meta` object
+    // the way charge events do — take the fast path when it's present, otherwise leave it to the
+    // daily reconciliation cron (billingReconciliation.ts), which downgrades any subscription
+    // whose period has lapsed regardless of whether this webhook fires or carries a usable
+    // user_id. Flutterwave's own community forum documents this webhook not always being
+    // delivered at all, so the cron is the real safety net either way, not this branch.
+    const userId = event.data.meta?.user_id;
+    if (userId) {
+      await cancelSubscriptionsForUserId(userId);
+      await allocateCredits(userId, 'free', 'flutterwave-cancellation');
+      logger.info('Flutterwave subscription cancelled, downgraded to free', { userId });
+    } else {
+      logger.warn('Flutterwave subscription.cancelled event had no usable user_id; relying on reconciliation cron', {
+        tx_ref: event.data.tx_ref,
+      });
+    }
+    return;
   }
 
   if (event.event === 'charge.failed' || (event.event === 'charge.completed' && event.data.status !== 'successful')) {

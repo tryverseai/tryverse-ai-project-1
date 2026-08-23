@@ -7,6 +7,7 @@ import { optionalApiKey, requireScope } from '../middleware/apiKey';
 import { uploadRateLimit } from '../middleware/rateLimiter';
 import { logger } from '../config/logger';
 import { fetchWithSsrfRedirectChecks, MAX_REMOTE_RESPONSE_BYTES } from '../utils/ssrfFetch';
+import { isPrivateOrBlockedHost } from '../lib/ssrfGuard';
 import { validateImageBuffer } from '../utils/validateImageBuffer';
 
 const router = Router();
@@ -36,10 +37,12 @@ const upload = multer({
  */
 router.post(
   '/',
-  uploadRateLimit,
   optionalApiKey,
   requireScope('write'),
   optionalAuth,
+  // Must run after the auth middleware above — see tryon.ts for why (its keyGenerator reads
+  // req.user/req.apiKey, which don't exist until optionalApiKey/optionalAuth have run).
+  uploadRateLimit,
   (req: Request, res: Response, next: NextFunction) => {
     upload.single('image')(req, res, (err) => {
       if (err) {
@@ -107,16 +110,16 @@ router.post(
  * POST /api/upload/from-url
  * Fetches an image from a URL and stores it. For widget product images.
  */
-// Blocklist for SSRF: internal/private IPs, localhost, file protocol
-const SSRF_BLOCKED_HOSTS = /^(localhost|127\.|0\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1|\[::\]|0\.0\.0\.0)/i;
 const SSRF_BLOCKED_PROTOCOLS = /^(file|ftp|data|gopher|dict):/i;
 
 router.post(
   '/from-url',
-  uploadRateLimit,
   optionalApiKey,
   requireScope('write'),
   optionalAuth,
+  // Must run after the auth middleware above — see tryon.ts for why (its keyGenerator reads
+  // req.user/req.apiKey, which don't exist until optionalApiKey/optionalAuth have run).
+  uploadRateLimit,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
@@ -135,7 +138,7 @@ router.post(
         res.status(400).json({ error: 'Invalid URL' });
         return;
       }
-      if (SSRF_BLOCKED_HOSTS.test(host)) {
+      if (isPrivateOrBlockedHost(host)) {
         logger.warn('SSRF attempt blocked', { url: url.slice(0, 80), host });
         res.status(400).json({ error: 'URL not allowed' });
         return;
@@ -143,7 +146,7 @@ router.post(
 
       let remoteImage: globalThis.Response;
       try {
-        remoteImage = await fetchWithSsrfRedirectChecks(url, (h) => SSRF_BLOCKED_HOSTS.test(h));
+        remoteImage = await fetchWithSsrfRedirectChecks(url, isPrivateOrBlockedHost);
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Fetch failed';
         logger.warn('Image URL fetch blocked or failed', { url: url.slice(0, 80), msg });

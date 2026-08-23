@@ -389,4 +389,25 @@ export function assertProductionSecurityConfig(): void {
       'WIDGET_ALLOWED_ORIGINS cannot be "*" in production. Set comma-separated origins (e.g. https://yourstore.com,https://www.yourstore.com).'
     );
   }
+  if (env.ALLOW_LOCAL_SESSION_AUTH) {
+    // Belt-and-suspenders on top of ALLOW_LOCAL_SESSION_AUTH's own prod-aware default — this flag
+    // accepts a completely unsigned, attacker-chosen `sub` as the authenticated user when on, so a
+    // silent misconfiguration here would be a full pre-auth account-impersonation vulnerability
+    // for every route using requireAuth/optionalAuth. Fail loudly at boot rather than silently.
+    throw new Error('ALLOW_LOCAL_SESSION_AUTH cannot be enabled in production.');
+  }
+  if (env.ALLOW_API_KEY_IN_QUERY) {
+    // Query-string API keys land in access logs (morgan) and browser history/referrer headers —
+    // acceptable for local dev, not for production traffic.
+    throw new Error('ALLOW_API_KEY_IN_QUERY cannot be enabled in production.');
+  }
+  if (!env.PAYSTACK_WEBHOOK_SECRET.trim()) {
+    // validatePaystackSignature already fails closed on an empty secret (webhook processing just
+    // silently stops working), so this isn't a security hole — but it's a misconfiguration that
+    // otherwise fails silently at runtime instead of loudly at boot.
+    throw new Error('PAYSTACK_WEBHOOK_SECRET must be set in production.');
+  }
+  if (!env.FLUTTERWAVE_WEBHOOK_SECRET.trim()) {
+    throw new Error('FLUTTERWAVE_WEBHOOK_SECRET must be set in production.');
+  }
 }

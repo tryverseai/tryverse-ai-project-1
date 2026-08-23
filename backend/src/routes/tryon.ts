@@ -47,11 +47,15 @@ router.get('/categories', (_req: Request, res: Response) => {
  */
 router.post(
   '/',
-  tryonRateLimit,
   optionalApiKey,
   requireScope('write'),
   optionalAuth,
   requireAuthenticatedActor,
+  // Must run after the auth middleware above — its keyGenerator reads req.user/req.apiKey, which
+  // don't exist yet if this runs first (a real bug found in security review: every "per-user"
+  // limiter registered before auth silently degrades to a pure per-IP limiter, since its key
+  // always falls through to req.ip).
+  tryonRateLimit,
   planAwareTryonRateLimit,
   [
     body('personImagePath')

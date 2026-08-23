@@ -161,7 +161,9 @@ export default defineSchema({
     reference: v.string(),
     status: v.string(),
     created_at: v.optional(v.string()),
-  }).index("by_userId", ["user_id"]),
+  })
+    .index("by_userId", ["user_id"])
+    .index("by_reference", ["reference"]),
 
   products: defineTable({
     legacy_id: v.optional(v.string()),

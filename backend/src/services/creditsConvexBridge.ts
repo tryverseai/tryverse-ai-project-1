@@ -149,12 +149,23 @@ export async function cxReserveCredit(userId: string, amount = 1): Promise<{
   return result as { ok: boolean; creditType?: 'monthly' | 'free'; reason?: string };
 }
 
-/** Atomically restores `amount` credits (undoes a reservation after a failed generation). */
-export async function cxRestoreCredit(userId: string, amount = 1): Promise<{ ok: boolean }> {
+/**
+ * Atomically restores `amount` credits (undoes a reservation after a failed generation).
+ * Pass the `creditType` returned by the original `cxReserveCredit`/`checkCredits` call whenever
+ * it's available — without it, restoreCredit falls back to guessing which pool to restore into,
+ * which can misattribute a free-pool reservation as a monthly-pool restore (see restoreCredit's
+ * own doc comment in backendTrusted.ts).
+ */
+export async function cxRestoreCredit(
+  userId: string,
+  amount = 1,
+  creditType?: 'monthly' | 'free'
+): Promise<{ ok: boolean }> {
   const result = await convexMutationTrusted(anyApi.backendTrusted.restoreCredit, {
     ...trusted(),
     userId,
     amount,
+    creditType,
   });
   return result as { ok: boolean };
 }

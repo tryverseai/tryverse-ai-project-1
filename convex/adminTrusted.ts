@@ -3,13 +3,8 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { authSubjectSegments } from "./authSubjectKeys";
 import { collectProfileDocsForSubjectKeys, findProfileBySubjectKeys } from "./profileLookup";
-
-function requireBackendSecret(secret: string) {
-  const expected = process.env.BACKEND_SHARED_SECRET;
-  if (!expected || secret !== expected) {
-    throw new Error("Unauthorized");
-  }
-}
+import { requireBackendSecret } from "./security";
+import { deleteAuthAccountAndSessions } from "./authAccountCleanup";
 
 export const adminMetricsBundle = query({
   args: { secret: v.string() },
@@ -566,9 +561,14 @@ export const rejectBetaAccessAdmin = mutation({
 });
 
 /**
- * Cascade-delete a user’s app data (profile, keys, try-ons, etc.).
- * Does not remove Convex Auth `authAccounts` rows (library limitation); deleting the profile
- * blocks dashboard access; signing in may recreate a profile on next bootstrap unless the auth user is removed manually.
+ * Cascade-delete a user's app data (profile, keys, try-ons, etc.) AND their Convex Auth identity —
+ * the `authAccounts` row holding their password hash, and every live session/refresh token. Found
+ * missing in a security review: without this, a JWT/refresh token issued before deletion kept
+ * working until natural expiry (up to ~1hr JWT + indefinite refresh-token reuse), and the
+ * password-hash row survived deletion entirely, which could complicate the same email
+ * re-registering. `invalidateSessions` is the library's own official session-revocation call
+ * (also used on password reset, `tryVersePassword.ts`); `authAccounts` rows are deleted directly
+ * since account deletion itself has no equivalent library helper.
  */
 export const deleteUserAccountAdmin = mutation({
   args: { secret: v.string(), userId: v.string() },
@@ -637,8 +637,13 @@ export const deleteUserAccountAdmin = mutation({
 
     for (const seg of keys) {
       try {
-        const doc = await ctx.db.get(seg as Id<"users">);
-        if (doc) await ctx.db.delete(doc._id);
+        const userDocId = seg as Id<"users">;
+        const doc = await ctx.db.get(userDocId);
+        if (!doc) continue;
+
+        await deleteAuthAccountAndSessions(ctx, userDocId);
+
+        await ctx.db.delete(doc._id);
       } catch {
         /* invalid id */
       }

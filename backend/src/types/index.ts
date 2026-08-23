@@ -87,6 +87,8 @@ export interface OutfitJob {
   outfitDbId: string;
   /** TryVerse credits reserved for this job — restored via restoreCredits() on failure. */
   creditAmount: number;
+  /** Which pool creditAmount was drawn from — passed to restoreCredits() so a refund lands back in the same pool instead of being guessed. */
+  creditType?: 'monthly' | 'free';
   modelImageUrl: string;
   slotImageUrls: {
     top?: string;
@@ -123,6 +125,8 @@ export interface ProductModelJob {
   generationDbId: string;
   /** TryVerse credits reserved for this job — restored via restoreCredits() on failure. */
   creditAmount: number;
+  /** Which pool creditAmount was drawn from — passed to restoreCredits() so a refund lands back in the same pool instead of being guessed. */
+  creditType?: 'monthly' | 'free';
   productImageUrl: string;
   faceReferenceUrl?: string;
   prompt?: string;
@@ -146,6 +150,8 @@ export interface VideoJob {
   generationDbId: string;
   /** TryVerse credits reserved for this job — restored via restoreCredits() on failure. */
   creditAmount: number;
+  /** Which pool creditAmount was drawn from — passed to restoreCredits() so a refund lands back in the same pool instead of being guessed. */
+  creditType?: 'monthly' | 'free';
   sourceImageUrl: string;
   prompt?: string;
   duration: 5 | 10;
@@ -203,7 +209,10 @@ export interface FlutterwaveWebhookEvent {
     amount: number;
     currency: string;
     status: string;
-    meta: {
+    // Present on charge.completed/charge.failed (merchant-supplied at checkout init). Not
+    // documented as present on subscription.cancelled — that event's payload centers on a `plan`
+    // object instead, so code handling cancellation must treat this as possibly absent.
+    meta?: {
       user_id: string;
       plan_id: string;
     };

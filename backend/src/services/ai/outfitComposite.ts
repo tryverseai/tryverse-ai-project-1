@@ -2,13 +2,13 @@ import sharp from 'sharp';
 import { logger } from '../../config/logger';
 import type { OutfitSlots } from './outfitSlots';
 import { OUTFIT_SLOT_ORDER } from './outfitSlots';
+import { isPrivateOrBlockedHost } from '../../lib/ssrfGuard';
 
 const CANVAS_SIZE = 1200;
 const CELL_PADDING = 28;
 const CANVAS_BACKGROUND = { r: 255, g: 255, b: 255, alpha: 1 } as const;
 
 const IMAGE_MAX_BYTES = 15 * 1024 * 1024; // 15MB cap per product photo
-const PRIVATE_HOST = /^(localhost|127\.|0\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1)/i;
 
 /**
  * Fetches an arbitrary product image URL with the same SSRF guard used by
@@ -25,7 +25,7 @@ async function fetchProductImageBuffer(imageUrl: string): Promise<Buffer> {
   if (parsed.protocol !== 'https:') {
     throw new Error('Only HTTPS product image URLs are allowed');
   }
-  if (PRIVATE_HOST.test(parsed.hostname)) {
+  if (isPrivateOrBlockedHost(parsed.hostname)) {
     throw new Error('Product image URL host not allowed');
   }
 

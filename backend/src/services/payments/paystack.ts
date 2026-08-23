@@ -5,8 +5,7 @@ import { logger } from '../../config/logger';
 import { AppError } from '../../middleware/errorHandler';
 import { allocateCredits } from '../credits';
 import {
-  paymentSuccessExists,
-  insertPaymentRow,
+  insertPaymentIfNew,
   upsertSubscriptionRow,
   cancelSubscriptionsForUserId,
 } from '../billingConvexBridge';
@@ -140,13 +139,8 @@ export async function handlePaystackWebhook(event: PaystackWebhookEvent): Promis
       return;
     }
 
-    if (await paymentSuccessExists(reference)) {
-      logger.warn('Duplicate Paystack webhook — already processed', { reference });
-      return;
-    }
-
     try {
-      await insertPaymentRow({
+      const inserted = await insertPaymentIfNew({
         user_id: metadata.user_id,
         reference,
         amount: amount / 100,
@@ -154,6 +148,10 @@ export async function handlePaystackWebhook(event: PaystackWebhookEvent): Promis
         status: 'success',
         provider: 'paystack',
       });
+      if (!inserted) {
+        logger.warn('Duplicate Paystack webhook — already processed', { reference });
+        return;
+      }
     } catch (paymentError) {
       logger.error('Failed to record payment', { error: String(paymentError) });
     }
@@ -230,7 +228,14 @@ export async function handlePaystackWebhook(event: PaystackWebhookEvent): Promis
     const userId = event.data.metadata?.user_id;
     if (userId) {
       await cancelSubscriptionsForUserId(userId);
-      logger.info('Paystack subscription cancelled', { userId });
+      // Cancelling only marks the subscription row cancelled — it does not by itself revoke
+      // plan-gated access, since every entitlement check reads profiles.plan_id/monthly_credits_*,
+      // never subscriptions.status. Without this, a user could cancel immediately after paying
+      // once and keep paid-plan access indefinitely. Reuses allocateCredits (the same function
+      // that grants a plan on successful payment) to downgrade to 'free' the same way a plan is
+      // ever granted, rather than duplicating the plan-lookup/credit-reset logic here.
+      await allocateCredits(userId, 'free', 'paystack-cancellation');
+      logger.info('Paystack subscription cancelled, downgraded to free', { userId });
     }
   }
 }

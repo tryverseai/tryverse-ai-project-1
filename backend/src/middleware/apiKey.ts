@@ -165,7 +165,17 @@ export async function validateDomain(req: Request, res: Response, next: NextFunc
 
   const origin = req.headers.origin || req.headers.referer || '';
   if (!origin) {
-    return next();
+    // Every route this middleware guards (widget.ts, personalize.ts) is a browser-embedded
+    // widget endpoint — a real shopper's browser always sends Origin or Referer on a fetch/XHR
+    // from a storefront page. A request with neither is a non-browser client (curl, a script, a
+    // server-to-server call) using a possibly-leaked API key outside the domain it's scoped to —
+    // fail closed rather than silently skipping the one check meant to contain exactly that case.
+    logger.warn('Domain validation: request has no Origin/Referer, rejecting', {
+      apiKeyId: req.apiKey.id,
+      path: req.path,
+    });
+    res.status(403).json({ error: 'Requests must include an Origin or Referer header from an authorized domain' });
+    return;
   }
 
   try {

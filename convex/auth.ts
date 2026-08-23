@@ -12,8 +12,8 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       reset: ResendOTPPasswordReset,
       verify: ResendEmailSignupVerification,
       validatePasswordRequirements(password: string) {
-        if (!password || password.length < 6) {
-          throw new Error("Password must be at least 6 characters.");
+        if (!password || password.length < 10) {
+          throw new Error("Password must be at least 10 characters.");
         }
       },
       profile(params) {

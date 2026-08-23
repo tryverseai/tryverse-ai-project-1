@@ -462,10 +462,18 @@ export async function decrementCredits(userId: string): Promise<void> {
  * Restores `amount` credits after AI inference failure (atomic — mirrors the reservation).
  * Only call when credits were reserved by `checkCredits` and the generation then failed.
  */
-export async function restoreCredits(userId: string, amount = 1): Promise<void> {
+/**
+ * @param creditType Pass the `creditType` from the original `checkCredits()` result whenever it's
+ * available — restores to that exact pool instead of guessing (see cxRestoreCredit's doc comment).
+ */
+export async function restoreCredits(
+  userId: string,
+  amount = 1,
+  creditType?: 'monthly' | 'free'
+): Promise<void> {
   try {
-    await cxRestoreCredit(userId, amount);
-    logger.info('Credit restored (AI failure)', { userId, amount });
+    await cxRestoreCredit(userId, amount, creditType);
+    logger.info('Credit restored (AI failure)', { userId, amount, creditType });
   } catch (e) {
     logger.warn('Credit restore failed', { userId, amount, error: String(e) });
   }

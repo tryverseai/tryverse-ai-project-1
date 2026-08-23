@@ -62,8 +62,10 @@ function requirePersonalizationEnabled(res: Response): boolean {
 // ---------------------------------------------------------------------------
 router.post(
   '/session',
-  widgetRateLimit,
   requireApiKey,
+  // Must run after requireApiKey — see tryon.ts for why (its keyGenerator reads req.apiKey,
+  // which doesn't exist until requireApiKey has run).
+  widgetRateLimit,
   validateDomain,
   upload.single('reference'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -121,8 +123,10 @@ router.post(
 // ---------------------------------------------------------------------------
 router.get(
   '/session/:sessionId',
-  widgetRateLimit,
   requireApiKey,
+  // Must run after requireApiKey — see tryon.ts for why (its keyGenerator reads req.apiKey,
+  // which doesn't exist until requireApiKey has run).
+  widgetRateLimit,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const sessionId = String(req.params.sessionId);
@@ -155,8 +159,10 @@ router.get(
 // ---------------------------------------------------------------------------
 router.post(
   '/generate',
-  widgetRateLimit,
   requireApiKey,
+  // Must run after requireApiKey — see tryon.ts for why (its keyGenerator reads req.apiKey,
+  // which doesn't exist until requireApiKey has run).
+  widgetRateLimit,
   validateDomain,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (!requirePersonalizationEnabled(res)) return;
@@ -249,8 +255,10 @@ router.post(
 // ---------------------------------------------------------------------------
 router.delete(
   '/session/:sessionId',
-  widgetRateLimit,
   requireApiKey,
+  // Must run after requireApiKey — see tryon.ts for why (its keyGenerator reads req.apiKey,
+  // which doesn't exist until requireApiKey has run).
+  widgetRateLimit,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const sessionId = String(req.params.sessionId);

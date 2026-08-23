@@ -5,9 +5,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { cxGetProfile } from '../creditsConvexBridge';
 import { isFreeTierPlanId } from '../../lib/planTier';
 import { anyApi, convexQueryPublic, convexQueryTrusted } from '../../config/convexHttp';
-
-const SSRF_BLOCKED_HOSTS =
-  /^(localhost|127\.|0\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1|\[::\]|0\.0\.0\.0)/i;
+import { isPrivateOrBlockedHost } from '../../lib/ssrfGuard';
 
 function isLocalhostOrigin(url: string): boolean {
   const u = url.trim();
@@ -96,7 +94,7 @@ function hostnameAllowedForModelImageFetch(hostname: string): boolean {
     }
   }
 
-  if (SSRF_BLOCKED_HOSTS.test(h)) return false;
+  if (isPrivateOrBlockedHost(h)) return false;
   return true;
 }
 

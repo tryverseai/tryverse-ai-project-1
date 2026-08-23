@@ -267,7 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: new Error("Email is required"), session: null };
       }
       if (!password || password.length < 6) {
-        return { error: new Error("Password must be at least 6 characters."), session: null };
+        return { error: new Error("Password must be at least 10 characters."), session: null };
       }
       try {
         const fd = buildPasswordFormData("signUp", trimmed, password, {

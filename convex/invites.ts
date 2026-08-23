@@ -1,14 +1,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-
-function requireBackendSecret(secret: string) {
-  const expected = (process.env.BACKEND_SHARED_SECRET ?? "").trim();
-  const got = String(secret).trim();
-  if (!expected || got !== expected) {
-    throw new Error("Unauthorized");
-  }
-}
+import { requireBackendSecret } from "./security";
 
 function newInviteToken(): string {
   return `inv_${crypto.randomUUID().replace(/-/g, "")}`;

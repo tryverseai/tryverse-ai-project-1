@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { normalizeAdminKeyInput } from '../lib/adminKey';
+import { normalizeAdminKeyInput, timingSafeStringEqual } from '../lib/adminKey';
 import { canonicalConvexProfileUserId } from '../lib/convexProfileId';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
@@ -230,16 +230,41 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
     require('../services/adminSession') as typeof import('../services/adminSession');
 
   const sessionToken = parseCookie(req.headers.cookie, ADMIN_SESSION_COOKIE);
-  if (await validateAndRefreshSession(sessionToken)) {
-    next();
-    return;
+  if (sessionToken) {
+    // The admin cookie is SameSite=None (required since the dashboard on Vercel and this API on
+    // Railway are cross-site) — browsers attach it on cross-site requests too, and many
+    // state-changing admin routes are simple POST/DELETE that don't require a CORS preflight, so
+    // CORS alone doesn't stop a malicious page from *sending* one of these with the cookie
+    // attached, only from *reading* the response. Sec-Fetch-Site is a browser-set, page-JS-
+    // unspoofable header (Fetch Metadata) — reject a cookie-authenticated request whose value
+    // shows it did not originate from this same site. Requests with no Sec-Fetch-Site at all
+    // (older browsers, direct curl/API usage) fall through unaffected; those must use the
+    // x-admin-key header path below instead, which needs a custom header a cross-site page can't
+    // set without CORS approval — inherently CSRF-safe already.
+    const secFetchSite = req.headers['sec-fetch-site'];
+    if (secFetchSite && secFetchSite !== 'same-origin' && secFetchSite !== 'none') {
+      logAudit({
+        event_type: 'failed_login',
+        actor: req.ip ? `ip:${req.ip}` : undefined,
+        action: 'admin_csrf_blocked',
+        details: { path: req.path, secFetchSite },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+      res.status(403).json({ error: 'Cross-site request blocked' });
+      return;
+    }
+    if (await validateAndRefreshSession(sessionToken)) {
+      next();
+      return;
+    }
   }
 
   // Fallback: raw key in header (still accepted for non-browser clients)
   const rawHdr = req.headers['x-admin-key'];
   const first = Array.isArray(rawHdr) ? rawHdr[0] : rawHdr;
   const adminKey = normalizeAdminKeyInput(first);
-  if (adminKey && adminKey === env.ADMIN_SECRET_KEY) {
+  if (adminKey && timingSafeStringEqual(adminKey, env.ADMIN_SECRET_KEY)) {
     next();
     return;
   }

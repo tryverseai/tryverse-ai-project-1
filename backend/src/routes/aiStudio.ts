@@ -3,6 +3,7 @@ import { body, matchedData } from 'express-validator';
 import { requireAuth, convexProfileCreditLookupKey } from '../middleware/auth';
 import { handleValidationErrors } from '../middleware/validate';
 import { generalRateLimit } from '../middleware/rateLimiter';
+import { planAwareAiStudioRateLimit } from '../middleware/planRateLimit';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../config/logger';
 import { env } from '../config/env';
@@ -34,12 +35,13 @@ const router = Router();
  * plan check — access is now metered by credits (available on every plan, including Free) rather
  * than locked to one tier. Throws a 402 AppError with the reason on insufficient credits.
  */
-async function reserveGenerationCredits(req: Request, amount: number): Promise<void> {
+async function reserveGenerationCredits(req: Request, amount: number): Promise<'monthly' | 'free'> {
   const userId = convexProfileCreditLookupKey(req);
   const result = await checkCredits(userId, amount);
   if (!result.allowed) {
     throw new AppError(result.reason || 'Not enough credits for this generation', 402, 'INSUFFICIENT_CREDITS');
   }
+  return result.creditType;
 }
 
 /** AI Video is not available on the Free plan (enforced server-side, not just hidden in the UI). */
@@ -70,23 +72,25 @@ router.post(
   '/models/generate',
   generalRateLimit,
   requireAuth,
+  planAwareAiStudioRateLimit,
   [body('prompt').isString().trim().notEmpty().isLength({ max: 500 })],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user!.id;
+    let creditType: 'monthly' | 'free' | undefined;
     try {
-      await reserveGenerationCredits(req, CREDIT_COSTS.aiModel);
+      creditType = await reserveGenerationCredits(req, CREDIT_COSTS.aiModel);
       const params = matchedData(req) as { prompt: string };
       const result = await generateAndSaveAiModel(userId, params);
       res.json(result);
     } catch (err) {
       logger.error('AI model generation failed', { error: err instanceof Error ? err.message : String(err) });
       if (err instanceof AppError) {
-        if (err.code !== 'INSUFFICIENT_CREDITS') await restoreCredits(userId, CREDIT_COSTS.aiModel);
+        if (err.code !== 'INSUFFICIENT_CREDITS') await restoreCredits(userId, CREDIT_COSTS.aiModel, creditType);
         next(err);
         return;
       }
-      await restoreCredits(userId, CREDIT_COSTS.aiModel);
+      await restoreCredits(userId, CREDIT_COSTS.aiModel, creditType);
       next(new AppError('Could not generate the AI model right now', 502));
     }
   }
@@ -127,19 +131,21 @@ router.post(
   '/photoshoot/generate',
   generalRateLimit,
   requireAuth,
+  planAwareAiStudioRateLimit,
   [
     body('productStoragePath').isString().trim().notEmpty(),
-    body('modelId').isString().trim().notEmpty(),
+    body('modelId').isString().trim().notEmpty().isLength({ max: 200 }),
     body('modelSource').isIn(['library', 'generated']),
-    body('background').optional().isString().trim(),
-    body('theme').optional().isString().trim(),
-    body('lighting').optional().isString().trim(),
+    body('background').optional().isString().trim().isLength({ max: 300 }),
+    body('theme').optional().isString().trim().isLength({ max: 300 }),
+    body('lighting').optional().isString().trim().isLength({ max: 300 }),
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user!.id;
+    let creditType: 'monthly' | 'free' | undefined;
     try {
-      await reserveGenerationCredits(req, CREDIT_COSTS.photoshoot);
+      creditType = await reserveGenerationCredits(req, CREDIT_COSTS.photoshoot);
       const params = matchedData(req) as {
         productStoragePath: string;
         modelId: string;
@@ -156,11 +162,11 @@ router.post(
     } catch (err) {
       logger.error('Product photoshoot failed', { error: err instanceof Error ? err.message : String(err) });
       if (err instanceof AppError) {
-        if (err.code !== 'INSUFFICIENT_CREDITS') await restoreCredits(userId, CREDIT_COSTS.photoshoot);
+        if (err.code !== 'INSUFFICIENT_CREDITS') await restoreCredits(userId, CREDIT_COSTS.photoshoot, creditType);
         next(err);
         return;
       }
-      await restoreCredits(userId, CREDIT_COSTS.photoshoot);
+      await restoreCredits(userId, CREDIT_COSTS.photoshoot, creditType);
       next(new AppError('Could not generate the photoshoot right now', 502));
     }
   }
@@ -181,19 +187,21 @@ router.post(
   '/outfit/generate',
   generalRateLimit,
   requireAuth,
+  planAwareAiStudioRateLimit,
   [
-    body('modelId').isString().trim().notEmpty(),
+    body('modelId').isString().trim().notEmpty().isLength({ max: 200 }),
     body('modelSource').isIn(['library', 'generated']),
     body('slots').isObject(),
-    ...OUTFIT_SLOT_FIELDS.map((f) => body(`slots.${f}`).optional().isString().trim().notEmpty()),
+    ...OUTFIT_SLOT_FIELDS.map((f) => body(`slots.${f}`).optional().isString().trim().notEmpty().isLength({ max: 200 })),
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user!.id;
     const creditAmount = CREDIT_COSTS.outfit;
     let creditsReserved = false;
+    let creditType: 'monthly' | 'free' | undefined;
     try {
-      await reserveGenerationCredits(req, creditAmount);
+      creditType = await reserveGenerationCredits(req, creditAmount);
       creditsReserved = true;
 
       const params = matchedData(req) as {
@@ -244,6 +252,7 @@ router.post(
         userId,
         outfitDbId,
         creditAmount,
+        creditType,
         modelImageUrl,
         slotImageUrls,
         slotLabels,
@@ -291,7 +300,7 @@ router.post(
       logger.error('Outfit generation failed', { error: err instanceof Error ? err.message : String(err) });
       // Job was never queued/run (failed before reaching the pipeline) — the pipeline handles
       // its own restore once a job actually starts running, so only restore here.
-      if (creditsReserved) await restoreCredits(userId, creditAmount);
+      if (creditsReserved) await restoreCredits(userId, creditAmount, creditType);
       next(err instanceof AppError ? err : new AppError('Could not start the outfit generation right now', 502));
     }
   }
@@ -353,6 +362,7 @@ router.post(
   '/product-model/generate',
   generalRateLimit,
   requireAuth,
+  planAwareAiStudioRateLimit,
   [
     body('productStoragePath').isString().trim().notEmpty(),
     body('faceReferenceStoragePath').optional().isString().trim().notEmpty(),
@@ -370,8 +380,9 @@ router.post(
       ? CREDIT_COSTS.photoshootFaceRef
       : CREDIT_COSTS.photoshoot;
     let creditsReserved = false;
+    let creditType: 'monthly' | 'free' | undefined;
     try {
-      await reserveGenerationCredits(req, creditAmount);
+      creditType = await reserveGenerationCredits(req, creditAmount);
       creditsReserved = true;
 
       if (!params.productStoragePath.startsWith(`${userId}/`)) {
@@ -399,6 +410,7 @@ router.post(
         jobId,
         userId,
         creditAmount,
+        creditType,
         generationDbId,
         productImageUrl,
         faceReferenceUrl,
@@ -443,7 +455,7 @@ router.post(
       res.json({ generationId: generationDbId, jobId, status: result.status, error: result.error });
     } catch (err) {
       logger.error('AI Model Studio generation failed', { error: err instanceof Error ? err.message : String(err) });
-      if (creditsReserved) await restoreCredits(userId, creditAmount);
+      if (creditsReserved) await restoreCredits(userId, creditAmount, creditType);
       next(err instanceof AppError ? err : new AppError('Could not start generation right now', 502));
     }
   }
@@ -504,11 +516,12 @@ router.post(
   '/video/generate',
   generalRateLimit,
   requireAuth,
+  planAwareAiStudioRateLimit,
   [
     // Exactly one source: a fresh upload, an existing try-on result, or a saved/library AI model.
     body('sourceStoragePath').optional().isString().trim().notEmpty(),
     body('tryonId').optional().isString().trim().notEmpty(),
-    body('modelId').optional().isString().trim().notEmpty(),
+    body('modelId').optional().isString().trim().notEmpty().isLength({ max: 200 }),
     body('modelSource').optional().isIn(['library', 'generated']),
     body('prompt').optional().isString().trim().isLength({ max: 200 }),
     body('duration').optional().isIn([5, 10]),
@@ -530,9 +543,10 @@ router.post(
     const resolution = params.resolution ?? '1080p';
     const creditAmount = videoCreditCost(resolution, duration);
     let creditsReserved = false;
+    let creditType: 'monthly' | 'free' | undefined;
     try {
       await blockFreePlanVideo(req);
-      await reserveGenerationCredits(req, creditAmount);
+      creditType = await reserveGenerationCredits(req, creditAmount);
       creditsReserved = true;
 
       const sourceCount = [params.sourceStoragePath, params.tryonId, params.modelId].filter(Boolean).length;
@@ -579,6 +593,7 @@ router.post(
         userId,
         generationDbId,
         creditAmount,
+        creditType,
         sourceImageUrl,
         prompt: params.prompt,
         duration,
@@ -623,7 +638,7 @@ router.post(
       res.json({ generationId: generationDbId, jobId, status: result.status, error: result.error });
     } catch (err) {
       logger.error('AI Video generation failed', { error: err instanceof Error ? err.message : String(err) });
-      if (creditsReserved) await restoreCredits(userId, creditAmount);
+      if (creditsReserved) await restoreCredits(userId, creditAmount, creditType);
       next(err instanceof AppError ? err : new AppError('Could not start video generation right now', 502));
     }
   }

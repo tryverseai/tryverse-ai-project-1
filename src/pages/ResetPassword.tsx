@@ -40,7 +40,7 @@ const ResetPassword = () => {
     if (newPassword.length < 6) {
       toast({
         title: "Password too short",
-        description: "Your new password needs at least 6 characters.",
+        description: "Your new password needs at least 10 characters.",
         variant: "destructive",
       });
       return;
@@ -142,7 +142,7 @@ const ResetPassword = () => {
               onChange={(ev) => setNewPassword(ev.target.value)}
               placeholder="••••••••"
               required
-              minLength={6}
+              minLength={10}
               className="h-12"
             />
           </div>

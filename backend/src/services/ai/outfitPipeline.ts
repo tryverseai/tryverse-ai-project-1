@@ -65,7 +65,7 @@ export async function executeOutfitPipeline(job: OutfitJob): Promise<OutfitResul
     const message = err instanceof Error ? err.message : String(err);
     logger.error('Outfit pipeline failed', { jobId: job.jobId, outfitDbId: job.outfitDbId, error: message });
 
-    await restoreCredits(job.userId, job.creditAmount);
+    await restoreCredits(job.userId, job.creditAmount, job.creditType);
 
     try {
       await convexMutationTrusted(anyApi.backendTrusted.patchOutfitGeneration, {

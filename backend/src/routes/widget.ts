@@ -32,8 +32,11 @@ const router = Router();
  */
 router.post(
   '/request',
-  widgetRateLimit,
   requireApiKey,
+  // Must run after requireApiKey — its keyGenerator reads req.apiKey, which doesn't exist until
+  // requireApiKey has run (a real bug found in security review: registered before auth, this
+  // silently degraded to a pure per-IP limiter instead of per-key).
+  widgetRateLimit,
   requireScope('write'),
   validateDomain,
   [
@@ -141,6 +144,7 @@ router.post(
 router.get(
   '/status/:tryonId',
   requireApiKey,
+  widgetRateLimit,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const rawId = req.params.tryonId;
@@ -180,6 +184,7 @@ router.get(
 router.get(
   '/config',
   requireApiKey,
+  widgetRateLimit,
   validateDomain,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {

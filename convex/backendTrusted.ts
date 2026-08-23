@@ -4,14 +4,8 @@ import { mutation, query, type MutationCtx } from "./_generated/server";
 import { authSubjectSegments, canonicalAuthSubjectProfileId, subjectsOverlap } from "./authSubjectKeys";
 import { collectProfileDocsForSubjectKeys, findProfileBySubjectKeys } from "./profileLookup";
 import { defaultModelLibraryRows } from "./modelLibrarySeedRows";
-
-function requireBackendSecret(secret: string) {
-  const expected = (process.env.BACKEND_SHARED_SECRET ?? "").trim();
-  const got = String(secret).trim();
-  if (!expected || got !== expected) {
-    throw new Error("Unauthorized");
-  }
-}
+import { requireBackendSecret } from "./security";
+import { deleteAuthAccountAndSessions } from "./authAccountCleanup";
 
 export const getUserRowById = query({
   args: { secret: v.string(), userId: v.string() },
@@ -458,8 +452,17 @@ export const deleteUserAccountBackendTrusted = mutation({
 
     for (const seg of keys) {
       try {
-        const doc = await ctx.db.get(seg as Id<"users">);
-        if (doc) await ctx.db.delete(doc._id);
+        const userDocId = seg as Id<"users">;
+        const doc = await ctx.db.get(userDocId);
+        if (!doc) continue;
+
+        // Also remove the Convex Auth identity itself — the password-hash row and every live
+        // session/refresh token — not just the app-level profile/data above. Found missing in a
+        // security review: without this, a JWT/refresh token issued before deletion kept working
+        // until natural expiry, and the password hash survived deletion entirely.
+        await deleteAuthAccountAndSessions(ctx, userDocId);
+
+        await ctx.db.delete(doc._id);
       } catch {
         /* invalid id */
       }
@@ -1629,11 +1632,22 @@ export const paymentSuccessExists = query({
   args: { secret: v.string(), reference: v.string() },
   handler: async (ctx, { secret, reference }) => {
     requireBackendSecret(secret);
-    const rows = await ctx.db.query("payments").collect();
-    return rows.some((p) => p.reference === reference && p.status === "success");
+    const rows = await ctx.db
+      .query("payments")
+      .withIndex("by_reference", (q) => q.eq("reference", reference))
+      .collect();
+    return rows.some((p) => p.status === "success");
   },
 });
 
+/**
+ * @deprecated Use {@link insertPaymentIfNewTrusted} — this unconditional insert paired with a
+ * separate `paymentSuccessExists` check-then-insert from the caller has a TOCTOU window: two
+ * webhook deliveries for the same reference (both Paystack and Flutterwave explicitly document
+ * retry-on-timeout delivery) can both pass the exists-check before either insert lands, since the
+ * check and the write are two independent round-trips, not one transaction. Kept only so any
+ * remaining caller doesn't break; do not add new call sites.
+ */
 export const insertPaymentTrusted = mutation({
   args: {
     secret: v.string(),
@@ -1655,6 +1669,45 @@ export const insertPaymentTrusted = mutation({
       provider: a.provider,
       created_at: new Date().toISOString(),
     });
+  },
+});
+
+/**
+ * Atomic check-and-insert: the read (any existing successful row for this reference) and the
+ * write happen inside one mutation handler invocation, which Convex serializes per-document —
+ * two concurrent calls for the same reference cannot both observe "no existing row" and both
+ * insert, closing the TOCTOU window `insertPaymentTrusted` + a separate `paymentSuccessExists`
+ * call had. Returns `{ inserted: false }` on a duplicate reference instead of writing a second row.
+ */
+export const insertPaymentIfNewTrusted = mutation({
+  args: {
+    secret: v.string(),
+    user_id: v.string(),
+    reference: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+    status: v.string(),
+    provider: v.string(),
+  },
+  handler: async (ctx, a) => {
+    requireBackendSecret(a.secret);
+    const existing = await ctx.db
+      .query("payments")
+      .withIndex("by_reference", (q) => q.eq("reference", a.reference))
+      .collect();
+    if (existing.some((p) => p.status === "success")) {
+      return { inserted: false as const };
+    }
+    await ctx.db.insert("payments", {
+      user_id: a.user_id,
+      reference: a.reference,
+      amount: a.amount,
+      currency: a.currency,
+      status: a.status,
+      provider: a.provider,
+      created_at: new Date().toISOString(),
+    });
+    return { inserted: true as const };
   },
 });
 
@@ -1828,8 +1881,19 @@ export const reserveCredit = mutation({
 });
 
 export const restoreCredit = mutation({
-  args: { secret: v.string(), userId: v.string(), amount: v.optional(v.number()) },
-  handler: async (ctx, { secret, userId, amount }) => {
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    amount: v.optional(v.number()),
+    // Which pool reserveCredit actually drew from (its own return value) — when provided, restore
+    // goes back to that exact pool instead of guessing. Found in security review: the old
+    // guess-based logic (paid plan + monthly pool not full → assume monthly) restores to the
+    // monthly pool even when the reservation actually drew from the free pool (e.g. a paid user
+    // whose monthly allotment was exhausted mid-cycle, so reserveCredit fell through to free) —
+    // permanently draining the free pool while crediting an extra monthly-plan generation.
+    creditType: v.optional(v.union(v.literal("monthly"), v.literal("free"))),
+  },
+  handler: async (ctx, { secret, userId, amount, creditType }) => {
     requireBackendSecret(secret);
     const cost = Math.max(1, Math.floor(amount ?? 1));
     const row = await profileRowForBackend(ctx, userId);
@@ -1842,7 +1906,11 @@ export const restoreCredit = mutation({
     const freeRem = Number(row.free_credits_remaining ?? 0);
     const freeTot = Number(row.free_credits_total ?? 0);
 
-    if (planId !== "free" && monthlyRem < monthlyTot) {
+    const restoreMonthly = creditType
+      ? creditType === "monthly"
+      : planId !== "free" && monthlyRem < monthlyTot;
+
+    if (restoreMonthly) {
       await ctx.db.patch(row._id, {
         monthly_credits_remaining: Math.min(monthlyTot, monthlyRem + cost),
         updated_at: new Date().toISOString(),
