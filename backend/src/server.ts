@@ -307,8 +307,11 @@ async function bootstrap(): Promise<void> {
   // assertProductionSecurityConfig) silently stopped every queue-backed route (Outfit Builder,
   // Product Model, Video) from ever completing a job — they'd enqueue, reserve credits, and hang
   // forever with nothing consuming the queue.
+  logger.error('DEBUG_MARKER: about to import worker module');
   const { startWorker } = await import('./services/queue/worker');
-  startWorker();
+  logger.error('DEBUG_MARKER: worker module imported, calling startWorker()');
+  const workerStarted = startWorker();
+  logger.error('DEBUG_MARKER: startWorker() returned', { workerStarted });
 
   const port = env.PORT;
   app.listen(port, LISTEN_HOST, () => {
