@@ -1,3 +1,5 @@
+import type { OutfitSlots } from '../services/ai/outfitSlots';
+
 /**
  * Product categories shared by the product catalog and the single-item try-on pipeline: apparel,
  * footwear, and accessories (eyewear, jewelry) routed through FASHN Try-On Max for the
@@ -97,20 +99,9 @@ export interface OutfitJob {
   /** Which pool creditAmount was drawn from — passed to restoreCredits() so a refund lands back in the same pool instead of being guessed. */
   creditType?: 'monthly' | 'free';
   modelImageUrl: string;
-  slotImageUrls: {
-    top?: string;
-    bottom?: string;
-    one_piece?: string;
-    shoes?: string;
-    outerwear?: string;
-  };
-  slotLabels: {
-    top?: string;
-    bottom?: string;
-    one_piece?: string;
-    shoes?: string;
-    outerwear?: string;
-  };
+  /** Same shape reused for both — one holds resolved image URLs, the other product display names. */
+  slotImageUrls: OutfitSlots;
+  slotLabels: OutfitSlots;
 }
 
 export interface OutfitResult {

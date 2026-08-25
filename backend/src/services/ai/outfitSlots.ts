@@ -10,6 +10,11 @@ export interface OutfitSlots {
   one_piece?: string;
   shoes?: string;
   outerwear?: string;
+  /** Sunglasses/glasses — matches the `'eyewear'` product category. */
+  eyewear?: string;
+  /** Earrings, necklaces, or other jewelry — matches the `'jewelry'` product category (not
+   *  split further since the catalog itself doesn't distinguish sub-types yet). */
+  jewelry?: string;
 }
 
 export interface OutfitSlotValidation {
@@ -20,16 +25,20 @@ export interface OutfitSlotValidation {
 /**
  * Rules:
  *  - Exactly one of {top+bottom} or {one_piece} — never both, never a bare top or bare bottom.
- *  - shoes and outerwear are each optional, additive, at most one.
- *  - At least one slot must be filled.
+ *  - shoes, outerwear, eyewear, and jewelry are each optional, additive, at most one.
+ *  - At least one slot must be filled overall — but unlike shoes/outerwear (which only ever made
+ *    sense as an addition to a clothing anchor), eyewear/jewelry are valid completely on their
+ *    own with no top/bottom/one_piece at all (e.g. "just add these sunglasses and this necklace
+ *    to the model"), so no clothing anchor is required anymore.
  */
 export function validateOutfitSlots(slots: OutfitSlots): OutfitSlotValidation {
   const hasTop = Boolean(slots.top);
   const hasBottom = Boolean(slots.bottom);
   const hasOnePiece = Boolean(slots.one_piece);
+  const anySlotFilled = Object.values(slots).some(Boolean);
 
-  if (!hasTop && !hasBottom && !hasOnePiece && !slots.shoes && !slots.outerwear) {
-    return { valid: false, error: 'Pick at least one product to build an outfit.' };
+  if (!anySlotFilled) {
+    return { valid: false, error: 'Pick at least one product to build a look.' };
   }
 
   if (hasOnePiece && (hasTop || hasBottom)) {
@@ -44,12 +53,16 @@ export function validateOutfitSlots(slots: OutfitSlots): OutfitSlotValidation {
     return { valid: false, error: 'A bottom needs a top to complete the outfit — or pick a one-piece instead.' };
   }
 
-  if (!hasTop && !hasBottom && !hasOnePiece) {
-    return { valid: false, error: 'Pick a top + bottom, or a one-piece, to build an outfit.' };
-  }
-
   return { valid: true };
 }
 
 /** Ordered slot keys used for consistent flat-lay layout and prompt generation. */
-export const OUTFIT_SLOT_ORDER: Array<keyof OutfitSlots> = ['outerwear', 'top', 'one_piece', 'bottom', 'shoes'];
+export const OUTFIT_SLOT_ORDER: Array<keyof OutfitSlots> = [
+  'outerwear',
+  'top',
+  'one_piece',
+  'bottom',
+  'shoes',
+  'eyewear',
+  'jewelry',
+];

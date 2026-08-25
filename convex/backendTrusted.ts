@@ -970,6 +970,8 @@ const outfitSlotsValidator = v.object({
   one_piece: v.optional(v.string()),
   shoes: v.optional(v.string()),
   outerwear: v.optional(v.string()),
+  eyewear: v.optional(v.string()),
+  jewelry: v.optional(v.string()),
 });
 
 /** Inserts a new Outfit Builder generation row in "processing" status. Mirrors `insertTryon`. */

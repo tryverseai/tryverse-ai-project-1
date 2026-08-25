@@ -89,14 +89,28 @@ function layoutFor(count: number): Array<{ x: number; y: number; w: number; h: n
         { x: 0, y: half, w: half, h: half },
         { x: half, y: half, w: half, h: half },
       ];
-    default:
-      // 4 items — classic 2x2 grid.
+    case 4:
+      // Classic 2x2 grid.
       return [
         { x: 0, y: 0, w: half, h: half },
         { x: half, y: 0, w: half, h: half },
         { x: 0, y: half, w: half, h: half },
         { x: half, y: half, w: half, h: half },
       ];
+    default: {
+      // 5+ items (now possible with eyewear/jewelry added alongside top/bottom/outerwear/shoes)
+      // — a generic near-square grid rather than a hand-tuned layout for every count.
+      const cols = Math.ceil(Math.sqrt(count));
+      const rows = Math.ceil(count / cols);
+      const cellW = CANVAS_SIZE / cols;
+      const cellH = CANVAS_SIZE / rows;
+      return Array.from({ length: count }, (_, i) => ({
+        x: (i % cols) * cellW,
+        y: Math.floor(i / cols) * cellH,
+        w: cellW,
+        h: cellH,
+      }));
+    }
   }
 }
 

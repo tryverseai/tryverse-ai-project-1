@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Camera, Download, Shirt, Footprints, Clock } from "lucide-react";
+import { Sparkles, Camera, Download, Shirt, Footprints, Clock, Glasses, Gem } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useCredits } from "@/contexts/CreditsContext";
@@ -26,7 +26,7 @@ const OUTFIT_STAGES = [
   "Almost ready",
 ];
 
-type SlotKey = "top" | "bottom" | "one_piece" | "shoes";
+type SlotKey = "top" | "bottom" | "one_piece" | "shoes" | "eyewear" | "jewelry";
 type Mode = "top_bottom" | "one_piece";
 
 const MAX_POLL_ATTEMPTS = 30;
@@ -93,6 +93,8 @@ export function OutfitBuilderTab() {
     bottom: [],
     one_piece: [],
     shoes: [],
+    eyewear: [],
+    jewelry: [],
   });
   const [productsLoading, setProductsLoading] = useState(true);
 
@@ -114,13 +116,17 @@ export function OutfitBuilderTab() {
       getProducts(1, 50, "dresses").catch(() => ({ products: [] as Product[] })),
       getProducts(1, 50, "one-pieces").catch(() => ({ products: [] as Product[] })),
       getProducts(1, 50, "footwear").catch(() => ({ products: [] as Product[] })),
-    ]).then(([tops, bottoms, dresses, onePieces, shoes]) => {
+      getProducts(1, 50, "eyewear").catch(() => ({ products: [] as Product[] })),
+      getProducts(1, 50, "jewelry").catch(() => ({ products: [] as Product[] })),
+    ]).then(([tops, bottoms, dresses, onePieces, shoes, eyewear, jewelry]) => {
       if (cancelled) return;
       setProductsBySlot({
         top: tops.products,
         bottom: bottoms.products,
         one_piece: [...dresses.products, ...onePieces.products],
         shoes: shoes.products,
+        eyewear: eyewear.products,
+        jewelry: jewelry.products,
       });
     }).finally(() => { if (!cancelled) setProductsLoading(false); });
 
@@ -145,12 +151,22 @@ export function OutfitBuilderTab() {
     });
   };
 
-  const isValidCombo =
-    mode === "one_piece" ? Boolean(selected.one_piece) : Boolean(selected.top && selected.bottom);
+  // Clothing is now optional — a look can be built from accessories alone (e.g. just sunglasses
+  // + a necklace on the model, no garment change). The only remaining hard rule is that a top
+  // needs its bottom and vice versa; everything else is additive.
+  const topBottomBalanced = mode !== "top_bottom" || Boolean(selected.top) === Boolean(selected.bottom);
+  const anySlotFilled = Boolean(
+    selected.top || selected.bottom || selected.one_piece || selected.shoes || selected.eyewear || selected.jewelry
+  );
+  const isValidCombo = topBottomBalanced && anySlotFilled;
 
   const handleGenerate = async () => {
     if (!isValidCombo) {
-      toast.error(mode === "one_piece" ? "Pick a dress or one-piece" : "Pick a top and a bottom");
+      toast.error(
+        !anySlotFilled
+          ? "Pick at least one product to build a look"
+          : "A top needs a bottom to complete the outfit — or pick a one-piece instead"
+      );
       return;
     }
     if (!selectedModel) {
@@ -161,6 +177,8 @@ export function OutfitBuilderTab() {
     posthogCapture("outfit_builder_generate_clicked", {
       mode,
       hasShoes: Boolean(selected.shoes),
+      hasEyewear: Boolean(selected.eyewear),
+      hasJewelry: Boolean(selected.jewelry),
       modelSource: selectedModel.source,
     });
     try {
@@ -169,6 +187,8 @@ export function OutfitBuilderTab() {
         bottom: mode === "top_bottom" ? selected.bottom?.id : undefined,
         one_piece: mode === "one_piece" ? selected.one_piece?.id : undefined,
         shoes: selected.shoes?.id,
+        eyewear: selected.eyewear?.id,
+        jewelry: selected.jewelry?.id,
       };
       const started = await generateOutfit({
         modelId: selectedModel.id,
@@ -216,7 +236,7 @@ export function OutfitBuilderTab() {
             Outfit Builder
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Style a complete look — combine products from your catalog onto one model.
+            Style a complete look — combine clothing, footwear, and accessories from your catalog onto one model.
           </p>
         </div>
       </div>
@@ -228,7 +248,7 @@ export function OutfitBuilderTab() {
           <div className="bg-card rounded-xl border border-border/50 shadow-card p-6 space-y-6">
             <div>
               <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Shirt className="h-4 w-4" /> 1. Build the outfit
+                <Shirt className="h-4 w-4" /> 1. Add clothing <span className="text-muted-foreground/70 font-normal">(optional)</span>
               </h3>
               <div className="flex gap-2 mb-4">
                 <Button
@@ -302,7 +322,41 @@ export function OutfitBuilderTab() {
 
             <div>
               <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Camera className="h-4 w-4" /> 2. Pick a model
+                <Gem className="h-4 w-4" /> 2. Add accessories <span className="text-muted-foreground/70 font-normal">(optional)</span>
+              </h3>
+              {productsLoading ? (
+                <p className="text-xs text-muted-foreground">Loading your products…</p>
+              ) : (
+                <div className="space-y-5">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Glasses className="h-3.5 w-3.5" /> Eyewear
+                    </p>
+                    <ProductPickerGrid
+                      products={productsBySlot.eyewear}
+                      selectedId={selected.eyewear?.id}
+                      onSelect={setSlot("eyewear")}
+                      emptyLabel="No eyewear in your catalog yet — tag a product as “Eyewear” to add one."
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Gem className="h-3.5 w-3.5" /> Jewelry
+                    </p>
+                    <ProductPickerGrid
+                      products={productsBySlot.jewelry}
+                      selectedId={selected.jewelry?.id}
+                      onSelect={setSlot("jewelry")}
+                      emptyLabel="No jewelry in your catalog yet — tag a product as “Jewelry” to add one."
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Camera className="h-4 w-4" /> 3. Pick a model
               </h3>
               <ModelPickerGrid selectedId={selectedModel?.id} onSelect={setSelectedModel} />
             </div>

@@ -1838,6 +1838,8 @@ export interface OutfitSlotSelection {
   one_piece?: string;
   shoes?: string;
   outerwear?: string;
+  eyewear?: string;
+  jewelry?: string;
 }
 
 export interface GenerateOutfitParams {

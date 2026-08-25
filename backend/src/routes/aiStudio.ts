@@ -181,7 +181,7 @@ router.post(
 // long to hold open a synchronous HTTP request/proxy connection for. Metered by credits, available
 // on every plan.
 
-const OUTFIT_SLOT_FIELDS = ['top', 'bottom', 'one_piece', 'shoes', 'outerwear'] as const;
+const OUTFIT_SLOT_FIELDS = ['top', 'bottom', 'one_piece', 'shoes', 'outerwear', 'eyewear', 'jewelry'] as const;
 
 router.post(
   '/outfit/generate',
