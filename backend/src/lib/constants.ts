@@ -7,6 +7,9 @@ export const VALID_TRY_ON_CATEGORIES: ProductCategory[] = [
   'bottoms',
   'dresses',
   'one-pieces',
+  'eyewear',
+  'jewelry',
+  'footwear',
 ];
 
 /**

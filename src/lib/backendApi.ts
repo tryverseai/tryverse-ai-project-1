@@ -96,7 +96,15 @@ export function widgetBackendPublicUrl(): string {
   return 'http://localhost:3001';
 }
 
-export type TryOnCategory = 'clothing' | 'tops' | 'bottoms' | 'dresses' | 'one-pieces';
+export type TryOnCategory =
+  | 'clothing'
+  | 'tops'
+  | 'bottoms'
+  | 'dresses'
+  | 'one-pieces'
+  | 'eyewear'
+  | 'jewelry'
+  | 'footwear';
 
 /**
  * Product catalog category — a superset of `TryOnCategory` that also allows `'shoes'` for the

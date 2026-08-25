@@ -48,7 +48,7 @@ interface GarmentOption {
   /** Unique picker key — several options can share the same underlying pipeline `category`. */
   key: string;
   label: string;
-  /** Pipeline routing category — unchanged 5-value set the backend already understands. */
+  /** Pipeline routing category — the full apparel + accessory set the backend understands. */
   category: TryOnCategory;
   /**
    * Sent as `productDescription` — real semantic context for the generation pipeline (garment
@@ -90,6 +90,15 @@ const GARMENT_OPTIONS: { group: string; items: GarmentOption[] }[] = [
       { key: "jumpsuit", label: "Jumpsuit", category: "one-pieces", description: "jumpsuit" },
       { key: "romper", label: "Romper", category: "one-pieces", description: "romper" },
       { key: "suit", label: "Suit", category: "one-pieces", description: "suit" },
+    ],
+  },
+  {
+    group: "Accessories",
+    items: [
+      { key: "eyewear", label: "Glasses / sunglasses", category: "eyewear", description: "eyewear" },
+      { key: "earrings", label: "Earrings", category: "jewelry", description: "earrings" },
+      { key: "necklace", label: "Necklace", category: "jewelry", description: "necklace" },
+      { key: "footwear", label: "Shoes", category: "footwear", description: "shoes" },
     ],
   },
   { group: "Other", items: [{ key: "other", label: "Other — describe it", category: "clothing" }] },

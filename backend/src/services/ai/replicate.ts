@@ -113,6 +113,11 @@ function getModelConfig(category: ProductCategory): {
           };
         },
       };
+    default:
+      // Accessory categories (eyewear/jewelry/footwear) never reach the Replicate/IDM-VTON
+      // clothing pipeline — they're routed to FASHN Try-On Max directly via the accessory
+      // early-return in pipeline.ts. Reaching here means that gate was bypassed.
+      throw new Error(`getModelConfig: unsupported category '${category}' — not a clothing category`);
   }
 }
 

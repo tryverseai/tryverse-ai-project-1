@@ -39,7 +39,17 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 function normalizeTryOnCategory(raw: string): TryOnCategory {
   const s = raw.toLowerCase();
-  if (s === "tops" || s === "bottoms" || s === "dresses" || s === "one-pieces" || s === "clothing") return s;
+  if (
+    s === "tops" ||
+    s === "bottoms" ||
+    s === "dresses" ||
+    s === "one-pieces" ||
+    s === "clothing" ||
+    s === "eyewear" ||
+    s === "jewelry" ||
+    s === "footwear"
+  )
+    return s;
   return "clothing";
 }
 

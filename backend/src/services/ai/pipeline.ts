@@ -30,6 +30,7 @@ import {
   removeInferenceScratchPaths,
   uploadResultBuffer,
 } from '../storage/images';
+import { runFashnOutfit } from './fashn';
 import { cxPatchTryon, cxInsertUsageEvent } from '../tryonConvexBridge';
 import { restoreCredits } from '../credits';
 import { sendTryOnCompletedEmail } from '../email';
@@ -170,6 +171,102 @@ async function fetchUrlBufferWithRetry(url: string, label: string): Promise<Buff
   throw last ?? new Error(`Failed to fetch ${label}`);
 }
 
+const ACCESSORY_CATEGORIES = new Set(['eyewear', 'jewelry', 'footwear']);
+
+/**
+ * Accessories (eyewear, jewelry, footwear) never go through the apparel-specific machinery below
+ * — garment topology classification, IDM-VTON/Flux engine selection, smart-frame prep, and
+ * human-parsing are all clothing concepts with no accessory equivalent. Routing them through that
+ * logic would risk degrading it for actual clothing categories for no benefit, so accessories are
+ * deliberately a separate, minimal branch that reuses FASHN's Try-On Max endpoint directly (the
+ * same endpoint already proven in production by the Outfit Builder — see `runFashnOutfit`).
+ */
+function isAccessoryCategory(category: string): boolean {
+  return ACCESSORY_CATEGORIES.has(category);
+}
+
+/**
+ * Category-specific instruction so Try-On Max places the item on the correct body region.
+ * `productDescription` (e.g. "earrings" vs "necklace") disambiguates placement within a category
+ * that maps to more than one body region — 'jewelry' covers both.
+ */
+function accessoryTryOnPrompt(category: string, productDescription?: string): string {
+  const item = productDescription?.trim() || undefined;
+  switch (category) {
+    case 'eyewear':
+      return `Add these ${item ?? 'glasses'} naturally onto the model’s face, positioned correctly on the bridge of the nose and ears. Preserve the model’s facial identity, skin, hair, and proportions exactly.`;
+    case 'jewelry':
+      return item
+        ? `Add this ${item} naturally onto the model, in the correct position for a ${item}. Preserve the model’s facial identity, skin, hair, and proportions exactly.`
+        : 'Add this jewelry naturally onto the model — earrings on the ears, necklaces at the neck/chest, as appropriate to the item shown. Preserve the model’s facial identity, skin, hair, and proportions exactly.';
+    case 'footwear':
+      return 'Add these shoes naturally onto the model’s feet, with correct orientation, proportion, and ground contact. Preserve the model’s identity, pose, and proportions exactly.';
+    default:
+      return 'Add this product naturally onto the model, preserving their identity and proportions exactly.';
+  }
+}
+
+/**
+ * Minimal accessory try-on path: one product image + one model image + a category-tailored
+ * prompt, straight to FASHN Try-On Max, cropped and stored exactly like every other FASHN result
+ * this session's crop fix already covers (`uploadResultBuffer(..., true)`). Deliberately skips
+ * caching-by-hash and the clothing pipeline's multi-attempt/engine-fallback logic — this is new,
+ * unproven integration surface (see `runFashnOutfit`'s own doc comment) and should fail loud
+ * during verification rather than silently retry into a different, unverified code path.
+ */
+async function executeAccessoryTryOn(job: TryOnJob): Promise<TryOnResult> {
+  const { tryonDbId, personImageUrl, productImageUrl, category, userId, productDescription } = job;
+  const startTime = Date.now();
+
+  const [personSignedUrl, productSignedUrl] = await Promise.all([
+    getSignedUrl(INPUT_BUCKET, personImageUrl, 7200),
+    getSignedUrl(INPUT_BUCKET, productImageUrl, 7200),
+  ]);
+
+  const fashnResult = await runFashnOutfit(
+    productSignedUrl,
+    personSignedUrl,
+    accessoryTryOnPrompt(category, productDescription)
+  );
+  const resultBuffer = await fetchUrlBufferWithRetry(fashnResult.resultUrl, 'accessory-result');
+  const resultPath = await uploadResultBuffer(resultBuffer, userId ?? undefined, true);
+
+  const storedSignedUrl = await getSignedUrl(RESULT_BUCKET, resultPath, 86400 * 30);
+  const cdnUrl = getCdnUrl(storedSignedUrl);
+  const responsiveUrls = getResponsiveImageUrls(storedSignedUrl);
+
+  await cxPatchTryon(tryonDbId, {
+    status: 'completed',
+    result_image: resultPath,
+    completed_at: new Date().toISOString(),
+  });
+
+  if (userId) {
+    sendTryOnCompletedEmail(userId, `${env.PUBLIC_API_URL}/api/results/tryon/${tryonDbId}`).catch((e) =>
+      logger.warn('Try-on completed email failed', { userId, error: String(e) })
+    );
+    await cxInsertUsageEvent(userId, 'tryon_completed', {
+      tryon_id: tryonDbId,
+      category,
+      model_used: 'fashn-tryon-max',
+      processing_time_ms: fashnResult.processingTimeMs,
+      total_pipeline_ms: Date.now() - startTime,
+      widget_mode: job.widgetMode,
+    });
+  }
+
+  const totalMs = Date.now() - startTime;
+  logger.info('Accessory pipeline completed', { tryonDbId, category, totalMs });
+
+  return {
+    jobId: job.jobId,
+    status: 'completed',
+    resultUrl: cdnUrl,
+    processingTimeMs: totalMs,
+    ...(responsiveUrls as unknown as Record<string, unknown>),
+  } as TryOnResult;
+}
+
 export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> {
   const { tryonDbId, personImageUrl, productImageUrl, category, userId, productDescription } = job;
   const startTime = Date.now();
@@ -183,6 +280,10 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
   await cxPatchTryon(tryonDbId, { status: 'processing' });
 
   try {
+    if (isAccessoryCategory(category)) {
+      return await executeAccessoryTryOn(job);
+    }
+
     // ── STEP 1: Get signed URLs and optimize images ──────────────────────────
     const [personSignedUrl, productSignedUrl] = await Promise.all([
       getSignedUrl(INPUT_BUCKET, personImageUrl, 7200),

@@ -1,12 +1,17 @@
 /**
- * Active product categories — clothing only (B2B fashion brands).
+ * Active product categories for the single-item try-on pipeline: apparel plus accessories
+ * (eyewear, jewelry, footwear) routed through FASHN Try-On Max — see `isAccessoryCategory` in
+ * `services/ai/pipeline.ts`.
  */
 export type ProductCategory =
   | 'clothing'
   | 'tops'
   | 'bottoms'
   | 'dresses'
-  | 'one-pieces';
+  | 'one-pieces'
+  | 'eyewear'
+  | 'jewelry'
+  | 'footwear';
 
 /**
  * Product catalog category — a superset of `ProductCategory` that also allows `'shoes'`, for the
