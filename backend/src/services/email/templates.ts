@@ -19,10 +19,15 @@ function firstNameFrom(name: string, brandName?: string): string {
   return source.split(/\s+/)[0] || 'there';
 }
 
-export function welcomeEmail(params: { name: string; brandName: string; appUrl?: string }) {
+export function welcomeEmail(params: { name: string; brandName: string; appUrl?: string; credits?: number }) {
   const { name, brandName, appUrl = DEFAULT_APP_URL } = params;
   const first = firstNameFrom(name, brandName);
   const dashboardUrl = `${appUrl.replace(/\/$/, '')}/dashboard`;
+  // Falls back to the same default new profiles actually get (convex/profiles.ts) only if the
+  // caller genuinely couldn't look up the real value — never a second hardcoded number to drift
+  // from the true one.
+  const credits = typeof params.credits === 'number' && params.credits >= 0 ? params.credits : 10;
+  const creditsLine = `${credits} complimentary AI generation${credits === 1 ? '' : 's'} ${credits === 1 ? 'has' : 'have'} been added to your account`;
 
   const bodyHtml = `
     <p style="margin:0 0 16px;">Hi ${escapeHtml(first)},</p>
@@ -32,7 +37,7 @@ export function welcomeEmail(params: { name: string; brandName: string; appUrl?:
     <p style="margin:0 0 8px;font-weight:600;color:#1a1a1a;">What&rsquo;s available now</p>
     ${renderBulletList([
       'Your TryVerse dashboard is ready',
-      '20 complimentary AI generations have been added to your account',
+      creditsLine,
       'Virtual try-on — upload a product and see it on a model instantly',
       'AI photoshoots and AI-generated models for your catalog',
       'Outfit visualization and product motion for campaign content',
@@ -62,7 +67,7 @@ export function welcomeEmail(params: { name: string; brandName: string; appUrl?:
       '',
       "What's available now:",
       '• Your TryVerse dashboard is ready',
-      '• 20 complimentary AI generations have been added to your account',
+      `• ${creditsLine}`,
       '• Virtual try-on — upload a product and see it on a model instantly',
       '• AI photoshoots and AI-generated models for your catalog',
       '• Outfit visualization and product motion for campaign content',
@@ -81,10 +86,12 @@ export function welcomeEmail(params: { name: string; brandName: string; appUrl?:
   };
 }
 
-export function accountVerifiedEmail(params: { firstName?: string; signInUrl?: string }) {
+export function accountVerifiedEmail(params: { firstName?: string; signInUrl?: string; credits?: number }) {
   const first = ((params.firstName || 'there').trim() || 'there');
   const firstEsc = escapeHtml(first);
   const signInUrlRaw = params.signInUrl ?? `${DEFAULT_APP_URL.replace(/\/$/, '')}/dashboard`;
+  const credits = typeof params.credits === 'number' && params.credits >= 0 ? params.credits : 10;
+  const creditsLine = `${credits} complimentary AI generation${credits === 1 ? '' : 's'} ${credits === 1 ? 'has' : 'have'} been added to your account`;
 
   const bodyHtml = `
     <p style="margin:0 0 16px;">Hi ${firstEsc},</p>
@@ -94,7 +101,7 @@ export function accountVerifiedEmail(params: { firstName?: string; signInUrl?: s
     <p style="margin:0 0 8px;font-weight:600;color:#1a1a1a;">What&rsquo;s available now</p>
     ${renderBulletList([
       'Your TryVerse dashboard is ready',
-      '20 complimentary AI generations have been added to your account',
+      creditsLine,
       'Virtual try-on — upload a product and see it on a model instantly',
       'AI photoshoots and AI-generated models for your catalog',
       'Outfit visualization and product motion for campaign content',
@@ -124,7 +131,7 @@ export function accountVerifiedEmail(params: { firstName?: string; signInUrl?: s
       '',
       "What's available now:",
       '• Your TryVerse dashboard is ready',
-      '• 20 complimentary AI generations have been added to your account',
+      `• ${creditsLine}`,
       '• Virtual try-on — upload a product and see it on a model instantly',
       '• AI photoshoots and AI-generated models for your catalog',
       '• Outfit visualization and product motion for campaign content',

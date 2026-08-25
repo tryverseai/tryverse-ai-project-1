@@ -86,11 +86,15 @@ async function sendWelcomeEmailOnce(params: {
     return;
   }
 
+  const freeCreditsTotal =
+    typeof row.free_credits_total === 'number' ? row.free_credits_total : undefined;
+
   try {
     const ok = await sendWelcomeEmail({
       email,
       ...(fullName ? { name: fullName } : {}),
       ...(brandName !== undefined ? { brandName } : {}),
+      ...(freeCreditsTotal !== undefined ? { credits: freeCreditsTotal } : {}),
     });
     if (!ok) {
       logger.warn('welcome email was not confirmed by provider (Resend); not retrying from bootstrap', {

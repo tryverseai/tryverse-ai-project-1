@@ -37,11 +37,16 @@ export async function sendWelcomeEmail(params: {
   email: string;
   name?: string;
   brandName?: string;
+  /** The account's actual free_credits_total — pass the real profile value so this can never
+   *  drift from a second hardcoded number; omit only when the caller genuinely has no profile
+   *  row to hand (the template falls back to the same default new profiles get). */
+  credits?: number;
 }): Promise<boolean> {
   const t = welcomeEmail({
     name: params.name || '',
     brandName: params.brandName || '',
     appUrl,
+    credits: params.credits,
   });
   return sendEmail({ to: params.email, subject: t.subject, html: t.html, text: t.text });
 }
@@ -49,9 +54,11 @@ export async function sendWelcomeEmail(params: {
 export async function sendAccountVerifiedEmail(params: {
   email: string;
   firstName?: string;
+  credits?: number;
 }): Promise<boolean> {
   const t = accountVerifiedEmail({
     firstName: params.firstName,
+    credits: params.credits,
   });
   return sendEmail({ to: params.email, subject: t.subject, html: t.html, text: t.text });
 }

@@ -55,7 +55,14 @@ router.post(
         return;
       }
       const { name, brandName } = req.body;
-      await sendWelcomeEmail({ email, name, brandName });
+      const freeCreditsTotal =
+        typeof profile?.free_credits_total === 'number' ? profile.free_credits_total : undefined;
+      await sendWelcomeEmail({
+        email,
+        name,
+        brandName,
+        ...(freeCreditsTotal !== undefined ? { credits: freeCreditsTotal } : {}),
+      });
       res.status(202).json({ success: true });
     } catch {
       res.status(202).json({ success: true }); // Always 202 to avoid blocking signup
