@@ -47,6 +47,7 @@ const PrivacyPolicy = lazyWithRetry(() => import("./pages/PrivacyPolicy"), "priv
 const DataProcessing = lazyWithRetry(() => import("./pages/DataProcessing"), "data-processing");
 const CookiePolicy = lazyWithRetry(() => import("./pages/CookiePolicy"), "cookie-policy");
 const AcceptableUsePolicy = lazyWithRetry(() => import("./pages/AcceptableUsePolicy"), "acceptable-use");
+const AiImageProcessingNotice = lazyWithRetry(() => import("./pages/AiImageProcessingNotice"), "ai-image-notice");
 const Support = lazyWithRetry(() => import("./pages/Support"), "support");
 
 /** Minimal spinner shown while a lazy route chunk is loading. */
@@ -118,6 +119,7 @@ const App = () =>
             <Route path="/data-processing" element={<DataProcessing />} />
             <Route path="/cookie-policy" element={<CookiePolicy />} />
             <Route path="/acceptable-use" element={<AcceptableUsePolicy />} />
+            <Route path="/ai-image-notice" element={<AiImageProcessingNotice />} />
             <Route path="/support" element={<Support />} />
             {/* Public — this is the API onboarding guide prospects read before signing up; account-specific parts (their own key) prompt sign-in inline instead of gating the whole page. */}
             <Route path="/studio" element={<Navigate to="/dashboard/business" replace />} />

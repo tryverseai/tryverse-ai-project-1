@@ -143,6 +143,9 @@ export const updateSettings = mutation({
   },
 });
 
+/** Bump whenever the published legal-policy set materially changes. Mirrors CURRENT_POLICY_VERSION in src/content/policyContent.tsx. */
+const CURRENT_POLICY_VERSION = "2026-08-24";
+
 export const acceptTermsOfService = mutation({
   args: {},
   handler: async (ctx) => {
@@ -153,6 +156,7 @@ export const acceptTermsOfService = mutation({
     const now = new Date().toISOString();
     await ctx.db.patch(existing._id, {
       terms_of_service_accepted_at: now,
+      policy_version_accepted: CURRENT_POLICY_VERSION,
       updated_at: now,
     });
     return { ok: true as const };

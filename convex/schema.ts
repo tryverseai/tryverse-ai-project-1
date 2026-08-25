@@ -54,6 +54,8 @@ export default defineSchema({
     beta_rejected: v.optional(v.boolean()),
     beta_rejected_at: v.optional(v.string()),
     terms_of_service_accepted_at: v.optional(v.string()),
+    /** Which published legal-policy version terms_of_service_accepted_at was recorded against — lets us tell a stale acceptance from a current one without ever rewriting historical accepted-at timestamps. */
+    policy_version_accepted: v.optional(v.string()),
     /** Set once the customer has made an explicit plan choice on the post-terms onboarding gate. */
     plan_selected_at: v.optional(v.string()),
     /** Legacy: was used to dedupe post-verify “welcome” sends; prefer `welcome_email_sent_at`. */

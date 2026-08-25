@@ -30,6 +30,7 @@ const columns: { title: string; links: FooterLink[] }[] = [
       { label: "Data processing", href: "/data-processing" },
       { label: "Cookie policy", href: "/cookie-policy" },
       { label: "Acceptable use", href: "/acceptable-use" },
+      { label: "AI & image notice", href: "/ai-image-notice" },
       { label: "Cookie settings", href: "#", cookieSettings: true },
     ],
   },

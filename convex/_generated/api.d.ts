@@ -10,14 +10,16 @@
 
 import type * as ResendEmailSignupVerification from "../ResendEmailSignupVerification.js";
 import type * as ResendOTPPasswordReset from "../ResendOTPPasswordReset.js";
-import type * as _qaTestAccountTools from "../_qaTestAccountTools.js";
 import type * as adminTrusted from "../adminTrusted.js";
 import type * as apiKeys from "../apiKeys.js";
 import type * as auth from "../auth.js";
+import type * as authAccountCleanup from "../authAccountCleanup.js";
 import type * as authSession from "../authSession.js";
 import type * as authSubjectKeys from "../authSubjectKeys.js";
 import type * as backendTrusted from "../backendTrusted.js";
 import type * as billing from "../billing.js";
+import type * as billingReconciliation from "../billingReconciliation.js";
+import type * as crons from "../crons.js";
 import type * as emailLayout from "../emailLayout.js";
 import type * as emailVerificationThrottle from "../emailVerificationThrottle.js";
 import type * as http from "../http.js";
@@ -32,6 +34,7 @@ import type * as profileLookup from "../profileLookup.js";
 import type * as profiles from "../profiles.js";
 import type * as resendEmailErrors from "../resendEmailErrors.js";
 import type * as resendEnv from "../resendEnv.js";
+import type * as security from "../security.js";
 import type * as seed from "../seed.js";
 import type * as trustedStorage from "../trustedStorage.js";
 import type * as tryVersePassword from "../tryVersePassword.js";
@@ -46,14 +49,16 @@ import type {
 declare const fullApi: ApiFromModules<{
   ResendEmailSignupVerification: typeof ResendEmailSignupVerification;
   ResendOTPPasswordReset: typeof ResendOTPPasswordReset;
-  _qaTestAccountTools: typeof _qaTestAccountTools;
   adminTrusted: typeof adminTrusted;
   apiKeys: typeof apiKeys;
   auth: typeof auth;
+  authAccountCleanup: typeof authAccountCleanup;
   authSession: typeof authSession;
   authSubjectKeys: typeof authSubjectKeys;
   backendTrusted: typeof backendTrusted;
   billing: typeof billing;
+  billingReconciliation: typeof billingReconciliation;
+  crons: typeof crons;
   emailLayout: typeof emailLayout;
   emailVerificationThrottle: typeof emailVerificationThrottle;
   http: typeof http;
@@ -68,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   profiles: typeof profiles;
   resendEmailErrors: typeof resendEmailErrors;
   resendEnv: typeof resendEnv;
+  security: typeof security;
   seed: typeof seed;
   trustedStorage: typeof trustedStorage;
   tryVersePassword: typeof tryVersePassword;

@@ -14,7 +14,7 @@ const TermsOfService = () => (
             This page reflects our standard terms for brands and merchants. Personal accounts see a tailored summary at
             signup.
           </p>
-          <p className="text-sm text-muted-foreground mb-12">Last updated: March 9, 2026</p>
+          <p className="text-sm text-muted-foreground mb-12">Last updated: August 24, 2026</p>
           <TermsContent audience="business" />
         </motion.div>
       </div>

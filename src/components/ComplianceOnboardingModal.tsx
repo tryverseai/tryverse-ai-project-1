@@ -11,9 +11,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   TermsContent,
   DataProcessingContent,
-  PersonalDataNoticeContent,
+  AiImageProcessingNoticeContent,
   type PolicyAudience,
 } from "@/content/policyContent";
+
+/** Shared "Last updated" label for every legal step shown in this modal — keep in sync with each document's own page. */
+const POLICY_LAST_UPDATED = "August 24, 2026";
 import { TryVersePrivacyPolicy } from "@/content/TryVersePrivacyPolicy";
 import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
@@ -51,15 +54,15 @@ function buildSteps(accountType: PolicyAudience): StepDef[] {
       ? {
           id: "data",
           title: "Your photos & data",
-          subtitle: "Last updated: March 9, 2026",
+          subtitle: `Last updated: ${POLICY_LAST_UPDATED}`,
           icon: Database,
-          content: PersonalDataNoticeContent,
+          content: AiImageProcessingNoticeContent,
           isLegal: true,
         }
       : {
           id: "data",
           title: "Data Processing Agreement",
-          subtitle: "Last updated: March 9, 2026",
+          subtitle: `Last updated: ${POLICY_LAST_UPDATED}`,
           icon: Database,
           content: DataProcessingContent,
           isLegal: true,
@@ -69,7 +72,7 @@ function buildSteps(accountType: PolicyAudience): StepDef[] {
     {
       id: "terms",
       title: "Terms of Service",
-      subtitle: "Last updated: March 9, 2026",
+      subtitle: `Last updated: ${POLICY_LAST_UPDATED}`,
       icon: FileText,
       content: TermsContent,
       isLegal: true,
@@ -77,7 +80,7 @@ function buildSteps(accountType: PolicyAudience): StepDef[] {
     {
       id: "privacy",
       title: "Privacy Policy",
-      subtitle: "Last updated: May 2026",
+      subtitle: `Last updated: ${POLICY_LAST_UPDATED}`,
       icon: Shield,
       content: TryVersePrivacyPolicy,
       isLegal: true,
