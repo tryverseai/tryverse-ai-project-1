@@ -7,6 +7,7 @@ import { handleValidationErrors } from '../middleware/validate';
 import { logger } from '../config/logger';
 import { anyApi, convexQueryTrusted, convexMutationTrusted } from '../config/convexHttp';
 import { cxGetProfile, cxPatchProfile } from '../services/creditsConvexBridge';
+import { allocateCredits } from '../services/credits';
 import { cxPatchTryon } from '../services/tryonConvexBridge';
 import { getTryOnQueue } from '../services/queue/producer';
 import { enqueueTryOnJob } from '../services/queue/producer';
@@ -747,6 +748,60 @@ router.patch(
           id: userId,
           free_credits_remaining: data?.free_credits_remaining,
           monthly_credits_remaining: data?.monthly_credits_remaining,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * PATCH /api/admin/users/:userId/plan
+ * Manually change a user's plan tier (support/QA use case) — reuses the same allocateCredits()
+ * codepath payment webhooks call on a successful subscription, so plan_id and monthly credit
+ * fields (including the -1 "unlimited" convention for enterprise) stay consistent with the normal
+ * paid-upgrade flow instead of a hand-rolled patch that could drift out of sync with it.
+ */
+router.patch(
+  '/users/:userId/plan',
+  [
+    param('userId').isString().trim().isLength({ min: 1, max: 256 }),
+    body('planId').isIn(['free', 'starter', 'growth', 'enterprise']).withMessage('Invalid planId'),
+  ],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.params.userId as string;
+      const planId = req.body.planId as string;
+
+      const existing = await cxGetProfile(userId);
+      if (!existing) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      await allocateCredits(userId, planId, 'admin');
+      const data = await cxGetProfile(userId);
+
+      await logAudit({
+        event_type: 'admin_action',
+        actor: 'admin',
+        action: 'user_plan_changed',
+        target_id: userId,
+        details: { planId },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+
+      logger.info('Admin: Plan changed', { userId, planId });
+      res.json({
+        success: true,
+        profile: {
+          id: userId,
+          plan_id: data?.plan_id,
+          monthly_credits_remaining: data?.monthly_credits_remaining,
+          monthly_credits_total: data?.monthly_credits_total,
         },
       });
     } catch (err) {
