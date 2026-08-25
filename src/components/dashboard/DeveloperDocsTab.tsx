@@ -17,7 +17,7 @@ const endpoints = [
     body: [
       { name: "personImagePath", type: "string", required: true, description: "Path returned from POST /api/upload (type=person)" },
       { name: "productImagePath", type: "string", required: true, description: "Path returned from POST /api/upload (type=product)" },
-      { name: "category", type: "string", required: true, description: "clothing, tops, bottoms, dresses, or one-pieces" },
+      { name: "category", type: "string", required: true, description: "clothing, tops, bottoms, dresses, one-pieces, footwear, eyewear, or jewelry" },
       { name: "productDescription", type: "string", required: false, description: "Optional caption for routing quality" },
     ],
     response: `{
@@ -129,7 +129,10 @@ function buildOpenApiSpec() {
                   properties: {
                     personImagePath: { type: "string" },
                     productImagePath: { type: "string" },
-                    category: { type: "string", enum: ["clothing", "tops", "bottoms", "dresses", "one-pieces"] },
+                    category: {
+                      type: "string",
+                      enum: ["clothing", "tops", "bottoms", "dresses", "one-pieces", "footwear", "eyewear", "jewelry"],
+                    },
                     productDescription: { type: "string" },
                   },
                 },

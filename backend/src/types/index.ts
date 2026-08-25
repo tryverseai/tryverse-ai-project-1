@@ -1,7 +1,8 @@
 /**
- * Active product categories for the single-item try-on pipeline: apparel plus accessories
- * (eyewear, jewelry, footwear) routed through FASHN Try-On Max — see `isAccessoryCategory` in
- * `services/ai/pipeline.ts`.
+ * Product categories shared by the product catalog and the single-item try-on pipeline: apparel,
+ * footwear, and accessories (eyewear, jewelry) routed through FASHN Try-On Max for the
+ * non-apparel values — see `isAccessoryCategory` in `services/ai/pipeline.ts`. Grouped into
+ * higher-level display categories by `PRODUCT_CATEGORY_GROUPS` in `lib/constants.ts`.
  */
 export type ProductCategory =
   | 'clothing'
@@ -14,13 +15,14 @@ export type ProductCategory =
   | 'footwear';
 
 /**
- * Product catalog category — a superset of `ProductCategory` that also allows `'shoes'`, for the
- * Outfit Builder. Deliberately NOT part of `ProductCategory` itself: the single-garment try-on
- * pipeline (`VALID_TRY_ON_CATEGORIES`, `mapToFashnCategory`) has no handling for shoes, so adding
- * it there would let a shoes-tagged product be submitted to the regular try-on flow and produce
- * an unpredictable result instead of a clean rejection.
+ * Product catalog category — historically a superset of `ProductCategory` for the Outfit
+ * Builder's 'shoes' slot, which had no equivalent in the single-item try-on pipeline. Now that
+ * `ProductCategory` includes `'footwear'`, catalog and single-item try-on share one category
+ * space; the Outfit Builder's `shoes` *slot key* (its internal object field, matching the
+ * `outfit_generations` Convex schema) is unrelated and stays as-is — only the catalog tagging
+ * value moved to `'footwear'`.
  */
-export type CatalogCategory = ProductCategory | 'shoes';
+export type CatalogCategory = ProductCategory;
 
 /** Lifecycle states a try-on record can be in (mirrors Convex schema). */
 export type TryOnStatus = 'queued' | 'processing' | 'completed' | 'failed';

@@ -23,7 +23,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -35,30 +37,18 @@ import {
   deleteProduct,
   uploadImage,
   resolveProductImageDisplayUrl,
+  PRODUCT_CATEGORY_GROUPS,
+  PRODUCT_CATEGORY_LABELS,
   type Product,
   type ProductCategory,
 } from "@/lib/backendApi";
 import { openExternalHttpUrlInNewTab, safeImageSrcForDom, safeHttpHrefForDom } from "@/lib/safeUrl";
 
-const CATEGORIES: { id: ProductCategory; label: string }[] = [
-  { id: "clothing", label: "Clothing" },
-  { id: "tops", label: "Tops" },
-  { id: "bottoms", label: "Bottoms" },
-  { id: "dresses", label: "Dresses" },
-  { id: "one-pieces", label: "One-pieces" },
-  { id: "shoes", label: "Shoes" },
-];
+const ALL_CATEGORIES: ProductCategory[] = PRODUCT_CATEGORY_GROUPS.flatMap((g) => g.categories);
 
 /** Type guard — narrows an unknown string to ProductCategory. */
 function isProductCategory(value: unknown): value is ProductCategory {
-  return (
-    value === "clothing" ||
-    value === "tops" ||
-    value === "bottoms" ||
-    value === "dresses" ||
-    value === "one-pieces" ||
-    value === "shoes"
-  );
+  return (ALL_CATEGORIES as string[]).includes(value as string);
 }
 
 /** Coerce an API-returned string to ProductCategory, falling back to 'clothing'. */
@@ -257,10 +247,15 @@ export function ProductsTab() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All categories</SelectItem>
-            {CATEGORIES.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.label}
-              </SelectItem>
+            {PRODUCT_CATEGORY_GROUPS.map((g) => (
+              <SelectGroup key={g.group}>
+                <SelectLabel>{g.group}</SelectLabel>
+                {g.categories.map((id) => (
+                  <SelectItem key={id} value={id}>
+                    {PRODUCT_CATEGORY_LABELS[id]}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             ))}
           </SelectContent>
         </Select>
@@ -363,8 +358,8 @@ export function ProductsTab() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-sm text-muted-foreground capitalize">
-                      {p.category}
+                    <td className="px-5 py-4 text-sm text-muted-foreground">
+                      {PRODUCT_CATEGORY_LABELS[p.category] ?? p.category}
                     </td>
                     <td className="px-5 py-4 text-sm font-medium">
                       {(p.tryons_count ?? 0).toLocaleString()}
@@ -498,10 +493,15 @@ export function ProductsTab() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.label}
-                    </SelectItem>
+                  {PRODUCT_CATEGORY_GROUPS.map((g) => (
+                    <SelectGroup key={g.group}>
+                      <SelectLabel>{g.group}</SelectLabel>
+                      {g.categories.map((id) => (
+                        <SelectItem key={id} value={id}>
+                          {PRODUCT_CATEGORY_LABELS[id]}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>

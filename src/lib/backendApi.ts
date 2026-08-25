@@ -107,12 +107,35 @@ export type TryOnCategory =
   | 'footwear';
 
 /**
- * Product catalog category — a superset of `TryOnCategory` that also allows `'shoes'` for the
- * Outfit Builder. Deliberately kept separate from `TryOnCategory` (used by the single-garment
- * try-on request) since the existing FASHN single-item category mapping has no 'shoes' handling —
- * offering it there would let a shopper pick a category that always fails server-side.
+ * Product catalog category — historically a superset of `TryOnCategory` for the Outfit Builder's
+ * 'shoes' slot. Now that `TryOnCategory` includes `'footwear'`, catalog and single-item try-on
+ * share one category space; the Outfit Builder's `shoes` *slot key* (its internal state field) is
+ * unrelated and stays as-is — only the catalog tagging value moved to `'footwear'`.
  */
-export type ProductCategory = TryOnCategory | 'shoes';
+export type ProductCategory = TryOnCategory;
+
+/**
+ * Display grouping for product categories — mirrors `PRODUCT_CATEGORY_GROUPS` in
+ * `backend/src/lib/constants.ts` (kept in sync by hand, same as `TryOnCategory` itself). Add a
+ * new category to the right group's array when the platform gains one.
+ */
+export const PRODUCT_CATEGORY_GROUPS: { group: string; categories: ProductCategory[] }[] = [
+  { group: 'Clothing', categories: ['clothing', 'tops', 'bottoms', 'dresses', 'one-pieces'] },
+  { group: 'Footwear', categories: ['footwear'] },
+  { group: 'Accessories', categories: ['eyewear', 'jewelry'] },
+];
+
+/** Friendly display labels for `ProductCategory` values — raw enum strings are not shown to users. */
+export const PRODUCT_CATEGORY_LABELS: Record<ProductCategory, string> = {
+  clothing: 'Clothing',
+  tops: 'Tops',
+  bottoms: 'Bottoms',
+  dresses: 'Dresses',
+  'one-pieces': 'One-pieces',
+  footwear: 'Footwear',
+  eyewear: 'Eyewear',
+  jewelry: 'Jewelry',
+};
 
 // ─── Typed API error (replaces `Error & { status?; code?; retryAfter? }`) ────
 

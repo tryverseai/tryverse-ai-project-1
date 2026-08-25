@@ -111,7 +111,7 @@ const POLL_INTERVAL_MS = 3000;
 
 const LOADING_STAGES = [
   "Preparing your image",
-  "Analyzing garment",
+  "Analyzing product",
   "Building your look",
   "Rendering final result",
   "Almost ready",
@@ -307,7 +307,7 @@ export function StudioTab() {
 
   const run = async () => {
     if (!garment.file) {
-      toast.error("Upload a garment photo.");
+      toast.error("Upload a product photo.");
       return;
     }
     if (entryMode === "upload" && !model.file) {
@@ -444,7 +444,7 @@ export function StudioTab() {
       <div className="space-y-1">
         <h2 className="text-2xl font-bold text-foreground tracking-tight">Personal Studio</h2>
         <p className="text-sm text-muted-foreground">
-          Try any garment on yourself or a virtual model, privately.
+          Try any product on yourself or a virtual model, privately.
         </p>
       </div>
 
@@ -510,7 +510,7 @@ export function StudioTab() {
                   stages={LOADING_STAGES}
                   previewItems={[
                     ...(chosenPreview ? [{ label: chosenLabel, imageUrl: chosenPreview }] : []),
-                    ...(garment.preview ? [{ label: "Garment", imageUrl: garment.preview }] : []),
+                    ...(garment.preview ? [{ label: "Product", imageUrl: garment.preview }] : []),
                   ]}
                 />
               ) : status === "done" && resultUrl ? (
@@ -614,7 +614,7 @@ export function StudioTab() {
 
                 <DropZone
                   slot={garment}
-                  label="Garment photo"
+                  label="Product photo"
                   hint="Clear product photo on white or transparent background"
                   icon={Shirt}
                   onFile={(f) => handleFile("garment", f)}
@@ -623,7 +623,7 @@ export function StudioTab() {
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-foreground flex items-center gap-2">
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    Garment category
+                    Product category
                   </p>
                   <Select value={garmentKey} onValueChange={setGarmentKey}>
                     <SelectTrigger className="h-10">

@@ -5,7 +5,7 @@ import { TryVerseLogo } from "@/components/TryVerseLogo";
 const DEFAULT_STAGES = [
   "Analyzing your photo",
   "Detecting body shape and pose",
-  "Preparing garment fit",
+  "Preparing your product",
   "Rendering realistic try-on",
   "Finalizing your look",
 ];

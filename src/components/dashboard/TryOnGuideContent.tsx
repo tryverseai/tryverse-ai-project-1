@@ -28,17 +28,17 @@ export function TryOnGuideContent() {
             <span className="font-medium text-foreground">Tip 2:</span> For the best outcome, make sure the clothing
             on the model is similar to the item being tried on. For example, if you&apos;re trying on a short-sleeve
             top, the model should also be wearing short sleeves. Avoid using images where the model is wearing long or
-            covering garments like coats or dresses, as this can lead to incorrect sleeve or garment mismatches.
+            covering items like coats or dresses, as this can lead to incorrect sleeve or fit mismatches.
           </li>
           <li>
             <span className="font-medium text-foreground">Tip 3:</span> Try to match the fit of the model&apos;s outfit
             with the item being tested. If the new piece is fitted (like a tank top), it works best when the model is
             already wearing something fitted. Loose outerwear like jackets or cardigans can reduce accuracy and affect how
-            the garment is displayed.
+            the item is displayed.
           </li>
           <li>
             <span className="font-medium text-foreground">Tip 4 (Dresses / Long Clothing):</span> When working with
-            long garments, it&apos;s best for the model to be standing in a neutral pose. Poses with bent limbs or
+            long items, it&apos;s best for the model to be standing in a neutral pose. Poses with bent limbs or
             overlapping body parts may interfere with how the clothing is rendered.
           </li>
         </ul>
@@ -58,29 +58,42 @@ export function TryOnGuideContent() {
       <SectionDivider />
 
       <section className="space-y-4">
-        <h3 className="font-display text-lg font-semibold text-foreground">Complete Outfits, Shoes &amp; Accessories</h3>
+        <h3 className="font-display text-lg font-semibold text-foreground">Complete Outfits &amp; Multi-Item Looks</h3>
         <ul className="space-y-4 text-sm text-foreground/90 leading-relaxed list-none pl-0">
           <li>
             <span className="font-medium text-foreground">Single reference photo:</span> Personal Studio&apos;s
             &quot;Full outfit&quot; category works from one photo that already shows the complete look. It&apos;s
-            best for simple, clearly-photographed outfits — busy or layered garments in one photo can render with
+            best for simple, clearly-photographed outfits — busy or layered items in one photo can render with
             some detail loss.
           </li>
           <li>
             <span className="font-medium text-foreground">Combining separate pieces:</span> To build a look from
-            individual top, bottom, and shoe product photos, use <strong>Outfit Builder</strong> instead of Personal
-            Studio. It composites each piece before generating, which preserves multi-garment fidelity far better
-            than asking a single photo to represent an entire outfit.
+            individual top, bottom, and footwear product photos, use <strong>Outfit Builder</strong> instead of
+            Personal Studio. It composites each piece before generating, which preserves multi-item fidelity far
+            better than asking a single photo to represent an entire outfit.
+          </li>
+        </ul>
+      </section>
+
+      <SectionDivider />
+
+      <section className="space-y-4">
+        <h3 className="font-display text-lg font-semibold text-foreground">Eyewear, Jewelry &amp; Footwear</h3>
+        <ul className="space-y-4 text-sm text-foreground/90 leading-relaxed list-none pl-0">
+          <li>
+            <span className="font-medium text-foreground">Eyewear:</span> Upload a clear product shot of the
+            glasses or sunglasses on a plain background, and a model photo where the face is clearly visible and
+            unobstructed.
           </li>
           <li>
-            <span className="font-medium text-foreground">Shoes:</span> Upload a clear side or three-quarter product
-            shot on a plain background, the same as any other garment photo — avoid shoes shown mid-stride or at an
-            extreme angle.
+            <span className="font-medium text-foreground">Jewelry (earrings &amp; necklaces):</span> Upload a
+            clean product photo and a model photo where the ears or neck are clearly visible, depending on the
+            piece.
           </li>
           <li>
-            <span className="font-medium text-foreground">Accessories (bags, eyewear):</span> Supported the same way
-            as clothing — upload a clean product photo and a model photo where the relevant area (hands, face) is
-            clearly visible and unobstructed.
+            <span className="font-medium text-foreground">Footwear:</span> Upload a clear side or three-quarter
+            product shot on a plain background, and a model photo where the feet are visible — avoid shoes shown
+            mid-stride or at an extreme angle.
           </li>
         </ul>
       </section>
@@ -90,7 +103,7 @@ export function TryOnGuideContent() {
       <section className="space-y-3">
         <h3 className="font-display text-lg font-semibold text-foreground">Notes</h3>
         <p className="text-sm text-foreground/90 leading-relaxed">
-          Some variations in clothing details may occur, especially when the item is small in the image or includes
+          Some variations in product details may occur, especially when the item is small in the image or includes
           intricate elements like text or logos. These finer details may not always render perfectly, which is a common
           limitation in virtual try-on systems. We&apos;re continuously improving this and welcome feedback to enhance
           accuracy.
@@ -102,9 +115,9 @@ export function TryOnGuideContent() {
       <section className="space-y-3">
         <h3 className="font-display text-lg font-semibold text-foreground">Image Guidelines for Best Results</h3>
         <ul className="list-disc pl-5 text-sm text-foreground/90 space-y-1.5">
-          <li>Use clear product images of a single clothing item</li>
+          <li>Use clear product images showing a single item</li>
           <li>Prefer flat lays with a clean, white background</li>
-          <li>Ensure the garment is the main focus of the image</li>
+          <li>Ensure the product is the main focus of the image</li>
         </ul>
       </section>
 

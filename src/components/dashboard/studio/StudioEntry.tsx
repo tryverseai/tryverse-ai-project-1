@@ -20,7 +20,7 @@ export function StudioEntry({ onUploadPhoto, onChooseModel }: StudioEntryProps) 
           Experience it on You
         </h2>
         <p className="text-sm text-white/60 sm:text-base">
-          Upload a photo or pick a model, then see any garment on them in seconds.
+          Upload a photo or pick a model, then see any product on them in seconds.
         </p>
         <div className="flex flex-col items-center gap-3 pt-2 sm:flex-row sm:justify-center">
           <Button

@@ -28,12 +28,12 @@ const upload = multer({
 
 /**
  * POST /api/upload
- * Uploads a person or garment image for try-on.
+ * Uploads a person or product image for try-on.
  * Returns the stored file path (not a URL — use /api/tryon with path).
  *
  * Body: multipart/form-data
  *   - image: File
- *   - type: 'person' | 'garment'
+ *   - type: 'person' | 'product'
  */
 router.post(
   '/',

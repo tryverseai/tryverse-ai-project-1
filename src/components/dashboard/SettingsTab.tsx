@@ -109,7 +109,7 @@ export function SettingsTab() {
     {
       key: "widget_auto_detect" as const,
       label: "Auto-detect Product Type",
-      desc: "Automatically detect clothing, jewelry, or glasses",
+      desc: "Automatically detect clothing, footwear, jewelry, or eyewear",
     },
     {
       key: "widget_collect_analytics" as const,

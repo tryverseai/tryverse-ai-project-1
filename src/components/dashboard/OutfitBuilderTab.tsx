@@ -113,7 +113,7 @@ export function OutfitBuilderTab() {
       getProducts(1, 50, "bottoms").catch(() => ({ products: [] as Product[] })),
       getProducts(1, 50, "dresses").catch(() => ({ products: [] as Product[] })),
       getProducts(1, 50, "one-pieces").catch(() => ({ products: [] as Product[] })),
-      getProducts(1, 50, "shoes").catch(() => ({ products: [] as Product[] })),
+      getProducts(1, 50, "footwear").catch(() => ({ products: [] as Product[] })),
     ]).then(([tops, bottoms, dresses, onePieces, shoes]) => {
       if (cancelled) return;
       setProductsBySlot({
@@ -293,7 +293,7 @@ export function OutfitBuilderTab() {
                       products={productsBySlot.shoes}
                       selectedId={selected.shoes?.id}
                       onSelect={setSlot("shoes")}
-                      emptyLabel="No shoes in your catalog yet — tag a product as “Shoes” to add one."
+                      emptyLabel="No footwear in your catalog yet — tag a product as “Footwear” to add one."
                     />
                   </div>
                 </div>

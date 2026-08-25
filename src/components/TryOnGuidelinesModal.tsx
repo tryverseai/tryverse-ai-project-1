@@ -4,7 +4,7 @@ import {
   Sun,
   UserSquare2,
   ScanFace,
-  Shirt,
+  Eye,
   CheckCircle2,
   ShieldCheck,
 } from "lucide-react";
@@ -43,7 +43,7 @@ const TIPS = [
   { icon: UserSquare2, label: "Full-body photo" },
   { icon: ScanFace, label: "Neutral, natural pose" },
   { icon: CheckCircle2, label: "Clear, unobstructed visibility" },
-  { icon: Shirt, label: "Fitted clothing preferred" },
+  { icon: Eye, label: "Face and body clearly visible" },
   { icon: Sun, label: "Good, even lighting" },
 ];
 

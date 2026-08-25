@@ -13,12 +13,38 @@ export const VALID_TRY_ON_CATEGORIES: ProductCategory[] = [
 ];
 
 /**
- * Product catalog categories — a superset of `VALID_TRY_ON_CATEGORIES` that also allows `'shoes'`
- * (Outfit Builder). Used only by `routes/products.ts`'s catalog CRUD validators — `routes/tryon.ts`
- * and `routes/widget.ts` deliberately keep using `VALID_TRY_ON_CATEGORIES` unchanged, since those
- * are the actual single-garment try-on request validators.
+ * Product catalog categories — used by `routes/products.ts`'s catalog CRUD validators. Equal to
+ * `VALID_TRY_ON_CATEGORIES`: catalog and single-item try-on share one category space (see
+ * `CatalogCategory` in `types/index.ts`). Kept as a separate export so catalog and try-on
+ * validators can diverge again later without a call-site rewrite.
  */
-export const VALID_PRODUCT_CATEGORIES: CatalogCategory[] = [...VALID_TRY_ON_CATEGORIES, 'shoes'];
+export const VALID_PRODUCT_CATEGORIES: CatalogCategory[] = VALID_TRY_ON_CATEGORIES;
+
+/**
+ * Display grouping for product categories — Product → Category group → Type. Purely UI/labeling
+ * metadata (not a schema or validation change): both the Products catalog page and Personal
+ * Studio's picker group `VALID_TRY_ON_CATEGORIES` values under one of these three headings rather
+ * than showing a flat list. Add a new `ProductCategory` value to the appropriate group's
+ * `categories` array when the platform gains one — no other change needed for it to appear
+ * grouped correctly.
+ */
+export const PRODUCT_CATEGORY_GROUPS: { group: string; categories: ProductCategory[] }[] = [
+  { group: 'Clothing', categories: ['clothing', 'tops', 'bottoms', 'dresses', 'one-pieces'] },
+  { group: 'Footwear', categories: ['footwear'] },
+  { group: 'Accessories', categories: ['eyewear', 'jewelry'] },
+];
+
+/** Friendly display labels for `ProductCategory` values — raw enum strings are not shown to users. */
+export const PRODUCT_CATEGORY_LABELS: Record<ProductCategory, string> = {
+  clothing: 'Clothing',
+  tops: 'Tops',
+  bottoms: 'Bottoms',
+  dresses: 'Dresses',
+  'one-pieces': 'One-pieces',
+  footwear: 'Footwear',
+  eyewear: 'Eyewear',
+  jewelry: 'Jewelry',
+};
 
 /** Signed URL lifetime for try-on result images (seconds). */
 export const SIGNED_URL_TTL_SECONDS = 3600;
