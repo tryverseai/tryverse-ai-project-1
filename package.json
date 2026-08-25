@@ -15,7 +15,9 @@
     "postconvex:deploy:prod": "convex dev --once --env-file .env.dev-sandbox",
     "convex:dev:reset": "convex dev --once --env-file .env.dev-sandbox",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:convex": "vitest run --config convex/vitest.config.ts",
+    "test:convex:watch": "vitest --config convex/vitest.config.ts"
   },
   "dependencies": {
     "@auth/core": "^0.37.0",
@@ -79,6 +81,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.6.0",
@@ -88,6 +91,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
+    "convex-test": "^0.0.56",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
