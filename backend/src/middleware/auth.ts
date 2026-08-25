@@ -231,18 +231,28 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
 
   const sessionToken = parseCookie(req.headers.cookie, ADMIN_SESSION_COOKIE);
   if (sessionToken) {
-    // The admin cookie is SameSite=None (required since the dashboard on Vercel and this API on
-    // Railway are cross-site) — browsers attach it on cross-site requests too, and many
-    // state-changing admin routes are simple POST/DELETE that don't require a CORS preflight, so
-    // CORS alone doesn't stop a malicious page from *sending* one of these with the cookie
-    // attached, only from *reading* the response. Sec-Fetch-Site is a browser-set, page-JS-
-    // unspoofable header (Fetch Metadata) — reject a cookie-authenticated request whose value
-    // shows it did not originate from this same site. Requests with no Sec-Fetch-Site at all
-    // (older browsers, direct curl/API usage) fall through unaffected; those must use the
-    // x-admin-key header path below instead, which needs a custom header a cross-site page can't
-    // set without CORS approval — inherently CSRF-safe already.
+    // The admin cookie is SameSite=None (the dashboard is served from tryverseai.com and this API
+    // from api.tryverseai.com — different origins, but the SAME registrable site) — browsers
+    // attach it on cross-site requests too, and many state-changing admin routes are simple
+    // POST/DELETE that don't require a CORS preflight, so CORS alone doesn't stop a malicious page
+    // from *sending* one of these with the cookie attached, only from *reading* the response.
+    // Sec-Fetch-Site is a browser-set, page-JS-unspoofable header (Fetch Metadata) — reject a
+    // cookie-authenticated request whose value shows it did not originate from this site or a
+    // same-registrable-domain subdomain of it. A genuine tryverseai.com → api.tryverseai.com
+    // request reports 'same-site' (not 'same-origin', since the subdomains differ) — treating
+    // 'same-site' as a block was a regression that locked every admin tab out even with a
+    // correct key, since only the initial /api/admin/session login (which doesn't require the
+    // cookie yet) got through. Requests with no Sec-Fetch-Site at all (older browsers, direct
+    // curl/API usage) fall through unaffected; those must use the x-admin-key header path below
+    // instead, which needs a custom header a cross-site page can't set without CORS approval —
+    // inherently CSRF-safe already.
     const secFetchSite = req.headers['sec-fetch-site'];
-    if (secFetchSite && secFetchSite !== 'same-origin' && secFetchSite !== 'none') {
+    if (
+      secFetchSite &&
+      secFetchSite !== 'same-origin' &&
+      secFetchSite !== 'same-site' &&
+      secFetchSite !== 'none'
+    ) {
       logAudit({
         event_type: 'failed_login',
         actor: req.ip ? `ip:${req.ip}` : undefined,

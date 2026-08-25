@@ -1296,7 +1296,21 @@ async function adminFetch<T = unknown>(path: string, _adminKey: string, options?
     }
     throw new Error(`Failed to fetch (${target}): ${hint}`);
   }
-  if (res.status === 403) throw new ApiError('Invalid admin key', 403);
+  if (res.status === 403) {
+    // A 403 here means the session cookie was rejected — could be an actually-wrong/expired key,
+    // but could also be a CSRF/Fetch-Metadata guard rejection or another server-side reason.
+    // Surface the server's real message instead of always guessing "Invalid admin key", which
+    // previously masked a real bug (a same-site-vs-same-origin CSRF check false positive) as a
+    // wrong-key report even though the key was correct.
+    let message = 'Admin access denied (403)';
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (typeof body?.error === 'string' && body.error.trim()) message = body.error.trim();
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(message, 403);
+  }
   if (!res.ok) {
     let message = `Admin API error (${res.status})`;
     try {
