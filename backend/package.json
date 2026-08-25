@@ -10,6 +10,8 @@
     "start": "node dist/server.js",
     "start:worker": "node dist/services/queue/worker.js",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint src --ext .ts",
     "cache:clear-tryon": "tsx scripts/clear-tryon-cache.ts"
   },
@@ -51,6 +53,7 @@
     "@types/sanitize-html": "^2.16.1",
     "@types/uuid": "^10.0.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.11"
   }
 }
