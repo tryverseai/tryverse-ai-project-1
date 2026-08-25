@@ -301,10 +301,14 @@ async function bootstrap(): Promise<void> {
   await logStorageBucketStatus();
   await mountBullBoard();
 
-  if (env.NODE_ENV === 'development') {
-    const { startWorker } = await import('./services/queue/worker');
-    startWorker();
-  }
+  // The queue worker runs in-process alongside the API server — there is no separate worker
+  // deployment/service. This must run in every environment, not just development: gating it
+  // behind NODE_ENV previously meant that fixing NODE_ENV to correctly read 'production' (see
+  // assertProductionSecurityConfig) silently stopped every queue-backed route (Outfit Builder,
+  // Product Model, Video) from ever completing a job — they'd enqueue, reserve credits, and hang
+  // forever with nothing consuming the queue.
+  const { startWorker } = await import('./services/queue/worker');
+  startWorker();
 
   const port = env.PORT;
   app.listen(port, LISTEN_HOST, () => {
