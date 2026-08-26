@@ -9,8 +9,8 @@ import featuresModelVideo from "@/assets/features-model-video.mp4";
 const stages = [
   {
     index: "01",
-    term: "Garment, isolated",
-    body: "The flat or on-mannequin shot is parsed into a garment layer — cut, seams, print placement, drape behaviour.",
+    term: "Product, isolated",
+    body: "The flat or on-mannequin shot is parsed into a product layer — form, material, placement, and how it moves or catches light.",
   },
   {
     index: "02",
@@ -20,7 +20,7 @@ const stages = [
   {
     index: "03",
     term: "Render, composited",
-    body: "The garment is rebuilt on the body under the original light, and the shopper's identity is returned untouched.",
+    body: "The product is rebuilt on the body under the original light, and the shopper's identity is returned untouched.",
   },
 ];
 
@@ -37,7 +37,7 @@ export function MannequinSection() {
   const scale = useTransform(scrollYProgress, [0, 1], reduce ? [1, 1] : [1.1, 1]);
 
   return (
-    <section id="pipeline" aria-label="How TryVerse renders a garment" className="relative overflow-hidden bg-background py-14 sm:py-20 md:py-36">
+    <section id="pipeline" aria-label="How TryVerse renders a product" className="relative overflow-hidden bg-background py-14 sm:py-20 md:py-36">
       <div className="mx-auto w-full max-w-[78rem] px-6 md:px-10">
         <Eyebrow index="03" className="mb-8">
           The workflow
@@ -54,7 +54,7 @@ export function MannequinSection() {
         </h2>
         <Reveal delay={0.15} className="mt-8 max-w-lg">
           <p className="type-lead text-pretty">
-            TryVerse treats a garment as geometry and material before it treats it as an image. That is why the
+            TryVerse treats a product as geometry and material before it treats it as an image. That is why the
             render holds its shape on a body it has never seen.
           </p>
         </Reveal>

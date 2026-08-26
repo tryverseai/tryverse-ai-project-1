@@ -21,7 +21,7 @@ const techs = [
   {
     icon: Layers,
     title: "Fit Prediction",
-    description: "Machine learning models estimate garment fit based on proportions and context.",
+    description: "Machine learning models estimate product fit based on proportions and context.",
   },
   {
     icon: Cpu,

@@ -61,8 +61,8 @@ export function TermsContent({ audience = "business" }: PolicyContentProps) {
           <p>
             TryVerse provides AI-assisted fashion visualization for your personal use — virtual Try-On, AI Model
             Studio, and outfit visualization. You can upload your own photo (or choose a preset virtual model where
-            offered), add a garment image, and generate a result to view and download. Personal accounts do not
-            include storefront widgets, merchant APIs, or brand analytics.
+            offered), add a product image — clothing, footwear, eyewear, or jewelry — and generate a result to view
+            and download. Personal accounts do not include storefront widgets, merchant APIs, or brand analytics.
           </p>
         </section>
         <section>
@@ -85,7 +85,7 @@ export function TermsContent({ audience = "business" }: PolicyContentProps) {
           <h2 className={h2}>6. AI Outputs</h2>
           <p>
             Try-On and other generated results are a visualization, not a guarantee of fit, sizing, drape, color, or
-            how a garment will actually look on you. Output can contain inaccuracies or artifacts. You are
+            how a product will actually look on you. Output can contain inaccuracies or artifacts. You are
             responsible for reviewing a result before relying on it.
           </p>
         </section>
@@ -837,8 +837,9 @@ export function AiImageProcessingNoticeContent(_props: PolicyContentProps = {}) 
       <section>
         <h2 className={h2}>3. Likeness and Accuracy</h2>
         <p>
-          AI systems may alter facial features, body proportions, garments, backgrounds, lighting, pose, or other
-          visual details. Try-On is a visualization rather than a guarantee of actual fit or appearance.
+          AI systems may alter facial features, body proportions, products (clothing, footwear, eyewear, jewelry),
+          backgrounds, lighting, pose, or other visual details. Try-On is a visualization rather than a guarantee of
+          actual fit or appearance.
         </p>
       </section>
       <section>

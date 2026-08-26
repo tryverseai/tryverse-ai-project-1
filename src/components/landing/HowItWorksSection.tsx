@@ -31,7 +31,7 @@ const steps = [
   {
     index: "03",
     title: "See it on you",
-    body: "TryVerse renders the garment onto their body and returns the result in the same session, on the same page.",
+    body: "TryVerse renders the product onto them and returns the result in the same session, on the same page.",
   },
 ];
 

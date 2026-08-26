@@ -21,14 +21,25 @@ require a timing-safe key comparison and reject cross-site credentialed requests
 
 ## 3. Secrets and Credentials
 Secrets, API keys, and provider credentials are stored in Railway/Convex environment configuration, not committed
-to source. **Known gap, not yet remediated**: customer API keys are currently stored in plaintext in Convex rather
-than hashed — see `docs/LEGAL_COUNSEL_CHECKLIST.md` and this session's production-readiness punch list. Plaintext
-credentials are not exposed through client bundles or logs **(verified)**.
+to source. Customer API keys are hashed at rest (SHA-256, looked up by exact-match hash rather than by the raw
+secret) as of 2026-08-26 — the prior plaintext-storage gap noted in earlier drafts of this schedule has been
+remediated **(verified — production rows backfilled and a live auth request confirmed working against the new
+hash-based lookup before deploy)**. One documented exception: the single auto-provisioned key the dashboard's
+Connect Store flow re-displays on every visit keeps plaintext storage by design, since a hash-only key has nothing
+left to redisplay after creation — every other key (named/scoped keys created via the API Keys tab) is hash-only
+from creation. Plaintext credentials are not exposed through client bundles or logs **(verified)**.
 
 ## 4. Application Security
 Secure development practices are in place for input validation, authorization checks, and dependency management.
-21 residual transitive dependency vulnerabilities remain in the backend as of 2026-08-23, tracked but not yet
-force-upgraded pending a staged soak test **(verified via `npm audit`)**.
+A Content-Security-Policy header was added to the frontend as of 2026-08-26 (`connect-src`/`script-src`/
+`frame-ancestors` restricted to known origins); `script-src` still permits `unsafe-inline`/`unsafe-eval`, which is a
+known remaining hardening step requiring its own live-verification pass before removal, not yet done
+**(verified as currently deployed — the further tightening is explicitly not claimed as done)**. Dependency
+vulnerabilities were re-audited and remediated as of 2026-08-26: backend down from 20 to 3 (the remainder is a
+Windows-only dev-server tool and a transitive dependency of the job-queue library that would require a breaking
+downgrade to fully clear); frontend's 3 critical/high advisories (in the authentication library itself) were fixed
+and the fix was verified with a live local sign-in test before shipping; 2 moderate frontend advisories in the
+routing library remain, deferred pending a major-version migration **(verified via `npm audit` and live testing)**.
 
 ## 5. Data Protection
 Personal data and Generated Content are protected via encryption in transit (HTTPS/TLS) **(verified)**. Storage URLs
@@ -38,7 +49,9 @@ are signed and access-controlled rather than public **(verified)**.
 Every creation, generated model, source asset, and account-scoped resource is authorized server-side against the
 authenticated user/account — not filtered client-side only **(verified as the general pattern this session; not
 every admin route was exhaustively line-reviewed for IDOR — flagged as a residual risk in the Security Engagement
-Report)**.
+Report)**. A new admin-only AI-usage visibility route was added 2026-08-26 (aggregate/per-account generation counts
+for internal support and capacity purposes); it sits behind the same admin session/key gate as every other admin
+route covered above, not separately re-reviewed.
 
 ## 7. Monitoring and Logging
 Security-relevant events are logged via Sentry, with authorization/auth-token headers stripped before capture

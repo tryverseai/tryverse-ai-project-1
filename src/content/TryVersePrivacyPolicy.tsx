@@ -142,14 +142,14 @@ export function TryVersePrivacyPolicy({
         <h2>5. AI &amp; Image Processing</h2>
         <p>
           When you or a shopper submit a photo and a product image, TryVerse routes them through an AI try-on
-          pipeline that composites the garment onto the person image. Depending on the category and configuration,
-          this may include automated pre-processing (e.g. framing, background handling) and post-processing of the
-          generated result.
+          pipeline that composites the product onto the person image — clothing, footwear, eyewear, and jewelry are
+          all supported categories. Depending on the category and configuration, this may include automated
+          pre-processing (e.g. framing, background handling) and post-processing of the generated result.
         </p>
         <p>
           AI-generated results are produced automatically and are not reviewed by a human before being returned. We
           aim to preserve the shopper&rsquo;s likeness and the product&rsquo;s appearance, but outputs are not
-          guaranteed to be a perfectly accurate representation of how a garment will look or fit in real life. See
+          guaranteed to be a perfectly accurate representation of how a product will look or fit in real life. See
           our{" "}
           <Link to="/ai-image-notice" className="text-primary underline underline-offset-2 font-medium">
             AI &amp; Image Processing Notice
