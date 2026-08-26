@@ -1421,6 +1421,25 @@ export async function getAdminRevenue(adminKey: string, days = 30): Promise<Reco
   return adminFetch<Record<string, unknown>>(`/api/admin/revenue?days=${days}`, adminKey);
 }
 
+export interface AdminAiUsage {
+  totalGenerations: number;
+  byFeature: Record<string, number>;
+  perUser: Array<{
+    userId: string;
+    brandName: string | null;
+    contactEmail: string | null;
+    planId: string;
+    total: number;
+    byFeature: Record<string, number>;
+    lastUsed: string;
+  }>;
+  recent: Array<{ userId: string; brandName: string | null; feature: string; createdAt: string }>;
+}
+
+export async function getAdminAiUsage(adminKey: string, limit = 100): Promise<AdminAiUsage> {
+  return adminFetch<AdminAiUsage>(`/api/admin/ai-usage?limit=${limit}`, adminKey);
+}
+
 export async function getAdminQueue(adminKey: string): Promise<AdminQueueStatus> {
   return adminFetch<AdminQueueStatus>('/api/admin/queue', adminKey);
 }

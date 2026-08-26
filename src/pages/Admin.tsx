@@ -19,6 +19,7 @@ import {
   BarChart3,
   Images,
   Menu,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ import { AdminLogsTab } from "@/components/admin/AdminLogsTab";
 import { AdminAuditTab } from "@/components/admin/AdminAuditTab";
 import { AdminAnalyticsTab } from "@/components/admin/AdminAnalyticsTab";
 import { AdminModelLibraryTab } from "@/components/admin/AdminModelLibraryTab";
+import { AdminAiUsageTab } from "@/components/admin/AdminAiUsageTab";
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Overview" },
@@ -50,6 +52,7 @@ const sidebarItems = [
   { icon: Zap, label: "Try-ons" },
   { icon: Cpu, label: "Queue" },
   { icon: CreditCard, label: "Revenue" },
+  { icon: Sparkles, label: "AI Usage" },
   { icon: Key, label: "API & Widget" },
   { icon: Images, label: "Models" },
   { icon: Settings, label: "Settings" },
@@ -136,6 +139,8 @@ const Admin = () => {
         return <AdminQueueTab adminKey={storedKey} />;
       case "Revenue":
         return <AdminRevenueTab adminKey={storedKey} />;
+      case "AI Usage":
+        return <AdminAiUsageTab adminKey={storedKey} />;
       case "API & Widget":
         return <AdminApiKeysTab adminKey={storedKey} />;
       case "Models":

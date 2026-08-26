@@ -851,9 +851,9 @@ export const getUserPlanTier = query({
 
 /**
  * Usage/history log for the Enterprise-gated AI generation features (AI Model Generation, AI
- * Video Generation via Higgsfield). Insert-only primitive — not yet called by any route; the
- * workstream that ships `/generate`-style endpoints for those features calls this after a
- * successful generation.
+ * Video Generation via Higgsfield). Called after every successful generation from
+ * videoPipeline.ts, productModelPipeline.ts, outfitPipeline.ts, productPhotoshoot.ts, and
+ * modelGeneration.ts — see aiGenerationUsageAdmin below for the read side (admin visibility).
  */
 export const logAiGenerationUsage = mutation({
   args: {
@@ -875,6 +875,66 @@ export const logAiGenerationUsage = mutation({
       created_at: new Date().toISOString(),
     });
     return { ok: true as const };
+  },
+});
+
+/**
+ * Admin visibility into AI generation usage — the write side (logAiGenerationUsage) has been live
+ * since these features shipped, but nothing ever read it back. Most useful for Enterprise/
+ * unlimited-plan accounts, since those don't draw down a visible credit balance the way
+ * free/paid-plan usage does — this is the only place that usage is otherwise observable at all.
+ * Returns per-feature totals, a per-user breakdown (sorted by total generations, joined with
+ * profile + plan for context), and the most recent raw events.
+ */
+export const aiGenerationUsageAdmin = query({
+  args: { secret: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, { secret, limit }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db.query("ai_generation_usage").collect();
+    rows.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+
+    const byFeature: Record<string, number> = {};
+    const byUser = new Map<string, { total: number; byFeature: Record<string, number>; lastUsed: string }>();
+    for (const r of rows) {
+      byFeature[r.feature] = (byFeature[r.feature] ?? 0) + 1;
+      const u = byUser.get(r.user_id) ?? { total: 0, byFeature: {}, lastUsed: "" };
+      u.total += 1;
+      u.byFeature[r.feature] = (u.byFeature[r.feature] ?? 0) + 1;
+      if (!u.lastUsed || String(r.created_at ?? "") > u.lastUsed) u.lastUsed = r.created_at ?? "";
+      byUser.set(r.user_id, u);
+    }
+
+    const userIds = [...byUser.keys()];
+    const profiles = await ctx.db.query("profiles").collect();
+    const profileMap = new Map(profiles.filter((p) => userIds.includes(p.id)).map((p) => [p.id, p]));
+
+    const perUser = userIds
+      .map((userId) => {
+        const u = byUser.get(userId)!;
+        const profile = profileMap.get(userId);
+        return {
+          userId,
+          brandName: profile?.brand_name ?? null,
+          contactEmail: profile?.contact_email ?? null,
+          planId: (typeof profile?.plan_id === "string" && profile.plan_id) || "free",
+          total: u.total,
+          byFeature: u.byFeature,
+          lastUsed: u.lastUsed,
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+
+    const recent = rows.slice(0, limit ?? 100).map((r) => {
+      const profile = profileMap.get(r.user_id);
+      return {
+        userId: r.user_id,
+        brandName: profile?.brand_name ?? null,
+        feature: r.feature,
+        createdAt: r.created_at ?? "",
+      };
+    });
+
+    return { totalGenerations: rows.length, byFeature, perUser, recent };
   },
 });
 

@@ -573,6 +573,38 @@ router.get('/revenue', async (req: Request, res: Response, next: NextFunction): 
   }
 });
 
+/**
+ * GET /api/admin/ai-usage
+ * Enterprise/unlimited-plan AI generation usage (AI Model Studio, AI Photoshoot, Outfit Builder,
+ * Product Photography, AI Video) — the only place this is visible at all, since Enterprise
+ * accounts don't draw down a metered credit balance the way free/paid plans do.
+ */
+router.get('/ai-usage', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit || '100'), 10) || 100, 1), 500);
+    const usage = await convexQueryTrusted<{
+      totalGenerations: number;
+      byFeature: Record<string, number>;
+      perUser: Array<{
+        userId: string;
+        brandName: string | null;
+        contactEmail: string | null;
+        planId: string;
+        total: number;
+        byFeature: Record<string, number>;
+        lastUsed: string;
+      }>;
+      recent: Array<{ userId: string; brandName: string | null; feature: string; createdAt: string }>;
+    }>(anyApi.backendTrusted.aiGenerationUsageAdmin, {
+      secret: env.BACKEND_SHARED_SECRET,
+      limit,
+    });
+    res.json(usage);
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** Bull queue stats — never hang waiting on Redis (common when REDIS_URL points at nothing). */
 const QUEUE_STATS_TIMEOUT_MS = 5000;
 
