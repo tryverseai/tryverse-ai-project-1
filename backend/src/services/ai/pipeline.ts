@@ -171,15 +171,16 @@ async function fetchUrlBufferWithRetry(url: string, label: string): Promise<Buff
   throw last ?? new Error(`Failed to fetch ${label}`);
 }
 
-const ACCESSORY_CATEGORIES = new Set(['eyewear', 'jewelry', 'footwear']);
+const ACCESSORY_CATEGORIES = new Set(['eyewear', 'earrings', 'necklace', 'jewelry', 'footwear']);
 
 /**
- * Accessories (eyewear, jewelry, footwear) never go through the apparel-specific machinery below
- * — garment topology classification, IDM-VTON/Flux engine selection, smart-frame prep, and
- * human-parsing are all clothing concepts with no accessory equivalent. Routing them through that
- * logic would risk degrading it for actual clothing categories for no benefit, so accessories are
- * deliberately a separate, minimal branch that reuses FASHN's Try-On Max endpoint directly (the
- * same endpoint already proven in production by the Outfit Builder — see `runFashnOutfit`).
+ * Accessories (eyewear, earrings, necklace, jewelry, footwear) never go through the
+ * apparel-specific machinery below — garment topology classification, IDM-VTON/Flux engine
+ * selection, smart-frame prep, and human-parsing are all clothing concepts with no accessory
+ * equivalent. Routing them through that logic would risk degrading it for actual clothing
+ * categories for no benefit, so accessories are deliberately a separate, minimal branch that
+ * reuses FASHN's Try-On Max endpoint directly (the same endpoint already proven in production by
+ * the Outfit Builder — see `runFashnOutfit`).
  */
 function isAccessoryCategory(category: string): boolean {
   return ACCESSORY_CATEGORIES.has(category);
@@ -187,18 +188,22 @@ function isAccessoryCategory(category: string): boolean {
 
 /**
  * Category-specific instruction so Try-On Max places the item on the correct body region.
- * `productDescription` (e.g. "earrings" vs "necklace") disambiguates placement within a category
- * that maps to more than one body region — 'jewelry' covers both.
+ * `productDescription` gives extra context (e.g. a specific jewelry piece name) but placement no
+ * longer depends on it for earrings vs. necklace — those are now their own categories.
  */
 function accessoryTryOnPrompt(category: string, productDescription?: string): string {
   const item = productDescription?.trim() || undefined;
   switch (category) {
     case 'eyewear':
       return `Add these ${item ?? 'glasses'} naturally onto the model’s face, positioned correctly on the bridge of the nose and ears. Preserve the model’s facial identity, skin, hair, and proportions exactly.`;
+    case 'earrings':
+      return `Add these ${item ?? 'earrings'} naturally onto both of the model’s ears. Preserve the model’s facial identity, skin, hair, and proportions exactly.`;
+    case 'necklace':
+      return `Add this ${item ?? 'necklace'} naturally around the model’s neck, resting at the correct length against the chest. Preserve the model’s facial identity, skin, hair, and proportions exactly.`;
     case 'jewelry':
       return item
         ? `Add this ${item} naturally onto the model, in the correct position for a ${item}. Preserve the model’s facial identity, skin, hair, and proportions exactly.`
-        : 'Add this jewelry naturally onto the model — earrings on the ears, necklaces at the neck/chest, as appropriate to the item shown. Preserve the model’s facial identity, skin, hair, and proportions exactly.';
+        : 'Add this jewelry naturally onto the model, in the position appropriate for the piece shown. Preserve the model’s facial identity, skin, hair, and proportions exactly.';
     case 'footwear':
       return 'Add these shoes naturally onto the model’s feet, with correct orientation, proportion, and ground contact. Preserve the model’s identity, pose, and proportions exactly.';
     default:

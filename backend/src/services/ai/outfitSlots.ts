@@ -12,8 +12,13 @@ export interface OutfitSlots {
   outerwear?: string;
   /** Sunglasses/glasses — matches the `'eyewear'` product category. */
   eyewear?: string;
-  /** Earrings, necklaces, or other jewelry — matches the `'jewelry'` product category (not
-   *  split further since the catalog itself doesn't distinguish sub-types yet). */
+  /** Matches the `'earrings'` product category — independent of `necklace` so both can be worn
+   *  in the same look at once (this is the actual "multiple accessories simultaneously" case). */
+  earrings?: string;
+  /** Matches the `'necklace'` product category. */
+  necklace?: string;
+  /** Any other jewelry that isn't earrings or a necklace (bracelets, rings, anklets, etc.) —
+   *  matches the generic `'jewelry'` product category. */
   jewelry?: string;
 }
 
@@ -25,11 +30,13 @@ export interface OutfitSlotValidation {
 /**
  * Rules:
  *  - Exactly one of {top+bottom} or {one_piece} — never both, never a bare top or bare bottom.
- *  - shoes, outerwear, eyewear, and jewelry are each optional, additive, at most one.
+ *  - shoes, outerwear, eyewear, earrings, necklace, and jewelry are each optional, additive, at
+ *    most one — and independent of each other, so earrings + necklace + eyewear can all be worn
+ *    at once.
  *  - At least one slot must be filled overall — but unlike shoes/outerwear (which only ever made
- *    sense as an addition to a clothing anchor), eyewear/jewelry are valid completely on their
- *    own with no top/bottom/one_piece at all (e.g. "just add these sunglasses and this necklace
- *    to the model"), so no clothing anchor is required anymore.
+ *    sense as an addition to a clothing anchor), accessories are valid completely on their own
+ *    with no top/bottom/one_piece at all (e.g. "just add these sunglasses and this necklace to
+ *    the model"), so no clothing anchor is required anymore.
  */
 export function validateOutfitSlots(slots: OutfitSlots): OutfitSlotValidation {
   const hasTop = Boolean(slots.top);
@@ -64,5 +71,7 @@ export const OUTFIT_SLOT_ORDER: Array<keyof OutfitSlots> = [
   'bottom',
   'shoes',
   'eyewear',
+  'earrings',
+  'necklace',
   'jewelry',
 ];

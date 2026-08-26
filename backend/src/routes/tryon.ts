@@ -41,7 +41,7 @@ router.get('/categories', (_req: Request, res: Response) => {
  * Body:
  *   - personImagePath: string       (path returned by POST /api/upload)
  *   - productImagePath: string      (path returned by POST /api/upload)
- *   - category: ProductCategory     (clothing|tops|bottoms|dresses|one-pieces|eyewear|jewelry|footwear — see VALID_TRY_ON_CATEGORIES)
+ *   - category: ProductCategory     (clothing|tops|bottoms|dresses|one-pieces|eyewear|earrings|necklace|jewelry|footwear — see VALID_TRY_ON_CATEGORIES)
  *   - productDescription?: string   (optional: extra detail; server always adds product-first instructions for every try-on)
  *   - async?: boolean               (default true)
  */

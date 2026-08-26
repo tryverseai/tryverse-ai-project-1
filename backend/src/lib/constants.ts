@@ -8,6 +8,8 @@ export const VALID_TRY_ON_CATEGORIES: ProductCategory[] = [
   'dresses',
   'one-pieces',
   'eyewear',
+  'earrings',
+  'necklace',
   'jewelry',
   'footwear',
 ];
@@ -31,7 +33,7 @@ export const VALID_PRODUCT_CATEGORIES: CatalogCategory[] = VALID_TRY_ON_CATEGORI
 export const PRODUCT_CATEGORY_GROUPS: { group: string; categories: ProductCategory[] }[] = [
   { group: 'Clothing', categories: ['clothing', 'tops', 'bottoms', 'dresses', 'one-pieces'] },
   { group: 'Footwear', categories: ['footwear'] },
-  { group: 'Accessories', categories: ['eyewear', 'jewelry'] },
+  { group: 'Accessories', categories: ['eyewear', 'earrings', 'necklace', 'jewelry'] },
 ];
 
 /** Friendly display labels for `ProductCategory` values — raw enum strings are not shown to users. */
@@ -43,7 +45,9 @@ export const PRODUCT_CATEGORY_LABELS: Record<ProductCategory, string> = {
   'one-pieces': 'One-pieces',
   footwear: 'Footwear',
   eyewear: 'Eyewear',
-  jewelry: 'Jewelry',
+  earrings: 'Earrings',
+  necklace: 'Necklace',
+  jewelry: 'Other Jewelry',
 };
 
 /** Signed URL lifetime for try-on result images (seconds). */

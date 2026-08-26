@@ -26,7 +26,7 @@ const OUTFIT_STAGES = [
   "Almost ready",
 ];
 
-type SlotKey = "top" | "bottom" | "one_piece" | "shoes" | "eyewear" | "jewelry";
+type SlotKey = "top" | "bottom" | "one_piece" | "shoes" | "eyewear" | "earrings" | "necklace" | "jewelry";
 type Mode = "top_bottom" | "one_piece";
 
 const MAX_POLL_ATTEMPTS = 30;
@@ -94,6 +94,8 @@ export function OutfitBuilderTab() {
     one_piece: [],
     shoes: [],
     eyewear: [],
+    earrings: [],
+    necklace: [],
     jewelry: [],
   });
   const [productsLoading, setProductsLoading] = useState(true);
@@ -117,8 +119,10 @@ export function OutfitBuilderTab() {
       getProducts(1, 50, "one-pieces").catch(() => ({ products: [] as Product[] })),
       getProducts(1, 50, "footwear").catch(() => ({ products: [] as Product[] })),
       getProducts(1, 50, "eyewear").catch(() => ({ products: [] as Product[] })),
+      getProducts(1, 50, "earrings").catch(() => ({ products: [] as Product[] })),
+      getProducts(1, 50, "necklace").catch(() => ({ products: [] as Product[] })),
       getProducts(1, 50, "jewelry").catch(() => ({ products: [] as Product[] })),
-    ]).then(([tops, bottoms, dresses, onePieces, shoes, eyewear, jewelry]) => {
+    ]).then(([tops, bottoms, dresses, onePieces, shoes, eyewear, earrings, necklace, jewelry]) => {
       if (cancelled) return;
       setProductsBySlot({
         top: tops.products,
@@ -126,6 +130,8 @@ export function OutfitBuilderTab() {
         one_piece: [...dresses.products, ...onePieces.products],
         shoes: shoes.products,
         eyewear: eyewear.products,
+        earrings: earrings.products,
+        necklace: necklace.products,
         jewelry: jewelry.products,
       });
     }).finally(() => { if (!cancelled) setProductsLoading(false); });
@@ -156,7 +162,14 @@ export function OutfitBuilderTab() {
   // needs its bottom and vice versa; everything else is additive.
   const topBottomBalanced = mode !== "top_bottom" || Boolean(selected.top) === Boolean(selected.bottom);
   const anySlotFilled = Boolean(
-    selected.top || selected.bottom || selected.one_piece || selected.shoes || selected.eyewear || selected.jewelry
+    selected.top ||
+      selected.bottom ||
+      selected.one_piece ||
+      selected.shoes ||
+      selected.eyewear ||
+      selected.earrings ||
+      selected.necklace ||
+      selected.jewelry
   );
   const isValidCombo = topBottomBalanced && anySlotFilled;
 
@@ -178,6 +191,8 @@ export function OutfitBuilderTab() {
       mode,
       hasShoes: Boolean(selected.shoes),
       hasEyewear: Boolean(selected.eyewear),
+      hasEarrings: Boolean(selected.earrings),
+      hasNecklace: Boolean(selected.necklace),
       hasJewelry: Boolean(selected.jewelry),
       modelSource: selectedModel.source,
     });
@@ -188,6 +203,8 @@ export function OutfitBuilderTab() {
         one_piece: mode === "one_piece" ? selected.one_piece?.id : undefined,
         shoes: selected.shoes?.id,
         eyewear: selected.eyewear?.id,
+        earrings: selected.earrings?.id,
+        necklace: selected.necklace?.id,
         jewelry: selected.jewelry?.id,
       };
       const started = await generateOutfit({
@@ -341,13 +358,35 @@ export function OutfitBuilderTab() {
                   </div>
                   <div>
                     <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
-                      <Gem className="h-3.5 w-3.5" /> Jewelry
+                      <Gem className="h-3.5 w-3.5" /> Earrings
+                    </p>
+                    <ProductPickerGrid
+                      products={productsBySlot.earrings}
+                      selectedId={selected.earrings?.id}
+                      onSelect={setSlot("earrings")}
+                      emptyLabel="No earrings in your catalog yet — tag a product as “Earrings” to add one."
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Gem className="h-3.5 w-3.5" /> Necklace
+                    </p>
+                    <ProductPickerGrid
+                      products={productsBySlot.necklace}
+                      selectedId={selected.necklace?.id}
+                      onSelect={setSlot("necklace")}
+                      emptyLabel="No necklaces in your catalog yet — tag a product as “Necklace” to add one."
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Gem className="h-3.5 w-3.5" /> Other jewelry
                     </p>
                     <ProductPickerGrid
                       products={productsBySlot.jewelry}
                       selectedId={selected.jewelry?.id}
                       onSelect={setSlot("jewelry")}
-                      emptyLabel="No jewelry in your catalog yet — tag a product as “Jewelry” to add one."
+                      emptyLabel="No other jewelry in your catalog yet — tag a product as “Other Jewelry” to add one."
                     />
                   </div>
                 </div>

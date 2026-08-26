@@ -103,6 +103,8 @@ export type TryOnCategory =
   | 'dresses'
   | 'one-pieces'
   | 'eyewear'
+  | 'earrings'
+  | 'necklace'
   | 'jewelry'
   | 'footwear';
 
@@ -122,7 +124,7 @@ export type ProductCategory = TryOnCategory;
 export const PRODUCT_CATEGORY_GROUPS: { group: string; categories: ProductCategory[] }[] = [
   { group: 'Clothing', categories: ['clothing', 'tops', 'bottoms', 'dresses', 'one-pieces'] },
   { group: 'Footwear', categories: ['footwear'] },
-  { group: 'Accessories', categories: ['eyewear', 'jewelry'] },
+  { group: 'Accessories', categories: ['eyewear', 'earrings', 'necklace', 'jewelry'] },
 ];
 
 /** Friendly display labels for `ProductCategory` values — raw enum strings are not shown to users. */
@@ -130,11 +132,13 @@ export const PRODUCT_CATEGORY_LABELS: Record<ProductCategory, string> = {
   clothing: 'Clothing',
   tops: 'Tops',
   bottoms: 'Bottoms',
+  earrings: 'Earrings',
+  necklace: 'Necklace',
   dresses: 'Dresses',
   'one-pieces': 'One-pieces',
   footwear: 'Footwear',
   eyewear: 'Eyewear',
-  jewelry: 'Jewelry',
+  jewelry: 'Other Jewelry',
 };
 
 // ─── Typed API error (replaces `Error & { status?; code?; retryAfter? }`) ────
@@ -1839,6 +1843,8 @@ export interface OutfitSlotSelection {
   shoes?: string;
   outerwear?: string;
   eyewear?: string;
+  earrings?: string;
+  necklace?: string;
   jewelry?: string;
 }
 

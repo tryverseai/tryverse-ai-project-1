@@ -34,7 +34,9 @@ export function buildOutfitPrompt(items: OutfitPromptInputs): string {
   // guidance below) — an outfit can now be accessories-only, with no clothing items at all.
   const accessoryParts: string[] = [];
   if (items.eyewear) accessoryParts.push(`${items.eyewear} on the face`);
-  if (items.jewelry) accessoryParts.push(`${items.jewelry} positioned appropriately (ears, neck, wrists, etc. as fits the piece)`);
+  if (items.earrings) accessoryParts.push(`${items.earrings} on both ears`);
+  if (items.necklace) accessoryParts.push(`${items.necklace} around the neck`);
+  if (items.jewelry) accessoryParts.push(`${items.jewelry} positioned appropriately for the piece`);
 
   const styleSentenceParts: string[] = [];
   if (clothingParts.length > 0) styleSentenceParts.push(clothingParts.join(', '));

@@ -2,9 +2,12 @@ import type { OutfitSlots } from '../services/ai/outfitSlots';
 
 /**
  * Product categories shared by the product catalog and the single-item try-on pipeline: apparel,
- * footwear, and accessories (eyewear, jewelry) routed through FASHN Try-On Max for the
- * non-apparel values — see `isAccessoryCategory` in `services/ai/pipeline.ts`. Grouped into
- * higher-level display categories by `PRODUCT_CATEGORY_GROUPS` in `lib/constants.ts`.
+ * footwear, and accessories (eyewear, earrings, necklace, jewelry) routed through FASHN Try-On
+ * Max for the non-apparel values — see `isAccessoryCategory` in `services/ai/pipeline.ts`.
+ * `earrings`/`necklace` are split out from the generic `jewelry` catch-all so both a placement
+ * prompt and an Outfit Builder slot can target each independently (e.g. earrings + necklace worn
+ * at once) — `jewelry` remains for pieces that don't fit either (bracelets, rings, anklets, etc).
+ * Grouped into higher-level display categories by `PRODUCT_CATEGORY_GROUPS` in `lib/constants.ts`.
  */
 export type ProductCategory =
   | 'clothing'
@@ -13,6 +16,8 @@ export type ProductCategory =
   | 'dresses'
   | 'one-pieces'
   | 'eyewear'
+  | 'earrings'
+  | 'necklace'
   | 'jewelry'
   | 'footwear';
 

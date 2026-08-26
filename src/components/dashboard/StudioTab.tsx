@@ -96,8 +96,9 @@ const GARMENT_OPTIONS: { group: string; items: GarmentOption[] }[] = [
     group: "Accessories",
     items: [
       { key: "eyewear", label: "Glasses / sunglasses", category: "eyewear", description: "eyewear" },
-      { key: "earrings", label: "Earrings", category: "jewelry", description: "earrings" },
-      { key: "necklace", label: "Necklace", category: "jewelry", description: "necklace" },
+      { key: "earrings", label: "Earrings", category: "earrings", description: "earrings" },
+      { key: "necklace", label: "Necklace", category: "necklace", description: "necklace" },
+      { key: "jewelry", label: "Other jewelry", category: "jewelry", description: "jewelry" },
       { key: "footwear", label: "Shoes", category: "footwear", description: "shoes" },
     ],
   },

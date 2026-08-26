@@ -333,6 +333,8 @@ export default defineSchema({
       shoes: v.optional(v.string()),
       outerwear: v.optional(v.string()),
       eyewear: v.optional(v.string()),
+      earrings: v.optional(v.string()),
+      necklace: v.optional(v.string()),
       jewelry: v.optional(v.string()),
     }),
     composite_image: v.optional(v.string()),

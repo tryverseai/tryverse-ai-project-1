@@ -46,6 +46,8 @@ function normalizeTryOnCategory(raw: string): TryOnCategory {
     s === "one-pieces" ||
     s === "clothing" ||
     s === "eyewear" ||
+    s === "earrings" ||
+    s === "necklace" ||
     s === "jewelry" ||
     s === "footwear"
   )

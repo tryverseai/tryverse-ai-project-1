@@ -406,7 +406,9 @@ export function getSupportedCategories(): Array<{
     { id: 'dresses', label: 'Dresses', description: 'Dresses and gowns', modelFamily: env.TRYON_CLOTHING_USE_FASHN ? 'FASHN' : 'IDM-VTON', active: true },
     { id: 'one-pieces', label: 'One-pieces', description: 'Jumpsuits, rompers, overalls', modelFamily: env.TRYON_CLOTHING_USE_FASHN ? 'FASHN' : 'IDM-VTON', active: true },
     { id: 'eyewear', label: 'Eyewear', description: 'Glasses and sunglasses', modelFamily: 'FASHN', active: true },
-    { id: 'jewelry', label: 'Jewelry', description: 'Earrings, necklaces, and other jewelry', modelFamily: 'FASHN', active: true },
+    { id: 'earrings', label: 'Earrings', description: 'Earrings', modelFamily: 'FASHN', active: true },
+    { id: 'necklace', label: 'Necklace', description: 'Necklaces and pendants', modelFamily: 'FASHN', active: true },
+    { id: 'jewelry', label: 'Other Jewelry', description: 'Bracelets, rings, and other jewelry', modelFamily: 'FASHN', active: true },
     { id: 'footwear', label: 'Footwear', description: 'Shoes and sneakers', modelFamily: 'FASHN', active: true },
   ];
 }
