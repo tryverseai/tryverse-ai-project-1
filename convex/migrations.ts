@@ -1,6 +1,7 @@
 import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { canonicalAuthSubjectProfileId } from "./authSubjectKeys";
+import { hashApiKey } from "./security";
 
 /**
  * One-time: merge all duplicate `profiles` rows for the same email/user.
@@ -127,5 +128,45 @@ export const deduplicateProfiles = internalMutation({
     }
 
     return { merged, deleted, normalised };
+  },
+});
+
+/**
+ * One-time: backfill `key_hash`/`key_last4` for every `api_keys` row created before the hash
+ * migration (which store a plaintext `key_value` but no hash yet). Auth (`lookupActiveApiKey`/
+ * `markApiKeyUsed` in backendTrusted.ts) looks up by `key_hash` exclusively, so this MUST be run
+ * — and confirmed complete — before that code is live, or every existing customer's API key
+ * would stop authenticating. Deliberately leaves `key_value` in place afterward (does not null it
+ * out) so those pre-existing keys keep working with the dashboard's "reveal" feature; only new
+ * keys created after this migration are hash-only.
+ *
+ * Idempotent (only touches rows missing `key_hash`) — safe to re-run.
+ * Run from Convex Dashboard → Functions → internal → `backfillApiKeyHashes`.
+ */
+export const backfillApiKeyHashes = internalMutation({
+  args: v.object({}),
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("api_keys").collect();
+    let hashed = 0;
+    let skippedNoValue = 0;
+    let alreadyDone = 0;
+
+    for (const row of rows) {
+      if (row.key_hash) {
+        alreadyDone++;
+        continue;
+      }
+      if (!row.key_value) {
+        // Shouldn't happen pre-migration (every old row has key_value), but guard anyway.
+        skippedNoValue++;
+        continue;
+      }
+      const key_hash = await hashApiKey(row.key_value);
+      const key_last4 = row.key_last4 ?? row.key_value.slice(-4);
+      await ctx.db.patch(row._id, { key_hash, key_last4 });
+      hashed++;
+    }
+
+    return { hashed, skippedNoValue, alreadyDone, total: rows.length };
   },
 });

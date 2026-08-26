@@ -40,14 +40,28 @@ function ExpiryLabel({ expiresAt, expired }: { expiresAt?: string | null; expire
   return <span className="text-muted-foreground">Expires {formatted}</span>;
 }
 
-function KeyRow({ record, onRevoked }: { record: ApiKeyRecord; onRevoked: (id: string) => void }) {
-  const [revealed, setRevealed] = useState(false);
+function KeyRow({
+  record,
+  onRevoked,
+  initiallyRevealed = false,
+}: {
+  record: ApiKeyRecord;
+  onRevoked: (id: string) => void;
+  initiallyRevealed?: boolean;
+}) {
+  const [revealed, setRevealed] = useState(initiallyRevealed);
   const [copied, setCopied] = useState(false);
   const [revoking, setRevoking] = useState(false);
 
-  const masked = `${record.key_value.slice(0, 11)}${"•".repeat(24)}${record.key_value.slice(-4)}`;
+  // Keys created after the hash migration have no stored value to reveal — only the safe last-4
+  // fragment. Older keys keep working exactly as before (full reveal/copy still available).
+  const canReveal = record.key_value !== null;
+  const masked = canReveal
+    ? `${record.key_value!.slice(0, 11)}${"•".repeat(24)}${record.key_value!.slice(-4)}`
+    : `tv_live_${"•".repeat(24)}${record.key_last4 ?? "????"}`;
 
   const copy = () => {
+    if (!record.key_value) return;
     navigator.clipboard.writeText(record.key_value);
     setCopied(true);
     toast.success("API key copied");
@@ -79,13 +93,17 @@ function KeyRow({ record, onRevoked }: { record: ApiKeyRecord; onRevoked: (id: s
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={() => setRevealed((r) => !r)} className="gap-1.5 text-xs h-7">
-            {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={copy} className="gap-1.5 text-xs h-7">
-            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            {copied ? "Copied" : "Copy"}
-          </Button>
+          {canReveal && (
+            <Button variant="ghost" size="sm" onClick={() => setRevealed((r) => !r)} className="gap-1.5 text-xs h-7">
+              {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </Button>
+          )}
+          {canReveal && (
+            <Button variant="ghost" size="sm" onClick={copy} className="gap-1.5 text-xs h-7">
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? "Copied" : "Copy"}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -98,7 +116,14 @@ function KeyRow({ record, onRevoked }: { record: ApiKeyRecord; onRevoked: (id: s
           </Button>
         </div>
       </div>
-      <p className="px-4 py-3 text-sm font-mono text-foreground break-all">{revealed ? record.key_value : masked}</p>
+      <p className="px-4 py-3 text-sm font-mono text-foreground break-all">
+        {revealed && canReveal ? record.key_value : masked}
+      </p>
+      {!canReveal && (
+        <p className="px-4 pb-3 text-xs text-muted-foreground">
+          Only shown once, right after creation — this can no longer be revealed. Revoke and create a new key if it's lost.
+        </p>
+      )}
     </div>
   );
 }
@@ -128,7 +153,7 @@ function CreateKeyDialog({ onClose, onCreated }: { onClose: () => void; onCreate
         scopes,
         expiresInDays: expiry === "never" ? undefined : Number(expiry),
       });
-      toast.success(`"${key.name}" created`);
+      toast.success(`"${key.name}" created — copy it now, it won't be shown again`, { duration: 8000 });
       onCreated(key);
       onClose();
     } catch (e) {
@@ -218,6 +243,10 @@ export function ApiKeysTab() {
   const [keys, setKeys] = useState<ApiKeyRecord[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  // Freshly created keys arrive with key_value populated (returned once at creation) but that
+  // value only exists in this in-memory state — reveal it by default so the user doesn't have to
+  // know to click an extra button before it's gone for good on the next page load.
+  const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -255,7 +284,12 @@ export function ApiKeysTab() {
           <div className="h-16 rounded-xl bg-muted/20 animate-pulse" />
         ) : keys && keys.length > 0 ? (
           keys.map((k) => (
-            <KeyRow key={k.id} record={k} onRevoked={(id) => setKeys((prev) => prev?.filter((k2) => k2.id !== id) ?? null)} />
+            <KeyRow
+              key={k.id}
+              record={k}
+              initiallyRevealed={k.id === justCreatedId}
+              onRevoked={(id) => setKeys((prev) => prev?.filter((k2) => k2.id !== id) ?? null)}
+            />
           ))
         ) : (
           <div className="bg-card rounded-xl border border-border/50 shadow-card text-center py-10">
@@ -280,7 +314,10 @@ export function ApiKeysTab() {
         {showCreate && (
           <CreateKeyDialog
             onClose={() => setShowCreate(false)}
-            onCreated={(key) => setKeys((prev) => [key, ...(prev ?? [])])}
+            onCreated={(key) => {
+              setKeys((prev) => [key, ...(prev ?? [])]);
+              setJustCreatedId(key.id);
+            }}
           />
         )}
       </AnimatePresence>

@@ -1090,7 +1090,8 @@ router.get('/api-keys', async (req: Request, res: Response, next: NextFunction):
       Array<{
         id: string;
         user_id: string;
-        key_value: string;
+        key_value: string | null;
+        key_last4: string | null;
         name: string;
         status: string;
         last_used: string | null;
@@ -1127,7 +1128,7 @@ router.get('/api-keys', async (req: Request, res: Response, next: NextFunction):
       last_used: k.last_used,
       created_at: k.created_at,
       brand_name: profileMap[k.user_id] || '—',
-      key_preview: k.key_value ? `${k.key_value.slice(0, 8)}…` : '—',
+      key_preview: k.key_value ? `${k.key_value.slice(0, 8)}…` : k.key_last4 ? `tv_live_…${k.key_last4}` : '—',
     }));
 
     res.json({ keys: keysWithBrand });

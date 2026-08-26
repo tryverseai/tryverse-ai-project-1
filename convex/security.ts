@@ -31,3 +31,21 @@ export function requireBackendSecret(secret: string): void {
     throw new Error("Unauthorized");
   }
 }
+
+/**
+ * SHA-256 hex digest of an API key secret, via the Web Crypto API (`crypto.subtle` is available
+ * in Convex's default V8 isolate — no `"use node"` needed, same as `crypto.getRandomValues`
+ * already used elsewhere for key generation).
+ *
+ * Deliberately a plain fast hash, not bcrypt/scrypt/argon2: those are for low-entropy *user
+ * passwords*, where slowing down brute force matters because attackers can guess a password
+ * dictionary. TryVerse API keys are already 192-bit random secrets (`randomApiKeySecret` in
+ * `adminTrusted.ts`) — nothing meaningfully "guessable" for a slow hash to protect against — and
+ * this hash is looked up by exact-match index on every widget/API request, so it needs to stay
+ * cheap. What it protects against is a stolen database dump handing out live, usable keys.
+ */
+export async function hashApiKey(plaintext: string): Promise<string> {
+  const data = new TextEncoder().encode(plaintext);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}

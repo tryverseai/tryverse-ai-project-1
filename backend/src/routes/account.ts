@@ -347,7 +347,9 @@ router.get('/me', requireAuth, async (req: Request, res: Response, next: NextFun
  */
 interface ApiKeyListRow {
   id: string;
-  key_value: string;
+  /** null once a key has moved to hash-only storage — see convex/adminTrusted.ts createApiKeyAdmin. */
+  key_value: string | null;
+  key_last4: string | null;
   name: string;
   created_at: string;
   last_used_at: string | null;
@@ -451,7 +453,7 @@ router.post(
  */
 router.post('/api-keys', requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const existing = await convexQueryTrusted<Array<{ id: string; key_value: string; name: string; created_at: string }>>(
+    const existing = await convexQueryTrusted<Array<{ id: string; key_value: string | null; name: string; created_at: string }>>(
       anyApi.backendTrusted.listApiKeysForUser,
       { secret: env.BACKEND_SHARED_SECRET, userId: req.user!.id }
     );
@@ -459,10 +461,15 @@ router.post('/api-keys', requireAuth, async (req: Request, res: Response, next: 
       res.json({ key: existing[0], created: false });
       return;
     }
+    // keepPlaintext: true — this is the single auto-provisioned onboarding key Connect Store
+    // re-fetches (idempotently) on every visit to redisplay in the setup snippet; a hash-only
+    // key has nothing left to redisplay after the first response. See createApiKeyAdmin's doc
+    // comment in convex/adminTrusted.ts for why this one path is exempt from the hash migration.
     const created = (await convexMutationTrusted(anyApi.adminTrusted.createApiKeyAdmin, {
       secret: env.BACKEND_SHARED_SECRET,
       userId: req.user!.id,
       name: 'Production',
+      keepPlaintext: true,
     })) as { id: string; user_id: string; key_value: string; name: string; created_at: string; status: 'active' };
     res.json({ key: created, created: true });
   } catch (err) {
@@ -493,6 +500,7 @@ router.post(
         secret: env.BACKEND_SHARED_SECRET,
         userId: req.user!.id,
         name: 'Production',
+        keepPlaintext: true, // same onboarding key as POST /api-keys above — see that route's comment
       })) as { id: string; user_id: string; key_value: string; name: string; created_at: string; status: 'active' };
       res.json({ key: created });
     } catch (err) {

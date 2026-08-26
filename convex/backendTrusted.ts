@@ -4,7 +4,7 @@ import { mutation, query, type MutationCtx } from "./_generated/server";
 import { authSubjectSegments, canonicalAuthSubjectProfileId, subjectsOverlap } from "./authSubjectKeys";
 import { collectProfileDocsForSubjectKeys, findProfileBySubjectKeys } from "./profileLookup";
 import { defaultModelLibraryRows } from "./modelLibrarySeedRows";
-import { requireBackendSecret } from "./security";
+import { requireBackendSecret, hashApiKey } from "./security";
 import { deleteAuthAccountAndSessions } from "./authAccountCleanup";
 
 export const getUserRowById = query({
@@ -476,9 +476,10 @@ export const lookupActiveApiKey = query({
   args: { secret: v.string(), keyValue: v.string() },
   handler: async (ctx, { secret, keyValue }) => {
     requireBackendSecret(secret);
+    const key_hash = await hashApiKey(keyValue);
     const row = await ctx.db
       .query("api_keys")
-      .withIndex("by_key_value", (q) => q.eq("key_value", keyValue))
+      .withIndex("by_key_hash", (q) => q.eq("key_hash", key_hash))
       .unique();
     if (!row || row.status !== "active") return null;
     // Expired keys behave exactly like inactive ones — same "invalid or revoked" error the
@@ -488,7 +489,6 @@ export const lookupActiveApiKey = query({
     return {
       id,
       userId: row.user_id,
-      keyValue: row.key_value,
       status: row.status,
       name: row.name,
       scopes: row.scopes ?? null,
@@ -512,9 +512,10 @@ export const markApiKeyUsed = mutation({
   args: { secret: v.string(), keyValue: v.string() },
   handler: async (ctx, { secret, keyValue }) => {
     requireBackendSecret(secret);
+    const key_hash = await hashApiKey(keyValue);
     const row = await ctx.db
       .query("api_keys")
-      .withIndex("by_key_value", (q) => q.eq("key_value", keyValue))
+      .withIndex("by_key_hash", (q) => q.eq("key_hash", key_hash))
       .unique();
     if (!row || row.status !== "active") return;
     await ctx.db.patch(row._id, { last_used_at: new Date().toISOString() });
@@ -1495,7 +1496,10 @@ export const listApiKeysForUser = query({
       .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")))
       .map((k) => ({
         id: k.legacy_id ?? String(k._id),
-        key_value: k.key_value,
+        // Only pre-migration keys still have a stored key_value to reveal; newer keys are
+        // hash-only and fall back to key_last4 for display purposes.
+        key_value: k.key_value ?? null,
+        key_last4: k.key_last4 ?? (k.key_value ? k.key_value.slice(-4) : null),
         name: k.name,
         created_at: k.created_at ?? "",
         last_used_at: k.last_used_at ?? null,

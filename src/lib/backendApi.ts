@@ -1680,7 +1680,10 @@ export type ApiKeyScope = 'read' | 'write';
 
 export interface ApiKeyRecord {
   id: string;
-  key_value: string;
+  /** null for keys created after the hash migration — nothing to reveal after the one-time
+   *  creation response, which is why `key_last4` exists for display. */
+  key_value: string | null;
+  key_last4: string | null;
   name: string;
   created_at: string;
   last_used_at?: string | null;

@@ -13,7 +13,6 @@ export function AdminApiKeysTab({ adminKey }: AdminApiKeysTabProps) {
   const [keys, setKeys] = useState<Array<{
     id: string;
     user_id: string;
-    key_value: string;
     key_preview: string;
     name: string;
     status: string;

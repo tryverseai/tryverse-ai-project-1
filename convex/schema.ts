@@ -118,7 +118,17 @@ export default defineSchema({
   api_keys: defineTable({
     legacy_id: v.optional(v.string()),
     user_id: v.string(),
-    key_value: v.string(),
+    /** Legacy plaintext storage — optional now. Populated only on keys created before the
+     *  hash migration; never written for new keys (see `key_hash`). Kept, not backfilled-and-
+     *  dropped, purely so those pre-existing keys' "reveal" UI still works; auth no longer reads
+     *  this field at all. */
+    key_value: v.optional(v.string()),
+    /** SHA-256 hex of the plaintext key — what auth actually looks up by (`by_key_hash`).
+     *  Optional only until the one-time backfill migration runs against every existing row. */
+    key_hash: v.optional(v.string()),
+    /** Last 4 characters of the plaintext, safe to keep at rest — lets the dashboard show
+     *  "tv_live_••••1234" for hash-only keys that have no recoverable `key_value`. */
+    key_last4: v.optional(v.string()),
     name: v.string(),
     status: v.string(),
     created_at: v.optional(v.string()),
@@ -130,7 +140,8 @@ export default defineSchema({
     expires_at: v.optional(v.string()),
   })
     .index("by_userId", ["user_id"])
-    .index("by_key_value", ["key_value"]),
+    .index("by_key_value", ["key_value"])
+    .index("by_key_hash", ["key_hash"]),
 
   allowed_domains: defineTable({
     legacy_id: v.optional(v.string()),

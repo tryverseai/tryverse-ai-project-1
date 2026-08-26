@@ -29,7 +29,6 @@ export async function optionalApiKey(req: Request, res: Response, next: NextFunc
     const apiKey = await convexQueryTrusted<{
       id: string;
       userId: string;
-      keyValue: string;
       status: string;
       name: string;
       scopes?: string[] | null;
@@ -42,7 +41,9 @@ export async function optionalApiKey(req: Request, res: Response, next: NextFunc
       req.apiKey = {
         id: apiKey.id,
         userId: apiKey.userId,
-        keyValue: apiKey.keyValue,
+        // The plaintext from the incoming request itself — lookupActiveApiKey no longer echoes
+        // it back now that keys are looked up by hash and mostly not stored in plaintext at all.
+        keyValue,
         status: apiKey.status,
         name: apiKey.name,
         scopes: apiKey.scopes,
@@ -81,7 +82,6 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
     const apiKey = await convexQueryTrusted<{
       id: string;
       userId: string;
-      keyValue: string;
       status: string;
       name: string;
       scopes?: string[] | null;
@@ -106,7 +106,7 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
     req.apiKey = {
       id: apiKey.id,
       userId: apiKey.userId,
-      keyValue: apiKey.keyValue,
+      keyValue,
       status: apiKey.status,
       name: apiKey.name,
       scopes: apiKey.scopes,

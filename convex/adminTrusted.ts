@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { authSubjectSegments } from "./authSubjectKeys";
 import { collectProfileDocsForSubjectKeys, findProfileBySubjectKeys } from "./profileLookup";
-import { requireBackendSecret } from "./security";
+import { requireBackendSecret, hashApiKey } from "./security";
 import { deleteAuthAccountAndSessions } from "./authAccountCleanup";
 
 export const adminMetricsBundle = query({
@@ -334,7 +334,10 @@ export const listApiKeysAdmin = query({
     return rows.slice(0, limit).map((k) => ({
       id: k.legacy_id ?? String(k._id),
       user_id: k.user_id,
-      key_value: k.key_value,
+      // Legacy plaintext (null for keys created after the hash migration) plus a safe last-4
+      // fallback so the admin panel can always show *something* to identify the key by.
+      key_value: k.key_value ?? null,
+      key_last4: k.key_last4 ?? (k.key_value ? k.key_value.slice(-4) : null),
       name: k.name,
       status: k.status,
       last_used: k.last_used_at ?? null,
@@ -358,13 +361,22 @@ export const createApiKeyAdmin = mutation({
     name: v.optional(v.string()),
     scopes: v.optional(v.array(v.string())),
     expiresInDays: v.optional(v.number()),
+    // Defaults to false (secure, hash-only — see hashApiKey doc comment). Set true only for the
+    // single auto-provisioned "Production" onboarding key (POST /api/account/api-keys, the
+    // idempotent call Connect Store re-fetches on every visit): that flow re-displays the same
+    // key value indefinitely as part of the setup snippet, which a hash-only key structurally
+    // can't support (there's nothing to reveal after the first response). Named/scoped keys
+    // created via the API Keys tab don't have that requirement, so they get the real fix.
+    keepPlaintext: v.optional(v.boolean()),
   },
-  handler: async (ctx, { secret, userId, name, scopes, expiresInDays }) => {
+  handler: async (ctx, { secret, userId, name, scopes, expiresInDays, keepPlaintext }) => {
     requireBackendSecret(secret);
     const profile = await findProfileBySubjectKeys(ctx, userId);
     if (!profile) throw new Error("profile_not_found");
     const now = new Date().toISOString();
     const key_value = randomApiKeySecret();
+    const key_hash = await hashApiKey(key_value);
+    const key_last4 = key_value.slice(-4);
     const legacy_id = crypto.randomUUID();
     const normalizedScopes = scopes?.filter((s) => s === "read" || s === "write");
     const expires_at =
@@ -374,7 +386,9 @@ export const createApiKeyAdmin = mutation({
     await ctx.db.insert("api_keys", {
       legacy_id,
       user_id: profile.id,
-      key_value,
+      key_hash,
+      key_last4,
+      ...(keepPlaintext ? { key_value } : {}),
       name: name?.trim() || "Production",
       status: "active",
       created_at: now,

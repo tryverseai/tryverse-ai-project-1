@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { hashApiKey } from "./security";
 
 function randomApiKeySecret(): string {
   const bytes = new Uint8Array(24);
@@ -27,7 +28,8 @@ export const listMyApiKeys = query({
     return rows.map((r) => ({
       id: r.legacy_id ?? r._id,
       name: r.name,
-      key_value: r.key_value,
+      key_value: r.key_value ?? null,
+      key_last4: r.key_last4 ?? (r.key_value ? r.key_value.slice(-4) : null),
       created_at: r.created_at ?? "",
       last_used_at: r.last_used_at ?? null,
       status: r.status,
@@ -42,11 +44,14 @@ export const createMyApiKey = mutation({
     if (!identity) throw new Error("Not authenticated");
     const now = new Date().toISOString();
     const key_value = randomApiKeySecret();
+    const key_hash = await hashApiKey(key_value);
+    const key_last4 = key_value.slice(-4);
     const legacy_id = newLegacyId();
     await ctx.db.insert("api_keys", {
       legacy_id,
       user_id: identity.subject,
-      key_value,
+      key_hash,
+      key_last4,
       name: name.trim() || "Production",
       status: "active",
       created_at: now,
