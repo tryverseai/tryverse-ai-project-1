@@ -20,8 +20,8 @@
     "test:convex:watch": "vitest --config convex/vitest.config.ts"
   },
   "dependencies": {
-    "@auth/core": "^0.37.0",
-    "@convex-dev/auth": "^0.0.91",
+    "@auth/core": "^0.41.1",
+    "@convex-dev/auth": "^0.0.95",
     "@hookform/resolvers": "^3.10.0",
     "@oslojs/crypto": "^1.0.1",
     "@radix-ui/react-accordion": "^1.2.11",
