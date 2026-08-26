@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Sparkles, Wand2, Trash2, RefreshCw, Users, Film, Loader2, Download, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ const PROMPT_EXAMPLE =
   "Professional African fashion model, female, age 28, dark skin, studio lighting, luxury editorial fashion campaign.";
 
 export function AiModelsTab() {
+  const navigate = useNavigate();
   const { refresh: refreshCredits } = useCredits();
   const isFreePlan = useIsFreePlan();
   const [prompt, setPrompt] = useState("");
@@ -202,7 +204,25 @@ export function AiModelsTab() {
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
-                          <Button size="icon" variant="secondary" className="h-8 w-8" title="Reuse in a try-on">
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-8 w-8"
+                            title="Reuse in a try-on"
+                            onClick={() =>
+                              navigate("/dashboard/business?tab=Personal+Studio", {
+                                state: {
+                                  pickedModel: {
+                                    source: "generated",
+                                    id: m.id,
+                                    imageUrl: m.imageUrl,
+                                    storagePath: m.storagePath,
+                                    label: "Your model",
+                                  },
+                                },
+                              })
+                            }
+                          >
                             <RefreshCw className="h-3.5 w-3.5" />
                           </Button>
                           <Button

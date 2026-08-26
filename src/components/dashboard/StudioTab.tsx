@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback, type ChangeEvent } from "react";
+import { useState, useRef, useCallback, useEffect, type ChangeEvent } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -305,6 +306,21 @@ export function StudioTab() {
     setPickedModel(m);
     setStep("garment");
   };
+
+  // "Reuse in a try-on" from AI Model Studio navigates here with the model already known —
+  // pre-select it and jump straight to the garment step instead of making the user pick it
+  // again from the grid. Clears the nav state after consuming it so a back-navigation or
+  // refresh doesn't re-trigger the same jump.
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const state = location.state as { pickedModel?: PickedModel } | null;
+    if (!state?.pickedModel) return;
+    setEntryMode("model");
+    handlePickModel(state.pickedModel);
+    navigate(location.pathname + location.search, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const run = async () => {
     if (!garment.file) {

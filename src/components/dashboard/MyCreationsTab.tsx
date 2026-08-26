@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Download, Eye, LayoutGrid, Trash2 } from "lucide-react";
+import { Download, Eye, LayoutGrid, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -13,7 +13,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { getMyCreations, deleteCreation, type Creation, type CreationType } from "@/lib/backendApi";
+import {
+  getMyCreations,
+  deleteCreation,
+  promoteCreationToModel,
+  type Creation,
+  type CreationType,
+} from "@/lib/backendApi";
 import { EmptyState } from "@/components/EmptyState";
 import { Lightbox } from "@/components/Lightbox";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
@@ -37,6 +43,8 @@ export function MyCreationsTab() {
   const [viewing, setViewing] = useState<Creation | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Creation | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [savingModelKey, setSavingModelKey] = useState<string | null>(null);
+  const [savedModelKeys, setSavedModelKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +88,21 @@ export function MyCreationsTab() {
       toast.error("Could not delete this", { description: e instanceof Error ? e.message : undefined });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleSaveAsModel = async (c: Creation) => {
+    if (c.isVideo || c.type === "video" || c.type === "ai_model") return;
+    const key = `${c.type}-${c.id}`;
+    setSavingModelKey(key);
+    try {
+      await promoteCreationToModel(c.type, c.id);
+      setSavedModelKeys((prev) => new Set(prev).add(key));
+      toast.success("Saved as a model", { description: "Find it under \"My Models\" anywhere you can pick a model." });
+    } catch (e) {
+      toast.error("Could not save this as a model", { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setSavingModelKey(null);
     }
   };
 
@@ -177,6 +200,18 @@ export function MyCreationsTab() {
                 >
                   <Download className="h-3.5 w-3.5" />
                 </Button>
+                {!c.isVideo && c.type !== "video" && c.type !== "ai_model" && (
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="h-8 w-8"
+                    title={savedModelKeys.has(`${c.type}-${c.id}`) ? "Saved as a model" : "Save as a model"}
+                    disabled={savingModelKey === `${c.type}-${c.id}` || savedModelKeys.has(`${c.type}-${c.id}`)}
+                    onClick={() => void handleSaveAsModel(c)}
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 <Button
                   size="icon"
                   variant="secondary"

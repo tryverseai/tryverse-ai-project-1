@@ -963,6 +963,66 @@ export const saveGeneratedAiModel = mutation({
   },
 });
 
+/**
+ * Promotes a past result (try-on, outfit, photoshoot, or product-model output) into a reusable
+ * saved model — the "Brand Library" write path. Reuses the SAME storage path rather than copying
+ * the file (Convex storage paths are stable/permanent), so this is just a new
+ * `ai_generated_models` row pointing at an image that already exists; the new row then flows
+ * through the exact same `listGeneratedAiModels`/`ModelPickerGrid` pipe every other saved model
+ * does, for free. `video` generations are deliberately excluded — not an image. `ai_model` results
+ * are already models and don't need this.
+ */
+export const promoteResultToModel = mutation({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    type: v.union(v.literal("tryon"), v.literal("outfit"), v.literal("photoshoot"), v.literal("product_model")),
+    id: v.string(),
+  },
+  handler: async (ctx, { secret, userId, type, id }) => {
+    requireBackendSecret(secret);
+
+    let resultImage: string | null | undefined;
+    let sourcePrompt: string;
+
+    if (type === "tryon") {
+      const row = await ctx.db
+        .query("tryons")
+        .withIndex("by_legacyId", (q) => q.eq("legacy_id", id))
+        .unique();
+      if (!row || !subjectsOverlap(userId, row.user_id ?? "")) throw new Error("not_found");
+      resultImage = row.result_image;
+      sourcePrompt = `Saved from a Try-On result (${row.category ?? "product"})`;
+    } else if (type === "outfit") {
+      const row = await ctx.db.get(id as Id<"outfit_generations">);
+      if (!row || row.user_id !== userId) throw new Error("not_found");
+      resultImage = row.result_image;
+      sourcePrompt = "Saved from an Outfit Builder result";
+    } else if (type === "photoshoot") {
+      const row = await ctx.db.get(id as Id<"photoshoot_generations">);
+      if (!row || row.user_id !== userId) throw new Error("not_found");
+      resultImage = row.result_image;
+      sourcePrompt = "Saved from an AI Photoshoot result";
+    } else {
+      const row = await ctx.db.get(id as Id<"product_model_generations">);
+      if (!row || row.user_id !== userId) throw new Error("not_found");
+      resultImage = row.result_image;
+      sourcePrompt = "Saved from a Product Photography result";
+    }
+
+    if (!resultImage) throw new Error("no_result_image");
+
+    const modelId = await ctx.db.insert("ai_generated_models", {
+      user_id: userId,
+      storage_path: resultImage,
+      params: { prompt: sourcePrompt },
+      status: "active",
+      created_at: new Date().toISOString(),
+    });
+    return { id: modelId };
+  },
+});
+
 /** Lists a user's saved AI-generated models (active only), newest first. */
 export const listGeneratedAiModels = query({
   args: { secret: v.string(), userId: v.string() },

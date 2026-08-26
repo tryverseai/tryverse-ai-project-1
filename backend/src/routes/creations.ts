@@ -244,4 +244,46 @@ router.delete(
   }
 );
 
+/**
+ * "Save as model" — the Brand Library write path. Promotes a completed result (try-on, outfit,
+ * photoshoot, or product-model output) into a reusable saved model, which then shows up in
+ * ModelPickerGrid everywhere a model can be picked (Personal Studio, AI Photoshoot, Outfit
+ * Builder) exactly like a model made in AI Model Studio. Not offered for `video` (not an image)
+ * or `ai_model` (already a model).
+ */
+router.post(
+  '/:type/:id/promote-to-model',
+  requireAuth,
+  [param('type').isIn(['tryon', 'outfit', 'photoshoot', 'product_model']), param('id').isString().trim().notEmpty()],
+  handleValidationErrors,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user!.id;
+      const type = req.params.type as 'tryon' | 'outfit' | 'photoshoot' | 'product_model';
+      const id = String(req.params.id);
+
+      const result = (await convexMutationTrusted(anyApi.backendTrusted.promoteResultToModel, {
+        secret: env.BACKEND_SHARED_SECRET,
+        userId,
+        type,
+        id,
+      })) as { id: string };
+
+      res.json({ ok: true, modelId: result.id });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('not_found')) {
+        next(new AppError('Creation not found', 404));
+        return;
+      }
+      if (msg.includes('no_result_image')) {
+        next(new AppError('This result has no image to save as a model', 400));
+        return;
+      }
+      logger.error('My Creations: promote-to-model failed', { error: msg });
+      next(new AppError('Could not save this as a model right now', 502));
+    }
+  }
+);
+
 export default router;

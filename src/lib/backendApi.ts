@@ -2022,6 +2022,19 @@ export async function deleteCreation(type: CreationType, id: string): Promise<vo
   await handleResponse<{ ok: boolean }>(res);
 }
 
+/** Types that produce an image usable as a model — `video` isn't an image, `ai_model` is already one. */
+export type PromotableCreationType = Exclude<CreationType, "video" | "ai_model">;
+
+/** "Save as model" — Brand Library write path. The result becomes a saved model in ModelPickerGrid everywhere. */
+export async function promoteCreationToModel(type: PromotableCreationType, id: string): Promise<{ modelId: string }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/api/creations/${type}/${encodeURIComponent(id)}/promote-to-model`, {
+    method: "POST",
+    headers,
+  });
+  return handleResponse<{ ok: boolean; modelId: string }>(res);
+}
+
 // ─── Health ───────────────────────────────────────────────────────────────────
 
 export async function checkBackendHealth(): Promise<boolean> {
