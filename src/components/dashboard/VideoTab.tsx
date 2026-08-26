@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, ImagePlus, Download, Film, Clock } from "lucide-react";
+import { Sparkles, ImagePlus, Download, Film, Clock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import {
   uploadImage,
   generateVideo,
   pollVideoStatus,
+  createPersonPathFromModel,
 } from "@/lib/backendApi";
 import { useIsFreePlan } from "@/hooks/useIsFreePlan";
 import { posthogCapture } from "@/lib/posthog";
@@ -24,6 +25,7 @@ import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
 import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
 import { EmptyState } from "@/components/EmptyState";
+import { ModelPickerGrid, type PickedModel } from "@/components/dashboard/ModelPickerGrid";
 
 const MAX_POLL_ATTEMPTS = 40;
 const POLL_INTERVAL_MS = 5000;
@@ -67,9 +69,12 @@ export function VideoTab() {
   const enabled = FEATURE_FLAGS.VIDEO_ENABLED;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [sourceMode, setSourceMode] = useState<"upload" | "model">("upload");
   const [sourcePreview, setSourcePreview] = useState<string | null>(null);
   const [sourcePath, setSourcePath] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [pickedModel, setPickedModel] = useState<PickedModel | null>(null);
+  const [resolvingModel, setResolvingModel] = useState(false);
 
   const [duration, setDuration] = useState<"5" | "10">("5");
   const [resolution, setResolution] = useState<"480p" | "720p" | "1080p">("1080p");
@@ -93,9 +98,24 @@ export function VideoTab() {
     }
   };
 
+  const handlePickModel = async (m: PickedModel) => {
+    setPickedModel(m);
+    setSourcePreview(m.imageUrl);
+    setSourcePath(null);
+    setResolvingModel(true);
+    try {
+      const path = m.source === "generated" ? m.storagePath : await createPersonPathFromModel(m.id);
+      setSourcePath(path);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not use this model");
+    } finally {
+      setResolvingModel(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!sourcePath) {
-      toast.error("Upload a source image first");
+      toast.error(sourceMode === "model" ? "Choose a model first" : "Upload a source image first");
       return;
     }
     if (isFreePlan) {
@@ -168,32 +188,67 @@ export function VideoTab() {
           <div className="bg-card rounded-xl border border-border/50 shadow-card p-6 space-y-6">
             <div>
               <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Film className="h-4 w-4" /> 1. Upload a source image
+                <Film className="h-4 w-4" /> 1. Choose a source image
               </h3>
-              {sourcePreview ? (
-                <div className="flex items-center gap-4">
-                  <div className="w-24 h-24 rounded-lg overflow-hidden border border-border/50 bg-muted flex-shrink-0">
-                    <img src={sourcePreview} alt="Source" className="w-full h-full object-cover" />
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>Replace</Button>
-                </div>
-              ) : (
-                <button
+              <div className="flex gap-2 mb-4">
+                <Button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full border-2 border-dashed border-border rounded-lg py-10 flex flex-col items-center gap-2 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors"
+                  size="sm"
+                  variant={sourceMode === "upload" ? "default" : "outline"}
+                  onClick={() => {
+                    setSourceMode("upload");
+                    setPickedModel(null);
+                    setSourcePreview(null);
+                    setSourcePath(null);
+                  }}
                 >
-                  <ImagePlus className="h-6 w-6" />
-                  <span className="text-sm">{uploading ? "Uploading…" : "Click to upload an image"}</span>
-                </button>
+                  Upload an image
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={sourceMode === "model" ? "default" : "outline"}
+                  onClick={() => {
+                    setSourceMode("model");
+                    setSourcePreview(null);
+                    setSourcePath(null);
+                  }}
+                  className="gap-1.5"
+                >
+                  <Users className="h-3.5 w-3.5" /> Choose a model
+                </Button>
+              </div>
+
+              {sourceMode === "upload" ? (
+                <>
+                  {sourcePreview ? (
+                    <div className="flex items-center gap-4">
+                      <div className="w-24 h-24 rounded-lg overflow-hidden border border-border/50 bg-muted flex-shrink-0">
+                        <img src={sourcePreview} alt="Source" className="w-full h-full object-cover" />
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>Replace</Button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full border-2 border-dashed border-border rounded-lg py-10 flex flex-col items-center gap-2 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors"
+                    >
+                      <ImagePlus className="h-6 w-6" />
+                      <span className="text-sm">{uploading ? "Uploading…" : "Click to upload an image"}</span>
+                    </button>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
+                  />
+                </>
+              ) : (
+                <ModelPickerGrid selectedId={pickedModel?.id} onSelect={(m) => void handlePickModel(m)} />
               )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
-              />
             </div>
 
             <div>
@@ -236,7 +291,7 @@ export function VideoTab() {
 
             <Button
               onClick={() => void handleGenerate()}
-              disabled={generating || uploading || !sourcePath}
+              disabled={generating || uploading || resolvingModel || !sourcePath}
               className="gradient-primary text-primary-foreground shadow-soft gap-2"
             >
               <Sparkles className="h-4 w-4" /> {generating ? "Generating…" : "Generate video"}
