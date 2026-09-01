@@ -43,7 +43,7 @@ export function ConfidenceSection() {
 
       {/* The photograph carries the rest of the section — full width, no card, no border. */}
       <div ref={ref} className="relative mt-16 overflow-hidden md:mt-24">
-        <div className="aspect-[4/5] sm:aspect-[16/10] lg:aspect-[21/9]">
+        <div className="aspect-[3/2] sm:aspect-[16/10] lg:aspect-[21/9]">
           <motion.img
             src={campaign.seatedTrio.src}
             alt={campaign.seatedTrio.alt}
