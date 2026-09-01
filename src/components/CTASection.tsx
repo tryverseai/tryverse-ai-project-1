@@ -19,8 +19,8 @@ export function CTASection() {
               Ready to Transform Your Brand&apos;s Shopping Experience?
             </h2>
             <p className="text-primary-foreground/70 text-lg max-w-2xl mx-auto mb-8">
-              TryVerse is now open for self-serve signup. Create your account and start embedding AI virtual try-on
-              on your storefront in minutes — no waitlist required.
+              Self-serve signup is open — no waitlist, no approval process. Create your account and start embedding
+              AI virtual try-on on your storefront in minutes.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
               <Link to="/auth?signup=business">
