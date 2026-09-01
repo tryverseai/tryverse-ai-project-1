@@ -167,6 +167,20 @@ export function convexAuthEmailFlowToast(err: unknown, flow: AuthEmailFlow): nul
     };
   }
 
+  /** Convex Auth's own "duplicate account" rejection (`Account <email> already exists`) — must be
+   *  checked before the generic `[CONVEX A(auth:signIn)] ... Called by client` wrapper branches
+   *  below, which match this error too (same wrapper shape) and would otherwise bury a clear
+   *  "you already have an account" message under an unrelated Resend/email-infra diagnostic wall
+   *  of text that has nothing to do with the actual cause. */
+  const alreadyExistsMatch = collapsed.match(/\baccount\s+([^\s]+@[^\s]+?)\s+already\s+exists\b/i);
+  if (alreadyExistsMatch && flow === "signup") {
+    return {
+      title: "Account already exists",
+      description: `An account for ${alreadyExistsMatch[1]} already exists. Sign in instead, or use “Forgot your password?” if you don’t remember it.`,
+      variant: "destructive",
+    };
+  }
+
   const nested = extractNestedAuthFailure(collapsed);
 
   const signupSimpleDestructive = (): { title: string; description: string; variant: "destructive" } => {
