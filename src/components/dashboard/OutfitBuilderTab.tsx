@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Sparkles, Camera, Download, Shirt, Footprints, Clock, Glasses, Gem } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Sparkles, Camera, Download, Shirt, Footprints, Clock, Glasses, Gem, RotateCcw, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useCredits } from "@/contexts/CreditsContext";
@@ -15,7 +15,8 @@ import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
 import { safeImageSrcForDom } from "@/lib/safeUrl";
 import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
-import { EmptyState } from "@/components/EmptyState";
+import { GeneratorEntry } from "@/components/dashboard/GeneratorEntry";
+import { BackLink } from "@/components/dashboard/BackLink";
 import { ModelPickerGrid, type PickedModel } from "@/components/dashboard/ModelPickerGrid";
 
 const OUTFIT_STAGES = [
@@ -28,6 +29,8 @@ const OUTFIT_STAGES = [
 
 type SlotKey = "top" | "bottom" | "one_piece" | "shoes" | "eyewear" | "earrings" | "necklace" | "jewelry";
 type Mode = "top_bottom" | "one_piece";
+type Step = "entry" | "build" | "model";
+type Status = "idle" | "generating" | "done" | "error";
 
 const MAX_POLL_ATTEMPTS = 30;
 const POLL_INTERVAL_MS = 3000;
@@ -86,6 +89,7 @@ export function OutfitBuilderTab() {
   const { refresh: refreshCredits } = useCredits();
   const enabled = FEATURE_FLAGS.OUTFIT_BUILDER_ENABLED;
 
+  const [step, setStep] = useState<Step>("entry");
   const [mode, setMode] = useState<Mode>("top_bottom");
   const [selected, setSelected] = useState<Partial<Record<SlotKey, Product>>>({});
   const [productsBySlot, setProductsBySlot] = useState<Record<SlotKey, Product[]>>({
@@ -102,8 +106,9 @@ export function OutfitBuilderTab() {
 
   const [selectedModel, setSelectedModel] = useState<PickedModel | null>(null);
 
-  const [generating, setGenerating] = useState(false);
-  const [results, setResults] = useState<{ imageUrl: string; createdAt: string }[]>([]);
+  const [status, setStatus] = useState<Status>("idle");
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const active = enabled;
 
@@ -157,8 +162,18 @@ export function OutfitBuilderTab() {
     });
   };
 
-  // Clothing is now optional — a look can be built from accessories alone (e.g. just sunglasses
-  // + a necklace on the model, no garment change). The only remaining hard rule is that a top
+  const reset = () => {
+    setStep("entry");
+    setMode("top_bottom");
+    setSelected({});
+    setSelectedModel(null);
+    setStatus("idle");
+    setResultUrl(null);
+    setErrorMsg(null);
+  };
+
+  // Clothing is optional — a look can be built from accessories alone (e.g. just sunglasses +
+  // a necklace on the model, no garment change). The only remaining hard rule is that a top
   // needs its bottom and vice versa; everything else is additive.
   const topBottomBalanced = mode !== "top_bottom" || Boolean(selected.top) === Boolean(selected.bottom);
   const anySlotFilled = Boolean(
@@ -172,6 +187,7 @@ export function OutfitBuilderTab() {
       selected.jewelry
   );
   const isValidCombo = topBottomBalanced && anySlotFilled;
+  const pieceCount = Object.values(selected).filter(Boolean).length;
 
   const handleGenerate = async () => {
     if (!isValidCombo) {
@@ -186,7 +202,8 @@ export function OutfitBuilderTab() {
       toast.error("Pick a model to try the outfit on");
       return;
     }
-    setGenerating(true);
+    setStatus("generating");
+    setErrorMsg(null);
     posthogCapture("outfit_builder_generate_clicked", {
       mode,
       hasShoes: Boolean(selected.shoes),
@@ -214,8 +231,10 @@ export function OutfitBuilderTab() {
       });
 
       if (started.status === "completed" && started.resultUrl) {
-        setResults((prev) => [{ imageUrl: started.resultUrl!, createdAt: started.createdAt ?? new Date().toISOString() }, ...prev]);
+        setResultUrl(started.resultUrl);
+        setStatus("done");
         toast.success("Outfit generated");
+        void refreshCredits();
         return;
       }
       if (started.status === "failed") {
@@ -228,7 +247,8 @@ export function OutfitBuilderTab() {
         attempts++;
         const update = await pollOutfitStatus(started.outfitId);
         if (update.status === "completed" && update.resultUrl) {
-          setResults((prev) => [{ imageUrl: update.resultUrl!, createdAt: update.createdAt ?? new Date().toISOString() }, ...prev]);
+          setResultUrl(update.resultUrl);
+          setStatus("done");
           toast.success("Outfit generated");
           void refreshCredits();
           return;
@@ -239,33 +259,60 @@ export function OutfitBuilderTab() {
       }
       throw new Error("This is taking longer than expected — check back shortly.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not generate the outfit");
-    } finally {
-      setGenerating(false);
+      const msg = e instanceof Error ? e.message : "Could not generate the outfit";
+      setErrorMsg(msg);
+      setStatus("error");
+      toast.error(msg);
     }
   };
 
-  return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
-            Outfit Builder
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Style a complete look — combine clothing, footwear, and accessories from your catalog onto one model.
-          </p>
+  const showingGenerationUi = status === "generating" || status === "done" || status === "error";
+
+  if (!enabled) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold text-foreground tracking-tight">Outfit Builder</h2>
+          <p className="text-sm text-muted-foreground">Style a complete look — combine clothing, footwear, and accessories from your catalog onto one model.</p>
         </div>
+        <ComingSoonState />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="space-y-1">
+        <h2 className="text-2xl font-bold text-foreground tracking-tight">Outfit Builder</h2>
+        <p className="text-sm text-muted-foreground">
+          Style a complete look — combine clothing, footwear, and accessories from your catalog onto one model.
+        </p>
       </div>
 
-      {!enabled ? (
-        <ComingSoonState />
-      ) : (
-        <div className="space-y-8">
-          <div className="bg-card rounded-xl border border-border/50 shadow-card p-6 space-y-6">
+      <AnimatePresence mode="wait">
+        {step === "entry" && (
+          <motion.div key="entry" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <GeneratorEntry
+              title="Build a complete look"
+              subtitle="Combine a top and bottom (or a dress), footwear, and accessories from your catalog onto one model — all at once."
+              actions={[{ label: "Start building", icon: Layers, onClick: () => setStep("build"), variant: "primary" }]}
+            />
+          </motion.div>
+        )}
+
+        {step === "build" && (
+          <motion.div
+            key="build"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="max-w-2xl mx-auto space-y-6"
+          >
+            <BackLink onClick={reset} label="Back to start" />
+
             <div>
-              <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Shirt className="h-4 w-4" /> 1. Add clothing <span className="text-muted-foreground/70 font-normal">(optional)</span>
+              <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Shirt className="h-4 w-4" /> Clothing <span className="text-muted-foreground/70 font-normal">(optional)</span>
               </h3>
               <div className="flex gap-2 mb-4">
                 <Button
@@ -338,8 +385,8 @@ export function OutfitBuilderTab() {
             </div>
 
             <div>
-              <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Gem className="h-4 w-4" /> 2. Add accessories <span className="text-muted-foreground/70 font-normal">(optional)</span>
+              <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Gem className="h-4 w-4" /> Accessories <span className="text-muted-foreground/70 font-normal">(optional)</span>
               </h3>
               {productsLoading ? (
                 <p className="text-xs text-muted-foreground">Loading your products…</p>
@@ -393,63 +440,99 @@ export function OutfitBuilderTab() {
               )}
             </div>
 
-            <div>
-              <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Camera className="h-4 w-4" /> 3. Pick a model
-              </h3>
-              <ModelPickerGrid selectedId={selectedModel?.id} onSelect={setSelectedModel} />
-            </div>
-
             <Button
-              onClick={() => void handleGenerate()}
-              disabled={generating || !isValidCombo || !selectedModel}
-              className="gradient-primary text-primary-foreground shadow-soft gap-2"
+              className="w-full h-11 gradient-primary text-primary-foreground shadow-soft"
+              disabled={!isValidCombo}
+              onClick={() => setStep("model")}
             >
-              <Sparkles className="h-4 w-4" /> {generating ? "Generating…" : "Try full outfit"}
+              Continue{pieceCount > 0 ? ` with ${pieceCount} piece${pieceCount === 1 ? "" : "s"}` : ""}
             </Button>
-          </div>
+          </motion.div>
+        )}
 
-          {generating ? (
-            <GenerationLoadingScreen
-              title="Creating your look"
-              stages={OUTFIT_STAGES}
-              previewItems={selectedModel ? [{ label: selectedModel.label, imageUrl: selectedModel.imageUrl }] : []}
-            />
-          ) : results.length === 0 ? (
-            <EmptyState
-              icon={Shirt}
-              title="No looks yet"
-              description="Generated outfits will appear here so you can reuse and download them."
-            />
-          ) : (
-            <div>
-              <h3 className="font-display text-sm font-semibold text-foreground mb-4">Results</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {results.map((r) => (
-                  <div key={r.imageUrl} className="rounded-xl overflow-hidden border border-border/50 bg-card group relative">
-                    <div className="aspect-[4/5] bg-muted">
-                      <img src={r.imageUrl} alt="Generated outfit" className="w-full h-full object-cover" />
-                    </div>
-                    <button
-                      type="button"
+        {step === "model" && (
+          <motion.div
+            key="model"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className={showingGenerationUi ? "" : "max-w-md mx-auto space-y-4"}
+          >
+            {showingGenerationUi ? (
+              status === "generating" ? (
+                <GenerationLoadingScreen
+                  title="Creating your look"
+                  stages={OUTFIT_STAGES}
+                  previewItems={selectedModel ? [{ label: selectedModel.label, imageUrl: selectedModel.imageUrl }] : []}
+                />
+              ) : status === "done" && resultUrl ? (
+                <div className="space-y-3">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="rounded-2xl overflow-hidden bg-muted w-fit max-w-full mx-auto"
+                  >
+                    <img
+                      src={resultUrl}
+                      alt="Generated outfit"
+                      className="block max-h-[75vh] max-w-full w-auto h-auto object-contain"
+                    />
+                  </motion.div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                    <Button variant="outline" size="sm" onClick={reset} className="gap-1.5">
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Start over
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="gap-1.5"
                       onClick={() =>
-                        void downloadFile(r.imageUrl, dateStampedFilename("tryverse-outfit")).catch(() =>
+                        void downloadFile(resultUrl, dateStampedFilename("tryverse-outfit")).catch(() =>
                           toast.error("Download failed")
                         )
                       }
-                      className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                     >
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-secondary-foreground shadow">
-                        <Download className="h-3.5 w-3.5" />
-                      </span>
-                    </button>
+                      <Download className="h-3.5 w-3.5" />
+                      Download
+                    </Button>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </motion.div>
+                </div>
+              ) : (
+                <div className="max-w-md mx-auto flex flex-col items-center justify-center rounded-xl border border-destructive/30 bg-destructive/5 min-h-[220px] p-6 text-center gap-3">
+                  <p className="text-sm font-medium text-destructive">Outfit generation failed</p>
+                  <p className="text-xs text-muted-foreground">{errorMsg}</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={reset}>
+                      <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                      Start over
+                    </Button>
+                    <Button size="sm" onClick={() => void handleGenerate()}>
+                      Try again
+                    </Button>
+                  </div>
+                </div>
+              )
+            ) : (
+              <>
+                <BackLink onClick={() => setStep("build")} />
+                <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Camera className="h-4 w-4 text-muted-foreground" /> Model
+                </p>
+                <ModelPickerGrid selectedId={selectedModel?.id} onSelect={setSelectedModel} />
+                <Button
+                  className="w-full h-11 gradient-primary text-primary-foreground shadow-soft"
+                  disabled={!selectedModel}
+                  onClick={() => void handleGenerate()}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Try full outfit
+                </Button>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

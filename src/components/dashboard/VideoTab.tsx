@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { Sparkles, ImagePlus, Download, Film, Clock, Users } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Sparkles, ImagePlus, Download, Film, Clock, Users, Upload, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,8 @@ import { posthogCapture } from "@/lib/posthog";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
 import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
-import { EmptyState } from "@/components/EmptyState";
+import { GeneratorEntry } from "@/components/dashboard/GeneratorEntry";
+import { BackLink } from "@/components/dashboard/BackLink";
 import { ModelPickerGrid, type PickedModel } from "@/components/dashboard/ModelPickerGrid";
 
 const MAX_POLL_ATTEMPTS = 40;
@@ -63,13 +64,19 @@ function ComingSoonState() {
   );
 }
 
+type Step = "entry" | "upload" | "choose-model" | "settings";
+type EntryMode = "upload" | "model" | null;
+type Status = "idle" | "generating" | "done" | "error";
+
 export function VideoTab() {
   const { refresh: refreshCredits } = useCredits();
   const isFreePlan = useIsFreePlan();
   const enabled = FEATURE_FLAGS.VIDEO_ENABLED;
 
+  const [step, setStep] = useState<Step>("entry");
+  const [entryMode, setEntryMode] = useState<EntryMode>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [sourceMode, setSourceMode] = useState<"upload" | "model">("upload");
   const [sourcePreview, setSourcePreview] = useState<string | null>(null);
   const [sourcePath, setSourcePath] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -80,8 +87,28 @@ export function VideoTab() {
   const [resolution, setResolution] = useState<"480p" | "720p" | "1080p">("1080p");
   const [prompt, setPrompt] = useState("");
 
-  const [generating, setGenerating] = useState(false);
-  const [results, setResults] = useState<{ videoUrl: string; createdAt: string }[]>([]);
+  const [status, setStatus] = useState<Status>("idle");
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const reset = () => {
+    setStep("entry");
+    setEntryMode(null);
+    setSourcePreview(null);
+    setSourcePath(null);
+    setPickedModel(null);
+    setDuration("5");
+    setResolution("1080p");
+    setPrompt("");
+    setStatus("idle");
+    setResultUrl(null);
+    setErrorMsg(null);
+  };
+
+  const goToUploadStep = () => {
+    setEntryMode("upload");
+    setStep("upload");
+  };
 
   const handleFile = async (file: File | null) => {
     if (!file) return;
@@ -106,6 +133,7 @@ export function VideoTab() {
     try {
       const path = m.source === "generated" ? m.storagePath : await createPersonPathFromModel(m.id);
       setSourcePath(path);
+      setStep("settings");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not use this model");
     } finally {
@@ -115,14 +143,15 @@ export function VideoTab() {
 
   const handleGenerate = async () => {
     if (!sourcePath) {
-      toast.error(sourceMode === "model" ? "Choose a model first" : "Upload a source image first");
+      toast.error(entryMode === "model" ? "Choose a model first" : "Upload a source image first");
       return;
     }
     if (isFreePlan) {
       toast.error("AI Video requires a paid plan.", { description: "Upgrade in Billing to unlock video generation." });
       return;
     }
-    setGenerating(true);
+    setStatus("generating");
+    setErrorMsg(null);
     posthogCapture("video_generate_clicked", { duration, resolution });
     try {
       const started = await generateVideo({
@@ -133,7 +162,8 @@ export function VideoTab() {
       });
 
       if (started.status === "completed" && started.resultUrl) {
-        setResults((prev) => [{ videoUrl: started.resultUrl!, createdAt: started.createdAt ?? new Date().toISOString() }, ...prev]);
+        setResultUrl(started.resultUrl);
+        setStatus("done");
         toast.success("Video generated");
         void refreshCredits();
         return;
@@ -148,8 +178,10 @@ export function VideoTab() {
         attempts++;
         const update = await pollVideoStatus(started.generationId);
         if (update.status === "completed" && update.resultUrl) {
-          setResults((prev) => [{ videoUrl: update.resultUrl!, createdAt: update.createdAt ?? new Date().toISOString() }, ...prev]);
+          setResultUrl(update.resultUrl);
+          setStatus("done");
           toast.success("Video generated");
+          void refreshCredits();
           return;
         }
         if (update.status === "failed") {
@@ -158,184 +190,249 @@ export function VideoTab() {
       }
       throw new Error("This is taking longer than expected — check back shortly.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not generate the video");
-    } finally {
-      setGenerating(false);
+      const msg = e instanceof Error ? e.message : "Could not generate the video";
+      setErrorMsg(msg);
+      setStatus("error");
+      toast.error(msg);
     }
   };
 
   const selectedCredits = RESOLUTION_OPTIONS.find((r) => r.value === resolution)?.credits ?? 0;
   const durationMultiplier = duration === "10" ? 2 : 1;
+  const showingGenerationUi = status === "generating" || status === "done" || status === "error";
+  const canGenerate = Boolean(sourcePath) && !uploading && !resolvingModel;
+
+  if (!enabled) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold text-foreground tracking-tight">AI Video</h2>
+          <p className="text-sm text-muted-foreground">Motion Studio — turn a still image into a short clip for social and ads.</p>
+        </div>
+        <ComingSoonState />
+      </div>
+    );
+  }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
-            AI Video
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Motion Studio — turn a still image into a short clip for social and ads.
-            {isFreePlan && " Requires a paid plan."}
-          </p>
-        </div>
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="space-y-1">
+        <h2 className="text-2xl font-bold text-foreground tracking-tight">AI Video</h2>
+        <p className="text-sm text-muted-foreground">
+          Motion Studio — turn a still image into a short clip for social and ads.
+          {isFreePlan && " Requires a paid plan."}
+        </p>
       </div>
 
-      {!enabled ? (
-        <ComingSoonState />
-      ) : (
-        <div className="space-y-8">
-          <div className="bg-card rounded-xl border border-border/50 shadow-card p-6 space-y-6">
-            <div>
-              <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Film className="h-4 w-4" /> 1. Choose a source image
-              </h3>
-              <div className="flex gap-2 mb-4">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={sourceMode === "upload" ? "default" : "outline"}
-                  onClick={() => {
-                    setSourceMode("upload");
-                    setPickedModel(null);
-                    setSourcePreview(null);
-                    setSourcePath(null);
-                  }}
-                >
-                  Upload an image
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={sourceMode === "model" ? "default" : "outline"}
-                  onClick={() => {
-                    setSourceMode("model");
-                    setSourcePreview(null);
-                    setSourcePath(null);
-                  }}
-                  className="gap-1.5"
-                >
-                  <Users className="h-3.5 w-3.5" /> Choose a model
-                </Button>
-              </div>
+      <AnimatePresence mode="wait">
+        {step === "entry" && (
+          <motion.div key="entry" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <GeneratorEntry
+              title="Bring a still into motion"
+              subtitle="Upload an image or pick a model, and get a short, social-ready clip in moments."
+              actions={[
+                { label: "Upload an image", icon: Upload, onClick: goToUploadStep, variant: "primary" },
+                { label: "Choose a model", icon: Users, onClick: () => { setEntryMode("model"); setStep("choose-model"); }, variant: "onInk" },
+              ]}
+            />
+          </motion.div>
+        )}
 
-              {sourceMode === "upload" ? (
-                <>
-                  {sourcePreview ? (
-                    <div className="flex items-center gap-4">
-                      <div className="w-24 h-24 rounded-lg overflow-hidden border border-border/50 bg-muted flex-shrink-0">
-                        <img src={sourcePreview} alt="Source" className="w-full h-full object-cover" />
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>Replace</Button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full border-2 border-dashed border-border rounded-lg py-10 flex flex-col items-center gap-2 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors"
-                    >
-                      <ImagePlus className="h-6 w-6" />
-                      <span className="text-sm">{uploading ? "Uploading…" : "Click to upload an image"}</span>
-                    </button>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
-                  />
-                </>
-              ) : (
-                <ModelPickerGrid selectedId={pickedModel?.id} onSelect={(m) => void handlePickModel(m)} />
-              )}
-            </div>
-
-            <div>
-              <h3 className="font-display text-sm font-semibold text-foreground mb-3">2. Settings</h3>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Duration</Label>
-                  <Select value={duration} onValueChange={(v) => setDuration(v as "5" | "10")}>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {DURATION_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label} ({o.credits} credits)</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Resolution</Label>
-                  <Select value={resolution} onValueChange={(v) => setResolution(v as "480p" | "720p" | "1080p")}>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {RESOLUTION_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Estimated usage: {selectedCredits * durationMultiplier} credits
+        {step === "upload" && (
+          <motion.div
+            key="upload"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="max-w-md mx-auto space-y-4"
+          >
+            <BackLink onClick={reset} label="Back to start" />
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                <ImagePlus className="h-4 w-4 text-muted-foreground" />
+                Source image
               </p>
-            </div>
-
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Motion guidance (optional)</Label>
-              <Input
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="e.g. gentle turn, fabric moving in the wind"
-                maxLength={200}
+              {sourcePreview ? (
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => fileInputRef.current?.click()}
+                  onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
+                  className="relative flex min-h-[220px] cursor-pointer select-none flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-border transition-colors hover:border-muted-foreground"
+                >
+                  <img src={sourcePreview} alt="Source" className="absolute inset-0 h-full w-full rounded-[10px] object-cover" />
+                  <div className="absolute inset-0 flex items-end justify-center rounded-[10px] bg-black/40 pb-4 opacity-0 transition-opacity hover:opacity-100">
+                    <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
+                      {uploading ? "Uploading…" : "Click to replace"}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex min-h-[180px] w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-6 text-center text-muted-foreground transition-colors hover:border-muted-foreground"
+                >
+                  <div className="rounded-full bg-muted p-3">
+                    <Upload className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground">Drop image here</p>
+                  <p className="text-xs text-muted-foreground">A clear, well-lit photo works best</p>
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
               />
-              <p className="text-xs text-muted-foreground/70 mt-1">Keep it short — motion is hard to control precisely, leave blank for automatic motion.</p>
             </div>
-
             <Button
-              onClick={() => void handleGenerate()}
-              disabled={generating || uploading || resolvingModel || !sourcePath}
-              className="gradient-primary text-primary-foreground shadow-soft gap-2"
+              className="w-full h-11 gradient-primary text-primary-foreground shadow-soft"
+              disabled={!sourcePath || uploading}
+              onClick={() => setStep("settings")}
             >
-              <Sparkles className="h-4 w-4" /> {generating ? "Generating…" : "Generate video"}
+              Continue
             </Button>
-          </div>
+          </motion.div>
+        )}
 
-          {generating ? (
-            <GenerationLoadingScreen
-              title="Creating your video"
-              stages={VIDEO_STAGES}
-              previewItems={sourcePreview ? [{ label: "Source", imageUrl: sourcePreview }] : []}
-            />
-          ) : results.length === 0 ? (
-            <EmptyState
-              icon={Film}
-              title="No videos yet"
-              description="Generated clips will appear here so you can reuse and download them."
-            />
-          ) : (
-            <div>
-              <h3 className="font-display text-sm font-semibold text-foreground mb-4">Results</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {results.map((r) => (
-                  <div key={r.videoUrl} className="rounded-xl overflow-hidden border border-border/50 bg-card group relative">
-                    <video src={r.videoUrl} className="w-full aspect-[4/5] object-cover bg-muted" controls loop muted playsInline />
+        {step === "choose-model" && (
+          <motion.div
+            key="choose-model"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="space-y-4"
+          >
+            <BackLink onClick={reset} label="Back to start" />
+            <p className="text-sm font-medium text-foreground">Choose a model</p>
+            <ModelPickerGrid selectedId={pickedModel?.id} onSelect={(m) => void handlePickModel(m)} />
+          </motion.div>
+        )}
+
+        {step === "settings" && (
+          <motion.div
+            key="settings"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className={showingGenerationUi ? "" : "max-w-md mx-auto space-y-4"}
+          >
+            {showingGenerationUi ? (
+              status === "generating" ? (
+                <GenerationLoadingScreen
+                  title="Creating your video"
+                  stages={VIDEO_STAGES}
+                  previewItems={sourcePreview ? [{ label: "Source", imageUrl: sourcePreview }] : []}
+                />
+              ) : status === "done" && resultUrl ? (
+                <div className="space-y-3">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="rounded-2xl overflow-hidden bg-muted w-fit max-w-full mx-auto"
+                  >
+                    <video src={resultUrl} controls loop className="block max-h-[75vh] max-w-full w-auto h-auto" />
+                  </motion.div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                    <Button variant="outline" size="sm" onClick={reset} className="gap-1.5">
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Start over
+                    </Button>
                     <Button
-                      size="icon"
+                      size="sm"
                       variant="secondary"
-                      className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="gap-1.5"
                       onClick={() =>
-                        void downloadFile(r.videoUrl, dateStampedFilename("tryverse-video", "mp4")).catch(() =>
+                        void downloadFile(resultUrl, dateStampedFilename("tryverse-video", "mp4")).catch(() =>
                           toast.error("Download failed")
                         )
                       }
                     >
                       <Download className="h-3.5 w-3.5" />
+                      Download
                     </Button>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </motion.div>
+                </div>
+              ) : (
+                <div className="max-w-md mx-auto flex flex-col items-center justify-center rounded-xl border border-destructive/30 bg-destructive/5 min-h-[220px] p-6 text-center gap-3">
+                  <p className="text-sm font-medium text-destructive">Video generation failed</p>
+                  <p className="text-xs text-muted-foreground">{errorMsg}</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={reset}>
+                      <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                      Start over
+                    </Button>
+                    <Button size="sm" onClick={() => void handleGenerate()}>
+                      Try again
+                    </Button>
+                  </div>
+                </div>
+              )
+            ) : (
+              <>
+                <BackLink onClick={() => setStep(entryMode === "upload" ? "upload" : "choose-model")} />
+
+                {sourcePreview && (
+                  <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                    <img src={sourcePreview} alt="Source" className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Using</p>
+                      <p className="text-sm font-medium text-foreground">{entryMode === "model" ? pickedModel?.label ?? "Model" : "Your image"}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Duration</Label>
+                    <Select value={duration} onValueChange={(v) => setDuration(v as "5" | "10")}>
+                      <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {DURATION_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label} ({o.credits} credits)</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Resolution</Label>
+                    <Select value={resolution} onValueChange={(v) => setResolution(v as "480p" | "720p" | "1080p")}>
+                      <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {RESOLUTION_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Estimated usage: {selectedCredits * durationMultiplier} credits
+                </p>
+
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Motion guidance (optional)</Label>
+                  <Input
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="e.g. gentle turn, fabric moving in the wind"
+                    maxLength={200}
+                  />
+                  <p className="text-xs text-muted-foreground/70 mt-1">Keep it short — leave blank for automatic motion.</p>
+                </div>
+
+                <Button
+                  className="w-full h-11 gradient-primary text-primary-foreground shadow-soft"
+                  disabled={!canGenerate}
+                  onClick={() => void handleGenerate()}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate video
+                </Button>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

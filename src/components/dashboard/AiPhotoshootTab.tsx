@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { Sparkles, Upload, ImagePlus, Camera, Download } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Sparkles, Upload, ImagePlus, Camera, Download, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -16,7 +16,8 @@ import { uploadImage, generateProductPhotoshoot } from "@/lib/backendApi";
 import { posthogCapture } from "@/lib/posthog";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
 import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
-import { EmptyState } from "@/components/EmptyState";
+import { GeneratorEntry } from "@/components/dashboard/GeneratorEntry";
+import { BackLink } from "@/components/dashboard/BackLink";
 import { ModelPickerGrid, type PickedModel } from "@/components/dashboard/ModelPickerGrid";
 
 const PHOTOSHOOT_STAGES = [
@@ -31,9 +32,14 @@ const THEME_OPTIONS = ["Contemporary catalog", "Luxury editorial", "Streetwear",
 const LIGHTING_OPTIONS = ["Soft studio", "Bright daylight", "Dramatic contrast", "Golden hour"];
 const BACKGROUND_OPTIONS = ["Clean neutral", "Studio white", "Textured backdrop", "Urban street", "Outdoor"];
 
+type Step = "entry" | "upload" | "shoot";
+type Status = "idle" | "generating" | "done" | "error";
+
 export function AiPhotoshootTab() {
   const { refresh: refreshCredits } = useCredits();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [step, setStep] = useState<Step>("entry");
 
   const [productFile, setProductFile] = useState<File | null>(null);
   const [productPreview, setProductPreview] = useState<string | null>(null);
@@ -46,8 +52,23 @@ export function AiPhotoshootTab() {
   const [lighting, setLighting] = useState(LIGHTING_OPTIONS[0]);
   const [background, setBackground] = useState(BACKGROUND_OPTIONS[0]);
 
-  const [generating, setGenerating] = useState(false);
-  const [results, setResults] = useState<{ imageUrl: string; createdAt: string }[]>([]);
+  const [status, setStatus] = useState<Status>("idle");
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const reset = () => {
+    setStep("entry");
+    setProductFile(null);
+    setProductPreview(null);
+    setProductStoragePath(null);
+    setSelectedModel(null);
+    setTheme(THEME_OPTIONS[0]);
+    setLighting(LIGHTING_OPTIONS[0]);
+    setBackground(BACKGROUND_OPTIONS[0]);
+    setStatus("idle");
+    setResultUrl(null);
+    setErrorMsg(null);
+  };
 
   const handleFileChange = async (file: File | null) => {
     if (!file) return;
@@ -74,7 +95,8 @@ export function AiPhotoshootTab() {
       toast.error("Pick a model to shoot the product on");
       return;
     }
-    setGenerating(true);
+    setStatus("generating");
+    setErrorMsg(null);
     posthogCapture("ai_photoshoot_generate_clicked", { modelSource: selectedModel.source, theme, lighting, background });
     try {
       const result = await generateProductPhotoshoot({
@@ -85,36 +107,55 @@ export function AiPhotoshootTab() {
         lighting,
         background,
       });
-      setResults((prev) => [result, ...prev]);
+      setResultUrl(result.imageUrl);
+      setStatus("done");
       toast.success("Photoshoot generated");
       void refreshCredits();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not generate the photoshoot");
-    } finally {
-      setGenerating(false);
+      const msg = e instanceof Error ? e.message : "Could not generate the photoshoot";
+      setErrorMsg(msg);
+      setStatus("error");
+      toast.error(msg);
     }
   };
 
+  const showingGenerationUi = status === "generating" || status === "done" || status === "error";
+  const canGenerate = Boolean(productStoragePath) && Boolean(selectedModel) && !uploading;
+
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
-            AI Product Photoshoot
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Create campaign-ready imagery — upload a product, pick a model, set the scene.
-          </p>
-        </div>
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="space-y-1">
+        <h2 className="text-2xl font-bold text-foreground tracking-tight">AI Photoshoot</h2>
+        <p className="text-sm text-muted-foreground">
+          Create campaign-ready imagery — upload a product, pick a model, set the scene.
+        </p>
       </div>
 
-      <div className="space-y-8">
-          <div className="bg-card rounded-xl border border-border/50 shadow-card p-6 space-y-6">
-            {/* Step 1: product upload */}
-            <div>
-              <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Upload className="h-4 w-4" /> 1. Upload your product
-              </h3>
+      <AnimatePresence mode="wait">
+        {step === "entry" && (
+          <motion.div key="entry" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <GeneratorEntry
+              title="Shoot it like a campaign"
+              subtitle="Upload one product photo, pick a model and a scene, and get a campaign-ready shot in seconds."
+              actions={[{ label: "Upload a product", icon: Upload, onClick: () => setStep("upload"), variant: "primary" }]}
+            />
+          </motion.div>
+        )}
+
+        {step === "upload" && (
+          <motion.div
+            key="upload"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="max-w-md mx-auto space-y-4"
+          >
+            <BackLink onClick={reset} label="Back to start" />
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                <ImagePlus className="h-4 w-4 text-muted-foreground" />
+                Product photo
+              </p>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -123,126 +164,175 @@ export function AiPhotoshootTab() {
                 onChange={(e) => void handleFileChange(e.target.files?.[0] ?? null)}
               />
               {productPreview ? (
-                <div className="flex items-center gap-4">
-                  <div className="w-24 h-24 rounded-lg overflow-hidden border border-border/50 bg-muted flex-shrink-0">
-                    <img src={productPreview} alt="Product" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-foreground">{productFile?.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {uploading ? "Uploading…" : productStoragePath ? "Ready" : "Upload failed"}
-                    </p>
-                    <Button variant="outline" size="sm" className="mt-2" onClick={() => fileInputRef.current?.click()}>
-                      Replace
-                    </Button>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => fileInputRef.current?.click()}
+                  onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
+                  className="relative flex min-h-[220px] cursor-pointer select-none flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-border transition-colors hover:border-muted-foreground"
+                >
+                  <img src={productPreview} alt="Product" className="absolute inset-0 h-full w-full rounded-[10px] object-cover" />
+                  <div className="absolute inset-0 flex items-end justify-center rounded-[10px] bg-black/40 pb-4 opacity-0 transition-opacity hover:opacity-100">
+                    <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
+                      {uploading ? "Uploading…" : "Click to replace"}
+                    </span>
                   </div>
                 </div>
               ) : (
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full border-2 border-dashed border-border rounded-lg py-10 flex flex-col items-center gap-2 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors"
+                  className="flex min-h-[180px] w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-6 text-center text-muted-foreground transition-colors hover:border-muted-foreground"
                 >
-                  <ImagePlus className="h-6 w-6" />
-                  <span className="text-sm">Click to upload a product photo</span>
+                  <div className="rounded-full bg-muted p-3">
+                    <Upload className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground">Drop image here</p>
+                  <p className="text-xs text-muted-foreground">Clear product photo on white or transparent background</p>
                 </button>
               )}
             </div>
-
-            {/* Step 2: pick a model */}
-            <div>
-              <h3 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Camera className="h-4 w-4" /> 2. Pick a model
-              </h3>
-              <ModelPickerGrid selectedId={selectedModel?.id} onSelect={setSelectedModel} />
-            </div>
-
-            {/* Step 3: scene */}
-            <div>
-              <h3 className="font-display text-sm font-semibold text-foreground mb-3">3. Scene</h3>
-              <div className="grid sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Theme</Label>
-                  <Select value={theme} onValueChange={setTheme}>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {THEME_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Lighting</Label>
-                  <Select value={lighting} onValueChange={setLighting}>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {LIGHTING_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Background</Label>
-                  <Select value={background} onValueChange={setBackground}>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {BACKGROUND_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
             <Button
-              onClick={() => void handleGenerate()}
-              disabled={generating || uploading || !productStoragePath || !selectedModel}
-              className="gradient-primary text-primary-foreground shadow-soft gap-2"
+              className="w-full h-11 gradient-primary text-primary-foreground shadow-soft"
+              disabled={!productStoragePath || uploading}
+              onClick={() => setStep("shoot")}
             >
-              <Sparkles className="h-4 w-4" /> {generating ? "Generating…" : "Generate photoshoot"}
+              Continue
             </Button>
-          </div>
+          </motion.div>
+        )}
 
-          {generating ? (
-            <GenerationLoadingScreen
-              title="Creating your photoshoot"
-              stages={PHOTOSHOOT_STAGES}
-              previewItems={[
-                ...(productPreview ? [{ label: "Product", imageUrl: productPreview }] : []),
-                ...(selectedModel ? [{ label: selectedModel.label, imageUrl: selectedModel.imageUrl }] : []),
-              ]}
-            />
-          ) : results.length === 0 ? (
-            <EmptyState
-              icon={Camera}
-              title="No photoshoots yet"
-              description="Generated campaign imagery will appear here so you can reuse and download it."
-            />
-          ) : (
-            <div>
-              <h3 className="font-display text-sm font-semibold text-foreground mb-4">Results</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {results.map((r) => (
-                  <div key={r.imageUrl} className="rounded-xl overflow-hidden border border-border/50 bg-card group relative">
-                    <div className="aspect-[4/5] bg-muted">
-                      <img src={r.imageUrl} alt="Generated photoshoot" className="w-full h-full object-cover" />
-                    </div>
-                    <button
-                      type="button"
+        {step === "shoot" && (
+          <motion.div
+            key="shoot"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className={showingGenerationUi ? "" : "max-w-2xl mx-auto space-y-6"}
+          >
+            {showingGenerationUi ? (
+              status === "generating" ? (
+                <GenerationLoadingScreen
+                  title="Creating your photoshoot"
+                  stages={PHOTOSHOOT_STAGES}
+                  previewItems={[
+                    ...(productPreview ? [{ label: "Product", imageUrl: productPreview }] : []),
+                    ...(selectedModel ? [{ label: selectedModel.label, imageUrl: selectedModel.imageUrl }] : []),
+                  ]}
+                />
+              ) : status === "done" && resultUrl ? (
+                <div className="space-y-3">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="rounded-2xl overflow-hidden bg-muted w-fit max-w-full mx-auto"
+                  >
+                    <img
+                      src={resultUrl}
+                      alt="Generated photoshoot"
+                      className="block max-h-[75vh] max-w-full w-auto h-auto object-contain"
+                    />
+                  </motion.div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                    <Button variant="outline" size="sm" onClick={reset} className="gap-1.5">
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Start over
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="gap-1.5"
                       onClick={() =>
-                        void downloadFile(r.imageUrl, dateStampedFilename("tryverse-photoshoot")).catch(() =>
+                        void downloadFile(resultUrl, dateStampedFilename("tryverse-photoshoot")).catch(() =>
                           toast.error("Download failed")
                         )
                       }
-                      className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                     >
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-secondary-foreground shadow">
-                        <Download className="h-3.5 w-3.5" />
-                      </span>
-                    </button>
+                      <Download className="h-3.5 w-3.5" />
+                      Download
+                    </Button>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-      </div>
-    </motion.div>
+                </div>
+              ) : (
+                <div className="max-w-md mx-auto flex flex-col items-center justify-center rounded-xl border border-destructive/30 bg-destructive/5 min-h-[220px] p-6 text-center gap-3">
+                  <p className="text-sm font-medium text-destructive">Photoshoot failed</p>
+                  <p className="text-xs text-muted-foreground">{errorMsg}</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={reset}>
+                      <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                      Start over
+                    </Button>
+                    <Button size="sm" onClick={() => void handleGenerate()}>
+                      Try again
+                    </Button>
+                  </div>
+                </div>
+              )
+            ) : (
+              <>
+                <BackLink onClick={() => setStep("upload")} />
+
+                <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                  <img src={productPreview ?? undefined} alt="Product" className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Using</p>
+                    <p className="text-sm font-medium text-foreground">Your product</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                    <Camera className="h-4 w-4 text-muted-foreground" /> Model
+                  </p>
+                  <ModelPickerGrid selectedId={selectedModel?.id} onSelect={setSelectedModel} />
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-3">Scene</p>
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Theme</Label>
+                      <Select value={theme} onValueChange={setTheme}>
+                        <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {THEME_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Lighting</Label>
+                      <Select value={lighting} onValueChange={setLighting}>
+                        <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {LIGHTING_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Background</Label>
+                      <Select value={background} onValueChange={setBackground}>
+                        <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {BACKGROUND_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  className="w-full h-11 gradient-primary text-primary-foreground shadow-soft"
+                  disabled={!canGenerate}
+                  onClick={() => void handleGenerate()}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate photoshoot
+                </Button>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
