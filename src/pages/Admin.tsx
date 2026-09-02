@@ -18,7 +18,8 @@ import {
   ScrollText,
   BarChart3,
   Images,
-  Menu,
+  PanelLeftOpen,
+  PanelLeftClose,
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,20 @@ const Admin = () => {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("Overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("tv-admin-sidebar-collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("tv-admin-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
+    } catch {
+      // Storage unavailable (private browsing, etc.) — collapse state just won't persist.
+    }
+  }, [sidebarCollapsed]);
   const ActiveIcon = sidebarItems.find((i) => i.label === activeTab)?.icon;
 
   useEffect(() => {
@@ -205,50 +220,90 @@ const Admin = () => {
       <Navbar mobileMenuHidden />
       <main className="pt-[var(--navbar-height)]">
         <div className="flex">
-          {/* Sidebar */}
-          <aside className="hidden lg:flex flex-col w-60 min-h-[calc(100vh-var(--navbar-height))] border-r border-border p-4 pt-6 sticky top-[var(--navbar-height)]">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Platform Admin</p>
-                <p className="text-sm font-semibold text-foreground">TryVerse</p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={handleLock} className="gap-1.5 h-8 text-muted-foreground">
-                <Lock className="h-3.5 w-3.5" />
-                Lock
-              </Button>
+          {/* Sidebar — collapses to an icon-only rail on desktop, state remembered via localStorage. */}
+          <aside
+            className={`hidden lg:flex flex-col ${sidebarCollapsed ? "w-[4.5rem]" : "w-60"} min-h-[calc(100vh-var(--navbar-height))] border-r border-border p-3 pt-6 sticky top-[var(--navbar-height)] transition-[width] duration-300 ease-in-out overflow-hidden`}
+          >
+            <div className="mb-6 flex flex-col items-start gap-3 px-1">
+              {!sidebarCollapsed && (
+                <div className="flex w-full items-center justify-between gap-2 min-w-0">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Platform Admin</p>
+                    <p className="text-sm font-semibold text-foreground truncate">TryVerse</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={handleLock} className="gap-1.5 h-8 flex-shrink-0 text-muted-foreground">
+                    <Lock className="h-3.5 w-3.5" />
+                    Lock
+                  </Button>
+                </div>
+              )}
+              {sidebarCollapsed && (
+                <Button variant="ghost" size="sm" onClick={handleLock} title="Lock" className="h-9 w-9 p-0 text-muted-foreground">
+                  <Lock className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-            <nav className="space-y-1">
+            <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden">
               {sidebarItems.map((item) => (
                 <button
                   key={item.label}
                   onClick={() => setActiveTab(item.label)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  title={sidebarCollapsed ? item.label : undefined}
+                  aria-label={sidebarCollapsed ? item.label : undefined}
+                  className={`w-full flex items-center gap-3 rounded-lg text-sm font-medium transition-colors ${
+                    sidebarCollapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
+                  } ${
                     activeTab === item.label
                       ? "bg-foreground text-background"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
+                  <item.icon className="h-4 w-4 flex-shrink-0" />
+                  {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
                 </button>
               ))}
             </nav>
+
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((v) => !v)}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!sidebarCollapsed}
+              className={`mt-3 flex h-9 flex-shrink-0 items-center gap-2 rounded-lg text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground ${
+                sidebarCollapsed ? "justify-center px-0" : "px-3"
+              }`}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="h-[18px] w-[18px] flex-shrink-0" />
+              ) : (
+                <>
+                  <PanelLeftClose className="h-[18px] w-[18px] flex-shrink-0" />
+                  <span className="text-xs font-medium">Collapse</span>
+                </>
+              )}
+            </button>
           </aside>
 
-          {/* Mobile: header + left slide-in nav panel (fixed below navbar) */}
+          {/* Mobile: minimal icon toggle + left slide-in nav panel (fixed below navbar) */}
           <div className="lg:hidden fixed top-20 left-0 right-0 z-20 bg-background border-b border-border">
-            <div className="flex items-center justify-between px-4 py-2 gap-2">
+            <div className="flex items-center gap-3 px-4 py-2.5">
               <button
                 type="button"
-                onClick={() => setMobileNavOpen(true)}
-                className="flex-1 flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-muted text-foreground min-w-0"
+                onClick={() => setMobileNavOpen((v) => !v)}
+                aria-label={mobileNavOpen ? "Close navigation panel" : "Open navigation panel"}
+                aria-expanded={mobileNavOpen}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-foreground transition-all duration-150 hover:bg-muted/70 active:scale-95"
               >
-                <span className="flex items-center gap-2 min-w-0">
-                  {ActiveIcon && <ActiveIcon className="h-4 w-4 flex-shrink-0" />}
-                  <span className="truncate">{activeTab}</span>
-                </span>
-                <Menu className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                {mobileNavOpen ? (
+                  <PanelLeftClose className="h-[18px] w-[18px]" />
+                ) : (
+                  <PanelLeftOpen className="h-[18px] w-[18px]" />
+                )}
               </button>
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                {ActiveIcon && <ActiveIcon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
+                <span className="truncate text-sm font-medium text-foreground">{activeTab}</span>
+              </span>
               <Button variant="ghost" size="sm" onClick={handleLock} className="gap-1.5 h-8 flex-shrink-0">
                 <Lock className="h-3.5 w-3.5" />
                 Lock
