@@ -48,20 +48,56 @@ import { AdminAnalyticsTab } from "@/components/admin/AdminAnalyticsTab";
 import { AdminModelLibraryTab } from "@/components/admin/AdminModelLibraryTab";
 import { AdminAiUsageTab } from "@/components/admin/AdminAiUsageTab";
 
-const sidebarItems = [
-  { icon: LayoutDashboard, label: "Overview" },
-  { icon: BarChart3, label: "Analytics" },
-  { icon: Users, label: "Users" },
-  { icon: Zap, label: "Try-ons" },
-  { icon: Cpu, label: "Queue" },
-  { icon: CreditCard, label: "Revenue" },
-  { icon: Sparkles, label: "AI Usage" },
-  { icon: Key, label: "API & Widget" },
-  { icon: Images, label: "Models" },
-  { icon: Settings, label: "Settings" },
-  { icon: ScrollText, label: "Logs" },
-  { icon: FileText, label: "Audit" },
+/**
+ * Operational command-center IA: Overview -> Users -> Generations (the canonical record for
+ * everything the AI platform produces — "Generations" replaces "Try-Ons" as the primary concept;
+ * the underlying page/data is unchanged, still Try-On records today, extending to other
+ * generation types is separate follow-up work, not done here) -> Business -> Platform
+ * (infrastructure/integration surfaces) -> Security & System (audit/logs/system config, kept apart
+ * from the customer-facing Settings that lives in the main product's own Account section).
+ */
+const sidebarGroups: { section: string; items: { icon: React.ElementType; label: string }[] }[] = [
+  {
+    section: "Overview",
+    items: [
+      { icon: LayoutDashboard, label: "Overview" },
+      { icon: BarChart3, label: "Analytics" },
+    ],
+  },
+  {
+    section: "Users",
+    items: [{ icon: Users, label: "Users" }],
+  },
+  {
+    section: "Generations",
+    items: [
+      { icon: Zap, label: "Generations" },
+      { icon: Cpu, label: "Queue" },
+      { icon: Sparkles, label: "AI Usage" },
+    ],
+  },
+  {
+    section: "Business",
+    items: [{ icon: CreditCard, label: "Revenue" }],
+  },
+  {
+    section: "Platform",
+    items: [
+      { icon: Images, label: "Models" },
+      { icon: Key, label: "API & Widget" },
+    ],
+  },
+  {
+    section: "Security & System",
+    items: [
+      { icon: FileText, label: "Audit" },
+      { icon: ScrollText, label: "Logs" },
+      { icon: Settings, label: "Settings" },
+    ],
+  },
 ];
+
+const sidebarItems = sidebarGroups.flatMap((g) => g.items);
 
 const Admin = () => {
   const [adminKey, setAdminKey] = useState("");
@@ -150,7 +186,7 @@ const Admin = () => {
         return <AdminAnalyticsTab adminKey={storedKey} />;
       case "Users":
         return <AdminUsersTab adminKey={storedKey} />;
-      case "Try-ons":
+      case "Generations":
         return <AdminTryonsTab adminKey={storedKey} />;
       case "Queue":
         return <AdminQueueTab adminKey={storedKey} />;
@@ -245,24 +281,35 @@ const Admin = () => {
                 </Button>
               )}
             </div>
-            <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden">
-              {sidebarItems.map((item) => (
-                <button
-                  key={item.label}
-                  onClick={() => setActiveTab(item.label)}
-                  title={sidebarCollapsed ? item.label : undefined}
-                  aria-label={sidebarCollapsed ? item.label : undefined}
-                  className={`w-full flex items-center gap-3 rounded-lg text-sm font-medium transition-colors ${
-                    sidebarCollapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
-                  } ${
-                    activeTab === item.label
-                      ? "bg-foreground text-background"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  <item.icon className="h-4 w-4 flex-shrink-0" />
-                  {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                </button>
+            <nav className="flex-1 space-y-5 overflow-y-auto overflow-x-hidden">
+              {sidebarGroups.map((group) => (
+                <div key={group.section}>
+                  {!sidebarCollapsed && (
+                    <p className="px-3 mb-1.5 text-[0.6875rem] font-semibold text-muted-foreground/70 uppercase tracking-wider truncate">
+                      {group.section}
+                    </p>
+                  )}
+                  <div className="space-y-1">
+                    {group.items.map((item) => (
+                      <button
+                        key={item.label}
+                        onClick={() => setActiveTab(item.label)}
+                        title={sidebarCollapsed ? item.label : undefined}
+                        aria-label={sidebarCollapsed ? item.label : undefined}
+                        className={`w-full flex items-center gap-3 rounded-lg text-sm font-medium transition-colors ${
+                          sidebarCollapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
+                        } ${
+                          activeTab === item.label
+                            ? "bg-foreground text-background"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <item.icon className="h-4 w-4 flex-shrink-0" />
+                        {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </nav>
 
@@ -318,7 +365,7 @@ const Admin = () => {
             onOpenChange={setMobileNavOpen}
             brandEyebrow="Platform Admin"
             brandName="TryVerse"
-            groups={[{ section: "Admin", items: sidebarItems }]}
+            groups={sidebarGroups}
             activeLabel={activeTab}
             onSelect={(label) => { setActiveTab(label); setMobileNavOpen(false); }}
           />

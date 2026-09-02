@@ -6,7 +6,7 @@ import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, BarChart3, Settings, Key, LayoutDashboard, CreditCard, BookOpen, FlaskConical, Sparkles,
-  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, LayoutGrid, PanelLeftOpen, PanelLeftClose, Menu, X,
+  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, LayoutGrid, Images, PanelLeftOpen, PanelLeftClose, Menu, X,
 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
@@ -157,21 +157,35 @@ const DeveloperDocsTab = lazyWithRetry(
   "developer-docs"
 );
 
+const MyModelsTab = lazyWithRetry(
+  () => import("@/components/dashboard/MyModelsTab").then((m) => ({ default: m.MyModelsTab })),
+  "my-models"
+);
+
 const DEFAULT_TAB = GUIDE_TAB;
 
-/** Grouped by workflow, not by feature-launch order — see platform navigation direction. */
+/**
+ * Information architecture: Overview (workspace/performance) -> Create (active creative
+ * workflows) -> Models (creation vs. the user's own saved models — deliberately two destinations,
+ * never merged, so a user's generated models are never presented as TryVerse's own library) ->
+ * Catalog (product data and the imagery built around it) -> Library (the unified home for
+ * everything the user has generated, not folded into any one workflow) -> Platform (onboarding/
+ * integration/infrastructure, not creative work) -> Account. Single source of truth for both the
+ * desktop sidebar and MobileNavSheet below — add a destination here once, it appears in both.
+ */
 const sidebarGroups: { section: string; items: { icon: React.ElementType; label: string }[] }[] = [
   {
-    section: "Visualization",
+    section: "Overview",
     items: [
-      { icon: FlaskConical, label: "Personal Studio" },
-      { icon: Shirt, label: "Outfit Builder" },
-      { icon: LayoutGrid, label: "My Creations" },
+      { icon: LayoutDashboard, label: "Overview" },
+      { icon: BarChart3, label: "Analytics" },
     ],
   },
   {
-    section: "Content",
+    section: "Create",
     items: [
+      { icon: FlaskConical, label: "Personal Studio" },
+      { icon: Shirt, label: "Outfit Builder" },
       { icon: Camera, label: "AI Photoshoot" },
       { icon: Film, label: "AI Video" },
     ],
@@ -180,31 +194,31 @@ const sidebarGroups: { section: string; items: { icon: React.ElementType; label:
     section: "Models",
     items: [
       { icon: Users, label: "AI Model Studio" },
-      { icon: Wand2, label: "Product Photography" },
+      { icon: Images, label: "My Models" },
     ],
   },
   {
     section: "Catalog",
-    items: [{ icon: Package, label: "Products" }],
+    items: [
+      { icon: Package, label: "Products" },
+      { icon: Wand2, label: "Product Photography" },
+    ],
+  },
+  {
+    section: "Library",
+    items: [{ icon: LayoutGrid, label: "My Creations" }],
   },
   {
     section: "Platform",
     items: [
-      { icon: LayoutDashboard, label: "Overview" },
-      { icon: BarChart3, label: "Analytics" },
       { icon: BookOpen, label: GUIDE_TAB },
       { icon: PlugZap, label: CONNECT_TAB },
-    ],
-  },
-  {
-    section: "Developers",
-    items: [
-      { icon: Key, label: "API Keys" },
       { icon: Terminal, label: "Developers" },
+      { icon: Key, label: "API Keys" },
     ],
   },
   {
-    section: "Admin",
+    section: "Account",
     items: [
       { icon: CreditCard, label: "Billing" },
       { icon: Settings, label: "Settings" },
@@ -223,6 +237,7 @@ const tabComponents: Record<string, React.ComponentType> = {
   "Personal Studio": StudioTab,
   "My Creations": MyCreationsTab,
   "AI Model Studio": AiModelsTab,
+  "My Models": MyModelsTab,
   "AI Photoshoot": AiPhotoshootTab,
   "Outfit Builder": OutfitBuilderTab,
   "Product Photography": ProductModelTab,
