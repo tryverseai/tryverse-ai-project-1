@@ -5,6 +5,10 @@ import { anyApi, convexMutationTrusted, convexQueryTrusted } from '../../config/
 import { resolveModelImageUrl } from '../models/modelLibrary';
 import { AppError } from '../../middleware/errorHandler';
 import { FashionGenerationProvider } from './fashionGenerationProvider';
+import { fetchRemoteMedia } from '../../lib/fetchRemoteMedia';
+import { TRUSTED_FASHN_OUTPUT_HOSTS } from '../../lib/fashnHosts';
+
+const PHOTOSHOOT_IMAGE_MAX_BYTES = 20 * 1024 * 1024; // 20 MB cap, matching other FASHN image results.
 
 export type PhotoshootModelSource = 'library' | 'generated';
 
@@ -106,9 +110,11 @@ export async function generateProductPhotoshoot(
       faceReferenceUrl: modelUrl,
     });
 
-    const res = await fetch(swapped.resultUrl);
-    if (!res.ok) throw new Error(`Failed to download photoshoot image (${res.status})`);
-    const buffer = Buffer.from(await res.arrayBuffer());
+    const { buffer } = await fetchRemoteMedia(swapped.resultUrl, {
+      label: 'generateProductPhotoshoot',
+      maxBytes: PHOTOSHOOT_IMAGE_MAX_BYTES,
+      allowedHosts: TRUSTED_FASHN_OUTPUT_HOSTS,
+    });
     const storagePath = await uploadResultBuffer(buffer, userId, true);
 
     await convexMutationTrusted(anyApi.backendTrusted.patchPhotoshootGeneration, {

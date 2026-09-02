@@ -15,6 +15,7 @@ import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 import { inferFashnGarmentCategory } from './garmentDescriptor';
 import type { VtonInput, VtonOutput } from './replicate';
+import { isTrustedFashnOutputHost } from '../../lib/fashnHosts';
 
 const FASHN_BASE_URL = 'https://api.fashn.ai/v1';
 
@@ -132,8 +133,25 @@ async function pollFashnStatus(predictionId: string, timeoutMs: number = POLL_TI
 
     if (data.status === 'completed') {
       const url = data.output?.[0];
-      if (!url || !url.startsWith('http')) {
-        throw new Error('FASHN completed but returned no valid output URL');
+      if (!url) {
+        throw new Error('FASHN completed but returned no output URL');
+      }
+      // Fail fast, at the source, with a clear reason — rather than only discovering an
+      // unexpected host much later inside whichever storage function ends up fetching it. The
+      // URL itself is still treated as opaque past this point: only its protocol/hostname are
+      // ever inspected, never its path, filename, or query string.
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+      } catch {
+        throw new Error('FASHN completed but returned an unparseable output URL');
+      }
+      if (parsed.protocol !== 'https:' || !isTrustedFashnOutputHost(parsed.hostname)) {
+        logger.error('FASHN returned an output URL from an untrusted host', {
+          predictionId,
+          host: parsed.hostname,
+        });
+        throw new Error('FASHN completed but returned an output URL from an untrusted host');
       }
       return url;
     }

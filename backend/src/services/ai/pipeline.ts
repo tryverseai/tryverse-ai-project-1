@@ -37,6 +37,7 @@ import { sendTryOnCompletedEmail } from '../email';
 import { captureAiError } from '../../config/sentry';
 import { logger } from '../../config/logger';
 import { env } from '../../config/env';
+import { fetchRemoteMedia } from '../../lib/fetchRemoteMedia';
 import sharp from 'sharp';
 import type { TryOnJob, TryOnResult } from '../../types';
 
@@ -150,16 +151,19 @@ function classifyTryOnError(err: Error): PublicError {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// This pipeline can hand back a FASHN, Replicate, or Flux-Kontext URL depending on which
+// clothing engine ran (see `clothingEngine` below) — deliberately no `allowedHosts` allowlist
+// here, unlike the FASHN-exclusive `storeResultImage`/`storeResultVideo`, since it legitimately
+// spans multiple providers' hostnames. The general private-host SSRF blocklist still applies.
+const RESULT_IMAGE_MAX_BYTES = 20 * 1024 * 1024; // 20 MB cap, matching storeResultImage's.
+
 async function fetchUrlBufferWithRetry(url: string, label: string): Promise<Buffer> {
   const attempts = 4;
   let last: Error | undefined;
   for (let i = 0; i < attempts; i++) {
     try {
-      const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch ${label}: ${res.status} ${res.statusText}`);
-      }
-      return Buffer.from(await res.arrayBuffer());
+      const { buffer } = await fetchRemoteMedia(url, { label, maxBytes: RESULT_IMAGE_MAX_BYTES });
+      return buffer;
     } catch (e) {
       last = e instanceof Error ? e : new Error(String(e));
       logger.warn('tryon: fetch retry', { label, attempt: i + 1, error: last.message });

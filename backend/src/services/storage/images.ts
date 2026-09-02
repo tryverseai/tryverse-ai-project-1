@@ -3,7 +3,8 @@ import { logger } from '../../config/logger';
 import sharp from 'sharp';
 import { convexUploadBuffer, convexDeleteStorageIds, storagePathToConvexId } from '../convexStorageBridge';
 import { anyApi, convexQueryTrusted } from '../../config/convexHttp';
-import { isPrivateOrBlockedHost } from '../../lib/ssrfGuard';
+import { fetchRemoteMedia } from '../../lib/fetchRemoteMedia';
+import { TRUSTED_FASHN_OUTPUT_HOSTS } from '../../lib/fashnHosts';
 
 // ---------------------------------------------------------------------------
 // Signed-URL in-memory cache
@@ -222,6 +223,13 @@ export async function uploadResultBuffer(
 }
 
 /** Always used for a final FASHN-generated subject photo fetched by URL — see `cropToSubjectBoundingBox`. */
+const RESULT_IMAGE_MAX_BYTES = 20 * 1024 * 1024; // 20 MB cap for result images
+const RESULT_VIDEO_MAX_BYTES = 100 * 1024 * 1024; // 100 MB cap — clips are short (5-10s) but capped well above a typical clip.
+
+/** Always used for a final FASHN-generated subject photo fetched by URL — the raw URL is treated
+ * as opaque (see `fetchRemoteMedia`'s doc comment): only its hostname/protocol are checked, and
+ * it must be one of FASHN's documented output hosts (`TRUSTED_FASHN_OUTPUT_HOSTS`) since every
+ * caller of this function passes a `fashnResult.resultUrl`, never a general provider URL. */
 export async function storeResultImage(
   imageUrl: string,
   tryonId: string,
@@ -229,34 +237,13 @@ export async function storeResultImage(
 ): Promise<string> {
   void tryonId;
 
-  // Basic SSRF guard: only allow HTTPS URLs pointing to non-private hosts.
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(imageUrl);
-  } catch {
-    throw new Error('storeResultImage: invalid URL');
-  }
-  if (parsedUrl.protocol !== 'https:') {
-    throw new Error('storeResultImage: only HTTPS URLs are allowed');
-  }
-  if (isPrivateOrBlockedHost(parsedUrl.hostname)) {
-    throw new Error('storeResultImage: URL host not allowed');
-  }
-
-  const response = await fetch(imageUrl);
-  if (!response.ok) throw new Error(`Failed to fetch result image: ${response.status}`);
-
-  // Cap response size before buffering to prevent OOM
-  const RESULT_IMAGE_MAX_BYTES = 20 * 1024 * 1024; // 20 MB cap for result images
-  const contentLength = response.headers.get('content-length');
-  if (contentLength && parseInt(contentLength, 10) > RESULT_IMAGE_MAX_BYTES) {
-    throw new Error('storeResultImage: remote image exceeds size limit');
-  }
-  const rawBuffer = await response.arrayBuffer();
-  if (rawBuffer.byteLength > RESULT_IMAGE_MAX_BYTES) {
-    throw new Error('storeResultImage: remote image exceeds size limit');
-  }
-  const buffer = Buffer.from(rawBuffer);
+  const { buffer } = await fetchRemoteMedia(imageUrl, {
+    label: 'storeResultImage',
+    maxBytes: RESULT_IMAGE_MAX_BYTES,
+    allowedHosts: TRUSTED_FASHN_OUTPUT_HOSTS,
+  });
+  // sharp() below both re-encodes and validates the buffer actually decodes as an image —
+  // a corrupt or non-image payload throws here rather than ever reaching storage.
   const cropped = await cropToSubjectBoundingBox(buffer);
 
   const optimized = await sharp(cropped)
@@ -273,41 +260,31 @@ export async function storeResultImage(
   return `${base}/${storageId}.jpg`;
 }
 
+/** MP4's ISO-BMFF container has a `ftyp` box starting at byte 4 in virtually every real-world
+ * encoder's output (including FASHN's) — a cheap signature check so an unexpected payload that
+ * merely claims `video/mp4` in its Content-Type header (never trusted alone) doesn't get stored
+ * and served to users as a video. */
+function looksLikeMp4(buffer: Buffer): boolean {
+  return buffer.length >= 12 && buffer.subarray(4, 8).toString('ascii') === 'ftyp';
+}
+
 /**
- * Downloads and stores a video result (AI Video / FASHN `image-to-video`) — same SSRF guard as
- * `storeResultImage`, but stored as-is with no Sharp re-encode (Sharp is image-only).
+ * Downloads and stores a video result (AI Video / FASHN `image-to-video`) — same trusted-host
+ * allowlist and hardened fetch as `storeResultImage`, but stored as-is with no Sharp re-encode
+ * (Sharp is image-only), so it gets its own lightweight signature check instead.
  */
 export async function storeResultVideo(videoUrl: string, userId?: string): Promise<string> {
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(videoUrl);
-  } catch {
-    throw new Error('storeResultVideo: invalid URL');
-  }
-  if (parsedUrl.protocol !== 'https:') {
-    throw new Error('storeResultVideo: only HTTPS URLs are allowed');
-  }
-  if (isPrivateOrBlockedHost(parsedUrl.hostname)) {
-    throw new Error('storeResultVideo: URL host not allowed');
+  const { buffer, contentType } = await fetchRemoteMedia(videoUrl, {
+    label: 'storeResultVideo',
+    maxBytes: RESULT_VIDEO_MAX_BYTES,
+    allowedHosts: TRUSTED_FASHN_OUTPUT_HOSTS,
+    timeoutMs: 45_000,
+  });
+  if (!looksLikeMp4(buffer)) {
+    throw new Error('storeResultVideo: remote content is not a recognizable MP4 file');
   }
 
-  const response = await fetch(videoUrl);
-  if (!response.ok) throw new Error(`Failed to fetch result video: ${response.status}`);
-
-  // Video clips are short (5-10s) but can still be a few MB — cap well above a typical clip.
-  const RESULT_VIDEO_MAX_BYTES = 100 * 1024 * 1024; // 100 MB cap
-  const contentLength = response.headers.get('content-length');
-  if (contentLength && parseInt(contentLength, 10) > RESULT_VIDEO_MAX_BYTES) {
-    throw new Error('storeResultVideo: remote video exceeds size limit');
-  }
-  const rawBuffer = await response.arrayBuffer();
-  if (rawBuffer.byteLength > RESULT_VIDEO_MAX_BYTES) {
-    throw new Error('storeResultVideo: remote video exceeds size limit');
-  }
-  const buffer = Buffer.from(rawBuffer);
-
-  const contentType = response.headers.get('content-type') || 'video/mp4';
-  const storageId = await convexUploadBuffer(buffer, contentType);
+  const storageId = await convexUploadBuffer(buffer, contentType || 'video/mp4');
   const base = userId ? `${userId}/videos` : `anonymous/videos`;
   return `${base}/${storageId}.mp4`;
 }

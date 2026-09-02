@@ -13,6 +13,10 @@ import { logger } from '../../config/logger';
 import { uploadResultBuffer } from '../storage/images';
 import { FashionGenerationProvider } from './fashionGenerationProvider';
 import { isFashnDirectEnabled } from './fashn';
+import { fetchRemoteMedia } from '../../lib/fetchRemoteMedia';
+import { TRUSTED_FASHN_OUTPUT_HOSTS } from '../../lib/fashnHosts';
+
+const PERSONALIZATION_IMAGE_MAX_BYTES = 20 * 1024 * 1024; // 20 MB cap, matching other FASHN image results.
 
 export interface PersonalizeInput {
   /** URL of the product photograph containing the original model. */
@@ -40,9 +44,11 @@ export async function generatePersonalizedModel(input: PersonalizeInput): Promis
     faceReferenceUrl: input.referenceImageUrl,
   });
 
-  const res = await fetch(swapped.resultUrl);
-  if (!res.ok) throw new Error(`Failed to download personalization result (${res.status})`);
-  const buffer = Buffer.from(await res.arrayBuffer());
+  const { buffer } = await fetchRemoteMedia(swapped.resultUrl, {
+    label: 'generatePersonalizedModel',
+    maxBytes: PERSONALIZATION_IMAGE_MAX_BYTES,
+    allowedHosts: TRUSTED_FASHN_OUTPUT_HOSTS,
+  });
   const resultPath = await uploadResultBuffer(buffer, input.userId, true);
 
   const durationMs = Date.now() - startMs;
