@@ -24,18 +24,25 @@ export function ConfidenceSection() {
           Why it matters
         </p>
         <h2 className="type-display max-w-2xl text-balance">
-          <RevealLines lines={[<>Turn uncertainty</>, <>into conversion.</>]} />
+          <RevealLines lines={[<>Turn fashion assets</>, <>into intelligent experiences.</>]} />
         </h2>
         <div className="mt-9 flex flex-col gap-6">
           <Reveal delay={0.18} className="max-w-lg">
             <p className="type-lead text-pretty text-[hsl(40_16%_95%/0.7)]">
-              Online fashion brands ask customers to make a decision from static product images. TryVerse gives them
-              a way to visualize products on themselves — directly within the shopping experience.
+              Fashion brands have traditionally relied on static product images and expensive, repetitive content
+              production to bring products to life. TryVerse transforms a single fashion product into infrastructure
+              for creating, visualizing and scaling new experiences.
             </p>
           </Reveal>
-          <Reveal delay={0.28} className="max-w-lg">
+          <Reveal delay={0.24} className="max-w-lg">
+            <p className="type-lead text-pretty text-[hsl(40_16%_95%/0.7)]">
+              The same product can power virtual try-ons, complete looks, AI models, product photography, photoshoots
+              and fashion video — without rebuilding the workflow from scratch each time.
+            </p>
+          </Reveal>
+          <Reveal delay={0.32} className="max-w-lg">
             <p className="type-title text-balance text-[hsl(40_16%_95%)]">
-              More confidence for shoppers. Better product experiences for brands.
+              More possibilities from every product. More intelligent experiences for fashion brands.
             </p>
           </Reveal>
         </div>

@@ -12,7 +12,7 @@ const Technology = () => {
         <title>Technology — TryVerse AI Infrastructure for Fashion Visualization</title>
         <meta
           name="description"
-          content="The AI infrastructure, developer platform, and enterprise architecture behind TryVerse — computer vision, generative AI, and edge delivery built for production fashion visualization."
+          content="The infrastructure behind fashion visualization — how TryVerse powers virtual try-on, AI-generated content, and commerce integration across storefronts, marketplaces, and applications."
         />
         <link rel="canonical" href="https://tryverseai.com/technology" />
       </Helmet>
@@ -26,11 +26,13 @@ const Technology = () => {
           >
             <p className="text-xs font-medium text-muted-foreground mb-3 tracking-[0.2em] uppercase">Technology</p>
             <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-6 leading-tight">
-              AI Infrastructure, Developer Platform, Enterprise Architecture
+              The Infrastructure Behind Fashion Visualization
             </h1>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              The systems behind every render — computer vision, generative AI, and edge delivery, built to run in
-              production across your API, SDK, and embedded widget.
+              TryVerse provides the infrastructure brands need to bring richer, more interactive product experiences
+              to digital fashion commerce. From visualization and virtual try-on to AI-powered fashion content, our
+              platform is designed to power these experiences across the places where customers shop — from
+              storefronts and marketplaces to applications and commerce platforms.
             </p>
           </motion.div>
         </div>

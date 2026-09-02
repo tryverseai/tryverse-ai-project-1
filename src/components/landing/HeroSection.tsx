@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { campaign } from "@/lib/campaignImagery";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
-const STATEMENT = "AI infrastructure for fashion visualization.";
+const STATEMENT = "AI infrastructure for the future of fashion commerce.";
+const SUPPORTING_COPY =
+  "Power virtual try-on, AI model generation, product visualization, and campaign content through a single intelligent platform — built to integrate directly into your storefront.";
 
 /**
  * Full-bleed on both breakpoints, same treatment: photograph fills the screen, statement
@@ -63,6 +65,14 @@ export function HeroSection() {
           >
             {STATEMENT}
           </motion.h1>
+          <motion.p
+            className="type-body mt-5 max-w-lg text-balance text-[hsl(40_16%_95%/0.78)]"
+            initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.25, ease: EASE }}
+          >
+            {SUPPORTING_COPY}
+          </motion.p>
           <motion.div
             className="mt-7 flex items-center gap-4"
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
@@ -120,6 +130,14 @@ export function HeroSection() {
           >
             {STATEMENT}
           </motion.h1>
+          <motion.p
+            className="type-caption mt-4 max-w-xs text-balance text-[hsl(40_16%_95%/0.78)]"
+            initial={reduce ? { opacity: 0 } : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.2, ease: EASE }}
+          >
+            {SUPPORTING_COPY}
+          </motion.p>
           <motion.div
             className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center"
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 14 }}

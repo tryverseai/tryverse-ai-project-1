@@ -16,17 +16,17 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <Helmet>
-        <title>TryVerse AI — Infrastructure for Fashion Visualization</title>
+        <title>TryVerse AI — AI Infrastructure for Fashion Commerce</title>
         <meta
           name="description"
-          content="AI infrastructure for fashion visualization. Virtual try-on, AI fashion photography, AI model generation, and outfit visualization for online fashion commerce — through APIs and SDKs."
+          content="AI infrastructure for the future of fashion commerce. TryVerse powers virtual try-on, AI models, product photography, AI photoshoots, and fashion video from a single platform, embedded directly in your storefront."
         />
         <link rel="canonical" href="https://tryverseai.com/" />
         <meta property="og:type" content="website" />
-        <meta property="og:title" content="TryVerse AI — Infrastructure for Fashion Visualization" />
+        <meta property="og:title" content="TryVerse AI — AI Infrastructure for Fashion Commerce" />
         <meta
           property="og:description"
-          content="Virtual try-on, AI fashion photography, and outfit visualization — from a single fashion visualization platform."
+          content="Virtual try-on, AI models, product photography, and fashion video — from a single AI fashion infrastructure platform."
         />
         <meta name="twitter:card" content="summary_large_image" />
       </Helmet>

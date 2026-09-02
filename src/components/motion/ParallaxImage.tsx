@@ -48,7 +48,8 @@ export function ParallaxImage({
         alt={alt}
         loading={priority ? "eager" : "lazy"}
         decoding="async"
-        fetchPriority={priority ? "high" : "auto"}
+        // eslint-disable-next-line react/no-unknown-property
+        {...{ fetchpriority: priority ? "high" : "auto" }}
         style={{ y, scale, filter }}
         className={cn("h-full w-full object-cover will-change-transform", imgClassName)}
       />

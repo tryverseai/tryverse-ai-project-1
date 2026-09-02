@@ -20,18 +20,18 @@ const showcaseSlides = [
 const steps = [
   {
     index: "01",
-    title: "Pick your style",
-    body: "The shopper chooses a piece from your catalogue. Nothing about your product data or merchandising changes.",
+    title: "Add your product",
+    body: "Start with a product image from your catalogue. Clothing, footwear, eyewear, jewellery and accessories can become the starting point for new AI-powered fashion experiences.",
   },
   {
     index: "02",
-    title: "Snap or upload a photo",
-    body: "One clear photo from a phone camera or camera roll. No scanning rig, no measuring tape, no account required.",
+    title: "Choose an experience",
+    body: "Select a person, model or creative workflow. Create a virtual try-on, build a complete look, generate an AI model, produce product photography, create a photoshoot or bring fashion content into motion.",
   },
   {
     index: "03",
-    title: "See it on you",
-    body: "TryVerse renders the product onto them and returns the result in the same session, on the same page.",
+    title: "Generate and create",
+    body: "TryVerse transforms your product into a new visual experience. Generate high-quality fashion imagery and creative assets, then save, reuse and build on your creations across the platform.",
   },
 ];
 
@@ -43,10 +43,10 @@ export function HowItWorksSection() {
         index="04"
         title={
           <>
-            Three steps between <em className="font-normal italic">curiosity</em> and confidence.
+            From product <em className="font-normal italic">to possibility</em>.
           </>
         }
-        lead="No avatars, no approximations, no separate app to download. The whole flow happens where the shopper already is."
+        lead="TryVerse gives fashion products a foundation for multiple AI-powered experiences. Upload once, select what you want to create, and generate new visual outcomes from the same product."
       />
 
       <RevealGroup className="mt-12 divide-y divide-border border-y border-border md:mt-16">

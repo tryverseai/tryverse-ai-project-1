@@ -4,29 +4,34 @@ import { CTASection } from "@/components/CTASection";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { GLASS_EASE, glassOuter, glassInner, glassInnerCard } from "@/lib/glassFrame";
-import { Globe, Target, Zap, Layers } from "lucide-react";
+import { Eye, Layers, Feather, Globe, ShieldCheck } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 
 const values = [
   {
-    icon: Target,
-    title: "Precision",
-    description: "Every pixel matters. We build AI that produces photorealistic results brands can trust.",
+    icon: Eye,
+    title: "Visualization",
+    description: "We believe shoppers should be able to experience products — not simply look at them.",
   },
   {
     icon: Layers,
     title: "Infrastructure",
-    description: "Built as a platform, not a single feature — the visualization layer commerce is missing.",
+    description: "We're building a platform, not a single feature. TryVerse is designed to support an expanding ecosystem of AI-powered fashion experiences.",
+  },
+  {
+    icon: Feather,
+    title: "Simplicity",
+    description: "Complex technology should create simple experiences. Brands should be able to integrate powerful capabilities without rebuilding their commerce stack.",
   },
   {
     icon: Globe,
-    title: "Global Scale",
-    description: "Infrastructure designed to scale with your brand and handle growing demand, worldwide.",
+    title: "Scale",
+    description: "Fashion is global. Our infrastructure is designed to support brands as they grow, expand their catalogs, and serve more customers.",
   },
   {
-    icon: Zap,
-    title: "Speed",
-    description: "Sub-second inference on cloud GPUs, delivering instant results to shoppers worldwide.",
+    icon: ShieldCheck,
+    title: "Confidence",
+    description: "Better visualization leads to better-informed decisions. We're building technology that helps close the gap between seeing a product online and knowing what it could feel like to own it.",
   },
 ];
 
@@ -55,9 +60,13 @@ const About = () => {
               Building the Infrastructure for Fashion's Digital Future
             </h1>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              TryVerse is AI infrastructure for fashion visualization — virtual try-on, AI model photography, and
-              outfit visualization for online fashion commerce. We're building tools to help brands sell more,
-              reduce returns, and build customer trust.
+              TryVerse is building the infrastructure layer for AI-powered fashion commerce. We help brands turn
+              static digital catalogs into richer, more interactive experiences — from virtual try-on and product
+              visualization to AI-powered fashion content.
+            </p>
+            <p className="text-lg text-muted-foreground leading-relaxed mt-4">
+              The goal isn't simply to help brands display products differently. It's to make digital fashion feel
+              more like experiencing fashion in the real world.
             </p>
           </motion.div>
 
@@ -76,22 +85,25 @@ const About = () => {
                   Building the Infrastructure Layer for Fashion Visualization
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  Fashion commerce runs on static photos in a category built for motion and fit. TryVerse exists to
-                  close that gap — the AI infrastructure layer that lets any brand, marketplace, or platform turn a
-                  product photo into a visualization a shopper can actually trust. Virtual try-on is where we
-                  started; the vision is the visualization and commerce layer the next generation of global fashion
-                  brands builds on.
+                  Fashion was built around movement, context, and fit. Yet most online shopping still begins with a
+                  static image. TryVerse exists to close that gap. We're building the infrastructure that allows
+                  brands, marketplaces, and commerce platforms to transform the way products are experienced online —
+                  giving shoppers more context, more confidence, and a more engaging path to purchase.
+                </p>
+                <p className="text-muted-foreground leading-relaxed mt-4">
+                  Virtual try-on is where we started. The bigger vision is to become the visualization infrastructure
+                  that powers the next generation of digital fashion commerce.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { value: "AI", label: "Powered engine" },
-                  { value: "<1s", label: "Try-on speed" },
-                  { value: "99%", label: "Uptime goal" },
+                  { value: "AI-Powered", label: "Fashion infrastructure" },
+                  { value: "Built for", label: "Real-world commerce" },
+                  { value: "Production", label: "Ready" },
                   { value: "∞", label: "Scalability" },
                 ].map((stat) => (
                   <div key={stat.label} className="text-center p-5 rounded-xl bg-muted/50">
-                    <p className="font-display text-2xl font-bold text-foreground">{stat.value}</p>
+                    <p className="font-display text-lg font-bold text-foreground leading-tight">{stat.value}</p>
                     <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
                   </div>
                 ))}
@@ -110,7 +122,7 @@ const About = () => {
             >
               <h2 className="font-display text-3xl font-bold text-foreground mb-3">What We Stand For</h2>
             </motion.div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
               {values.map((v, i) => (
                 <motion.div
                   key={v.title}

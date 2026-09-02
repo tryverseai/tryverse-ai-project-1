@@ -9,18 +9,18 @@ import featuresModelVideo from "@/assets/features-model-video.mp4";
 const stages = [
   {
     index: "01",
-    term: "Product, isolated",
-    body: "The flat or on-mannequin shot is parsed into a product layer — form, material, placement, and how it moves or catches light.",
+    term: "Ingest",
+    body: "A product enters TryVerse through a simple image or product asset. Its visual identity becomes the foundation for future generation, styling and visualization workflows.",
   },
   {
     index: "02",
-    term: "Body, understood",
-    body: "Pose, proportion and depth are read from a single photo. No rig, no depth camera, no measurements.",
+    term: "Configure",
+    body: "Pair the product with a real person, customer image, AI-generated model or creative direction. Products can also be combined across categories — from clothing and footwear to eyewear, jewellery and accessories.",
   },
   {
     index: "03",
-    term: "Render, composited",
-    body: "The product is rebuilt on the body under the original light, and the shopper's identity is returned untouched.",
+    term: "Generate",
+    body: "Turn the same fashion asset into different experiences — virtual try-ons, complete outfits, AI models, product photography, AI photoshoots, fashion video. One product layer. Multiple visual outcomes.",
   },
 ];
 
@@ -45,17 +45,17 @@ export function MannequinSection() {
         <h2 className="type-display max-w-2xl text-balance">
           <RevealLines
             lines={[
-              <>Before it reaches</>,
+              <>One fashion product.</>,
               <>
-                a person, it becomes <em className="font-normal italic">form</em>.
+                Multiple <em className="font-normal italic">intelligent</em> experiences.
               </>,
             ]}
           />
         </h2>
         <Reveal delay={0.15} className="mt-8 max-w-lg">
           <p className="type-lead text-pretty">
-            TryVerse treats a product as geometry and material before it treats it as an image. That is why the
-            render holds its shape on a body it has never seen.
+            TryVerse transforms fashion products into infrastructure that can be used across the entire visual
+            commerce workflow.
           </p>
         </Reveal>
 

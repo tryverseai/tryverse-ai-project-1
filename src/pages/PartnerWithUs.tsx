@@ -2,9 +2,9 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { GLASS_EASE, glassOuter, glassInner, glassInnerCard } from "@/lib/glassFrame";
+import { GLASS_EASE, glassOuter, glassInnerCard } from "@/lib/glassFrame";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, TrendingDown, TrendingUp, ShieldCheck, Code2, Sparkles, Globe, Zap, Shield } from "lucide-react";
+import { ArrowRight, TrendingDown, TrendingUp, ShieldCheck, Code2, Sparkles, Image as ImageIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { Helmet } from "react-helmet-async";
@@ -13,17 +13,17 @@ import { ParallaxImage } from "@/components/motion/ParallaxImage";
 import partnerMirror from "@/assets/partner-mirror.jpg";
 
 const benefits = [
-  { icon: TrendingDown, title: "Reduce Purchase Uncertainty", description: "Help customers visualize products before committing." },
-  { icon: TrendingUp, title: "Increase Conversion Rates", description: "Visual experiences help shoppers make faster buying decisions." },
-  { icon: ShieldCheck, title: "Elevate Customer Experience", description: "Transform static product pages into interactive shopping experiences." },
-  { icon: Code2, title: "Flexible Integration", description: "Ship with our SDK and API, or embed the widget — whatever fits your stack." },
+  { icon: TrendingDown, title: "Reduce Purchase Uncertainty", description: "Help customers better understand how products could look before committing to a purchase." },
+  { icon: ShieldCheck, title: "Create More Confident Shoppers", description: "Give customers richer product experiences that make online shopping feel more personal." },
+  { icon: Sparkles, title: "Elevate Product Discovery", description: "Turn traditional product pages into interactive experiences that encourage customers to explore." },
+  { icon: Code2, title: "Integrate Without Rebuilding", description: "Introduce TryVerse into your existing commerce environment while keeping your current catalog, storefront, and workflows intact." },
 ];
 
 const reasons = [
-  { icon: Sparkles, title: "AI-Powered Try-On", description: "Let shoppers see products on themselves before buying." },
-  { icon: Globe, title: "Global Scale", description: "Infrastructure built to scale with brands worldwide." },
-  { icon: Zap, title: "Flexible Integration", description: "Connect TryVerse through APIs, SDKs, and commerce integrations built for modern fashion platforms." },
-  { icon: Shield, title: "Enterprise Ready", description: "Secure, reliable, and designed for production workloads." },
+  { icon: Sparkles, title: "Transform the Shopping Experience", description: "Turn static product discovery into an interactive experience that helps customers visualize products in a more meaningful way." },
+  { icon: ImageIcon, title: "Expand Your Content Capabilities", description: "Create new ways to showcase collections, products, and campaigns across your digital channels." },
+  { icon: TrendingUp, title: "Scale With Your Business", description: "Start with the experiences you need today and expand as your customers, catalog, and digital presence grow." },
+  { icon: Code2, title: "Integrate Your Way", description: "Bring TryVerse into your existing commerce experience without changing how your catalog or storefront operates." },
 ];
 
 const PartnerWithUs = () => {
@@ -48,10 +48,13 @@ const PartnerWithUs = () => {
           >
             <p className="text-xs font-medium text-muted-foreground mb-3 tracking-[0.2em] uppercase">Partner With Us</p>
             <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Bring Your Collection to Life
+              Build the Next Generation of Fashion Commerce
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Partner with TryVerse to give your customers the confidence to buy — and the experience that keeps them coming back.
+              Give your customers a more visual, interactive way to discover and experience your products. TryVerse
+              gives fashion brands the infrastructure to introduce AI-powered experiences into their storefronts —
+              helping shoppers understand products with greater confidence and making digital shopping feel more
+              personal.
             </p>
           </motion.div>
 
@@ -95,9 +98,9 @@ const PartnerWithUs = () => {
                   <Button type="button" size="lg" className="gradient-primary text-primary-foreground shadow-soft text-base px-8 h-12" onClick={() => openSignupChooser()}>
                     Sign Up <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
-                  <Link to="/pricing">
+                  <Link to="/enterprise-contact">
                     <Button size="lg" variant="outline" className="text-base px-8 h-12">
-                      View pricing
+                      Talk to Enterprise
                     </Button>
                   </Link>
                 </>
@@ -107,8 +110,8 @@ const PartnerWithUs = () => {
         </div>
       </section>
 
-      {/* A single photograph — confidence is the product being sold here, not just the code. */}
-      <section aria-label="The confidence TryVerse sells" className="relative overflow-hidden bg-[hsl(var(--ink))]">
+      {/* A single photograph — better visualization is the product being sold here, not just the code. */}
+      <section aria-label="Why brands partner with TryVerse" className="relative overflow-hidden bg-[hsl(var(--ink))]">
         <ParallaxImage
           src={partnerMirror}
           alt="A shopper checking her reflection in a mirror before going out"
@@ -121,17 +124,17 @@ const PartnerWithUs = () => {
           aria-hidden="true"
         />
         <p className="pointer-events-none absolute bottom-6 left-6 type-eyebrow text-[hsl(40_16%_95%/0.75)] md:bottom-8 md:left-10">
-          The confidence your customers buy for
+          Better visualization. Better discovery. More confident shoppers.
         </p>
       </section>
 
-      {/* The Infrastructure Powering Virtual Try-On */}
+      {/* The Infrastructure Powering Fashion Visualization */}
       <section className="py-14 sm:py-20 md:py-32">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="max-w-3xl mx-auto">
             <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
             >
@@ -140,9 +143,10 @@ const PartnerWithUs = () => {
                 The Infrastructure Powering Fashion Visualization
               </h2>
               <p className="text-muted-foreground text-lg leading-relaxed mb-8">
-                Integrate TryVerse into your commerce stack through APIs, SDKs, and storefront integrations. Deliver
-                fashion visualization experiences directly inside your shopping journey without changing how your
-                catalog works.
+                Your catalog already exists. Your storefront already works. TryVerse adds the visualization layer
+                that makes digital fashion commerce more interactive. Integrate AI-powered fashion experiences
+                directly into your existing customer journey and give shoppers more context before they make a
+                purchase.
               </p>
 
               <div className="grid sm:grid-cols-2 gap-5 mb-8">
@@ -182,52 +186,13 @@ const PartnerWithUs = () => {
                     <Button type="button" size="lg" className="gradient-primary text-primary-foreground shadow-soft" onClick={() => openSignupChooser()}>
                       Sign Up <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
-                    <Link to="/pricing">
+                    <Link to="/enterprise-contact">
                       <Button size="lg" variant="outline">
-                        View pricing
+                        Talk to Enterprise
                       </Button>
                     </Link>
                   </>
                 )}
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className={glassOuter}
-            >
-              <div className={cn(glassInner, "p-5 sm:p-6")}>
-              <div className="rounded-xl bg-foreground/[0.03] p-5 font-mono text-sm">
-                <p className="text-muted-foreground mb-2">{"// Server-side, with the TryVerse SDK"}</p>
-                <p className="text-foreground">
-                  <span className="text-foreground/70">import</span> {"{ TryVerse }"} <span className="text-foreground/70">from</span> <span className="text-foreground/60">"@tryverseai/sdk"</span>;
-                </p>
-                <p className="text-foreground mt-3">
-                  <span className="text-foreground/70">const</span> tryverse = <span className="text-foreground/70">new</span> TryVerse();
-                </p>
-                <p className="text-foreground mt-3">
-                  <span className="text-foreground/70">const</span> {"{ resultUrl }"} = <span className="text-foreground/70">await</span> tryverse.tryOn({"{"}
-                </p>
-                <p className="text-muted-foreground pl-4">personImage: <span className="text-foreground/60">shopperPhoto</span>,</p>
-                <p className="text-muted-foreground pl-4">productImage: <span className="text-foreground/60">'PRODUCT_URL'</span>,</p>
-                <p className="text-foreground">{"})"};</p>
-              </div>
-
-              <div className="mt-5 grid grid-cols-3 gap-3">
-                {[
-                  { label: "Powered", value: "AI" },
-                  { label: "Latency", value: "<1s" },
-                  { label: "Uptime", value: "99%" },
-                ].map((stat) => (
-                  <div key={stat.label} className="text-center p-3 rounded-xl bg-foreground/[0.04]">
-                    <p className="font-display text-lg font-bold text-foreground">{stat.value}</p>
-                    <p className="text-xs text-muted-foreground">{stat.label}</p>
-                  </div>
-                ))}
-              </div>
               </div>
             </motion.div>
           </div>

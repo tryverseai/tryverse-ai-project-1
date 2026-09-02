@@ -1,37 +1,37 @@
 import { motion } from "framer-motion";
-import { Scan, Brain, Box, Layers, Cpu, Globe } from "lucide-react";
+import { Eye, Sparkles, Wand2, Layers, Globe, ShieldCheck } from "lucide-react";
 import { GLASS_EASE, glassOuter, glassInnerCard, glassSectionBackdrop } from "@/lib/glassFrame";
 
 const techs = [
   {
-    icon: Scan,
-    title: "Computer Vision",
-    description: "High-precision image understanding for accurate body and product detection.",
+    icon: Eye,
+    title: "Product Visualization",
+    description: "Transform the way customers experience products online with richer, more contextual visual experiences.",
   },
   {
-    icon: Brain,
-    title: "Generative AI",
-    description: "State-of-the-art models create realistic, human-like try-on experiences.",
+    icon: Sparkles,
+    title: "Virtual Try-On",
+    description: "Give shoppers a more personal way to experience products before making a purchase.",
   },
   {
-    icon: Box,
-    title: "Pose Intelligence",
-    description: "Advanced body and landmark detection from a single image.",
+    icon: Wand2,
+    title: "AI Fashion Content",
+    description: "Create new possibilities for product imagery, model content, and campaign experiences without relying entirely on traditional production workflows.",
   },
   {
     icon: Layers,
-    title: "Fit Prediction",
-    description: "Machine learning models estimate product fit based on proportions and context.",
-  },
-  {
-    icon: Cpu,
-    title: "High-Performance Inference",
-    description: "Optimized GPU processing ensures fast and seamless results.",
+    title: "Commerce Integration",
+    description: "Connect TryVerse to the systems your business already uses and bring AI-powered experiences directly into your existing customer journey.",
   },
   {
     icon: Globe,
-    title: "Global Delivery Network",
-    description: "Edge infrastructure delivers results quickly to users worldwide.",
+    title: "Built to Scale",
+    description: "From early experimentation to high-volume commerce, TryVerse is designed to support growing brands and increasingly demanding customer experiences.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Reliable by Design",
+    description: "Production-ready infrastructure built around consistent performance, dependable experiences, and the demands of modern digital commerce.",
   },
 ];
 
@@ -48,15 +48,12 @@ export function TechnologySection() {
           transition={{ duration: 0.7, ease: GLASS_EASE }}
           className="text-center mb-10 sm:mb-14 md:mb-16 max-w-3xl mx-auto"
         >
-          <p className="text-xs font-medium text-muted-foreground mb-2 sm:mb-3 tracking-[0.2em] uppercase">
-            Technology
-          </p>
           <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4 leading-tight px-1">
-            Built on Advanced AI Infrastructure
+            Built for Modern Fashion Commerce
           </h2>
           <p className="text-muted-foreground text-base sm:text-lg leading-relaxed px-1">
-            Designed for speed, realism, and reliability — built to handle high traffic across your storefront,
-            whether through our API, SDK, or embedded widget.
+            Fashion visualization needs to be fast, reliable, and effortless to integrate. TryVerse gives brands the
+            foundation to introduce AI-powered shopping experiences without rebuilding their existing commerce stack.
           </p>
         </motion.div>
 
