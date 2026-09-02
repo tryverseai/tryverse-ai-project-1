@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { campaign } from "@/lib/campaignImagery";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
-const STATEMENT = "AI infrastructure for the future of fashion commerce.";
+const STATEMENT = "AI infrastructure for fashion commerce.";
 
 /**
  * Full-bleed on both breakpoints, same treatment: photograph fills the screen, statement
