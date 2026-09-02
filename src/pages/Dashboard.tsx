@@ -6,7 +6,7 @@ import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, BarChart3, Settings, Key, LayoutDashboard, CreditCard, BookOpen, FlaskConical, Sparkles,
-  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, LayoutGrid, PanelLeftOpen, PanelLeftClose,
+  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, LayoutGrid, PanelLeftOpen, PanelLeftClose, Menu, X,
 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
@@ -405,9 +405,9 @@ const Dashboard = () => {
                 className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-foreground transition-all duration-150 hover:bg-muted/70 active:scale-95"
               >
                 {mobileNavOpen ? (
-                  <PanelLeftClose className="h-[18px] w-[18px]" />
+                  <X className="h-[18px] w-[18px]" />
                 ) : (
-                  <PanelLeftOpen className="h-[18px] w-[18px]" />
+                  <Menu className="h-[18px] w-[18px]" />
                 )}
               </button>
               <span className="flex min-w-0 flex-1 items-center gap-2">
