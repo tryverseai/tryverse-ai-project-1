@@ -81,6 +81,8 @@ interface AuthContextType {
     code: string,
     opts?: { pendingBootstrap?: PendingEmailVerificationBootstrap }
   ) => Promise<{ error: Error | null; deviceApprovalRequired?: boolean }>;
+  /** Re-sends the signup verification code to `email` (server-side throttled — see convex/emailVerificationThrottle.ts). */
+  resendEmailVerificationCode: (email: string) => Promise<{ error: Error | null }>;
   /**
    * After Convex Auth has already signed the user in (e.g. password reset verification),
    * sync the Node API session / credits profile using the current JWT.
@@ -402,6 +404,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [convexPasswordSignIn, bootstrapAfterConvexSignIn, syncBackendSession]
   );
 
+  /** Same mechanism signup uses to send the first code — omitting `code` makes the server mint
+   * and email a fresh one instead of trying to verify (see tryVersePassword.ts's
+   * "email-verification" branch), subject to the server-side cooldown/abuse throttle. */
+  const resendEmailVerificationCode = useCallback(
+    async (email: string) => {
+      const trimmed = email.trim().toLowerCase();
+      if (!trimmed) {
+        return { error: new Error("Email is required") };
+      }
+      try {
+        const fd = new FormData();
+        fd.set("email", trimmed);
+        fd.set("flow", "email-verification");
+        await convexPasswordSignIn("password", fd);
+      } catch (e) {
+        return { error: normalizeConvexAuthError(e) };
+      }
+      return { error: null };
+    },
+    [convexPasswordSignIn]
+  );
+
   const signOut = useCallback(async () => {
     const uid = user?.id;
     try {
@@ -430,10 +454,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signIn,
       verifyEmailWithCode,
+      resendEmailVerificationCode,
       syncBackendSession,
       signOut,
     }),
-    [user, isAuthenticated, session, loading, signUp, signIn, verifyEmailWithCode, syncBackendSession, signOut]
+    [
+      user,
+      isAuthenticated,
+      session,
+      loading,
+      signUp,
+      signIn,
+      verifyEmailWithCode,
+      resendEmailVerificationCode,
+      syncBackendSession,
+      signOut,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -53,7 +53,7 @@ function navigateAfterAuthenticated(
 const VerifyEmail = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { verifyEmailWithCode } = useAuth();
+  const { verifyEmailWithCode, resendEmailVerificationCode } = useAuth();
   const { toast } = useToast();
 
   const payloadFromStorage = useMemo(() => readEmailVerifyPending(), []);
@@ -71,6 +71,7 @@ const VerifyEmail = () => {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [codeFailed, setCodeFailed] = useState(false);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     if (!payload?.email) {
@@ -151,6 +152,33 @@ const VerifyEmail = () => {
     }
   };
 
+  const handleResend = async () => {
+    if (resending) return;
+    setResending(true);
+    try {
+      const result = await resendEmailVerificationCode(payload.email);
+      if (result.error) {
+        const friendly = convexAuthEmailFlowToast(result.error, "email_verify");
+        toast({
+          title: friendly?.title ?? "Could not resend code",
+          description: friendly?.description ?? result.error.message,
+          variant: friendly?.variant ?? "destructive",
+          duration: 9000,
+        });
+        return;
+      }
+      posthogCapture("email_verification_code_resent", { email: payload.email });
+      toast({
+        title: "Code sent",
+        description: `We sent a new code to ${payload.email}.`,
+        duration: 6000,
+      });
+      setCodeFailed(false);
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <motion.div
@@ -169,10 +197,30 @@ const VerifyEmail = () => {
           Back to sign in
         </Link>
         <h1 className="font-display text-2xl font-bold text-foreground mb-2">Verify your email</h1>
-        <p className="text-muted-foreground mb-6 text-sm">Enter the 8-digit verification code.</p>
+        <p className="text-muted-foreground mb-6 text-sm">
+          Enter the 8-digit verification code we sent to <span className="text-foreground font-medium">{payload.email}</span>.
+        </p>
         <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email-verify-code">Verification code</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="email-verify-code">Verification code</Label>
+              <button
+                type="button"
+                onClick={() => void handleResend()}
+                disabled={resending}
+                aria-busy={resending}
+                className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-60 disabled:pointer-events-none"
+              >
+                {resending ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                    Sending…
+                  </span>
+                ) : (
+                  "Resend code"
+                )}
+              </button>
+            </div>
             <Input
               id="email-verify-code"
               inputMode="numeric"
