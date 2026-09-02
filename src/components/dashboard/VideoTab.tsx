@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Sparkles, ImagePlus, Download, Film, Clock, Users, Upload, RotateCcw } from "lucide-react";
+import { Sparkles, Download, Film, Clock, Users, Upload, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,8 @@ import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
 import { GeneratorEntry } from "@/components/dashboard/GeneratorEntry";
 import { BackLink } from "@/components/dashboard/BackLink";
 import { ModelPickerGrid, type PickedModel } from "@/components/dashboard/ModelPickerGrid";
+import { DarkPanel } from "@/components/dashboard/DarkPanel";
+import { useFilePicker } from "@/hooks/useFilePicker";
 
 const MAX_POLL_ATTEMPTS = 40;
 const POLL_INTERVAL_MS = 5000;
@@ -64,7 +66,7 @@ function ComingSoonState() {
   );
 }
 
-type Step = "entry" | "upload" | "choose-model" | "settings";
+type Step = "entry" | "choose-model" | "settings";
 type EntryMode = "upload" | "model" | null;
 type Status = "idle" | "generating" | "done" | "error";
 
@@ -76,7 +78,6 @@ export function VideoTab() {
   const [step, setStep] = useState<Step>("entry");
   const [entryMode, setEntryMode] = useState<EntryMode>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [sourcePreview, setSourcePreview] = useState<string | null>(null);
   const [sourcePath, setSourcePath] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -105,11 +106,6 @@ export function VideoTab() {
     setErrorMsg(null);
   };
 
-  const goToUploadStep = () => {
-    setEntryMode("upload");
-    setStep("upload");
-  };
-
   const handleFile = async (file: File | null) => {
     if (!file) return;
     setSourcePreview(URL.createObjectURL(file));
@@ -123,6 +119,17 @@ export function VideoTab() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const photoPicker = useFilePicker((f) => {
+    void handleFile(f);
+    setEntryMode("upload");
+    setStep("settings");
+  });
+
+  const openPhotoPicker = () => {
+    setEntryMode("upload");
+    photoPicker.open();
   };
 
   const handlePickModel = async (m: PickedModel) => {
@@ -231,70 +238,10 @@ export function VideoTab() {
               title="Bring a still into motion"
               subtitle="Upload an image or pick a model, and get a short, social-ready clip in moments."
               actions={[
-                { label: "Upload an image", icon: Upload, onClick: goToUploadStep, variant: "primary" },
+                { label: "Upload an image", icon: Upload, onClick: openPhotoPicker, variant: "primary" },
                 { label: "Choose a model", icon: Users, onClick: () => { setEntryMode("model"); setStep("choose-model"); }, variant: "onInk" },
               ]}
             />
-          </motion.div>
-        )}
-
-        {step === "upload" && (
-          <motion.div
-            key="upload"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="max-w-md mx-auto space-y-4"
-          >
-            <BackLink onClick={reset} label="Back to start" />
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                <ImagePlus className="h-4 w-4 text-muted-foreground" />
-                Source image
-              </p>
-              {sourcePreview ? (
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => fileInputRef.current?.click()}
-                  onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
-                  className="relative flex min-h-[220px] cursor-pointer select-none flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-border transition-colors hover:border-muted-foreground"
-                >
-                  <img src={sourcePreview} alt="Source" className="absolute inset-0 h-full w-full rounded-[10px] object-cover" />
-                  <div className="absolute inset-0 flex items-end justify-center rounded-[10px] bg-black/40 pb-4 opacity-0 transition-opacity hover:opacity-100">
-                    <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
-                      {uploading ? "Uploading…" : "Click to replace"}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex min-h-[180px] w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-6 text-center text-muted-foreground transition-colors hover:border-muted-foreground"
-                >
-                  <div className="rounded-full bg-muted p-3">
-                    <Upload className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground">Drop image here</p>
-                  <p className="text-xs text-muted-foreground">A clear, well-lit photo works best</p>
-                </button>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
-              />
-            </div>
-            <Button
-              className="w-full h-11 gradient-primary text-primary-foreground shadow-soft"
-              disabled={!sourcePath || uploading}
-              onClick={() => setStep("settings")}
-            >
-              Continue
-            </Button>
           </motion.div>
         )}
 
@@ -304,11 +251,14 @@ export function VideoTab() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="space-y-4"
           >
-            <BackLink onClick={reset} label="Back to start" />
-            <p className="text-sm font-medium text-foreground">Choose a model</p>
-            <ModelPickerGrid selectedId={pickedModel?.id} onSelect={(m) => void handlePickModel(m)} />
+            <DarkPanel onBack={reset} eyebrow="Choose a model">
+              <ModelPickerGrid
+                selectedId={pickedModel?.id}
+                onSelect={(m) => void handlePickModel(m)}
+                theme="dark"
+              />
+            </DarkPanel>
           </motion.div>
         )}
 
@@ -373,7 +323,7 @@ export function VideoTab() {
               )
             ) : (
               <>
-                <BackLink onClick={() => setStep(entryMode === "upload" ? "upload" : "choose-model")} />
+                <BackLink onClick={() => (entryMode === "upload" ? reset() : setStep("choose-model"))} />
 
                 {sourcePreview && (
                   <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
@@ -433,6 +383,14 @@ export function VideoTab() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <input
+        ref={photoPicker.inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="sr-only"
+        onChange={photoPicker.onChange}
+      />
     </div>
   );
 }

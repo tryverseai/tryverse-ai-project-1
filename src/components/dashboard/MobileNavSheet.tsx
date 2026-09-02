@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { X } from "lucide-react";
+import { PanelLeftClose } from "lucide-react";
 import {
   Sheet,
   SheetClose,
@@ -64,8 +64,11 @@ export function MobileNavSheet({
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
             {headerAction}
-            <SheetClose className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-              <X className="h-4 w-4" />
+            <SheetClose
+              aria-label="Close navigation panel"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground bg-muted hover:bg-muted/70 active:scale-95 transition-all duration-150"
+            >
+              <PanelLeftClose className="h-[18px] w-[18px]" />
               <span className="sr-only">Close</span>
             </SheetClose>
           </div>

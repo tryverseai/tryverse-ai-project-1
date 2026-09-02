@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Sparkles, Upload, ImagePlus, Camera, Download, RotateCcw } from "lucide-react";
+import { Sparkles, Upload, Camera, Download, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,6 +19,7 @@ import { GenerationLoadingScreen } from "@/components/GenerationLoadingScreen";
 import { GeneratorEntry } from "@/components/dashboard/GeneratorEntry";
 import { BackLink } from "@/components/dashboard/BackLink";
 import { ModelPickerGrid, type PickedModel } from "@/components/dashboard/ModelPickerGrid";
+import { useFilePicker } from "@/hooks/useFilePicker";
 
 const PHOTOSHOOT_STAGES = [
   "Preparing your product photo",
@@ -32,12 +33,11 @@ const THEME_OPTIONS = ["Contemporary catalog", "Luxury editorial", "Streetwear",
 const LIGHTING_OPTIONS = ["Soft studio", "Bright daylight", "Dramatic contrast", "Golden hour"];
 const BACKGROUND_OPTIONS = ["Clean neutral", "Studio white", "Textured backdrop", "Urban street", "Outdoor"];
 
-type Step = "entry" | "upload" | "shoot";
+type Step = "entry" | "shoot";
 type Status = "idle" | "generating" | "done" | "error";
 
 export function AiPhotoshootTab() {
   const { refresh: refreshCredits } = useCredits();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>("entry");
 
@@ -119,6 +119,11 @@ export function AiPhotoshootTab() {
     }
   };
 
+  const photoPicker = useFilePicker((f) => {
+    void handleFileChange(f);
+    setStep("shoot");
+  });
+
   const showingGenerationUi = status === "generating" || status === "done" || status === "error";
   const canGenerate = Boolean(productStoragePath) && Boolean(selectedModel) && !uploading;
 
@@ -137,68 +142,8 @@ export function AiPhotoshootTab() {
             <GeneratorEntry
               title="Shoot it like a campaign"
               subtitle="Upload one product photo, pick a model and a scene, and get a campaign-ready shot in seconds."
-              actions={[{ label: "Upload a product", icon: Upload, onClick: () => setStep("upload"), variant: "primary" }]}
+              actions={[{ label: "Upload a product", icon: Upload, onClick: photoPicker.open, variant: "primary" }]}
             />
-          </motion.div>
-        )}
-
-        {step === "upload" && (
-          <motion.div
-            key="upload"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="max-w-md mx-auto space-y-4"
-          >
-            <BackLink onClick={reset} label="Back to start" />
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                <ImagePlus className="h-4 w-4 text-muted-foreground" />
-                Product photo
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={(e) => void handleFileChange(e.target.files?.[0] ?? null)}
-              />
-              {productPreview ? (
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => fileInputRef.current?.click()}
-                  onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
-                  className="relative flex min-h-[220px] cursor-pointer select-none flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-border transition-colors hover:border-muted-foreground"
-                >
-                  <img src={productPreview} alt="Product" className="absolute inset-0 h-full w-full rounded-[10px] object-cover" />
-                  <div className="absolute inset-0 flex items-end justify-center rounded-[10px] bg-black/40 pb-4 opacity-0 transition-opacity hover:opacity-100">
-                    <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
-                      {uploading ? "Uploading…" : "Click to replace"}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex min-h-[180px] w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-6 text-center text-muted-foreground transition-colors hover:border-muted-foreground"
-                >
-                  <div className="rounded-full bg-muted p-3">
-                    <Upload className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground">Drop image here</p>
-                  <p className="text-xs text-muted-foreground">Clear product photo on white or transparent background</p>
-                </button>
-              )}
-            </div>
-            <Button
-              className="w-full h-11 gradient-primary text-primary-foreground shadow-soft"
-              disabled={!productStoragePath || uploading}
-              onClick={() => setStep("shoot")}
-            >
-              Continue
-            </Button>
           </motion.div>
         )}
 
@@ -270,7 +215,7 @@ export function AiPhotoshootTab() {
               )
             ) : (
               <>
-                <BackLink onClick={() => setStep("upload")} />
+                <BackLink onClick={reset} label="Back to start" />
 
                 <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
                   <img src={productPreview ?? undefined} alt="Product" className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
@@ -333,6 +278,14 @@ export function AiPhotoshootTab() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <input
+        ref={photoPicker.inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="sr-only"
+        onChange={photoPicker.onChange}
+      />
     </div>
   );
 }

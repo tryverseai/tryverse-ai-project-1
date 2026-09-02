@@ -15,13 +15,19 @@ interface ModelPickerGridProps {
   selectedId?: string | null;
   onSelect: (model: PickedModel) => void;
   className?: string;
+  /** "dark" when rendered on the ink surface directly after a GeneratorEntry (e.g. inside DarkPanel). */
+  theme?: "light" | "dark";
 }
 
-/** Shared saved-model + library-model picker grid — used by Personal Studio, AI Photoshoot, Outfit Builder. */
-export function ModelPickerGrid({ selectedId, onSelect, className }: ModelPickerGridProps) {
+/** Shared saved-model + library-model picker grid — used by Personal Studio, AI Photoshoot, AI Video, Outfit Builder. */
+export function ModelPickerGrid({ selectedId, onSelect, className, theme = "light" }: ModelPickerGridProps) {
   const [libraryModels, setLibraryModels] = useState<TryverseModel[]>([]);
   const [savedModels, setSavedModels] = useState<AiModelResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const dark = theme === "dark";
+  const labelCls = dark ? "text-white/45" : "text-muted-foreground";
+  const emptyCls = dark ? "text-white/60" : "text-muted-foreground";
+  const selectedBorderCls = dark ? "border-white" : "border-foreground";
 
   useEffect(() => {
     let cancelled = false;
@@ -40,16 +46,16 @@ export function ModelPickerGrid({ selectedId, onSelect, className }: ModelPicker
     };
   }, []);
 
-  if (loading) return <p className="text-xs text-muted-foreground">Loading models…</p>;
+  if (loading) return <p className={`text-xs ${emptyCls}`}>Loading models…</p>;
   if (savedModels.length === 0 && libraryModels.length === 0) {
-    return <p className="text-xs text-muted-foreground">No models available yet.</p>;
+    return <p className={`text-xs ${emptyCls}`}>No models available yet.</p>;
   }
 
   return (
     <div className={`space-y-5 ${className ?? ""}`}>
       {savedModels.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          <p className={`text-xs font-medium uppercase tracking-wider mb-2 ${labelCls}`}>
             My Models
           </p>
           <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-3">
@@ -67,7 +73,7 @@ export function ModelPickerGrid({ selectedId, onSelect, className }: ModelPicker
                   })
                 }
                 className={`rounded-lg border-2 transition-colors ${
-                  selectedId === m.id ? "border-foreground" : "border-transparent"
+                  selectedId === m.id ? selectedBorderCls : "border-transparent"
                 }`}
               >
                 <ModelPortrait src={m.imageUrl} alt="Your generated model" className="aspect-[3/4] rounded-md" />
@@ -78,7 +84,7 @@ export function ModelPickerGrid({ selectedId, onSelect, className }: ModelPicker
       )}
       {libraryModels.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          <p className={`text-xs font-medium uppercase tracking-wider mb-2 ${labelCls}`}>
             TryVerse Models
           </p>
           <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-3">
@@ -90,7 +96,7 @@ export function ModelPickerGrid({ selectedId, onSelect, className }: ModelPicker
                   onSelect({ source: "library", id: m.slug, imageUrl: m.image_url, label: m.display_name })
                 }
                 className={`rounded-lg border-2 transition-colors ${
-                  selectedId === m.slug ? "border-foreground" : "border-transparent"
+                  selectedId === m.slug ? selectedBorderCls : "border-transparent"
                 }`}
                 title={m.display_name}
               >

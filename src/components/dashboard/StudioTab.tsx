@@ -41,6 +41,8 @@ import { Film } from "lucide-react";
 import { downloadFile, dateStampedFilename } from "@/lib/utils";
 import { StudioEntry } from "@/components/dashboard/studio/StudioEntry";
 import { ModelPickerGrid, type PickedModel } from "@/components/dashboard/ModelPickerGrid";
+import { DarkPanel } from "@/components/dashboard/DarkPanel";
+import { useFilePicker } from "@/hooks/useFilePicker";
 
 const VIDEO_MAX_POLL_ATTEMPTS = 60;
 const VIDEO_POLL_INTERVAL_MS = 5000;
@@ -120,7 +122,7 @@ const LOADING_STAGES = [
 ];
 
 type Status = "idle" | "uploading" | "processing" | "done" | "error";
-type StudioStep = "entry" | "upload" | "choose-model" | "garment";
+type StudioStep = "entry" | "choose-model" | "garment";
 type EntryMode = "upload" | "model" | null;
 
 interface ImageSlot {
@@ -255,10 +257,12 @@ export function StudioTab() {
   const [videoStatus, setVideoStatus] = useState<"idle" | "generating" | "done" | "error">("idle");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
-  const handleFile = useCallback((slot: "model" | "garment", file: File) => {
+  /** Returns whether the file was accepted, so callers that advance a step on success (like the
+   * direct-picker flow below) don't move the user forward when validation rejects the file. */
+  const handleFile = useCallback((slot: "model" | "garment", file: File): boolean => {
     if (!file.type.startsWith("image/")) {
       toast.error("Please upload an image file.");
-      return;
+      return false;
     }
     const preview = URL.createObjectURL(file);
     if (slot === "model") {
@@ -266,6 +270,7 @@ export function StudioTab() {
     } else {
       setGarment({ file, preview, path: null });
     }
+    return true;
   }, []);
 
   const reset = () => {
@@ -284,9 +289,15 @@ export function StudioTab() {
     setVideoUrl(null);
   };
 
-  const goToUploadStep = () => {
+  const photoPicker = useFilePicker((f) => {
+    if (!handleFile("model", f)) return;
     setEntryMode("upload");
-    setStep("upload");
+    setStep("garment");
+  });
+
+  const openPhotoPicker = () => {
+    setEntryMode("upload");
+    photoPicker.open();
   };
 
   const handleUploadPhotoClick = () => {
@@ -294,7 +305,7 @@ export function StudioTab() {
       setGuidelinesOpen(true);
       return;
     }
-    goToUploadStep();
+    openPhotoPicker();
   };
 
   const handleChooseModelClick = () => {
@@ -472,43 +483,16 @@ export function StudioTab() {
           </motion.div>
         )}
 
-        {step === "upload" && (
-          <motion.div
-            key="upload"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="max-w-md mx-auto space-y-4"
-          >
-            <BackLink onClick={reset} label="Back to start" />
-            <DropZone
-              slot={model}
-              label="Your photo"
-              hint="Front-facing, full-body photo works best"
-              icon={Upload}
-              onFile={(f) => handleFile("model", f)}
-            />
-            <Button
-              className="w-full h-11 gradient-primary text-primary-foreground shadow-soft"
-              disabled={!model.file}
-              onClick={() => setStep("garment")}
-            >
-              Continue
-            </Button>
-          </motion.div>
-        )}
-
         {step === "choose-model" && (
           <motion.div
             key="choose-model"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="space-y-4"
           >
-            <BackLink onClick={reset} label="Back to start" />
-            <p className="text-sm font-medium text-foreground">Choose a virtual model</p>
-            <ModelPickerGrid selectedId={pickedModel?.id} onSelect={handlePickModel} />
+            <DarkPanel onBack={reset} eyebrow="Choose a virtual model">
+              <ModelPickerGrid selectedId={pickedModel?.id} onSelect={handlePickModel} theme="dark" />
+            </DarkPanel>
           </motion.div>
         )}
 
@@ -612,7 +596,7 @@ export function StudioTab() {
             ) : (
               <>
                 <BackLink
-                  onClick={() => setStep(entryMode === "upload" ? "upload" : "choose-model")}
+                  onClick={() => (entryMode === "upload" ? reset() : setStep("choose-model"))}
                 />
 
                 {chosenPreview && (
@@ -691,12 +675,20 @@ export function StudioTab() {
         )}
       </AnimatePresence>
 
+      <input
+        ref={photoPicker.inputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={photoPicker.onChange}
+      />
+
       <TryOnGuidelinesModal
         open={guidelinesOpen}
         onOpenChange={setGuidelinesOpen}
         onAcknowledge={() => {
           if (step === "entry") {
-            goToUploadStep();
+            openPhotoPicker();
           } else if (model.file && garment.file) {
             void run();
           }

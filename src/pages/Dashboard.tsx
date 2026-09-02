@@ -6,7 +6,7 @@ import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, BarChart3, Settings, Key, LayoutDashboard, CreditCard, BookOpen, FlaskConical, Sparkles,
-  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, LayoutGrid, PanelLeftOpen,
+  Users, Camera, Terminal, PlugZap, Shirt, Wand2, Film, LayoutGrid, PanelLeftOpen, PanelLeftClose,
 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
@@ -349,19 +349,24 @@ const Dashboard = () => {
           {/* Mobile tabs — left slide-in panel instead of a dropdown, mirrors the desktop
               sidebar's grouped list one-for-one. */}
           <div className="lg:hidden fixed left-0 right-0 z-30 bg-background border-b border-border" style={{ top: 'var(--navbar-height)' }}>
-            <div className="px-4 py-2 flex items-center gap-2">
+            <div className="px-4 py-2.5 flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setMobileNavOpen(true)}
-                aria-label="Open navigation panel"
-                className="flex-1 min-w-0 flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium bg-muted text-foreground"
+                onClick={() => setMobileNavOpen((v) => !v)}
+                aria-label={mobileNavOpen ? "Close navigation panel" : "Open navigation panel"}
+                aria-expanded={mobileNavOpen}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-foreground transition-all duration-150 hover:bg-muted/70 active:scale-95"
               >
-                <PanelLeftOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <span className="flex items-center gap-2 min-w-0">
-                  {ActiveIcon && <ActiveIcon className="h-4 w-4 flex-shrink-0" />}
-                  <span className="truncate">{activeTab}</span>
-                </span>
+                {mobileNavOpen ? (
+                  <PanelLeftClose className="h-[18px] w-[18px]" />
+                ) : (
+                  <PanelLeftOpen className="h-[18px] w-[18px]" />
+                )}
               </button>
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                {ActiveIcon && <ActiveIcon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
+                <span className="truncate text-sm font-medium text-foreground">{activeTab}</span>
+              </span>
               <CreditsBadge onClick={() => selectTab("Billing")} className="flex-shrink-0" />
             </div>
           </div>
