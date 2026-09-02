@@ -245,6 +245,22 @@ const Dashboard = () => {
   const tabParam = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(DEFAULT_TAB);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Desktop-only collapse state for the left sidebar rail, remembered across visits like a
+  // native desktop app (VS Code, Slack) rather than resetting every reload.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("tv-dashboard-sidebar-collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("tv-dashboard-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
+    } catch {
+      // Storage unavailable (private browsing, etc.) — collapse state just won't persist.
+    }
+  }, [sidebarCollapsed]);
   const [guideAcknowledged, setGuideAcknowledged] = useState(() => hasAcknowledgedTryOnGuide());
   const { user, signOut } = useAuth();
   // BetaAccessOverlay (terms acceptance / plan selection) is a sibling overlay that mounts on top
@@ -312,38 +328,69 @@ const Dashboard = () => {
         <Navbar mobileMenuHidden />
         <main className="pt-[var(--navbar-height)]">
           <div className="flex">
-          {/* Sidebar */}
-          <aside className="hidden lg:flex flex-col w-60 min-h-[calc(100vh-var(--navbar-height))] border-r border-border p-4 pt-6 sticky top-[var(--navbar-height)]">
-            <div className="mb-6">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Brand Dashboard</p>
-              <p className="text-sm font-semibold text-foreground mb-3">{brandName}</p>
-              <CreditsBadge onClick={() => selectTab("Billing")} />
+          {/* Sidebar — collapses to an icon-only rail on desktop, state remembered via localStorage. */}
+          <aside
+            className={`hidden lg:flex flex-col ${sidebarCollapsed ? "w-[4.5rem]" : "w-60"} min-h-[calc(100vh-var(--navbar-height))] border-r border-border p-3 pt-6 sticky top-[var(--navbar-height)] transition-[width] duration-300 ease-in-out overflow-hidden`}
+          >
+            <div className="mb-6 flex flex-col items-start gap-3 px-1">
+              {!sidebarCollapsed && (
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Brand Dashboard</p>
+                  <p className="text-sm font-semibold text-foreground truncate">{brandName}</p>
+                </div>
+              )}
+              <CreditsBadge onClick={() => selectTab("Billing")} collapsed={sidebarCollapsed} />
             </div>
-            <nav className="space-y-5">
+            <nav className="flex-1 space-y-5 overflow-y-auto overflow-x-hidden">
               {sidebarGroups.map((group) => (
                 <div key={group.section}>
-                  <p className="px-3 mb-1.5 text-[0.6875rem] font-semibold text-muted-foreground/70 uppercase tracking-wider">
-                    {group.section}
-                  </p>
+                  {!sidebarCollapsed && (
+                    <p className="px-3 mb-1.5 text-[0.6875rem] font-semibold text-muted-foreground/70 uppercase tracking-wider truncate">
+                      {group.section}
+                    </p>
+                  )}
                   <div className="space-y-1">
                     {group.items.map((item) => (
                       <button
                         key={item.label}
                         onClick={() => selectTab(item.label)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                        title={sidebarCollapsed ? item.label : undefined}
+                        aria-label={sidebarCollapsed ? item.label : undefined}
+                        className={`w-full flex items-center gap-3 rounded-lg text-sm font-medium transition-colors ${
+                          sidebarCollapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
+                        } ${
                           activeTab === item.label
                             ? "bg-foreground text-background"
                             : "text-muted-foreground hover:text-foreground hover:bg-muted"
                         }`}
                       >
-                        <item.icon className="h-4 w-4" />
-                        {item.label}
+                        <item.icon className="h-4 w-4 flex-shrink-0" />
+                        {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
                       </button>
                     ))}
                   </div>
                 </div>
               ))}
             </nav>
+
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((v) => !v)}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!sidebarCollapsed}
+              className={`mt-3 flex h-9 flex-shrink-0 items-center gap-2 rounded-lg text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground ${
+                sidebarCollapsed ? "justify-center px-0" : "px-3"
+              }`}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="h-[18px] w-[18px] flex-shrink-0" />
+              ) : (
+                <>
+                  <PanelLeftClose className="h-[18px] w-[18px] flex-shrink-0" />
+                  <span className="text-xs font-medium">Collapse</span>
+                </>
+              )}
+            </button>
           </aside>
 
           {/* Mobile tabs — left slide-in panel instead of a dropdown, mirrors the desktop
