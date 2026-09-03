@@ -51,7 +51,7 @@ export async function executeVideoPipeline(job: VideoJob): Promise<VideoResult> 
     const message = err instanceof Error ? err.message : String(err);
     logger.error('Video pipeline failed', { jobId: job.jobId, generationDbId: job.generationDbId, error: message });
 
-    await restoreCredits(job.userId, job.creditAmount, job.creditType);
+    await restoreCredits(job.userId, job.creditAmount, job.creditType, `video:${job.generationDbId}`);
 
     try {
       await convexMutationTrusted(anyApi.backendTrusted.patchVideoGeneration, {

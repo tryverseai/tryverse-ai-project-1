@@ -704,7 +704,7 @@ export async function executeTryOnPipeline(job: TryOnJob): Promise<TryOnResult> 
     });
 
     if (userId) {
-      await restoreCredits(userId);
+      await restoreCredits(userId, 1, undefined, `tryon:${tryonDbId}`);
       await cxInsertUsageEvent(userId, 'tryon_failed', {
         tryon_id: tryonDbId,
         category,

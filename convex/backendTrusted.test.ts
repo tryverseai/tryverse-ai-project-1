@@ -319,6 +319,98 @@ describe("restoreCredit", () => {
     const row = await client.run((ctx) => getProfile(ctx, "u-legacy"));
     expect(row.free_credits_remaining).toBe(4);
   });
+
+  describe("refundKey idempotency (Bull retry double-refund fix)", () => {
+    it("only restores once when the same refundKey is submitted twice, e.g. two failed Bull retry attempts for the same job", async () => {
+      const client = t();
+      await client.run((ctx) =>
+        seedProfile(ctx, "u-dedup", {
+          free_credits_remaining: 3,
+          free_credits_total: 10,
+        })
+      );
+
+      const first = await client.mutation(api.backendTrusted.restoreCredit, {
+        secret: SECRET,
+        userId: "u-dedup",
+        creditType: "free",
+        refundKey: "tryon:abc123",
+      });
+      const second = await client.mutation(api.backendTrusted.restoreCredit, {
+        secret: SECRET,
+        userId: "u-dedup",
+        creditType: "free",
+        refundKey: "tryon:abc123",
+      });
+
+      expect(first).toEqual({ ok: true });
+      expect(second).toEqual({ ok: true, deduped: true });
+
+      const row = await client.run((ctx) => getProfile(ctx, "u-dedup"));
+      // Restored exactly once (3 -> 4), not twice (which would be 5).
+      expect(row.free_credits_remaining).toBe(4);
+    });
+
+    it("restores independently for two different refundKeys (different generations)", async () => {
+      const client = t();
+      await client.run((ctx) =>
+        seedProfile(ctx, "u-dedup-2", {
+          free_credits_remaining: 0,
+          free_credits_total: 10,
+        })
+      );
+
+      await client.mutation(api.backendTrusted.restoreCredit, {
+        secret: SECRET,
+        userId: "u-dedup-2",
+        creditType: "free",
+        refundKey: "tryon:job-1",
+      });
+      await client.mutation(api.backendTrusted.restoreCredit, {
+        secret: SECRET,
+        userId: "u-dedup-2",
+        creditType: "free",
+        refundKey: "tryon:job-2",
+      });
+
+      const row = await client.run((ctx) => getProfile(ctx, "u-dedup-2"));
+      expect(row.free_credits_remaining).toBe(2);
+    });
+
+    it("still restores every time when no refundKey is given (unchanged legacy behavior)", async () => {
+      const client = t();
+      await client.run((ctx) =>
+        seedProfile(ctx, "u-no-key", {
+          free_credits_remaining: 0,
+          free_credits_total: 10,
+        })
+      );
+
+      await client.mutation(api.backendTrusted.restoreCredit, {
+        secret: SECRET,
+        userId: "u-no-key",
+        creditType: "free",
+      });
+      await client.mutation(api.backendTrusted.restoreCredit, {
+        secret: SECRET,
+        userId: "u-no-key",
+        creditType: "free",
+      });
+
+      const row = await client.run((ctx) => getProfile(ctx, "u-no-key"));
+      expect(row.free_credits_remaining).toBe(2);
+    });
+
+    it("does not create a dedup row (and stays restorable) when the profile itself doesn't exist", async () => {
+      const client = t();
+      const result = await client.mutation(api.backendTrusted.restoreCredit, {
+        secret: SECRET,
+        userId: "u-does-not-exist",
+        refundKey: "tryon:orphan",
+      });
+      expect(result).toEqual({ ok: false });
+    });
+  });
 });
 
 describe("insertPaymentIfNewTrusted (webhook idempotency)", () => {

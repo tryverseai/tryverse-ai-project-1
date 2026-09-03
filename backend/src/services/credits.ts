@@ -466,14 +466,28 @@ export async function decrementCredits(userId: string): Promise<void> {
  * @param creditType Pass the `creditType` from the original `checkCredits()` result whenever it's
  * available — restores to that exact pool instead of guessing (see cxRestoreCredit's doc comment).
  */
+/**
+ * `refundKey` should be a stable identifier for the generation record being refunded (e.g.
+ * `tryon:<tryonDbId>`), NOT the Bull job id — Bull retries re-run the same job (and can call this
+ * on every failed attempt, see JOB_MAX_RETRIES), so a job-scoped key would still allow multiple
+ * refunds for one original reservation. A record-scoped key survives every retry unchanged,
+ * making the Convex-side dedup (`credit_refund_dedup`) actually collapse them to one restore.
+ * Omitting it restores the old (non-idempotent) behavior — every automatic generation-failure
+ * call site should pass one.
+ */
 export async function restoreCredits(
   userId: string,
   amount = 1,
-  creditType?: 'monthly' | 'free'
+  creditType?: 'monthly' | 'free',
+  refundKey?: string
 ): Promise<void> {
   try {
-    await cxRestoreCredit(userId, amount, creditType);
-    logger.info('Credit restored (AI failure)', { userId, amount, creditType });
+    const result = await cxRestoreCredit(userId, amount, creditType, refundKey);
+    if (result.deduped) {
+      logger.info('Credit restore skipped (already refunded for this record)', { userId, amount, refundKey });
+    } else {
+      logger.info('Credit restored (AI failure)', { userId, amount, creditType, refundKey });
+    }
   } catch (e) {
     logger.warn('Credit restore failed', { userId, amount, error: String(e) });
   }

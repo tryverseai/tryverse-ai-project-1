@@ -178,6 +178,22 @@ export default defineSchema({
     .index("by_userId", ["user_id"])
     .index("by_reference", ["reference"]),
 
+  /**
+   * Dedup guard for credit refunds. A queued generation job (try-on/outfit/product-model/video)
+   * can be retried by Bull up to JOB_MAX_RETRIES times, and each failed attempt independently
+   * calls restoreCredit — without this, the same original reservation gets refunded once per
+   * failed attempt (2-3x) instead of once, or a later-successful retry leaves the user refunded
+   * for a generation they did receive. `refund_key` is a stable per-record key (e.g.
+   * "tryon:<tryonDbId>") that survives every retry of the same job, so restoreCredit can check-
+   * and-insert atomically (same pattern as insertPaymentIfNewTrusted) before applying the actual
+   * credit restoration, making the refund idempotent regardless of how many times it's attempted.
+   */
+  credit_refund_dedup: defineTable({
+    refund_key: v.string(),
+    user_id: v.string(),
+    created_at: v.string(),
+  }).index("by_refund_key", ["refund_key"]),
+
   products: defineTable({
     legacy_id: v.optional(v.string()),
     user_id: v.string(),

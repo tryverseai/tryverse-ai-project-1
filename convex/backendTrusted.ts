@@ -2020,12 +2020,43 @@ export const restoreCredit = mutation({
     // whose monthly allotment was exhausted mid-cycle, so reserveCredit fell through to free) —
     // permanently draining the free pool while crediting an extra monthly-plan generation.
     creditType: v.optional(v.union(v.literal("monthly"), v.literal("free"))),
+    // Stable per-record key (e.g. "tryon:<tryonDbId>") — when provided, this restore is a no-op
+    // if the same key has already been refunded (see credit_refund_dedup's doc comment). Optional
+    // only so any caller that genuinely has no stable record id (should not exist for real
+    // generation pipelines, but keeps this mutation from being a breaking change) still works,
+    // just without the dedup guarantee.
+    refundKey: v.optional(v.string()),
   },
-  handler: async (ctx, { secret, userId, amount, creditType }) => {
+  handler: async (ctx, { secret, userId, amount, creditType, refundKey }) => {
     requireBackendSecret(secret);
     const cost = Math.max(1, Math.floor(amount ?? 1));
+
+    if (refundKey) {
+      const existing = await ctx.db
+        .query("credit_refund_dedup")
+        .withIndex("by_refund_key", (q) => q.eq("refund_key", refundKey))
+        .first();
+      if (existing) return { ok: true as const, deduped: true as const };
+    }
+
     const row = await profileRowForBackend(ctx, userId);
     if (!row) return { ok: false as const };
+
+    // Record the dedup key only once we know a restore will actually be attempted for a real
+    // profile — in the SAME mutation invocation as the balance patch below, so Convex's
+    // per-document/query serialization means two concurrent restoreCredit calls for the same
+    // refundKey cannot both observe "no existing row" and both proceed. If we inserted this
+    // earlier (before the profile lookup), a call for a refundKey whose profile lookup fails
+    // would permanently mark that key as "already refunded" even though nothing was ever
+    // credited — silently swallowing a legitimate future retry.
+    if (refundKey) {
+      await ctx.db.insert("credit_refund_dedup", {
+        refund_key: refundKey,
+        user_id: userId,
+        created_at: new Date().toISOString(),
+      });
+    }
+
     if (Number(row.monthly_credits_total) === -1) return { ok: true as const };
 
     const planId = typeof row.plan_id === "string" ? row.plan_id : "free";

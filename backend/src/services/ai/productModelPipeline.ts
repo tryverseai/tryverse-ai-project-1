@@ -51,7 +51,7 @@ export async function executeProductModelPipeline(job: ProductModelJob): Promise
     const message = err instanceof Error ? err.message : String(err);
     logger.error('Product-model pipeline failed', { jobId: job.jobId, generationDbId: job.generationDbId, error: message });
 
-    await restoreCredits(job.userId, job.creditAmount, job.creditType);
+    await restoreCredits(job.userId, job.creditAmount, job.creditType, `product_model:${job.generationDbId}`);
 
     try {
       await convexMutationTrusted(anyApi.backendTrusted.patchProductModelGeneration, {

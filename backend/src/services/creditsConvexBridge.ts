@@ -159,13 +159,15 @@ export async function cxReserveCredit(userId: string, amount = 1): Promise<{
 export async function cxRestoreCredit(
   userId: string,
   amount = 1,
-  creditType?: 'monthly' | 'free'
-): Promise<{ ok: boolean }> {
+  creditType?: 'monthly' | 'free',
+  refundKey?: string
+): Promise<{ ok: boolean; deduped?: boolean }> {
   const result = await convexMutationTrusted(anyApi.backendTrusted.restoreCredit, {
     ...trusted(),
     userId,
     amount,
     creditType,
+    refundKey,
   });
-  return result as { ok: boolean };
+  return result as { ok: boolean; deduped?: boolean };
 }
