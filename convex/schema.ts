@@ -314,6 +314,19 @@ export default defineSchema({
     count_in_window: v.number(),
   }).index("by_email", ["email"]),
 
+  /**
+   * Password-sign-in brute-force/credential-stuffing throttle — see signInAttemptThrottle.ts.
+   * One row per attempted email (bounded by the set of distinct addresses ever tried, not by
+   * attempt count), so this can't grow unboundedly the way a per-attempt log would.
+   */
+  sign_in_attempt_throttle: defineTable({
+    email: v.string(),
+    fail_count: v.number(),
+    last_attempt_at: v.number(),
+    /** ms epoch; while set and in the future, sign-in attempts for this email are rejected. */
+    locked_until: v.optional(v.number()),
+  }).index("by_email", ["email"]),
+
   admin_audit_log: defineTable({
     event_type: v.string(),
     actor: v.optional(v.string()),

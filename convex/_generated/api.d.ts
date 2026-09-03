@@ -36,6 +36,7 @@ import type * as resendEmailErrors from "../resendEmailErrors.js";
 import type * as resendEnv from "../resendEnv.js";
 import type * as security from "../security.js";
 import type * as seed from "../seed.js";
+import type * as signInAttemptThrottle from "../signInAttemptThrottle.js";
 import type * as trustedStorage from "../trustedStorage.js";
 import type * as tryVersePassword from "../tryVersePassword.js";
 import type * as userBootstrap from "../userBootstrap.js";
@@ -75,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   resendEnv: typeof resendEnv;
   security: typeof security;
   seed: typeof seed;
+  signInAttemptThrottle: typeof signInAttemptThrottle;
   trustedStorage: typeof trustedStorage;
   tryVersePassword: typeof tryVersePassword;
   userBootstrap: typeof userBootstrap;

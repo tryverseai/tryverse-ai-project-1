@@ -20,6 +20,7 @@ import {
 import type { DocumentByName, GenericDataModel, WithoutSystemFields } from "convex/server";
 import type { Value } from "convex/values";
 import { Scrypt } from "lucia";
+import { internal } from "./_generated/api";
 
 export interface TryVersePasswordConfig<DataModel extends GenericDataModel> {
   id?: string;
@@ -77,9 +78,27 @@ export function TryVersePassword<DataModel extends GenericDataModel>(
         if (secret === undefined) {
           throw new Error("Missing `password` param for `signIn` flow");
         }
-        const retrieved = await retrieveAccount(ctx, {
-          provider,
-          account: { id: email, secret },
+        // Brute-force / credential-stuffing throttle — see signInAttemptThrottle.ts. Checked
+        // before the actual credential verification below; throws the same generic message
+        // regardless of whether `email` belongs to a real account, so throttling itself can't be
+        // used to enumerate valid addresses.
+        await ctx.runMutation(internal.signInAttemptThrottle.checkThrottle, { email });
+        let retrieved: Awaited<ReturnType<typeof retrieveAccount>>;
+        try {
+          retrieved = await retrieveAccount(ctx, {
+            provider,
+            account: { id: email, secret },
+          });
+        } catch (e) {
+          await ctx.runMutation(internal.signInAttemptThrottle.recordAttemptResult, {
+            email,
+            success: false,
+          });
+          throw e;
+        }
+        await ctx.runMutation(internal.signInAttemptThrottle.recordAttemptResult, {
+          email,
+          success: retrieved !== null,
         });
         if (retrieved === null) {
           throw new Error("Invalid credentials");
