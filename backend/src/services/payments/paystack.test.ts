@@ -19,6 +19,8 @@ vi.mock('../../config/convexHttp', () => ({
 }));
 vi.mock('../billingConvexBridge', () => ({
   insertPaymentIfNew: vi.fn(),
+  insertPaymentIntent: vi.fn(),
+  getPaymentIntentByReference: vi.fn(),
   upsertSubscriptionRow: vi.fn(),
   cancelSubscriptionsForUserId: vi.fn(),
 }));

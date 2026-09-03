@@ -1839,6 +1839,50 @@ export const insertPaymentIfNewTrusted = mutation({
   },
 });
 
+/** Written at payment-initialize time, before the provider is involved — see payment_intents'
+ * schema doc comment. Idempotent on `reference` (the caller generates a fresh unique reference
+ * per checkout attempt, so a duplicate insert here would only happen on a genuine client retry of
+ * the same initialize call; overwriting with the same expected values is harmless). */
+export const insertPaymentIntentTrusted = mutation({
+  args: {
+    secret: v.string(),
+    reference: v.string(),
+    provider: v.string(),
+    user_id: v.string(),
+    plan_id: v.string(),
+    expected_amount: v.number(),
+    expected_currency: v.string(),
+  },
+  handler: async (ctx, a) => {
+    requireBackendSecret(a.secret);
+    const existing = await ctx.db
+      .query("payment_intents")
+      .withIndex("by_reference", (q) => q.eq("reference", a.reference))
+      .first();
+    if (existing) return;
+    await ctx.db.insert("payment_intents", {
+      reference: a.reference,
+      provider: a.provider,
+      user_id: a.user_id,
+      plan_id: a.plan_id,
+      expected_amount: a.expected_amount,
+      expected_currency: a.expected_currency,
+      created_at: new Date().toISOString(),
+    });
+  },
+});
+
+export const getPaymentIntentByReferenceTrusted = query({
+  args: { secret: v.string(), reference: v.string() },
+  handler: async (ctx, { secret, reference }) => {
+    requireBackendSecret(secret);
+    return await ctx.db
+      .query("payment_intents")
+      .withIndex("by_reference", (q) => q.eq("reference", reference))
+      .first();
+  },
+});
+
 export const upsertSubscriptionForUser = mutation({
   args: {
     secret: v.string(),

@@ -179,6 +179,25 @@ export default defineSchema({
     .index("by_reference", ["reference"]),
 
   /**
+   * Server-side record of what a payment was initialized for, written at
+   * /api/payment/initialize/* time — BEFORE the provider is ever involved — so the webhook has a
+   * trusted expectation to check the actually-charged amount/currency/plan/user against, instead
+   * of only relying on the provider's signature (which proves the event is genuinely from
+   * Paystack/Flutterwave, but not that it matches what THIS app expected to happen). One row per
+   * payment attempt; not deleted after use so `by_reference` stays a durable audit trail.
+   */
+  payment_intents: defineTable({
+    reference: v.string(),
+    provider: v.string(),
+    user_id: v.string(),
+    plan_id: v.string(),
+    /** Major currency units (naira/dollars) — same convention the `payments` table itself uses. */
+    expected_amount: v.number(),
+    expected_currency: v.string(),
+    created_at: v.string(),
+  }).index("by_reference", ["reference"]),
+
+  /**
    * Dedup guard for credit refunds. A queued generation job (try-on/outfit/product-model/video)
    * can be retried by Bull up to JOB_MAX_RETRIES times, and each failed attempt independently
    * calls restoreCredit — without this, the same original reservation gets refunded once per

@@ -42,6 +42,36 @@ export async function insertPaymentIfNew(args: {
   return result.inserted;
 }
 
+export interface PaymentIntentRow {
+  reference: string;
+  provider: string;
+  user_id: string;
+  plan_id: string;
+  expected_amount: number;
+  expected_currency: string;
+  created_at: string;
+}
+
+/** Written at payment-initialize time — see convex/schema.ts's payment_intents doc comment. */
+export async function insertPaymentIntent(args: {
+  reference: string;
+  provider: string;
+  user_id: string;
+  plan_id: string;
+  expected_amount: number;
+  expected_currency: string;
+}): Promise<void> {
+  await convexMutationTrusted(anyApi.backendTrusted.insertPaymentIntentTrusted, { ...secret(), ...args });
+}
+
+export async function getPaymentIntentByReference(reference: string): Promise<PaymentIntentRow | null> {
+  const result = await convexQueryTrusted(anyApi.backendTrusted.getPaymentIntentByReferenceTrusted, {
+    ...secret(),
+    reference,
+  });
+  return (result as PaymentIntentRow | null) ?? null;
+}
+
 export async function upsertSubscriptionRow(args: {
   user_id: string;
   plan_id: string;

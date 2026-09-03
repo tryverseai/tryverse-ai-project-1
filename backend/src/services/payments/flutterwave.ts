@@ -5,6 +5,8 @@ import { logger } from '../../config/logger';
 import { AppError } from '../../middleware/errorHandler';
 import {
   insertPaymentIfNew,
+  insertPaymentIntent,
+  getPaymentIntentByReference,
   upsertSubscriptionRow,
   cancelSubscriptionsForUserId,
 } from '../billingConvexBridge';
@@ -12,6 +14,7 @@ import { cxGetPlan, cxGetProfile } from '../creditsConvexBridge';
 import { cxInsertUsageEvent } from '../tryonConvexBridge';
 import { allocateCredits } from '../credits';
 import { sendPaymentConfirmationEmail, sendFailedPaymentEmail } from '../email';
+import { validatePaymentAgainstIntent } from './paymentIntentValidation';
 import type { FlutterwaveWebhookEvent } from '../../types';
 
 const FLW_API = 'https://api.flutterwave.com/v3';
@@ -83,6 +86,25 @@ export async function initializeFlutterwavePayment(params: {
     throw new Error(`Flutterwave initialization failed: ${response.data.message}`);
   }
 
+  // See paystack.ts's identical call for why — recorded before Flutterwave (or a replayed
+  // webhook) is ever involved, so the webhook can independently re-check what actually got
+  // charged. Best-effort: doesn't block checkout on failure.
+  try {
+    await insertPaymentIntent({
+      reference: tx_ref,
+      provider: 'flutterwave',
+      user_id: params.userId,
+      plan_id: params.planId,
+      expected_amount: params.amount,
+      expected_currency: params.currency,
+    });
+  } catch (e) {
+    logger.warn('Failed to record payment intent (webhook will fall back to legacy trust model for this reference)', {
+      tx_ref,
+      error: String(e),
+    });
+  }
+
   logger.info('Flutterwave payment initialized', { tx_ref, planId: params.planId });
   return {
     authorization_url: response.data.data.link,
@@ -141,6 +163,32 @@ export async function handleFlutterwaveWebhook(event: FlutterwaveWebhookEvent): 
     if (!meta?.user_id || !meta?.plan_id) {
       logger.error('Missing meta in Flutterwave webhook', { tx_ref });
       return;
+    }
+
+    // Independent server-side re-assertion of the commercial expectation — see paystack.ts's
+    // identical check and payment_intents' schema doc comment for the full rationale.
+    const intent = await getPaymentIntentByReference(tx_ref);
+    if (!intent) {
+      logger.warn('Flutterwave webhook: no payment_intents record for this tx_ref (pre-existing or intent-write failed) — proceeding on signature+reference trust alone', {
+        tx_ref,
+      });
+    } else {
+      const result = validatePaymentAgainstIntent(
+        {
+          user_id: intent.user_id,
+          plan_id: intent.plan_id,
+          expected_amount: intent.expected_amount,
+          expected_currency: intent.expected_currency,
+        },
+        { user_id: meta.user_id, plan_id: meta.plan_id, amount, currency }
+      );
+      if (!result.ok) {
+        logger.error('Flutterwave webhook REJECTED: charged amount/currency/plan/user does not match what this tx_ref was initialized for', {
+          tx_ref,
+          reason: result.reason,
+        });
+        return;
+      }
     }
 
     const inserted = await insertPaymentIfNew({

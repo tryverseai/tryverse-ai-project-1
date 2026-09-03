@@ -6,12 +6,15 @@ import { AppError } from '../../middleware/errorHandler';
 import { allocateCredits } from '../credits';
 import {
   insertPaymentIfNew,
+  insertPaymentIntent,
+  getPaymentIntentByReference,
   upsertSubscriptionRow,
   cancelSubscriptionsForUserId,
 } from '../billingConvexBridge';
 import { cxGetPlan, cxGetProfile } from '../creditsConvexBridge';
 import { cxInsertUsageEvent } from '../tryonConvexBridge';
 import { sendPaymentConfirmationEmail, sendFailedPaymentEmail } from '../email';
+import { validatePaymentAgainstIntent } from './paymentIntentValidation';
 import type { PaystackWebhookEvent } from '../../types';
 
 const PAYSTACK_API = 'https://api.paystack.co';
@@ -72,6 +75,27 @@ export async function initializePaystackPayment(params: {
 
   if (!response.data.status) {
     throw new AppError(`Payment initialization failed: ${response.data.message}`, 502);
+  }
+
+  // Record what this reference is *expected* to be for, before Paystack (or an attacker replaying
+  // a webhook) ever gets involved — the webhook handler checks the actually-charged amount/
+  // currency/plan/user against this instead of trusting the event alone. Best-effort: a failure
+  // here shouldn't block checkout (the older signature+reference-uniqueness protections still
+  // apply), but it does mean this specific reference falls back to the pre-existing trust model.
+  try {
+    await insertPaymentIntent({
+      reference,
+      provider: 'paystack',
+      user_id: params.userId,
+      plan_id: params.planId,
+      expected_amount: params.amount,
+      expected_currency: 'NGN',
+    });
+  } catch (e) {
+    logger.warn('Failed to record payment intent (webhook will fall back to legacy trust model for this reference)', {
+      reference,
+      error: String(e),
+    });
   }
 
   logger.info('Paystack payment initialized', { reference, planId: params.planId });
@@ -137,6 +161,35 @@ export async function handlePaystackWebhook(event: PaystackWebhookEvent): Promis
     if (!metadata?.user_id || !metadata?.plan_id) {
       logger.error('Missing metadata in Paystack webhook', { reference });
       return;
+    }
+
+    // Independent server-side re-assertion of the commercial expectation — see payment_intents'
+    // schema doc comment. A missing intent (reference initialized before this check existed, or
+    // the best-effort insert above failed) is logged but NOT blocked, so no in-flight or historical
+    // payment breaks; a MISMATCH against a found intent IS blocked — that's a real red flag,
+    // never something a legitimate delayed/retried webhook for the same checkout would produce.
+    const intent = await getPaymentIntentByReference(reference);
+    if (!intent) {
+      logger.warn('Paystack webhook: no payment_intents record for this reference (pre-existing or intent-write failed) — proceeding on signature+reference trust alone', {
+        reference,
+      });
+    } else {
+      const result = validatePaymentAgainstIntent(
+        {
+          user_id: intent.user_id,
+          plan_id: intent.plan_id,
+          expected_amount: intent.expected_amount,
+          expected_currency: intent.expected_currency,
+        },
+        { user_id: metadata.user_id, plan_id: metadata.plan_id, amount: amount / 100, currency }
+      );
+      if (!result.ok) {
+        logger.error('Paystack webhook REJECTED: charged amount/currency/plan/user does not match what this reference was initialized for', {
+          reference,
+          reason: result.reason,
+        });
+        return;
+      }
     }
 
     try {

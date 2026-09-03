@@ -521,3 +521,94 @@ describe("insertPaymentIfNewTrusted (webhook idempotency)", () => {
     expect(rows.length).toBe(0);
   });
 });
+
+describe("payment_intents (payment amount/currency validation record)", () => {
+  it("stores an intent and returns it by reference", async () => {
+    const client = t();
+    await client.mutation(api.backendTrusted.insertPaymentIntentTrusted, {
+      secret: SECRET,
+      reference: "TV_PS_ref1",
+      provider: "paystack",
+      user_id: "u1",
+      plan_id: "starter",
+      expected_amount: 5000,
+      expected_currency: "NGN",
+    });
+
+    const row = await client.query(api.backendTrusted.getPaymentIntentByReferenceTrusted, {
+      secret: SECRET,
+      reference: "TV_PS_ref1",
+    });
+
+    expect(row).toMatchObject({
+      reference: "TV_PS_ref1",
+      provider: "paystack",
+      user_id: "u1",
+      plan_id: "starter",
+      expected_amount: 5000,
+      expected_currency: "NGN",
+    });
+  });
+
+  it("returns null for an unknown/never-initialized reference", async () => {
+    const client = t();
+    const row = await client.query(api.backendTrusted.getPaymentIntentByReferenceTrusted, {
+      secret: SECRET,
+      reference: "never-existed",
+    });
+    expect(row).toBeNull();
+  });
+
+  it("does not create a duplicate row for the same reference (idempotent insert)", async () => {
+    const client = t();
+    await client.mutation(api.backendTrusted.insertPaymentIntentTrusted, {
+      secret: SECRET,
+      reference: "TV_PS_ref2",
+      provider: "paystack",
+      user_id: "u1",
+      plan_id: "starter",
+      expected_amount: 5000,
+      expected_currency: "NGN",
+    });
+    // A client retry of the same initialize call (e.g. after a network timeout) reuses the
+    // reference — must not create a second row or overwrite with different values.
+    await client.mutation(api.backendTrusted.insertPaymentIntentTrusted, {
+      secret: SECRET,
+      reference: "TV_PS_ref2",
+      provider: "paystack",
+      user_id: "u1",
+      plan_id: "starter",
+      expected_amount: 5000,
+      expected_currency: "NGN",
+    });
+
+    const rows = await client.run((ctx) =>
+      ctx.db
+        .query("payment_intents")
+        .withIndex("by_reference", (q: any) => q.eq("reference", "TV_PS_ref2"))
+        .collect()
+    );
+    expect(rows.length).toBe(1);
+  });
+
+  it("rejects with a wrong shared secret and inserts nothing", async () => {
+    const client = t();
+    await expect(
+      client.mutation(api.backendTrusted.insertPaymentIntentTrusted, {
+        secret: "wrong-secret",
+        reference: "TV_PS_ref3",
+        provider: "paystack",
+        user_id: "u1",
+        plan_id: "starter",
+        expected_amount: 5000,
+        expected_currency: "NGN",
+      })
+    ).rejects.toThrow();
+
+    const row = await client.query(api.backendTrusted.getPaymentIntentByReferenceTrusted, {
+      secret: SECRET,
+      reference: "TV_PS_ref3",
+    });
+    expect(row).toBeNull();
+  });
+});
