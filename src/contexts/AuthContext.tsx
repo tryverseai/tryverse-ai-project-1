@@ -109,10 +109,24 @@ function normalizeConvexAuthError(err: unknown): Error {
 const SIGN_IN_FRIENDLY =
   /invalidaccountid|invalid\s*account|credentialssignin|invalid\s*credentials?|incorrect\s*password|wrong\s*password|user\s*not\s*found|no\s*user|account\s*not\s*found|email\s*(?:is\s*)?not\s*found|invalid\s*login|authentication\s*failed/i;
 
+/**
+ * Convex wraps a thrown Error's message with an "Uncaught Error: " prefix (sometimes doubled)
+ * each time it crosses a runMutation/action boundary — see signInAttemptThrottle.ts's
+ * checkThrottle, called from this action via ctx.runMutation. Matched BEFORE the generic
+ * "noisy Convex error" fallback below, which would otherwise catch this message too (it contains
+ * both "uncaught error" and "sign-in") and silently collapse it to the same text as a wrong
+ * password — leaving a throttled user with no indication they should wait rather than keep
+ * retrying (or panic-reset a password that was never actually wrong).
+ */
+const THROTTLED_SIGN_IN = /too many sign-in attempts/i;
+
 export function humanizeSignInPasswordError(err: unknown): Error {
   const inner = normalizeConvexAuthError(err);
   const m = inner.message.replace(/\s+/g, " ").trim();
   if (!m) return new Error("Invalid account or password.");
+  if (THROTTLED_SIGN_IN.test(m)) {
+    return new Error("Too many sign-in attempts. Please wait a moment and try again.");
+  }
   if (SIGN_IN_FRIENDLY.test(m)) {
     return new Error("Invalid account or password.");
   }
