@@ -182,7 +182,7 @@ function adminSessionCookieOptions(): {
     httpOnly: true,
     sameSite: prod ? 'none' : 'lax',
     secure: prod,
-    maxAge: 15 * 60 * 1000, // 15 minutes (ms for Express res.cookie)
+    maxAge: 7 * 60 * 1000, // 7 minutes (ms for Express res.cookie) — matches SESSION_TTL_MS in adminSession.ts
     path: '/api/admin',
   };
 }

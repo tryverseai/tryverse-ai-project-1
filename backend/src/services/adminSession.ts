@@ -3,7 +3,8 @@ import { getRedisClient } from '../config/redis';
 import { logger } from '../config/logger';
 
 export const ADMIN_SESSION_COOKIE = 'tryverse_admin_session';
-const SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutes (matches frontend idle timeout)
+const SESSION_TTL_MS = 7 * 60 * 1000; // 7 minutes — tighter than the dashboard's 15-minute idle
+// window given admin's privileged surface (block/ban/delete accounts, revoke keys, etc.).
 const SESSION_TTL_SEC = SESSION_TTL_MS / 1000;
 const REDIS_KEY_PREFIX = 'admin:session:';
 const MAX_FALLBACK_SESSIONS = 20; // Safety cap for the in-memory path — admin is a single user
