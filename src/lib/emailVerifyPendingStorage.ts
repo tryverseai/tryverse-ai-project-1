@@ -25,7 +25,7 @@ export function saveEmailVerifyPending(payload: EmailVerifyPendingPayload) {
 }
 
 function isAccountType(v: unknown): v is AccountType {
-  return v === "individual" || v === "business";
+  return v === "business";
 }
 
 export function readEmailVerifyPending(): EmailVerifyPendingPayload | null {

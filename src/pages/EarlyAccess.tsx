@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { submitEarlyAccessRequest, submitIndividualEarlyAccessRequest } from "@/lib/backendApi";
+import { submitEarlyAccessRequest } from "@/lib/backendApi";
 import { inviteSignupEnabled, FEATURE_FLAGS } from "@/lib/featureFlags";
 import { X } from "lucide-react";
 
@@ -134,22 +134,12 @@ function Field({
   );
 }
 
-type AccessFlow = "pick" | "business" | "individual";
-
 const EarlyAccess = () => {
   const premiumWaitlistCopy = FEATURE_FLAGS.INVITE_ONLY_MODE;
   const navigate = useNavigate();
   const [open, setOpen] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [flow, setFlow] = useState<AccessFlow>("pick");
-  const [submissionKind, setSubmissionKind] = useState<"business" | "individual">("business");
-  const [pickSelection, setPickSelection] = useState<string>("");
-  const [indFirstName, setIndFirstName] = useState("");
-  const [indEmail, setIndEmail] = useState("");
-  const [indInterests, setIndInterests] = useState("");
-  const [indTimeline, setIndTimeline] = useState<string>("");
-  const [indHeardAbout, setIndHeardAbout] = useState<string>("");
 
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
@@ -176,42 +166,6 @@ const EarlyAccess = () => {
   const toggleMulti = (list: string[], id: string, setList: (v: string[]) => void) => {
     if (list.includes(id)) setList(list.filter((x) => x !== id));
     else setList([...list, id]);
-  };
-
-  const handlePickContinue = () => {
-    if (pickSelection === "business") setFlow("business");
-    else if (pickSelection === "individual") setFlow("individual");
-    else toast.error("Please select what you are registering as.");
-  };
-
-  const handleSubmitIndividual = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!indFirstName.trim() || !indEmail.trim() || !indInterests.trim() || !indTimeline) {
-      toast.error("Please complete all required fields.");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const result = await submitIndividualEarlyAccessRequest({
-        first_name: indFirstName.trim(),
-        email: indEmail.trim().toLowerCase(),
-        what_interests_you: indInterests.trim(),
-        timeline: indTimeline,
-        heard_about: indHeardAbout || null,
-      });
-      setSubmissionKind("individual");
-      setSubmitted(true);
-      toast.success(
-        result.emailSent === false
-          ? "Request received. We could not send the confirmation email yet — check spam, or ask the team to verify RESEND_API_KEY (backend) and AUTH_RESEND_KEY (Convex) at resend.com/api-keys."
-          : "Request sent — check your inbox."
-      );
-    } catch (err) {
-      console.error(err);
-      toast.error(err instanceof Error ? err.message : "Something went wrong. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -272,7 +226,6 @@ const EarlyAccess = () => {
         prior_solution_notes: priorNotes.trim() || null,
       });
 
-      setSubmissionKind("business");
       setSubmitted(true);
       toast.success(
         result.emailSent === false
@@ -315,8 +268,8 @@ const EarlyAccess = () => {
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">
               {premiumWaitlistCopy
-                ? "Founding access: request early access as a business or individual. Applications are reviewed within 48 hours."
-                : "Waitlist and interest forms: choose business or individual, then complete the matching questionnaire."}
+                ? "Founding access: request early access for your brand. Applications are reviewed within 48 hours."
+                : "Early access interest form for fashion brands."}
             </DialogPrimitive.Description>
 
             <DialogPrimitive.Close
@@ -335,13 +288,9 @@ const EarlyAccess = () => {
                   🎉
                 </p>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto">
-                  {submissionKind === "individual"
-                    ? premiumWaitlistCopy
-                      ? "Thank you. Applications are reviewed within 48 hours; we’ll reach out with next steps."
-                      : "Thanks — we’ll be in touch about personal virtual try-on access when spots open up."
-                    : premiumWaitlistCopy
-                      ? "Thank you. Applications are reviewed within 48 hours. Our team will follow up to align on fit and rollout."
-                      : "Thanks again — we’ll follow up to learn more about your store and share how TryVerse can support your goals."}
+                  {premiumWaitlistCopy
+                    ? "Thank you. Applications are reviewed within 48 hours. Our team will follow up to align on fit and rollout."
+                    : "Thanks again — we’ll follow up to learn more about your store and share how TryVerse can support your goals."}
                 </p>
                 <Button className="mt-4 gradient-primary text-primary-foreground" onClick={() => handleOpenChange(false)}>
                   Back to home
@@ -370,146 +319,7 @@ const EarlyAccess = () => {
               </div>
             ) : (
               <div className="space-y-6 pr-1">
-                {flow === "pick" && (
-                  <div className="space-y-5">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-2">
-                        {premiumWaitlistCopy ? "TryVerse — Founding access" : "TryVerse — Early access"}
-                      </p>
-                      <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground leading-tight">
-                        {premiumWaitlistCopy ? "Apply for Early Access" : "How are you joining?"}
-                      </h2>
-                      <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-                        {premiumWaitlistCopy
-                          ? "Request founding member access. Applications are reviewed within 48 hours."
-                          : "Choose one to continue — you&apos;ll get the right form."}
-                      </p>
-                    </div>
-                    <Field label="Registering as *" htmlFor="ea-register-as">
-                      <Select value={pickSelection} onValueChange={setPickSelection}>
-                        <SelectTrigger id="ea-register-as">
-                          <SelectValue placeholder="As a business or as an individual" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="business">As a business (brand or store)</SelectItem>
-                          <SelectItem value="individual">As an individual (personal try-on)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <Button
-                        type="button"
-                        className="flex-1 gradient-primary text-primary-foreground h-11"
-                        onClick={handlePickContinue}
-                      >
-                        Next
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
-                        Cancel
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Already have an account?{" "}
-                      <Link to="/auth" className="underline hover:text-foreground">
-                        Log in
-                      </Link>
-                    </p>
-                  </div>
-                )}
-
-                {flow === "individual" && (
-                  <form onSubmit={handleSubmitIndividual} className="space-y-6">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-2">
-                        {premiumWaitlistCopy ? "TryVerse — Founding access" : "TryVerse — Interest list"}
-                      </p>
-                      <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground leading-tight">
-                        Personal virtual try-on
-                      </h2>
-                      <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-                        {premiumWaitlistCopy
-                          ? "Request founding member access. Applications are reviewed within 48 hours."
-                          : "Tell us a bit about you — we&apos;ll reach out when we open more personal spots."}
-                      </p>
-                    </div>
-                    <Field label="Full name *" htmlFor="ind-first">
-                      <Input
-                        id="ind-first"
-                        required
-                        value={indFirstName}
-                        onChange={(e) => setIndFirstName(e.target.value)}
-                        autoComplete="name"
-                      />
-                    </Field>
-                    <Field label="Email *" htmlFor="ind-email">
-                      <Input
-                        id="ind-email"
-                        type="email"
-                        required
-                        value={indEmail}
-                        onChange={(e) => setIndEmail(e.target.value)}
-                        autoComplete="email"
-                      />
-                    </Field>
-                    <Field label="What are you interested in? *" htmlFor="ind-interests">
-                      <Textarea
-                        id="ind-interests"
-                        required
-                        rows={4}
-                        placeholder="e.g. Trying outfits before I buy, special events, experimenting with looks…"
-                        value={indInterests}
-                        onChange={(e) => setIndInterests(e.target.value)}
-                      />
-                    </Field>
-                    <Field label="When are you hoping to try TryVerse? *">
-                      <Select value={indTimeline} onValueChange={setIndTimeline}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select timeline" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TIMELINES.map((o) => (
-                            <SelectItem key={o.value} value={o.value}>
-                              {o.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field label="How did you hear about us? (optional)">
-                      <Select
-                        value={indHeardAbout || "none"}
-                        onValueChange={(v) => setIndHeardAbout(v === "none" ? "" : v)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Prefer not to say</SelectItem>
-                          {HEARD_ABOUT.map((o) => (
-                            <SelectItem key={o.value} value={o.value}>
-                              {o.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                      <Button
-                        type="submit"
-                        disabled={submitting}
-                        className="flex-1 gradient-primary text-primary-foreground h-11"
-                      >
-                        {submitting ? "Sending…" : "Submit interest"}
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => setFlow("pick")}>
-                        Back
-                      </Button>
-                    </div>
-                  </form>
-                )}
-
-                {flow === "business" && (
-                  <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-6">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-2">
                       {premiumWaitlistCopy ? "TryVerse — Founding access" : "TryVerse — Early access"}
@@ -810,13 +620,7 @@ const EarlyAccess = () => {
                       Already have an account? Log in
                     </Link>
                   </p>
-                  <div className="flex justify-center pt-1">
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setFlow("pick")}>
-                      ← Change registration type
-                    </Button>
-                  </div>
                 </form>
-                )}
               </div>
             )}
           </DialogPrimitive.Content>

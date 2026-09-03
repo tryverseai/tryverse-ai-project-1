@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { getAdminUsers, banAdminUser, adjustUserCredits, patchAdminUserAccountType, deleteAdminUserAccount } from "@/lib/backendApi";
+import { getAdminUsers, banAdminUser, adjustUserCredits, deleteAdminUserAccount } from "@/lib/backendApi";
 import { toast } from "sonner";
 
 interface AdminUsersTabProps {
@@ -38,7 +38,7 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 1 });
   const [search, setSearch] = useState("");
-  const [accountFilter, setAccountFilter] = useState<"all" | "business" | "individual">("all");
+  const [accountFilter, setAccountFilter] = useState<"all" | "business">("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creditsDialog, setCreditsDialog] = useState<AdminUser | null>(null);
@@ -87,24 +87,6 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
   useEffect(() => {
     fetchUsers();
   }, [adminKey, pagination.page, search, accountFilter]);
-
-  const handleAccountTypeChange = async (u: AdminUser, next: "business" | "individual") => {
-    const cur = u.account_type === "individual" ? "individual" : "business";
-    if (cur === next) return;
-    if (
-      !confirm(
-        `Set this account to ${next}? The user’s dashboard routing updates after they refresh or sign in again.`
-      )
-    )
-      return;
-    try {
-      await patchAdminUserAccountType(adminKey, u.id, next);
-      toast.success("Account type updated");
-      await fetchUsers();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to update account type");
-    }
-  };
 
   const handleBlock = async (u: AdminUser) => {
     if (!confirm(`Block ${u.brand_name || u.contact_email || "this user"}? They will not be able to use the API.`)) return;
@@ -160,7 +142,6 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
             [
               { id: "all" as const, label: "All accounts" },
               { id: "business" as const, label: "Business" },
-              { id: "individual" as const, label: "Individual" },
             ]
           ).map((t) => (
             <Button
@@ -228,19 +209,7 @@ export function AdminUsersTab({ adminKey }: AdminUsersTabProps) {
                         <p className="text-xs text-muted-foreground">{u.contact_email || u.full_name || u.id.slice(0, 8)}</p>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
-                      <select
-                        className="text-xs border border-border rounded-md bg-background px-2 py-1.5 max-w-[140px]"
-                        value={u.account_type === "individual" ? "individual" : "business"}
-                        onChange={(e) =>
-                          void handleAccountTypeChange(u, e.target.value as "business" | "individual")
-                        }
-                        aria-label="Account type"
-                      >
-                        <option value="business">Business</option>
-                        <option value="individual">Individual</option>
-                      </select>
-                    </td>
+                    <td className="px-5 py-4 text-sm">Business</td>
                     <td className="px-5 py-4 text-sm capitalize">{u.plan_id || u.current_plan_id || "free"}</td>
                     <td className="px-5 py-4 text-sm">
                       {u.free_credits_remaining + (u.monthly_credits_remaining || 0)} total

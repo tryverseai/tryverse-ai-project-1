@@ -17,7 +17,7 @@ export function AccountTypeGate({
 
   if (adminChecking || loading) return <RouteFallbackSpinner />;
 
-  /** Admin API session: allow both business and individual routes for support testing. */
+  /** Admin API session: bypass account-type gating for support testing. */
   if (adminBypass) return <>{children}</>;
 
   if (!allowed.includes(accountType)) {

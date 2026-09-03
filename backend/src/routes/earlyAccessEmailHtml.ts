@@ -70,31 +70,3 @@ export function buildEarlyAccessConfirmationHtml(
 
   return wrapEmailHtml(sanitizeHtml(inner, SANITIZE_OPTIONS));
 }
-
-/** Personal / individual waitlist confirmation — same positioning as brand flow. */
-export function buildIndividualWaitlistConfirmationHtml(
-  escapedFirstName: string,
-  urls: EarlyAccessEmailUrls
-): string {
-  const hrefDemo = escapeHtmlAttr(urls.bookDemoUrl);
-  const hrefHome = escapeHtmlAttr(urls.homeUrl);
-  const siteLabel = escapeHtmlAttr(publicSiteLabel(urls.homeUrl));
-  const inner =
-    '<p>Hi ' +
-    escapedFirstName +
-    ',</p>' +
-    '<p>We\'ve received your request for early access to <strong>TryVerse</strong>.</p>' +
-    '<p>We\'re currently in a limited private beta, onboarding select brands and individuals with priority access. Our team will reach out directly with your invite link as spots become available.</p>' +
-    '<p>If you represent a brand or retail team and would like to explore TryVerse sooner, we\'d love to connect.</p>' +
-    '<p><a href="' +
-    hrefDemo +
-    '">Schedule a Private Demo</a> →</p>' +
-    '<p>Thank you for your interest.<br/>— The TryVerse Team</p>' +
-    '<p><a href="' +
-    hrefHome +
-    '">' +
-    siteLabel +
-    '</a></p>';
-
-  return wrapEmailHtml(sanitizeHtml(inner, SANITIZE_OPTIONS));
-}

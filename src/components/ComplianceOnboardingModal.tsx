@@ -8,19 +8,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { patchMyCompliance } from "@/lib/backendApi";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  TermsContent,
-  DataProcessingContent,
-  AiImageProcessingNoticeContent,
-  type PolicyAudience,
-} from "@/content/policyContent";
+import { TermsContent, DataProcessingContent } from "@/content/policyContent";
 
 /** Shared "Last updated" label for every legal step shown in this modal — keep in sync with each document's own page. */
 const POLICY_LAST_UPDATED = "August 24, 2026";
 import { TryVersePrivacyPolicy } from "@/content/TryVersePrivacyPolicy";
 import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
-import { dashboardPathForAccountType, type AccountType } from "@/lib/accountType";
+import { dashboardPathForAccountType } from "@/lib/accountType";
 import { complianceDoneSessionKey } from "@/lib/complianceStorage";
 
 const GOALS_OPTIONS_BUSINESS = [
@@ -31,42 +26,24 @@ const GOALS_OPTIONS_BUSINESS = [
   "Create high-fashion content for ads and social media",
 ];
 
-const GOALS_OPTIONS_INDIVIDUAL = [
-  "Try clothes online before I buy",
-  "See how different styles look on someone like me",
-  "Make fun or shareable try-on images",
-  "Save time versus in-store fitting rooms",
-  "Experiment with fashion looks for myself",
-];
-
 type StepDef = {
   id: string;
   title: string;
   subtitle: string;
   icon: LucideIcon;
-  content: React.ComponentType<{ audience?: PolicyAudience }> | null;
+  content: React.ComponentType<{ audience?: "business" }> | null;
   isLegal: boolean;
 };
 
-function buildSteps(accountType: PolicyAudience): StepDef[] {
-  const dataStep: StepDef =
-    accountType === "individual"
-      ? {
-          id: "data",
-          title: "Your photos & data",
-          subtitle: `Last updated: ${POLICY_LAST_UPDATED}`,
-          icon: Database,
-          content: AiImageProcessingNoticeContent,
-          isLegal: true,
-        }
-      : {
-          id: "data",
-          title: "Data Processing Agreement",
-          subtitle: `Last updated: ${POLICY_LAST_UPDATED}`,
-          icon: Database,
-          content: DataProcessingContent,
-          isLegal: true,
-        };
+function buildSteps(): StepDef[] {
+  const dataStep: StepDef = {
+    id: "data",
+    title: "Data Processing Agreement",
+    subtitle: `Last updated: ${POLICY_LAST_UPDATED}`,
+    icon: Database,
+    content: DataProcessingContent,
+    isLegal: true,
+  };
 
   return [
     {
@@ -100,7 +77,6 @@ function buildSteps(accountType: PolicyAudience): StepDef[] {
 interface ComplianceOnboardingModalProps {
   open: boolean;
   userId: string;
-  accountType: PolicyAudience;
   onComplete: () => void;
   onExit?: () => void;
 }
@@ -108,7 +84,6 @@ interface ComplianceOnboardingModalProps {
 export function ComplianceOnboardingModal({
   open,
   userId,
-  accountType,
   onComplete,
   onExit,
 }: ComplianceOnboardingModalProps) {
@@ -121,9 +96,8 @@ export function ComplianceOnboardingModal({
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const STEPS = useMemo(() => buildSteps(accountType), [accountType]);
-  const goalOptions =
-    accountType === "individual" ? GOALS_OPTIONS_INDIVIDUAL : GOALS_OPTIONS_BUSINESS;
+  const STEPS = useMemo(() => buildSteps(), []);
+  const goalOptions = GOALS_OPTIONS_BUSINESS;
 
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0, behavior: "instant" });
@@ -135,7 +109,7 @@ export function ComplianceOnboardingModal({
       setAcknowledged(false);
       setSelectedGoals([]);
     }
-  }, [open, accountType]);
+  }, [open]);
 
   const step = STEPS[stepIndex];
   const isLastStep = stepIndex === STEPS.length - 1;
@@ -159,7 +133,7 @@ export function ComplianceOnboardingModal({
         onComplete();
         toast.success("Welcome to TryVerse! Your dashboard is ready.");
 
-        const dash = dashboardPathForAccountType(accountType as AccountType);
+        const dash = dashboardPathForAccountType();
         if (!location.pathname.startsWith("/admin") && location.pathname !== dash) {
           navigate(dash, { replace: true });
         }
@@ -254,7 +228,7 @@ export function ComplianceOnboardingModal({
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
                       Select all that apply. This helps us tailor TryVerse for{" "}
-                      {accountType === "individual" ? "your personal try-ons" : "your brand"}.
+                      your brand.
                     </p>
                     <div className="space-y-2">
                       {goalOptions.map((goal) => (
@@ -278,7 +252,7 @@ export function ComplianceOnboardingModal({
                     </div>
                   </div>
                 ) : (
-                  ContentComponent && <ContentComponent audience={accountType} />
+                  ContentComponent && <ContentComponent audience="business" />
                 )}
               </motion.div>
             </AnimatePresence>

@@ -1,4 +1,6 @@
-export type AccountType = "business" | "individual";
+/** TryVerse is B2B-only — "individual"/B2C accounts were removed (no product surface ever
+ * fully offered them, and no account ever used one; see git history for the prior variant). */
+export type AccountType = "business";
 
 /** Profile-like fields stored in the browser session (no remote auth provider). */
 export type LegacyUserMetadata = {
@@ -10,9 +12,8 @@ export type LegacyUserMetadata = {
 };
 
 const DASHBOARD_BUSINESS = "/dashboard/business";
-const DASHBOARD_INDIVIDUAL = "/dashboard/individual";
 
-export function dashboardPathForAccountType(_type: AccountType | null | undefined): string {
+export function dashboardPathForAccountType(_type?: AccountType | null): string {
   return DASHBOARD_BUSINESS;
 }
 
@@ -25,11 +26,12 @@ export function defaultDashboardTabValue(_type: AccountType): string {
  * `AccountType` value. Returns `null` when the input is absent or unrecognised.
  * Single source of truth — used by AuthContext, useProfileAccountType, and
  * useSyncedConvexProfile instead of each implementing the same trimming/lowercasing.
+ * A legacy "individual" value (from before the account type was removed) maps to
+ * "business" rather than null, so no old row is treated as unrecognised.
  */
 export function normalizeAccountType(raw: string | null | undefined): AccountType | null {
   if (raw == null) return null;
   const s = String(raw).trim().toLowerCase();
-  if (s === "individual") return "individual";
-  if (s === "business" || s === "brand") return "business";
+  if (s === "business" || s === "brand" || s === "individual") return "business";
   return null;
 }

@@ -47,11 +47,6 @@ function signUpErrorToast(error: Error): {
   };
 }
 
-/** Convex + API use `personal`; app session uses `individual`. */
-function inviteKindToBootstrapType(kind: "personal" | "business"): AccountType {
-  return kind === "personal" ? "individual" : "business";
-}
-
 const AuthInvite = () => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
@@ -60,8 +55,8 @@ const AuthInvite = () => {
   const [gateLoading, setGateLoading] = useState(true);
   const [gateValid, setGateValid] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  /** Convex lifecycle shape; legacy env tokens resolve as business. */
-  const [inviteKind, setInviteKind] = useState<"personal" | "business" | null>(null);
+  /** B2B-only — all invites are business invites; legacy env tokens also resolve as business. */
+  const [inviteKind, setInviteKind] = useState<"business" | null>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -104,9 +99,7 @@ const AuthInvite = () => {
         if (valid && "email" in res && res.email) {
           setInviteEmail(res.email);
           setEmail(res.email);
-          const apiKind =
-            res.accountType === "personal" ? ("personal" as const) : ("business" as const);
-          setInviteKind(apiKind);
+          setInviteKind("business");
           if (typeof res.name === "string" && res.name.trim()) {
             setFullName(res.name.trim());
           }
@@ -146,9 +139,9 @@ const AuthInvite = () => {
     e.preventDefault();
     if (!gateValid || !inviteKind || !token?.trim()) return;
 
-    const acctBootstrap = inviteKindToBootstrapType(inviteKind);
+    const acctBootstrap: AccountType = "business";
 
-    if (inviteKind === "business" && !companyName.trim()) {
+    if (!companyName.trim()) {
       toast({
         title: "Company required",
         description: "Enter your company name to continue.",
@@ -159,17 +152,7 @@ const AuthInvite = () => {
 
     setLoading(true);
     try {
-      const signResult =
-        inviteKind === "personal"
-          ? await signUp(
-              email,
-              password,
-              fullName.trim() || "My Try-Ons",
-              fullName.trim(),
-              undefined,
-              "individual"
-            )
-          : await signUp(email, password, companyName.trim(), fullName.trim(), undefined, "business");
+      const signResult = await signUp(email, password, companyName.trim(), fullName.trim(), undefined, "business");
 
       if (signResult.error) {
         console.error("Signup error:", signResult.error);
@@ -284,7 +267,7 @@ const AuthInvite = () => {
           ) : (
             <>
               <h1 className="font-display text-2xl font-bold text-foreground mb-2">
-                {inviteKind === "personal" ? "Create your TryVerse account" : "Activate your business access"}
+                Activate your business access
               </h1>
               <p className="text-muted-foreground mb-6">
                 Complete setup with the email on your invitation ({inviteEmail}).
@@ -314,18 +297,16 @@ const AuthInvite = () => {
                     required
                   />
                 </div>
-                {inviteKind === "business" && (
-                  <div className="relative">
-                    <Building2 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Company name"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      className="pl-10 h-12"
-                      required
-                    />
-                  </div>
-                )}
+                <div className="relative">
+                  <Building2 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Company name"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    className="pl-10 h-12"
+                    required
+                  />
+                </div>
                 <div className="relative">
                   <Lock className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -361,7 +342,7 @@ const AuthInvite = () => {
                     </>
                   ) : (
                     <>
-                      {inviteKind === "personal" ? "Create My Account" : "Activate Business Account"}
+                      Activate Business Account
                       <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
                     </>
                   )}

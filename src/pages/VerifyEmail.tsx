@@ -125,7 +125,7 @@ const VerifyEmail = () => {
       posthogCapture("email_verification_completed", { email: payload.email });
 
       if (payload.inviteToken?.trim()) {
-        const acct: AccountType = payload.accountTypeAfterInvite ?? "individual";
+        const acct: AccountType = payload.accountTypeAfterInvite ?? "business";
         try {
           await completeInviteAfterSignup(payload.inviteToken.trim(), payload.email);
         } catch (err) {

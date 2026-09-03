@@ -18,8 +18,6 @@ import { assignTrustedPaymentCheckoutUrl } from "@/lib/safeUrl";
 import { cn } from "@/lib/utils";
 import { Helmet } from "react-helmet-async";
 
-type PricingAudience = "individual" | "business";
-
 type PlanRow = {
   id: string;
   name: string;
@@ -67,7 +65,7 @@ const STATIC_PLAN_CATALOG: PlanRow[] = [
     price_usd: 0,
     tryons_per_month: 5,
     features: [
-      "5 try-ons/month on free pool (individual) · 10 on signup (brands)",
+      "10 try-ons on signup for your brand",
       "Watermark",
       "Basic quality",
     ],
@@ -184,7 +182,6 @@ const PLAN_UI: Record<string, PlanUiEntry> = {
   },
 };
 
-const B2C_ORDER = ["free", "pro", "creator"] as const;
 const B2B_ORDER = ["free", "starter", "growth", "enterprise"] as const;
 
 function firstFreePlan(all: PlanRow[]): PlanRow | undefined {
@@ -205,12 +202,9 @@ function withWidgetEmbed(plan: PlanRow): PlanRow {
   return { ...plan, features: ["Widget embed", ...list] };
 }
 
-/**
- * Resolves slot ids to rows. `free` slot accepts free | free_trial | trial from DB.
- * Pro/Creator use DB row or static fallback so Individuals always shows three tiers.
- */
-function resolvePlansForAudience(all: PlanRow[], audience: PricingAudience): PlanRow[] {
-  const order = audience === "individual" ? B2C_ORDER : B2B_ORDER;
+/** Resolves slot ids to rows. `free` slot accepts free | free_trial | trial from DB. */
+function resolvePlansForAudience(all: PlanRow[]): PlanRow[] {
+  const order = B2B_ORDER;
   return order
     .map((slotId): PlanRow | null => {
       if (slotId === "free") {
@@ -223,7 +217,7 @@ function resolvePlansForAudience(all: PlanRow[], audience: PricingAudience): Pla
           price_usd: 0,
           tryons_per_month: 5,
           features: [
-            "5 try-ons/month on free pool (individual) · 10 on signup (brands)",
+            "10 try-ons on signup for your brand",
             "Watermark",
             "Basic quality",
           ],
@@ -244,7 +238,6 @@ function isFreePlanId(id: string): boolean {
 
 const Pricing = () => {
   const navigate = useNavigate();
-  const [audience] = useState<PricingAudience>("business");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [providers, setProviders] = useState({
     paystack: false,
@@ -353,7 +346,7 @@ const Pricing = () => {
       ? "NGN"
       : checkoutCurrency;
 
-  const visiblePlans = resolvePlansForAudience(dbPlans, audience);
+  const visiblePlans = resolvePlansForAudience(dbPlans);
 
   const renderPlanCard = (plan: PlanRow, i: number) => {
     const baseUi = PLAN_UI[plan.id] || {
@@ -363,25 +356,17 @@ const Pricing = () => {
       cta: "Get Started",
     };
 
-    const freeOverride =
-      isFreePlanId(plan.id)
-        ? audience === "individual"
-          ? {
-              description: "5 try-ons on the free pool, watermark, basic quality — built for sharing.",
-              goodFor: "Virality · Fashion discovery",
-            }
-          : {
-              description: "10 try-ons on signup for your brand, watermark, basic quality — perfect for a pilot.",
-              goodFor: "Small brands testing fit AI",
-            }
-        : {};
+    const freeOverride = isFreePlanId(plan.id)
+      ? {
+          description: "10 try-ons on signup for your brand, watermark, basic quality — perfect for a pilot.",
+          goodFor: "Small brands testing fit AI",
+        }
+      : {};
 
     const ui: PlanUiEntry = { ...baseUi, ...freeOverride };
 
     const features = isFreePlanId(plan.id)
-      ? audience === "individual"
-        ? ["5 try-ons", "Watermark", "Basic quality"]
-        : ["10 try-ons", "Watermark", "Basic quality"]
+      ? ["10 try-ons", "Watermark", "Basic quality"]
       : parseFeatures(plan.features);
     const showUsd = displayCurrency === "USD";
     const free = isFreePlanId(plan.id);
@@ -405,7 +390,7 @@ const Pricing = () => {
 
     return (
       <motion.div
-        key={`${audience}-${plan.id}`}
+        key={plan.id}
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: i * 0.1 }}
@@ -530,8 +515,7 @@ const Pricing = () => {
           ) : (
             <div
               className={cn(
-                "grid grid-cols-1 gap-5 lg:gap-6 items-stretch max-w-7xl mx-auto w-full",
-                audience === "individual" ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-4"
+                "grid grid-cols-1 gap-5 lg:gap-6 items-stretch max-w-7xl mx-auto w-full sm:grid-cols-2 lg:grid-cols-4"
               )}
             >
               {visiblePlans.map((plan, i) => renderPlanCard(plan, i))}

@@ -187,7 +187,7 @@ export interface AdminMetrics {
 export interface AdminUser {
   user_id?: string;
   email?: string;
-  account_type?: 'individual' | 'business' | null;
+  account_type?: 'business' | null;
   plan_id?: string | null;
   is_blocked?: boolean;
   is_banned: boolean;
@@ -825,7 +825,7 @@ export async function getCredits() {
   const res = await fetch(`${BACKEND_URL}/api/credits`, { headers });
   return handleResponse<{
     plan: string;
-    accountType: 'individual' | 'business';
+    accountType: 'business';
     isUnlimited: boolean;
     freeCreditsRemaining: number;
     freeCreditsTotal: number;
@@ -904,21 +904,6 @@ export async function submitEarlyAccessRequest(
   payload: EarlyAccessPayload
 ): Promise<{ success: boolean; id?: string; convexDocumentId?: string; emailSent?: boolean }> {
   const res = await fetchWithConnectivityHint(composeApiUrl('/api/early-access'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  return handleResponse(res, { feature: 'early_access' });
-}
-
-export async function submitIndividualEarlyAccessRequest(payload: {
-  first_name: string;
-  email: string;
-  what_interests_you: string;
-  timeline: string;
-  heard_about?: string | null;
-}): Promise<{ success: boolean; id?: string; convexDocumentId?: string; emailSent?: boolean }> {
-  const res = await fetchWithConnectivityHint(composeApiUrl('/api/early-access/individual'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -1395,23 +1380,12 @@ export async function getAdminUsers(
   page = 1,
   limit = 50,
   search?: string,
-  accountType?: 'all' | 'business' | 'individual'
+  accountType?: 'all' | 'business'
 ): Promise<AdminUserList> {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (search) params.append('search', search);
   if (accountType && accountType !== 'all') params.append('accountType', accountType);
   return adminFetch<AdminUserList>(`/api/admin/users?${params}`, adminKey);
-}
-
-export async function patchAdminUserAccountType(
-  adminKey: string,
-  userId: string,
-  account_type: 'business' | 'individual'
-): Promise<{ ok: boolean }> {
-  return adminFetch<{ ok: boolean }>(`/api/admin/users/${userId}/profile`, adminKey, {
-    method: 'PATCH',
-    body: JSON.stringify({ account_type }),
-  });
 }
 
 export async function getAdminTryons(adminKey: string, page = 1, limit = 50, status?: string): Promise<AdminTryOnList> {

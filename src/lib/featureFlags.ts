@@ -6,12 +6,6 @@
 export const inviteSignupEnabled = import.meta.env.VITE_ENABLE_INVITE_SIGNUP !== "false";
 
 /**
- * Personal (B2C) accounts: /auth?signup=individual
- * Set VITE_ENABLE_B2C_SIGNUP=false to pause consumer registration.
- */
-export const b2cSignupEnabled = import.meta.env.VITE_ENABLE_B2C_SIGNUP !== "false";
-
-/**
  * Pre-launch UI: emphasize invite / demo CTAs in the shell; does not block /auth?signup=* create-account forms
  * (beta approval is enforced after signup). Set VITE_INVITE_ONLY_MODE=true (or legacy VITE_INVITE_ONLY_ACCESS=true).
  */

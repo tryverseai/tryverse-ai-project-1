@@ -16,9 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { posthogCapture } from "@/lib/posthog";
-import { inviteSignupEnabled, b2cSignupEnabled, FEATURE_FLAGS } from "@/lib/featureFlags";
+import { inviteSignupEnabled, FEATURE_FLAGS } from "@/lib/featureFlags";
 import { postLoginRedirectPath, safeInAppRedirectPath } from "@/lib/safeUrl";
-import { Label } from "@/components/ui/label";
 import { useSignupChooser } from "@/components/signup/SignupChooserContext";
 import { saveEmailVerifyPending } from "@/lib/emailVerifyPendingStorage";
 import { convexAuthEmailFlowToast } from "@/lib/convexAuthEmailFlowToast";
@@ -78,10 +77,6 @@ const Auth = () => {
   const showBusinessSignupForm = wantsBusinessInvite && inviteSignupEnabled;
   /** Business self-serve disabled but user landed on business signup URL — show paused messaging */
   const businessSignupPaused = wantsBusinessInvite && !inviteSignupEnabled;
-
-  const wantsIndividualSignup = searchParams.get("signup") === "individual";
-  const showIndividualSignupForm = wantsIndividualSignup && b2cSignupEnabled;
-  const individualSignupPaused = wantsIndividualSignup && !b2cSignupEnabled;
 
   const signupPausedToastSent = useRef(false);
 
@@ -150,49 +145,7 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
-    if (showIndividualSignupForm) {
-      const result = await signUp(
-        email,
-        password,
-        fullName.trim() || "My Try-Ons",
-        fullName,
-        undefined,
-        "individual"
-      );
-      if (result.error) {
-        console.error("Signup error:", result.error);
-        const t = signUpErrorToast(result.error);
-        toast({ title: t.title, description: t.description, variant: t.variant, duration: 15000 });
-      } else if ("deviceApprovalRequired" in result && result.deviceApprovalRequired) {
-        saveEmailVerifyPending({ email: result.pendingEmail });
-        toast({
-          title: "Approve this browser next",
-          description:
-            "You’re signed in. On the next screen, tap “Email me a code” and enter the 6-digit approval we send to your inbox.",
-          duration: 10000,
-        });
-        setPassword("");
-        navigate("/auth/approve-device");
-      } else if ("needsEmailVerification" in result && result.needsEmailVerification) {
-        saveEmailVerifyPending({
-          email: result.pendingEmail,
-          pendingBootstrap: result.pendingBootstrap,
-        });
-        toast({
-          title: "Check your email",
-          description:
-            "We sent a welcome email with your 8-digit verification code. Open it, then continue on the verification page to activate your account.",
-          duration: 9000,
-        });
-        setPassword("");
-        navigate("/auth/verify-email");
-      } else {
-        posthogCapture("user_signed_up", { email, account_type: "individual" });
-        toast({ title: "Welcome!", description: "Your account is ready.", duration: 6000 });
-        setPassword("");
-        goToDashboardAfterAuth();
-      }
-    } else if (showBusinessSignupForm) {
+    if (showBusinessSignupForm) {
       const finalRole = role === "Other" ? customRole : role;
       const result = await signUp(email, password, brandName, fullName, finalRole, "business");
       if (result.error) {
@@ -343,57 +296,15 @@ const Auth = () => {
                 </p>
               </div>
             </>
-          ) : individualSignupPaused ? (
-            <>
-              <h1 className="font-display text-2xl font-bold text-foreground mb-2">Personal sign-up is paused</h1>
-              <p className="text-muted-foreground mb-6">
-                We&apos;re not creating new individual accounts right now. Please check back later or{" "}
-                <Link to="/auth" className="text-foreground font-medium underline underline-offset-2">
-                  sign in
-                </Link>{" "}
-                if you already have one.
-              </p>
-            </>
           ) : (
             <>
           <h1
             className={`font-display text-2xl font-bold text-foreground ${showBusinessSignupForm ? "mb-2" : "mb-6"}`}
           >
-            {showIndividualSignupForm
-              ? "Create a personal account"
-              : showBusinessSignupForm
-                ? "Create your TryVerse account"
-                : "Sign in or create an account"}
+            {showBusinessSignupForm ? "Create your TryVerse account" : "Sign in or create an account"}
           </h1>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {(showIndividualSignupForm || showBusinessSignupForm) && (
-              <div className="space-y-2">
-                <Label htmlFor="auth-account-type-locked">Account type</Label>
-                <Select value={showIndividualSignupForm ? "individual" : "business"} disabled>
-                  <SelectTrigger id="auth-account-type-locked" className="h-12 bg-muted/50 opacity-90">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="individual">Individual</SelectItem>
-                    <SelectItem value="business">Business</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {showIndividualSignupForm && (
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Your name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="pl-10 h-12"
-                  required
-                  autoComplete="name"
-                />
-              </div>
-            )}
             {showBusinessSignupForm && (
               <>
                 <div className="relative">
@@ -447,7 +358,7 @@ const Auth = () => {
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="email"
-                placeholder={showIndividualSignupForm ? "Email" : "Work email"}
+                placeholder="Work email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="pl-10 h-12"
@@ -488,14 +399,14 @@ const Auth = () => {
                 </>
               ) : (
                 <>
-                  {showBusinessSignupForm || showIndividualSignupForm ? "Create account" : "Sign In"}
+                  {showBusinessSignupForm ? "Create account" : "Sign In"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               )}
             </Button>
           </form>
 
-          {!showBusinessSignupForm && !showIndividualSignupForm && (
+          {!showBusinessSignupForm && (
             <>
               <p className="text-sm text-muted-foreground text-center mt-4">
                 <Link to="/forgot-password" className="text-foreground font-medium hover:underline">
@@ -522,7 +433,7 @@ const Auth = () => {
             </>
           )}
 
-          {(showBusinessSignupForm || showIndividualSignupForm) && (
+          {(showBusinessSignupForm) && (
             <p className="text-sm text-muted-foreground text-center mt-4">
               Already have an account?{" "}
               <Link to="/auth" className="text-foreground font-medium hover:underline">

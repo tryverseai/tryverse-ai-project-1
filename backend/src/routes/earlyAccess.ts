@@ -7,22 +7,9 @@ import { anyApi, convexMutationTrusted } from '../config/convexHttp';
 import { TRYVERSE_TRANSACTIONAL_FROM } from '../email/fromAddress';
 import { sendEmail } from '../services/email/resend';
 import { logger } from '../config/logger';
-import { buildEarlyAccessConfirmationHtml, buildIndividualWaitlistConfirmationHtml } from './earlyAccessEmailHtml';
+import { buildEarlyAccessConfirmationHtml } from './earlyAccessEmailHtml';
 
 const router = Router();
-
-/** Placeholders for required merchant columns when saving an individual waitlist row. */
-const INDIVIDUAL_EARLY_ACCESS_FILLERS = {
-  brand_name_suffix: '(personal interest)',
-  role: 'Individual waitlist',
-  website_url: 'https://tryverseai.com',
-  platform: 'Personal',
-  product_range: 'n/a',
-  monthly_revenue: 'n/a',
-  return_rate: 'n/a',
-  top_return_reason: 'n/a',
-  customer_confidence: 'n/a',
-} as const;
 
 function escapeHtml(s: string): string {
   return s
@@ -170,102 +157,6 @@ router.post(
           convexDocumentId,
           hint:
             'Set RESEND_API_KEY in backend/.env. For Resend test mode, emails only go to your verified address; for production verify your domain at resend.com/domains and set EMAIL_FROM to an address on that domain.',
-        });
-      }
-
-      res.status(201).json({ success: true, emailSent, id: convexDocumentId, convexDocumentId });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-router.post(
-  '/individual',
-  earlyAccessRateLimit,
-  [
-    body('first_name').trim().isLength({ min: 1, max: 120 }),
-    body('email').trim().isEmail().isLength({ max: 254 }),
-    body('what_interests_you').trim().isLength({ min: 1, max: 8000 }),
-    body('timeline').trim().isLength({ min: 1, max: 80 }),
-    body('heard_about').optional({ nullable: true }).isString().isLength({ max: 120 }),
-  ],
-  handleValidationErrors,
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { first_name, email, what_interests_you, timeline, heard_about } = req.body as Record<
-        string,
-        unknown
-      >;
-
-      let convexDocumentId: string | undefined;
-      try {
-        const inserted = (await convexMutationTrusted(anyApi.backendTrusted.insertEarlyAccessRowTrusted, {
-          secret: env.BACKEND_SHARED_SECRET,
-          row: {
-            applicant_type: 'individual',
-            first_name,
-            email: String(email).toLowerCase(),
-            brand_name: `${String(first_name).trim()} ${INDIVIDUAL_EARLY_ACCESS_FILLERS.brand_name_suffix}`,
-            role: INDIVIDUAL_EARLY_ACCESS_FILLERS.role,
-            website_url: INDIVIDUAL_EARLY_ACCESS_FILLERS.website_url,
-            platform: INDIVIDUAL_EARLY_ACCESS_FILLERS.platform,
-            product_range: INDIVIDUAL_EARLY_ACCESS_FILLERS.product_range,
-            monthly_revenue: INDIVIDUAL_EARLY_ACCESS_FILLERS.monthly_revenue,
-            return_rate: INDIVIDUAL_EARLY_ACCESS_FILLERS.return_rate,
-            top_return_reason: INDIVIDUAL_EARLY_ACCESS_FILLERS.top_return_reason,
-            customer_confidence: INDIVIDUAL_EARLY_ACCESS_FILLERS.customer_confidence,
-            tried_solutions: [],
-            must_have_features: [],
-            biggest_challenge: what_interests_you,
-            timeline,
-            heard_about: heard_about || null,
-            prior_solution_notes: null,
-          },
-        })) as { id?: string };
-        convexDocumentId = inserted?.id;
-        logger.info('Early access (individual) saved to Convex', {
-          convexDocumentId,
-          email: String(email).toLowerCase(),
-        });
-      } catch (error) {
-        logger.error('Individual early access insert failed', { error: String(error) });
-        res.status(500).json({ error: 'Could not save your request. Please try again later.' });
-        return;
-      }
-
-      const to = String(email).toLowerCase();
-      const urls = publicEmailLinks();
-      const html = buildIndividualWaitlistConfirmationHtml(escapeHtml(String(first_name)), urls);
-      const text = [
-        `Hi ${String(first_name)},`,
-        '',
-        "We've received your request for early access to TryVerse.",
-        '',
-        "We're currently in a limited private beta, onboarding select brands and individuals with priority access. Our team will reach out directly with your invite link as spots become available.",
-        '',
-        'If you represent a brand or retail team and would like to explore TryVerse sooner, we\'d love to connect.',
-        '',
-        `Schedule a Private Demo → ${urls.bookDemoUrl}`,
-        '',
-        'Thank you for your interest.',
-        '— The TryVerse Team',
-        '',
-        urls.homeUrl.replace(/^https?:\/\//, ''),
-      ].join('\n');
-
-      const emailSent = await sendEmail({
-        from: TRYVERSE_TRANSACTIONAL_FROM,
-        to,
-        subject: 'TryVerse Early Access — Application Received',
-        html,
-        text,
-      });
-
-      if (!emailSent) {
-        logger.warn('Individual early access saved but confirmation email was not sent', {
-          to,
-          convexDocumentId,
         });
       }
 

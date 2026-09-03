@@ -246,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (row) break;
         await new Promise<void>((r) => setTimeout(r, 80));
       }
-      const at = normalizeAccountType(row?.account_type as string | undefined) ?? "individual";
+      const at = normalizeAccountType(row?.account_type as string | undefined) ?? "business";
       const emailNorm = opts?.email?.trim().toLowerCase();
       const email =
         emailNorm ||
