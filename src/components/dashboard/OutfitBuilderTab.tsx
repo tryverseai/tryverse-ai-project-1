@@ -228,6 +228,7 @@ export function OutfitBuilderTab() {
         modelId: selectedModel.id,
         modelSource: selectedModel.source,
         slots,
+        idempotencyKey: crypto.randomUUID(),
       });
 
       if (started.status === "completed" && started.resultUrl) {

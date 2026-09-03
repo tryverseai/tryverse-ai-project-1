@@ -25,7 +25,28 @@ import { executeOutfitPipeline } from '../services/ai/outfitPipeline';
 import { executeProductModelPipeline } from '../services/ai/productModelPipeline';
 import { executeVideoPipeline } from '../services/ai/videoPipeline';
 import { checkCredits, restoreCredits, getPlanId, CREDIT_COSTS, videoCreditCost } from '../services/credits';
+import { claimIdempotencyKey, completeIdempotencyKey } from '../services/generationIdempotency';
 import type { OutfitJob, ProductModelJob, VideoJob } from '../types';
+
+const idempotencyKeyValidator = body('idempotencyKey')
+  .optional({ nullable: true })
+  .isString()
+  .isLength({ min: 8, max: 100 })
+  .withMessage('idempotencyKey must be a string between 8 and 100 characters');
+
+/** Shared "already claimed by an in-flight or completed request" response, identical shape
+ * across all five generators here. */
+function respondDuplicate(res: Response, refIdField: string, claim: { refId: string | null }): void {
+  if (claim.refId) {
+    res.status(200).json({
+      [refIdField]: claim.refId,
+      status: 'duplicate',
+      message: 'This generation was already started with this idempotency key.',
+    });
+  } else {
+    res.status(409).json({ error: 'This request is already being processed. Please wait a moment.' });
+  }
+}
 
 const router = Router();
 
@@ -73,15 +94,22 @@ router.post(
   generalRateLimit,
   requireAuth,
   planAwareAiStudioRateLimit,
-  [body('prompt').isString().trim().notEmpty().isLength({ max: 500 })],
+  [body('prompt').isString().trim().notEmpty().isLength({ max: 500 }), idempotencyKeyValidator],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user!.id;
+    const idempotencyKey = req.body.idempotencyKey as string | undefined;
     let creditType: 'monthly' | 'free' | undefined;
     try {
+      const claim = await claimIdempotencyKey(userId, idempotencyKey, 'ai_model');
+      if (!claim.claimed) {
+        respondDuplicate(res, 'id', claim);
+        return;
+      }
       creditType = await reserveGenerationCredits(req, CREDIT_COSTS.aiModel);
       const params = matchedData(req) as { prompt: string };
       const result = await generateAndSaveAiModel(userId, params);
+      await completeIdempotencyKey(userId, idempotencyKey, result.id);
       res.json(result);
     } catch (err) {
       logger.error('AI model generation failed', { error: err instanceof Error ? err.message : String(err) });
@@ -139,12 +167,19 @@ router.post(
     body('background').optional().isString().trim().isLength({ max: 300 }),
     body('theme').optional().isString().trim().isLength({ max: 300 }),
     body('lighting').optional().isString().trim().isLength({ max: 300 }),
+    idempotencyKeyValidator,
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user!.id;
+    const idempotencyKey = req.body.idempotencyKey as string | undefined;
     let creditType: 'monthly' | 'free' | undefined;
     try {
+      const claim = await claimIdempotencyKey(userId, idempotencyKey, 'photoshoot');
+      if (!claim.claimed) {
+        respondDuplicate(res, 'storagePath', claim);
+        return;
+      }
       creditType = await reserveGenerationCredits(req, CREDIT_COSTS.photoshoot);
       const params = matchedData(req) as {
         productStoragePath: string;
@@ -158,6 +193,7 @@ router.post(
         throw new AppError('Product image does not belong to this account', 403);
       }
       const result = await generateProductPhotoshoot(userId, params);
+      await completeIdempotencyKey(userId, idempotencyKey, result.storagePath);
       res.json(result);
     } catch (err) {
       logger.error('Product photoshoot failed', { error: err instanceof Error ? err.message : String(err) });
@@ -193,14 +229,21 @@ router.post(
     body('modelSource').isIn(['library', 'generated']),
     body('slots').isObject(),
     ...OUTFIT_SLOT_FIELDS.map((f) => body(`slots.${f}`).optional().isString().trim().notEmpty().isLength({ max: 200 })),
+    idempotencyKeyValidator,
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user!.id;
+    const idempotencyKey = req.body.idempotencyKey as string | undefined;
     const creditAmount = CREDIT_COSTS.outfit;
     let creditsReserved = false;
     let creditType: 'monthly' | 'free' | undefined;
     try {
+      const claim = await claimIdempotencyKey(userId, idempotencyKey, 'outfit');
+      if (!claim.claimed) {
+        respondDuplicate(res, 'outfitId', claim);
+        return;
+      }
       creditType = await reserveGenerationCredits(req, creditAmount);
       creditsReserved = true;
 
@@ -245,6 +288,7 @@ router.post(
         slots: slotImageUrls,
         promptUsed: prompt,
       })) as { id: string };
+      await completeIdempotencyKey(userId, idempotencyKey, outfitDbId);
 
       const jobId = `outfit_${outfitDbId}_${Date.now()}`;
       const job: OutfitJob = {
@@ -367,10 +411,12 @@ router.post(
     body('productStoragePath').isString().trim().notEmpty(),
     body('faceReferenceStoragePath').optional().isString().trim().notEmpty(),
     body('prompt').optional().isString().trim().isLength({ max: 500 }),
+    idempotencyKeyValidator,
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user!.id;
+    const idempotencyKey = req.body.idempotencyKey as string | undefined;
     const params = matchedData(req) as {
       productStoragePath: string;
       faceReferenceStoragePath?: string;
@@ -382,6 +428,11 @@ router.post(
     let creditsReserved = false;
     let creditType: 'monthly' | 'free' | undefined;
     try {
+      const claim = await claimIdempotencyKey(userId, idempotencyKey, 'product_model');
+      if (!claim.claimed) {
+        respondDuplicate(res, 'generationId', claim);
+        return;
+      }
       creditType = await reserveGenerationCredits(req, creditAmount);
       creditsReserved = true;
 
@@ -404,6 +455,7 @@ router.post(
         faceReference: faceReferenceUrl,
         promptUsed: params.prompt,
       })) as { id: string };
+      await completeIdempotencyKey(userId, idempotencyKey, generationDbId);
 
       const jobId = `product_model_${generationDbId}_${Date.now()}`;
       const job: ProductModelJob = {
@@ -526,10 +578,12 @@ router.post(
     body('prompt').optional().isString().trim().isLength({ max: 200 }),
     body('duration').optional().isIn([5, 10]),
     body('resolution').optional().isIn(['480p', '720p', '1080p']),
+    idempotencyKeyValidator,
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user!.id;
+    const idempotencyKey = req.body.idempotencyKey as string | undefined;
     const params = matchedData(req) as {
       sourceStoragePath?: string;
       tryonId?: string;
@@ -545,6 +599,11 @@ router.post(
     let creditsReserved = false;
     let creditType: 'monthly' | 'free' | undefined;
     try {
+      const claim = await claimIdempotencyKey(userId, idempotencyKey, 'video');
+      if (!claim.claimed) {
+        respondDuplicate(res, 'generationId', claim);
+        return;
+      }
       await blockFreePlanVideo(req);
       creditType = await reserveGenerationCredits(req, creditAmount);
       creditsReserved = true;
@@ -586,6 +645,7 @@ router.post(
         durationSeconds: duration,
         resolution,
       })) as { id: string };
+      await completeIdempotencyKey(userId, idempotencyKey, generationDbId);
 
       const jobId = `video_${generationDbId}_${Date.now()}`;
       const job: VideoJob = {

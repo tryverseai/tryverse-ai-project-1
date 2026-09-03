@@ -166,6 +166,7 @@ export function VideoTab() {
         prompt: prompt.trim() || undefined,
         duration: Number(duration) as 5 | 10,
         resolution,
+        idempotencyKey: crypto.randomUUID(),
       });
 
       if (started.status === "completed" && started.resultUrl) {

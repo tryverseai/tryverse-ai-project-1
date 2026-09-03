@@ -28,7 +28,7 @@ export function AiModelsTab() {
     setGenerating(true);
     posthogCapture("ai_model_generate_clicked", { promptLength: prompt.trim().length });
     try {
-      await generateAiModel({ prompt: prompt.trim() });
+      await generateAiModel({ prompt: prompt.trim(), idempotencyKey: crypto.randomUUID() });
       setPrompt("");
       void refreshCredits();
       toast.success("AI model generated", {

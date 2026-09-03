@@ -103,6 +103,7 @@ export function ProductModelTab() {
         productStoragePath: productPath,
         faceReferenceStoragePath: facePath ?? undefined,
         prompt: prompt.trim() || undefined,
+        idempotencyKey: crypto.randomUUID(),
       });
 
       if (started.status === "completed" && started.resultUrl) {

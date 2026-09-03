@@ -65,7 +65,7 @@ export function MyModelsTab() {
     }
     setVideoByModel((prev) => ({ ...prev, [modelId]: { status: "generating" } }));
     try {
-      const started = await generateVideo({ modelId, modelSource: "generated" });
+      const started = await generateVideo({ modelId, modelSource: "generated", idempotencyKey: crypto.randomUUID() });
       if (started.status === "completed" && started.resultUrl) {
         setVideoByModel((prev) => ({ ...prev, [modelId]: { status: "done", url: started.resultUrl } }));
         return;

@@ -371,6 +371,7 @@ export function StudioTab() {
         productImagePath: garmentUpload.filePath,
         category,
         productDescription,
+        idempotencyKey: crypto.randomUUID(),
       });
 
       if (job.status === "completed" && job.resultUrl) {
@@ -433,7 +434,7 @@ export function StudioTab() {
     setVideoStatus("generating");
     setVideoUrl(null);
     try {
-      const started = await generateVideo({ tryonId: resultTryonId });
+      const started = await generateVideo({ tryonId: resultTryonId, idempotencyKey: crypto.randomUUID() });
       if (started.status === "completed" && started.resultUrl) {
         setVideoUrl(started.resultUrl);
         setVideoStatus("done");

@@ -198,6 +198,24 @@ export default defineSchema({
   }).index("by_reference", ["reference"]),
 
   /**
+   * Idempotency guard for credit-consuming generation requests (try-on, outfit, photoshoot,
+   * product-model, video, AI model). A client retry after a timeout/network interruption can
+   * otherwise reserve credits and create a generation job a second time for what the user
+   * experienced as one action. Scoped by (user_id, key) — never a collision across users even if
+   * two different accounts independently pick the same key string. `ref_id` is set once the
+   * generation record actually exists; a row with `ref_id` still unset means the original request
+   * is (or was) mid-flight — see signInAttemptThrottle-style staleness handling in
+   * generationIdempotency.ts so a crashed original request can't permanently block retries.
+   */
+  generation_idempotency: defineTable({
+    key: v.string(),
+    user_id: v.string(),
+    route: v.string(),
+    ref_id: v.optional(v.string()),
+    created_at: v.string(),
+  }).index("by_user_key", ["user_id", "key"]),
+
+  /**
    * Dedup guard for credit refunds. A queued generation job (try-on/outfit/product-model/video)
    * can be retried by Bull up to JOB_MAX_RETRIES times, and each failed attempt independently
    * calls restoreCredit — without this, the same original reservation gets refunded once per

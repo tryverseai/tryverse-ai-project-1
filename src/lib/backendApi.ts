@@ -643,12 +643,15 @@ export interface TryOnRequest {
   productImagePath: string;
   category: TryOnCategory;
   productDescription?: string;
+  /** Client-generated per-attempt key (crypto.randomUUID()) — lets the server dedupe a retried
+   * request instead of double-reserving credits or starting a second job. Omit to skip protection. */
+  idempotencyKey?: string;
 }
 
 export interface TryOnResponse {
   tryonId: string;
   jobId: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed';
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'duplicate';
   category: TryOnCategory;
   resultUrl?: string;
   processingTimeMs?: number;
@@ -1774,6 +1777,9 @@ export async function revokeApiKeyById(id: string): Promise<void> {
 export interface AiModelGenerationParams {
   /** Free-text description of the model to generate. */
   prompt: string;
+  /** Client-generated per-attempt key (crypto.randomUUID()) — lets the server dedupe a retried
+   * request instead of double-reserving credits or starting a second job. Omit to skip protection. */
+  idempotencyKey?: string;
 }
 
 export interface AiModelResult {
@@ -1791,9 +1797,15 @@ export async function generateAiModel(params: AiModelGenerationParams): Promise<
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
   });
-  const data = await handleResponse<{ id: string; storagePath: string; createdAt: string }>(res);
+  const data = await handleResponse<{ id: string; storagePath?: string; createdAt?: string; status?: string }>(res);
+  if (data.status === 'duplicate' || !data.storagePath) {
+    // A retried request reused an idempotency key already claimed by a prior generation — the
+    // server intentionally didn't replay the full result. Surface this rather than building a
+    // broken AiModelResult from a partial response.
+    throw new ApiError('This model was already generated with this request — check My Models.', 409, 'duplicate_request');
+  }
   const imageUrl = await getSignedImageUrl(data.storagePath);
-  return { id: data.id, imageUrl, storagePath: data.storagePath, createdAt: data.createdAt };
+  return { id: data.id, imageUrl, storagePath: data.storagePath, createdAt: data.createdAt ?? new Date().toISOString() };
 }
 
 export async function getSavedAiModels(): Promise<AiModelResult[]> {
@@ -1833,6 +1845,9 @@ export interface PhotoshootGenerationParams {
   background?: string;
   theme?: string;
   lighting?: string;
+  /** Client-generated per-attempt key (crypto.randomUUID()) — lets the server dedupe a retried
+   * request instead of double-reserving credits or starting a second job. Omit to skip protection. */
+  idempotencyKey?: string;
 }
 
 export interface PhotoshootResult {
@@ -1847,9 +1862,13 @@ export async function generateProductPhotoshoot(params: PhotoshootGenerationPara
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
   });
-  const data = await handleResponse<{ storagePath: string; createdAt: string }>(res);
+  const data = await handleResponse<{ storagePath?: string; createdAt?: string; status?: string }>(res);
+  if (data.status === 'duplicate' || !data.storagePath) {
+    // See generateAiModel above — a retried request reused an already-claimed idempotency key.
+    throw new ApiError('This photoshoot was already generated with this request — check your results.', 409, 'duplicate_request');
+  }
   const imageUrl = await getSignedImageUrl(data.storagePath);
-  return { imageUrl, createdAt: data.createdAt };
+  return { imageUrl, createdAt: data.createdAt ?? new Date().toISOString() };
 }
 
 // ─── Outfit Builder (Enterprise) ────────────────────────────────────────────
@@ -1874,12 +1893,15 @@ export interface GenerateOutfitParams {
   modelId: string;
   modelSource: 'library' | 'generated';
   slots: OutfitSlotSelection;
+  /** Client-generated per-attempt key (crypto.randomUUID()) — lets the server dedupe a retried
+   * request instead of double-reserving credits or starting a second job. Omit to skip protection. */
+  idempotencyKey?: string;
 }
 
 export interface OutfitResponse {
   outfitId: string;
   jobId?: string;
-  status: 'processing' | 'completed' | 'failed';
+  status: 'processing' | 'completed' | 'failed' | 'duplicate';
   resultUrl?: string;
   error?: string;
   createdAt?: string;
@@ -1910,12 +1932,15 @@ export interface GenerateProductModelParams {
   productStoragePath: string;
   faceReferenceStoragePath?: string;
   prompt?: string;
+  /** Client-generated per-attempt key (crypto.randomUUID()) — lets the server dedupe a retried
+   * request instead of double-reserving credits or starting a second job. Omit to skip protection. */
+  idempotencyKey?: string;
 }
 
 export interface ProductModelGenerationResponse {
   generationId: string;
   jobId?: string;
-  status: 'processing' | 'completed' | 'failed';
+  status: 'processing' | 'completed' | 'failed' | 'duplicate';
   resultUrl?: string;
   error?: string;
   createdAt?: string;
@@ -1952,12 +1977,15 @@ export interface GenerateVideoParams {
   prompt?: string;
   duration?: 5 | 10;
   resolution?: '480p' | '720p' | '1080p';
+  /** Client-generated per-attempt key (crypto.randomUUID()) — lets the server dedupe a retried
+   * request instead of double-reserving credits or starting a second job. Omit to skip protection. */
+  idempotencyKey?: string;
 }
 
 export interface VideoGenerationResponse {
   generationId: string;
   jobId?: string;
-  status: 'processing' | 'completed' | 'failed';
+  status: 'processing' | 'completed' | 'failed' | 'duplicate';
   resultUrl?: string;
   error?: string;
   createdAt?: string;

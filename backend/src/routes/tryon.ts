@@ -6,6 +6,7 @@ import { tryonRateLimit } from '../middleware/rateLimiter';
 import { planAwareTryonRateLimit } from '../middleware/planRateLimit';
 import { handleValidationErrors } from '../middleware/validate';
 import { checkCredits, SHOPPER_TRYON_UNAVAILABLE_MESSAGE } from '../services/credits';
+import { claimIdempotencyKey, completeIdempotencyKey } from '../services/generationIdempotency';
 import { getJobStatusForUser } from '../services/queue/producer';
 import { getSupportedCategories } from '../services/ai/replicate';
 import { getSignedUrl, RESULT_BUCKET } from '../services/storage/images';
@@ -83,6 +84,11 @@ router.post(
     body('async')
       .optional({ nullable: true })
       .isBoolean(),
+    body('idempotencyKey')
+      .optional({ nullable: true })
+      .isString()
+      .isLength({ min: 8, max: 100 })
+      .withMessage('idempotencyKey must be a string between 8 and 100 characters'),
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -94,6 +100,7 @@ router.post(
         category,
         productDescription,
         async: asyncMode = true,
+        idempotencyKey,
       } = req.body;
 
       const ownerPrefix = `${userId}/`;
@@ -103,6 +110,23 @@ router.post(
           personImagePath: String(personImagePath).slice(0, 80),
         });
         res.status(403).json({ error: 'Person and product images must be uploaded under your account' });
+        return;
+      }
+
+      // Duplicate-request protection: a client retry after a timeout must not reserve credits or
+      // create a second job for what the user did as one action. See generationIdempotency.ts.
+      const claim = await claimIdempotencyKey(userId, idempotencyKey, 'tryon');
+      if (!claim.claimed) {
+        if (claim.refId) {
+          res.status(200).json({
+            success: true,
+            tryonId: claim.refId,
+            status: 'duplicate',
+            message: 'This try-on was already started with this idempotency key — poll /api/tryon/:tryonId for its status.',
+          });
+        } else {
+          res.status(409).json({ error: 'This request is already being processed. Please wait a moment.' });
+        }
         return;
       }
 
@@ -140,6 +164,10 @@ router.post(
         }
         throw err;
       }
+
+      // The generation record now exists (and credits are reserved) — from here on, a retry of
+      // this same idempotencyKey must find it and stop, not create a second one.
+      await completeIdempotencyKey(userId, idempotencyKey, dispatch.tryonLegacyId);
 
       if (dispatch.dispatched === 'queued') {
         res.status(202).json({

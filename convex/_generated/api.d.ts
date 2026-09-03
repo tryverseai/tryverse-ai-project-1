@@ -22,6 +22,7 @@ import type * as billingReconciliation from "../billingReconciliation.js";
 import type * as crons from "../crons.js";
 import type * as emailLayout from "../emailLayout.js";
 import type * as emailVerificationThrottle from "../emailVerificationThrottle.js";
+import type * as generationIdempotency from "../generationIdempotency.js";
 import type * as http from "../http.js";
 import type * as invites from "../invites.js";
 import type * as migrations from "../migrations.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   emailLayout: typeof emailLayout;
   emailVerificationThrottle: typeof emailVerificationThrottle;
+  generationIdempotency: typeof generationIdempotency;
   http: typeof http;
   invites: typeof invites;
   migrations: typeof migrations;

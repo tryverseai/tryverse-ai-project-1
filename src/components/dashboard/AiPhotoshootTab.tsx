@@ -106,6 +106,7 @@ export function AiPhotoshootTab() {
         theme,
         lighting,
         background,
+        idempotencyKey: crypto.randomUUID(),
       });
       setResultUrl(result.imageUrl);
       setStatus("done");
