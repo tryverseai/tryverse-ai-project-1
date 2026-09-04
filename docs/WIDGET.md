@@ -1,18 +1,24 @@
 # TryVerse Widget Integration Guide
 
-Embed AI-powered virtual try-on on your e-commerce site in minutes.
+The embeddable widget is a **lower-friction integration path** for putting AI virtual try-on on a
+brand's storefront — an alternative to the TryVerse SDK (the recommended path) and the raw REST
+API. It calls the same `/api/widget/*` endpoints, authenticated by an API key + domain allowlist.
+The authoritative, always-current version of this guide lives in the product at
+**Dashboard → Developers**.
 
 ## Prerequisites
 
-- TryVerse account with an active plan
-- API key (Dashboard → API Keys)
-- Domain added to allowed list (Dashboard → Widget → add your domain)
+- TryVerse business account with an active plan
+- API key (Dashboard → API Keys, or auto-provisioned in Dashboard → Connect Store)
+- Domain added to the allowlist (Dashboard → Developers → Allowed domains)
 
 ## Quick Start
 
 ### 1. Add your domain
 
-Before embedding, add your website domain in the Dashboard under **Widget** → **Allowed Domains**. Example: `yourshop.com` or `www.yourshop.com`.
+Before embedding, add your storefront domain in **Dashboard → Developers → Allowed domains**.
+Example: `yourshop.com` or `www.yourshop.com`. Server-side calls (the SDK, your own backend) do
+not need an allowlisted domain.
 
 ### 2. Popup mode (button trigger)
 
@@ -107,6 +113,6 @@ The API validates the request origin. Ensure your domain is in the allowed list.
 | Error | Solution |
 |-------|----------|
 | `Invalid signature` | Check API key and backend URL |
-| `Domain not authorized` | Add your domain in Dashboard → Widget |
+| `Domain not authorized` | Add your domain in Dashboard → Developers → Allowed domains |
 | `Insufficient credits` | Upgrade plan or wait for monthly reset |
 | `Upload failed` | Ensure product image URL is accessible (no auth, CORS) |

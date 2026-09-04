@@ -1,6 +1,6 @@
 # TryVerse Convex backend
 
-This folder is the Convex project: **`schema.ts`** defines tables; **`auth.ts`** configures Convex Auth (password, profile fields for individual vs business sign-up). **`auth.config.ts`** wires the Auth.js-style provider domain.
+This folder is the Convex project: **`schema.ts`** defines tables; **`auth.ts`** configures Convex Auth (password + profile fields for business sign-up — TryVerse is B2B-only, every profile is `account_type: "business"`). **`auth.config.ts`** wires the Auth.js-style provider domain.
 
 ## One-time link
 
