@@ -7,7 +7,6 @@ import {
   cxGetProfile,
   cxPatchProfile,
   cxInsertProfile,
-  cxGetUserRow,
   cxGetPlan,
   cxReserveCredit,
   cxRestoreCredit,
@@ -42,7 +41,6 @@ const LOW_CREDITS_THRESHOLD = 5;
 
 function narrowCreditFields(p: ConvexProfileRow): {
   plan_id: string | null;
-  account_type?: string | null;
   free_credits_remaining: number;
   free_credits_total: number;
   monthly_credits_remaining: number;
@@ -50,7 +48,6 @@ function narrowCreditFields(p: ConvexProfileRow): {
 } {
   return {
     plan_id: typeof p.plan_id === 'string' ? p.plan_id : null,
-    account_type: p.account_type,
     free_credits_remaining: Number(p.free_credits_remaining ?? 0),
     free_credits_total: Number(p.free_credits_total ?? 0),
     monthly_credits_remaining: Number(p.monthly_credits_remaining ?? 0),
@@ -62,44 +59,25 @@ function narrowCreditFields(p: ConvexProfileRow): {
 export const SHOPPER_TRYON_UNAVAILABLE_MESSAGE =
   "Virtual try-on isn't available right now. Please try again later or contact the store.";
 
-/** B2C free try-on pool (upper end of 3–5 range; cap enforced on reset & reconcile). */
-export const DEFAULT_FREE_CREDITS_INDIVIDUAL = 5;
-
-/** B2B / brand free try-on pool on free plan. */
+/**
+ * Free AI-generation pool granted on signup. TryVerse is B2B-only — one flat business pool,
+ * no account-type branching.
+ */
 export const DEFAULT_FREE_CREDITS_BUSINESS = 10;
 
-/**
- * @deprecated Use {@link DEFAULT_FREE_CREDITS_BUSINESS} or {@link freePoolCapForAccountType}.
- * Retained only for backward compatibility; will be removed in a future cleanup.
- */
+/** @deprecated Alias of {@link DEFAULT_FREE_CREDITS_BUSINESS}; kept for import back-compat. */
 export const DEFAULT_FREE_CREDITS = DEFAULT_FREE_CREDITS_BUSINESS;
 
-export function freePoolCapForAccountType(accountType: string | null | undefined): number {
-  const t = String(accountType ?? 'business')
-    .trim()
-    .toLowerCase();
-  return t === 'individual' ? DEFAULT_FREE_CREDITS_INDIVIDUAL : DEFAULT_FREE_CREDITS_BUSINESS;
-}
-
-/** Older signups used a 3-try free pool; migrate cap depends on account_type. */
+/** Older signups used a 3-try free pool; new cap is the flat business pool. */
 const LEGACY_FREE_CREDITS_TOTAL = 3;
 
-async function accountTypeFromConvexUser(userId: string): Promise<'individual' | 'business'> {
-  const row = await cxGetUserRow(userId);
-  const s = String(row?.account_type ?? '')
-    .trim()
-    .toLowerCase();
-  return s === 'individual' ? 'individual' : 'business';
-}
-
 /**
- * One-time migration from legacy 3-cap pool to account-type-aware free pool.
+ * One-time migration from the legacy 3-credit free pool to the current flat business pool.
  */
 async function migrateLegacyFreeCreditsIfNeeded(
   userId: string,
   profile: {
     plan_id: string | null;
-    account_type?: string | null;
     free_credits_remaining: number;
     free_credits_total: number;
   }
@@ -118,7 +96,7 @@ async function migrateLegacyFreeCreditsIfNeeded(
     };
   }
 
-  const cap = freePoolCapForAccountType(profile.account_type);
+  const cap = DEFAULT_FREE_CREDITS_BUSINESS;
   const bonus = cap - LEGACY_FREE_CREDITS_TOTAL;
   const newRemaining = Math.min(cap, profile.free_credits_remaining + bonus);
   const newTotal = cap;
@@ -137,23 +115,22 @@ async function migrateLegacyFreeCreditsIfNeeded(
     };
   }
 
-  logger.info('Migrated legacy free credits pool (3 → account cap)', {
+  logger.info('Migrated legacy free credits pool (3 → 10)', {
     userId,
     newRemaining,
     newTotal,
-    accountType: profile.account_type,
   });
   return { free_credits_remaining: newRemaining, free_credits_total: newTotal };
 }
 
 /**
- * Individuals on free plan should not keep a business-sized (20) pool — cap to individual limit.
+ * Caps a free-plan pool at the current flat free-credit total, in case an older row carries a
+ * larger legacy value.
  */
-async function reconcileIndividualFreePoolCap(
+async function reconcileFreePoolCap(
   userId: string,
   profile: {
     plan_id: string | null;
-    account_type?: string | null;
     free_credits_remaining: number;
     free_credits_total: number;
   }
@@ -165,7 +142,7 @@ async function reconcileIndividualFreePoolCap(
       free_credits_total: profile.free_credits_total,
     };
   }
-  const cap = freePoolCapForAccountType(profile.account_type);
+  const cap = DEFAULT_FREE_CREDITS_BUSINESS;
   if (profile.free_credits_total <= cap && profile.free_credits_remaining <= cap) {
     return {
       free_credits_remaining: profile.free_credits_remaining,
@@ -183,7 +160,7 @@ async function reconcileIndividualFreePoolCap(
       updated_at: new Date().toISOString(),
     });
   } catch (e) {
-    logger.warn('Individual free pool cap reconcile failed', { userId, message: String(e) });
+    logger.warn('Free pool cap reconcile failed', { userId, message: String(e) });
     return {
       free_credits_remaining: profile.free_credits_remaining,
       free_credits_total: profile.free_credits_total,
@@ -191,12 +168,12 @@ async function reconcileIndividualFreePoolCap(
   }
 
   if (newTotal !== profile.free_credits_total || newRem !== profile.free_credits_remaining) {
-    logger.info('Reconciled free pool to account-type cap', { userId, cap });
+    logger.info('Reconciled free pool to cap', { userId, cap });
   }
   return { free_credits_remaining: newRem, free_credits_total: newTotal };
 }
 
-/** Paid tier monthly try-on limits (free uses account-type pool, not this map). */
+/** Paid tier monthly try-on limits (free uses the flat free pool, not this map). */
 const PLAN_LIMITS: Record<string, number> = {
   free: 0,
   starter: 100,
@@ -212,7 +189,6 @@ async function ensureMonthlyCreditReset(
   userId: string,
   profile: {
     plan_id: string | null;
-    account_type?: string | null;
     free_credits_remaining: number;
     free_credits_total: number;
     monthly_credits_remaining: number;
@@ -265,27 +241,10 @@ async function ensureMonthlyCreditReset(
   }
 }
 
-async function hydrateProfileWithAccountType<T extends { account_type?: string | null }>(
-  userId: string,
-  profile: T | null
-): Promise<T | null> {
-  if (!profile) return null;
-  if (profile.account_type === 'individual' || profile.account_type === 'business') {
-    return profile;
-  }
-  const row = await cxGetProfile(userId);
-  const at = row?.account_type;
-  if (typeof at === 'string' && (at === 'individual' || at === 'business')) {
-    return { ...profile, account_type: at };
-  }
-  return { ...profile, account_type: await accountTypeFromConvexUser(userId) };
-}
-
 /**
- * Loads, hydrates, and normalizes a user's credit profile.
+ * Loads and normalizes a user's credit profile.
  * Shared between `checkCredits` and `getCreditSummary` to keep the bootstrap
- * sequence (get-or-create → hydrate account type → migrate legacy caps → reconcile
- * individual cap) in one place.
+ * sequence (get-or-create → migrate legacy caps → reconcile free-pool cap) in one place.
  *
  * Does NOT trigger monthly credit resets — `checkCredits` does that separately
  * to avoid resetting credits during a read-only summary request.
@@ -296,10 +255,9 @@ async function buildCreditProfile(userId: string): Promise<ConvexProfileRow | nu
   let profile = await cxGetProfile(userId);
 
   if (!profile) {
-    const acct = await accountTypeFromConvexUser(userId);
-    const cap = freePoolCapForAccountType(acct);
+    const cap = DEFAULT_FREE_CREDITS_BUSINESS;
     try {
-      await cxInsertProfile(userId, acct, cap, cap);
+      await cxInsertProfile(userId, cap, cap);
     } catch (insertErr) {
       logger.error('Failed to create profile', { userId, error: String(insertErr) });
       return null;
@@ -309,13 +267,10 @@ async function buildCreditProfile(userId: string): Promise<ConvexProfileRow | nu
 
   if (!profile) return null;
 
-  profile = await hydrateProfileWithAccountType(userId, profile);
-  if (!profile) return null;
-
   const migratedFree = await migrateLegacyFreeCreditsIfNeeded(userId, narrowCreditFields(profile));
   profile = { ...profile, ...migratedFree };
 
-  const reconciled = await reconcileIndividualFreePoolCap(userId, narrowCreditFields(profile));
+  const reconciled = await reconcileFreePoolCap(userId, narrowCreditFields(profile));
   return { ...profile, ...reconciled };
 }
 
@@ -556,7 +511,8 @@ export async function getCreditSummary(userId: string) {
 
   return {
     plan: pf.plan_id || 'free',
-    accountType: profile.account_type === 'individual' ? 'individual' : 'business',
+    // TryVerse is B2B-only — kept in the response shape for client back-compat.
+    accountType: 'business' as const,
     isUnlimited,
     freeCreditsRemaining: pf.free_credits_remaining,
     freeCreditsTotal: pf.free_credits_total,

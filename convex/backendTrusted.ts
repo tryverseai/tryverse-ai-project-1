@@ -46,7 +46,9 @@ export const insertProfileRow = mutation({
   args: {
     secret: v.string(),
     userId: v.string(),
-    accountType: v.string(),
+    /** TryVerse is B2B-only. Accepted for wire back-compat with older backend builds; always
+     *  stored as "business" regardless of what is passed. */
+    accountType: v.optional(v.string()),
     freeCreditsRemaining: v.number(),
     freeCreditsTotal: v.number(),
     contactEmail: v.optional(v.string()),
@@ -143,7 +145,7 @@ export const insertProfileRow = mutation({
     await ctx.db.insert("profiles", {
       id: canon,
       plan_id: "free",
-      account_type: args.accountType,
+      account_type: "business",
       free_credits_remaining: args.freeCreditsRemaining,
       free_credits_total: args.freeCreditsTotal,
       monthly_credits_remaining: 0,
@@ -1561,7 +1563,7 @@ export const ensurePlansSeeded = mutation({
     const rows = [
       {
         id: "free", name: "Free", is_active: true, max_products: 0, price_ngn: 0, price_usd: 0, tryons_per_month: 5,
-        features: ["Free try-on pool (individuals: 5 · brands: 10 on signup)", "Watermark on free tier", "Basic quality", "Upgrade anytime"],
+        features: ["10 free AI generations on signup", "Watermark on free tier", "Basic quality", "Upgrade anytime"],
         created_at: now,
       },
       {

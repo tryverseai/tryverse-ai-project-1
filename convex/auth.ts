@@ -17,25 +17,20 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         }
       },
       profile(params) {
+        // TryVerse is B2B-only — every account is a "business" account.
         const email = String(params.email ?? "").trim();
         const flow = String(params.flow ?? "");
-        const accountType =
-          String(params.accountType ?? params.account_type ?? "business").toLowerCase() === "individual"
-            ? "individual"
-            : "business";
         const brandName = params.brandName != null ? String(params.brandName).trim() : "";
         const fullName = params.fullName != null ? String(params.fullName).trim() : "";
         const role = params.role != null ? String(params.role).trim() : "";
         const displayName =
           flow === "signUp"
-            ? accountType === "individual"
-              ? fullName || email.split("@")[0]!
-              : brandName || fullName || email.split("@")[0]!
+            ? brandName || fullName || email.split("@")[0]!
             : email.split("@")[0]!;
         const base: Record<string, string> & { email: string } = {
           email,
           name: displayName,
-          account_type: accountType,
+          account_type: "business",
         };
         if (brandName !== "") base["brand_name"] = brandName;
         if (fullName !== "") base["full_name"] = fullName;

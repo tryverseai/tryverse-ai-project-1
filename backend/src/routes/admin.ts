@@ -18,7 +18,7 @@ import { logAudit } from '../services/audit';
 import { AppError } from '../middleware/errorHandler';
 import { listAllModelsForAdmin } from '../services/models/modelLibrary';
 import { sendEmail } from '../services/email/resend';
-import { businessInviteBodies, FIXED_FROM, personalInviteBodies } from '../email/inviteEmailBodies';
+import { businessInviteBodies, FIXED_FROM } from '../email/inviteEmailBodies';
 
 const router = Router();
 
@@ -443,7 +443,7 @@ router.get(
     query('limit').optional().isInt({ min: 1, max: 200 }).toInt(),
     query('page').optional().isInt({ min: 1 }).toInt(),
     query('search').optional().isString().trim().isLength({ max: 80 }),
-    query('accountType').optional().isIn(['business', 'individual', 'all']),
+    query('accountType').optional().isIn(['business', 'all']),
   ],
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -452,7 +452,7 @@ router.get(
         limit?: number;
         page?: number;
         search?: string;
-        accountType?: 'business' | 'individual' | 'all';
+        accountType?: 'business' | 'all';
       };
       const limit = Math.min(q.limit ?? 50, 200);
       const page = Math.max(q.page ?? 1, 1);
@@ -842,52 +842,11 @@ router.patch(
   }
 );
 
-/**
- * PATCH /api/admin/users/:userId/profile — account_type (and JWT metadata sync for dashboard routing).
+/*
+ * PATCH /api/admin/users/:userId/profile (account_type switch) was removed — TryVerse is
+ * B2B-only, every account is "business", and there is nothing to switch to. The frontend
+ * control and its API client were already gone; this finishes the removal server-side.
  */
-router.patch(
-  '/users/:userId/profile',
-  [
-    param('userId').isString().trim().isLength({ min: 1, max: 256 }),
-    body('account_type').isIn(['business', 'individual']).withMessage('account_type required'),
-  ],
-  handleValidationErrors,
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const userId = req.params.userId as string;
-      const account_type = req.body.account_type as 'business' | 'individual';
-
-      try {
-        await convexMutationTrusted(anyApi.adminTrusted.patchUserAccountType, {
-          secret: env.BACKEND_SHARED_SECRET,
-          userId,
-          account_type,
-        });
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes('User not found') || msg.includes('not_found')) {
-          res.status(404).json({ error: 'User not found' });
-          return;
-        }
-        throw e;
-      }
-
-      await logAudit({
-        event_type: 'admin_action',
-        actor: 'admin',
-        action: 'user_account_type_changed',
-        target_id: userId,
-        details: { account_type },
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-      });
-
-      res.json({ success: true, account_type, authMetadataSynced: true });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
 
 /**
  * POST /api/admin/tryons/:tryonId/retry
@@ -1575,7 +1534,8 @@ router.post(
   [
     body('email').trim().isEmail().isLength({ max: 254 }),
     body('name').optional({ nullable: true }).isString().isLength({ max: 200 }),
-    body('accountType').isIn(['personal', 'business']),
+    // TryVerse is B2B-only — accountType is accepted but ignored; every invite is a business invite.
+    body('accountType').optional().isString(),
     body('companyName').optional({ nullable: true }).isString().isLength({ max: 400 }),
   ],
   handleValidationErrors,
@@ -1584,11 +1544,10 @@ router.post(
       const b = matchedData(req) as {
         email: string;
         name?: string | null;
-        accountType: 'personal' | 'business';
         companyName?: string | null;
       };
       const companyName = typeof b.companyName === 'string' ? b.companyName.trim() : '';
-      if (b.accountType === 'business' && !companyName) {
+      if (!companyName) {
         res.status(400).json({ error: 'companyName is required for business invitations' });
         return;
       }
@@ -1597,8 +1556,8 @@ router.post(
         secret: env.BACKEND_SHARED_SECRET,
         email: b.email.trim().toLowerCase(),
         name: b.name?.trim() || undefined,
-        accountType: b.accountType,
-        companyName: b.accountType === 'business' ? companyName : undefined,
+        accountType: 'business',
+        companyName,
         createdBy: actor,
       })) as { token: string };
 
@@ -1607,9 +1566,9 @@ router.post(
         actor: 'admin',
         action: 'invite_create',
         details: {
-          summary: `Created invite (${b.accountType}) for ${b.email.trim().toLowerCase()}`,
+          summary: `Created invite (business) for ${b.email.trim().toLowerCase()}`,
           email: b.email.trim().toLowerCase(),
-          accountType: b.accountType,
+          accountType: 'business',
           token_preview: `${out.token.slice(0, 12)}…`,
         },
         ip_address: req.ip,
@@ -1621,7 +1580,7 @@ router.post(
         token,
         inviteUrl: lifecycleInviteAcceptUrl(token),
         email: b.email.trim().toLowerCase(),
-        accountType: b.accountType,
+        accountType: 'business',
       });
     } catch (err) {
       next(err);
@@ -1665,25 +1624,12 @@ router.post(
       const inviteUrl = lifecycleInviteAcceptUrl(row.token);
       const name = row.name ?? row.email.split('@')[0];
 
-      let subject: string;
-      let html: string;
-      let text: string;
-      if (row.accountType === 'personal') {
-        const b = personalInviteBodies({
-          name,
-          email: row.email,
-          inviteUrl,
-        });
-        ({ subject, html, text } = b);
-      } else {
-        const b = businessInviteBodies({
-          name,
-          email: row.email,
-          companyName: row.companyName ?? '',
-          inviteUrl,
-        });
-        ({ subject, html, text } = b);
-      }
+      const { subject, html, text } = businessInviteBodies({
+        name,
+        email: row.email,
+        companyName: row.companyName ?? '',
+        inviteUrl,
+      });
 
       const sent = await sendEmail({
         to: row.email.toLowerCase(),

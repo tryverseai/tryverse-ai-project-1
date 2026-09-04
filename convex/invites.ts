@@ -40,7 +40,8 @@ export const createInviteTrusted = mutation({
     secret: v.string(),
     email: v.string(),
     name: v.optional(v.string()),
-    accountType: v.union(v.literal("personal"), v.literal("business")),
+    /** TryVerse is B2B-only. Accepted for wire back-compat; every invite is stored as "business". */
+    accountType: v.optional(v.string()),
     companyName: v.optional(v.string()),
     createdBy: v.optional(v.string()),
   },
@@ -63,7 +64,7 @@ export const createInviteTrusted = mutation({
       token,
       email,
       name: args.name?.trim() || undefined,
-      accountType: args.accountType,
+      accountType: "business",
       companyName: args.companyName?.trim() || undefined,
       status: "pending",
       createdAt: Date.now(),

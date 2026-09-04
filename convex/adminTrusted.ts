@@ -74,7 +74,7 @@ export const adminListProfiles = query({
   handler: async (ctx, { secret, limit, offset, search, accountType }) => {
     requireBackendSecret(secret);
     let rows = await ctx.db.query("profiles").collect();
-    if (accountType === "business" || accountType === "individual") {
+    if (accountType === "business") {
       rows = rows.filter((r) => r.account_type === accountType);
     }
     if (search && search.trim()) {
@@ -207,28 +207,6 @@ export const adminGetTryonForRetry = query({
       category: row.category,
       status: row.status,
     };
-  },
-});
-
-export const patchUserAccountType = mutation({
-  args: {
-    secret: v.string(),
-    userId: v.string(),
-    account_type: v.union(v.literal("business"), v.literal("individual")),
-  },
-  handler: async (ctx, { secret, userId, account_type }) => {
-    requireBackendSecret(secret);
-    const user = await ctx.db.get(userId as Id<"users">);
-    if (!user) throw new Error("User not found");
-    await ctx.db.patch(user._id, { account_type } as never);
-    const prof = await findProfileBySubjectKeys(ctx, userId);
-    if (prof) {
-      await ctx.db.patch(prof._id, {
-        account_type,
-        updated_at: new Date().toISOString(),
-      });
-    }
-    return { ok: true as const };
   },
 });
 

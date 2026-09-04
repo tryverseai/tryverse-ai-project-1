@@ -340,7 +340,8 @@ export type InviteValidationResult =
       valid: true;
       email: string;
       name?: string;
-      accountType?: 'personal' | 'business';
+      /** TryVerse is B2B-only — always "business" when present. */
+      accountType?: 'business';
       companyName?: string;
     };
 
@@ -1626,7 +1627,8 @@ export async function adminCreateInvite(
   body: {
     email: string;
     name?: string;
-    accountType: 'personal' | 'business';
+    /** TryVerse is B2B-only — value is ignored server-side; every invite is a business invite. */
+    accountType?: 'business';
     companyName?: string;
   }
 ): Promise<{ token: string; inviteUrl: string; email: string; accountType: string }> {
