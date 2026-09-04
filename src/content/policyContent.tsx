@@ -2,10 +2,15 @@ import { Link } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 
-export type PolicyAudience = "business" | "individual";
+/**
+ * TryVerse is B2B-only. This alias is retained (rather than deleted) so the prop threading in
+ * `ComplianceOnboardingModal` / `TryVersePrivacyPolicy` keeps compiling; there is only one
+ * audience now.
+ */
+export type PolicyAudience = "business";
 
 interface PolicyContentProps {
-  /** Defaults to business (e.g. public /terms page). */
+  /** Always "business" — TryVerse has no individual/consumer account type. */
   audience?: PolicyAudience;
 }
 
@@ -32,180 +37,10 @@ function PendingCounselNote({ items }: { items: string }) {
 const h2 = "font-display text-lg font-semibold text-foreground mb-3";
 const prose = "prose prose-neutral max-w-none space-y-8 text-foreground/90 text-sm leading-relaxed";
 
-export function TermsContent({ audience = "business" }: PolicyContentProps) {
-  if (audience === "individual") {
-    return (
-      <div className={prose}>
-        <PendingCounselNote items="the governing-law jurisdiction, dispute-resolution venue, and the fixed-amount floor on our liability cap" />
-        <section>
-          <h2 className={h2}>1. Agreement and Acceptance</h2>
-          <p>
-            These Terms of Service (&quot;Terms&quot;) govern your access to and use of TryVerse (&quot;TryVerse,&quot;
-            &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) as an individual — Personal Studio, virtual Try-On,
-            AI Model Studio, My Creations, and related personal-account features. By creating an account, accepting
-            these Terms, or otherwise using the Service, you agree to be bound by them. If you do not agree, do not
-            use the Service.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>2. Eligibility and Accounts</h2>
-          <p>
-            You must have the legal capacity required by applicable law to enter into these Terms. TryVerse is not
-            directed to children below the minimum age permitted by applicable law. You are responsible for
-            safeguarding your credentials and for all activity under your account, except to the extent caused by
-            TryVerse&rsquo;s failure to apply reasonable security measures.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>3. What the Service Does for You</h2>
-          <p>
-            TryVerse provides AI-assisted fashion visualization for your personal use — virtual Try-On, AI Model
-            Studio, and outfit visualization. You can upload your own photo (or choose a preset virtual model where
-            offered), add a product image — clothing, footwear, eyewear, or jewelry — and generate a result to view
-            and download. Personal accounts do not include storefront widgets, merchant APIs, or brand analytics.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>4. Try-On Guide and Acknowledgment</h2>
-          <p>
-            Certain Try-On flows require you to affirmatively acknowledge a guidance screen (&quot;I Understand &amp;
-            Continue&quot; or equivalent) before generation proceeds. This acknowledgment is an informational product
-            control — it does not by itself establish any separate legal consent required elsewhere in these Terms.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>5. Your Photos and Permissions</h2>
-          <p>
-            You retain whatever rights you have in the photos and content you submit. You grant TryVerse the limited
-            rights necessary to host, store, transform, and process that content to provide, secure, and maintain the
-            Service. You must not upload a photo of another person without their permission or another lawful basis.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>6. AI Outputs</h2>
-          <p>
-            Try-On and other generated results are a visualization, not a guarantee of fit, sizing, drape, color, or
-            how a product will actually look on you. Output can contain inaccuracies or artifacts. You are
-            responsible for reviewing a result before relying on it.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>7. My Creations</h2>
-          <p>
-            A successful generation is saved to your My Creations library and remains available across sessions and
-            devices until you delete it, close your account, or a documented legal/retention requirement requires
-            deletion. Records of a failed generation may be retained separately for security, billing, and abuse
-            prevention even if it never appears as a saved creation.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>8. Credits and Fair Use</h2>
-          <p>
-            Personal accounts use Credits to measure generation activity, as described at signup or on your plan.
-            Credits are usage units, not cash or transferable property, unless applicable law requires otherwise. You
-            may not automate, resell, or systematically abuse the Service; API keys and embeddable widgets are
-            offered only under business terms.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>9. Payment and Billing</h2>
-          <p>
-            Paid personal plans, where offered, are billed as shown at checkout and processed by a third-party
-            payment processor. TryVerse does not store full payment-card numbers where the processor can handle them
-            directly. Subscriptions may auto-renew until cancelled. Refunds are handled on a case-by-case basis and
-            in accordance with mandatory consumer law.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>10. Acceptable Use and Responsible AI</h2>
-          <p>
-            You must comply with the{" "}
-            <Link to="/acceptable-use" className="text-foreground underline font-medium">
-              Acceptable Use &amp; Responsible AI/Image Policy
-            </Link>
-            . Prohibited conduct includes non-consensual image generation, sexualized content involving minors,
-            non-consensual intimate imagery, impersonation for fraud or defamation, and unlawful content.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>11. Intellectual Property</h2>
-          <p>
-            TryVerse and its licensors retain all rights in the Service, software, and underlying technology. Subject
-            to third-party rights, applicable law, and your plan terms, TryVerse grants you the rights it is legally
-            able to grant in Generated Content produced for your account. No right is granted to use TryVerse
-            trademarks or to suggest TryVerse endorses your use of a generated image.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>12. Availability and Warranties</h2>
-          <p>
-            To the maximum extent permitted by law, the Service is provided &quot;as is&quot; and &quot;as
-            available.&quot; TryVerse does not warrant uninterrupted availability, error-free operation, or that
-            every generated image will be suitable for a particular purpose. Nothing here excludes a warranty or
-            consumer right that cannot lawfully be excluded.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>13. Limitation of Liability</h2>
-          <p>
-            To the maximum extent permitted by applicable law, TryVerse will not be liable for indirect, incidental,
-            special, consequential, or punitive damages, or for loss of profits, goodwill, or data arising from the
-            Service. TryVerse&rsquo;s aggregate liability arising from the Service is limited to the fees you paid
-            TryVerse in the 12 months preceding the event giving rise to the claim.{" "}
-            <span className="italic">
-              A fixed-amount minimum floor on this cap, applicable in jurisdictions where a fees-based cap alone is
-              not appropriate, is still being finalized with counsel.
-            </span>
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>14. Suspension and Termination</h2>
-          <p>
-            TryVerse may suspend or terminate access where reasonably necessary to prevent harm, address a security
-            incident, enforce these Terms, or comply with law. You may stop using the Service and request account
-            deletion at any time, governed by our{" "}
-            <Link to="/privacy" className="text-foreground underline font-medium">
-              Privacy Policy
-            </Link>
-            .
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>15. Governing Law and Disputes</h2>
-          <p className="italic">
-            The governing law and dispute-resolution venue for these Terms are being finalized with counsel and will
-            be published here once confirmed. Nothing in this section limits any mandatory consumer-protection right
-            you have under the law of your own place of residence.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>16. Changes to These Terms</h2>
-          <p>
-            TryVerse may update these Terms. Material changes will be communicated through reasonable channels where
-            required by law, and the effective date at the top of this document will be updated.
-          </p>
-        </section>
-        <section>
-          <h2 className={h2}>17. Contact</h2>
-          <p>
-            For questions about these Terms, please use our{" "}
-            <Link to="/support" className="text-foreground underline font-medium">
-              Contact us
-            </Link>{" "}
-            page, or email{" "}
-            <a href="mailto:info@tryverseai.com" className="text-foreground underline font-medium">
-              info@tryverseai.com
-            </a>
-            .
-          </p>
-        </section>
-      </div>
-    );
-  }
-
+export function TermsContent(_props: PolicyContentProps = {}) {
   return (
     <div className={prose}>
-      <PendingCounselNote items="the governing-law jurisdiction, dispute-resolution venue, and the fixed-amount floor on our liability cap" />
+      <PendingCounselNote items="the registered legal entity name, address and jurisdiction, the governing-law jurisdiction, the dispute-resolution venue, and the fixed-amount floor on our liability cap" />
       <section>
         <h2 className={h2}>1. Agreement and Acceptance</h2>
         <p>
@@ -226,13 +61,23 @@ export function TermsContent({ audience = "business" }: PolicyContentProps) {
         </p>
       </section>
       <section>
-        <h2 className={h2}>2. Eligibility and Accounts</h2>
+        <h2 className={h2}>2. Definitions and Accounts</h2>
         <p>
-          You must have the legal capacity required by applicable law to enter into these Terms. TryVerse is not
-          directed to children below the minimum age permitted by applicable law. You must provide accurate account
-          information and keep it current. You are responsible for safeguarding credentials and API keys and for all
-          activity occurring through your account, except to the extent caused by TryVerse&rsquo;s failure to apply
-          reasonable security measures.
+          &quot;TryVerse&quot; refers to the service operated by TryVerse AI
+          (<span className="font-medium">[LEGAL ENTITY NAME &mdash; TO BE CONFIRMED BY COUNSEL]</span>).
+          &quot;Customer&quot; means the business, brand, organization, or other commercial entity that holds a
+          TryVerse account. &quot;Authorized User&quot; means a natural person the Customer permits to access or
+          administer that account (for example an owner, employee, contractor, or agency operator).
+          &quot;Shopper&quot; or &quot;End User&quot; means a person who interacts with a TryVerse-powered
+          experience that a Customer provides to or for its own customers. TryVerse accounts are business
+          accounts; TryVerse does not offer a separate individual or consumer account type.
+        </p>
+        <p>
+          You must have the legal capacity and authority required by applicable law to enter into these Terms on
+          behalf of the Customer. TryVerse is not directed to children below the minimum age permitted by applicable
+          law. The Customer and its Authorized Users must provide accurate account information and keep it current,
+          and are responsible for safeguarding credentials and API keys and for all activity occurring through the
+          account, except to the extent caused by TryVerse&rsquo;s failure to apply reasonable security measures.
         </p>
         <p>
           TryVerse may require email verification, device verification, multi-factor authentication, or other
@@ -339,7 +184,8 @@ export function TermsContent({ audience = "business" }: PolicyContentProps) {
           purchase or in an applicable order form. Payments are processed by third-party payment processors; TryVerse
           does not store full payment-card numbers where the payment processor can process those credentials
           directly. Subscriptions renew automatically until cancelled. Refunds, credits, cancellations, and
-          chargebacks are governed by the applicable plan terms and mandatory consumer law.
+          chargebacks are governed by the applicable plan terms and by any mandatory protections under applicable
+          law that cannot lawfully be excluded.
         </p>
       </section>
       <section>
@@ -381,8 +227,9 @@ export function TermsContent({ audience = "business" }: PolicyContentProps) {
           <Link to="/privacy" className="text-foreground underline font-medium">
             Privacy Policy
           </Link>{" "}
-          describes TryVerse&rsquo;s processing of personal data in direct-user contexts. Where a Brand determines
-          the purposes and means of processing shopper personal data and TryVerse acts on the Brand&rsquo;s
+          describes TryVerse&rsquo;s processing of personal data where TryVerse acts as a controller (including
+          account, authentication, billing, and platform-security data). Where a Customer determines the purposes and
+          means of processing its Shoppers&rsquo; personal data and TryVerse acts on the Customer&rsquo;s
           instructions, the{" "}
           <Link to="/data-processing" className="text-foreground underline font-medium">
             Data Processing Agreement
@@ -431,7 +278,7 @@ export function TermsContent({ audience = "business" }: PolicyContentProps) {
           To the maximum extent permitted by law, the Service is provided on an &quot;as is&quot; and &quot;as
           available&quot; basis. TryVerse does not warrant uninterrupted availability, perfect output accuracy,
           error-free operation, specific commercial results, or that every generated image or video will be suitable
-          for a particular use. Nothing in these Terms excludes a warranty or consumer right that cannot lawfully be
+          for a particular use. Nothing in these Terms excludes a warranty or right that cannot lawfully be
           excluded.
         </p>
       </section>
@@ -472,8 +319,8 @@ export function TermsContent({ audience = "business" }: PolicyContentProps) {
         <h2 className={h2}>22. Governing Law and Dispute Resolution</h2>
         <p className="italic">
           The governing law, dispute-resolution mechanism, and venue for these Terms are being finalized with counsel
-          and will be published here once confirmed. Nothing in this section limits any mandatory consumer or
-          statutory right you have under the law of your own jurisdiction.
+          and will be published here once confirmed. Nothing in this section limits any mandatory statutory right
+          that applies to you under the law of your own jurisdiction.
         </p>
       </section>
       <section>
@@ -504,7 +351,11 @@ export function TermsContent({ audience = "business" }: PolicyContentProps) {
           <Link to="/support" className="text-foreground underline font-medium">
             Contact us
           </Link>{" "}
-          page. Our registered entity name and business address will be added here once confirmed with counsel.
+          page. TryVerse is operated by <span className="font-medium">[LEGAL ENTITY NAME &mdash; TO BE CONFIRMED BY
+          COUNSEL]</span>, <span className="font-medium">[REGISTERED ADDRESS &mdash; TO BE CONFIRMED]</span>,{" "}
+          <span className="font-medium">[JURISDICTION &mdash; TO BE CONFIRMED BY COUNSEL]</span>. Formal legal
+          notices may also be sent to <span className="font-medium">[LEGAL CONTACT EMAIL &mdash; TO BE
+          CONFIRMED]</span>.
         </p>
       </section>
     </div>
@@ -519,23 +370,26 @@ export function DataProcessingContent(_props: PolicyContentProps = {}) {
         <h2 className={h2}>1. Parties and Scope</h2>
         <p>
           This Data Processing Agreement (&quot;DPA&quot;) forms part of the agreement between TryVerse AI
-          (&quot;TryVerse,&quot; &quot;Processor&quot;) and the Brand/customer identified in the applicable order
-          form or account (&quot;Controller&quot;) where TryVerse processes personal data on the
-          Controller&rsquo;s behalf. It applies to shopper/person images, product images, Generated Content,
-          interaction data, and other personal data submitted through the TryVerse widget, API, SDK, dashboard, or
+          (<span className="font-medium">[LEGAL ENTITY NAME &mdash; TO BE CONFIRMED BY COUNSEL]</span>;
+          &quot;TryVerse,&quot; &quot;Processor&quot;) and the Customer identified in the applicable order form or
+          account (&quot;Controller&quot;) where TryVerse processes personal data on the Controller&rsquo;s behalf.
+          It applies to Shopper/subject images, product images, Generated Content, interaction data, and other
+          personal data submitted through the TryVerse dashboard, API, SDK, embeddable widget, or other
           integrations where TryVerse acts as Processor.
         </p>
       </section>
       <section>
         <h2 className={h2}>2. Roles</h2>
         <p>
-          The Controller determines the purposes and means of processing its end users&rsquo; personal data.
-          TryVerse processes personal data only on documented instructions from the Controller except where
-          applicable law requires otherwise. Where an individual uses TryVerse directly for their own purposes, the{" "}
+          The Controller (the Customer) determines the purposes and means of processing its Shoppers&rsquo; and
+          other end users&rsquo; personal data. TryVerse processes that personal data only on documented
+          instructions from the Controller except where applicable law requires otherwise. Where TryVerse acts as a
+          controller in its own right &mdash; for example for the Customer&rsquo;s account, authentication, and
+          billing records, or for platform security and abuse prevention &mdash; that processing is governed by the{" "}
           <Link to="/privacy" className="text-foreground underline font-medium">
             Privacy Policy
           </Link>{" "}
-          governs that processing and this DPA does not apply.
+          rather than this DPA.
         </p>
       </section>
       <section>
@@ -567,9 +421,9 @@ export function DataProcessingContent(_props: PolicyContentProps = {}) {
         <h2 className={h2}>6. Retention and Deletion</h2>
         <p>
           Reference photos submitted through the anonymous storefront widget are held only for the duration of the
-          active processing session and automatically deleted after 7 days. Dashboard-based generations (signed-in
-          individual or business accounts) are retained as My Creations until the user deletes them or the account is
-          closed. Upon termination, TryVerse will delete or return remaining Controller personal data as instructed,
+          active processing session and automatically deleted after 7 days. Dashboard-based generations created by an
+          Authorized User in a signed-in business account are retained as My Creations until they are deleted or the
+          account is closed. Upon termination, TryVerse will delete or return remaining Controller personal data as instructed,
           except where retention is required by law or necessary for legitimate security, fraud, billing, dispute, or
           backup purposes.
         </p>
@@ -723,8 +577,9 @@ export function AcceptableUsePolicyContent(_props: PolicyContentProps = {}) {
         <h2 className={h2}>1. Purpose</h2>
         <p>
           TryVerse generates and processes images and videos of real people and synthetic models. This Policy applies
-          to everyone who uses TryVerse — brand teams, their shoppers via the embedded widget, and personal accounts
-          — and exists to protect individuals, brands, shoppers, and the integrity of the platform.
+          to everyone who uses TryVerse &mdash; a Customer&rsquo;s team and Authorized Users, and the Shoppers who
+          interact with a TryVerse-powered experience on a Customer&rsquo;s storefront &mdash; and exists to protect
+          those individuals, the Customers, and the integrity of the platform.
         </p>
       </section>
       <section>
@@ -809,8 +664,8 @@ export function AcceptableUsePolicyContent(_props: PolicyContentProps = {}) {
 
 /**
  * AI & Image Processing Notice — customer-facing notice for photo, likeness, synthetic-model
- * and generation risks. Shown standalone at /ai-image-notice and as the individual-account
- * onboarding step (previously a separate, narrower "Personal Data Notice").
+ * and generation risks. Shown standalone at /ai-image-notice and as a step in business
+ * onboarding (ComplianceOnboardingModal; previously a separate, narrower "Personal Data Notice").
  */
 export function AiImageProcessingNoticeContent(_props: PolicyContentProps = {}) {
   return (

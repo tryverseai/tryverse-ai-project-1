@@ -28,8 +28,8 @@ items and flag the unresolved ones with an in-page notice rather than raw placeh
   (`PrivacyContent` in `src/content/policyContent.tsx`) has been deleted; it was not what was actually live and had
   drifted from the real policy.
 - ✅ **New document published** — the AI & Image Processing Notice (Part VI) is now live at `/ai-image-notice` and
-  reused in the individual-account onboarding consent flow, which previously showed a narrower, non-standalone
-  "personal data notice" with no URL of its own.
+  reused in the business onboarding consent flow (`ComplianceOnboardingModal`), which previously showed a narrower,
+  non-standalone "personal data notice" with no URL of its own.
 - ✅ **Basic version tracking added** — `profiles.policy_version_accepted` now records which published policy
   version a user's `terms_of_service_accepted_at` timestamp corresponds to, without altering historical timestamps.
 
@@ -44,8 +44,13 @@ still needs to be made:
 - [ ] Confirm governing law and dispute-resolution mechanism/venue for the Terms.
 - [ ] Confirm the fixed-amount minimum floor (if any) for the liability cap — currently published as "fees paid in
       the preceding 12 months" only, with no dollar-figure minimum.
-- [ ] Confirm whether separate B2C/B2B Terms are needed, or whether the current single-document-with-branches
-      approach (individual vs. business audience) is sufficient.
+- [ ] TryVerse is now B2B-only — the individual/consumer ("B2C") account type is removed from the product (code,
+      auth, billing, onboarding) **and the published Terms / Privacy Policy / DPA have been edited to match**:
+      consumer-account framing removed, three roles defined (Customer / Authorized User / Shopper), legal-entity
+      details replaced with professional bracket placeholders. **Counsel action: review the applied wording** —
+      every change is listed before/after in `docs/B2B_LEGAL_REDLINE.md`. Confirm in particular the
+      controller/processor split as written in DPA §2 and Terms §14, and whether any consumer-protection carve-out
+      is still wanted for sole-trader customers.
 - [ ] Confirm the actual FASHN relationship, processing terms, and data-use restrictions before this is described
       in any signed subprocessor schedule (`docs/LEGAL_SUBPROCESSOR_SCHEDULE.md` currently has several
       `[CONFIRM]` cells for location/transfer-mechanism/contract-status).
