@@ -11,8 +11,7 @@ const TermsOfService = () => (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-2">Terms of Service</h1>
           <p className="text-sm text-muted-foreground mb-8">
-            This page reflects our standard terms for brands and merchants. Personal accounts see a tailored summary at
-            signup.
+            These are the terms for TryVerse business accounts.
           </p>
           <p className="text-sm text-muted-foreground mb-12">Last updated: August 24, 2026</p>
           <TermsContent audience="business" />

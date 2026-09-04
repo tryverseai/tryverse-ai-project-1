@@ -39,15 +39,20 @@ export function TryVersePrivacyPolicy({
       </Alert>
 
       <p>
-        Welcome to TryVerse. This Privacy Policy explains how TryVerse AI (&quot;TryVerse,&quot; &quot;we,&quot;
-        &quot;our,&quot; or &quot;us&quot;) collects, uses, stores, and protects your information when you use our
-        website, applications, AI fashion-visualization tools, embeddable storefront widget, developer API/SDK, and
-        related services (collectively, the &quot;Services&quot;).
+        Welcome to TryVerse. This Privacy Policy explains how TryVerse AI
+        (&quot;TryVerse,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;;
+        the operating legal entity is <strong>[LEGAL ENTITY NAME &mdash; TO BE CONFIRMED BY COUNSEL]</strong>)
+        collects, uses, stores, and protects information when the Services are used &mdash; our website,
+        applications, AI fashion-visualization tools, developer API and SDK, and an embeddable storefront
+        widget (collectively, the &quot;Services&quot;).
       </p>
       <p>
-        It applies to individuals using TryVerse directly and describes the relevant processing in brand/merchant
-        contexts. Where TryVerse processes shopper data strictly on a brand&rsquo;s documented instructions, the
-        brand is the controller and TryVerse acts as processor under our{" "}
+        TryVerse is a B2B platform: accounts are held by businesses, and it applies to the
+        <strong> Authorized Users</strong> who access a business account. It describes how TryVerse
+        processes personal data both as a <strong>controller</strong> &mdash; for account, authentication,
+        billing, and platform-security data &mdash; and, where a business customer determines the purposes
+        and means of processing its own <strong>Shoppers&rsquo;</strong> data, as a <strong>processor</strong>{" "}
+        acting on that customer&rsquo;s documented instructions under our{" "}
         <Link to="/data-processing" className="text-primary underline underline-offset-2 font-medium">
           Data Processing Agreement
         </Link>
@@ -59,20 +64,22 @@ export function TryVersePrivacyPolicy({
       <section>
         <h2>1. Who We Are</h2>
         <p>
-          TryVerse is an AI infrastructure platform for fashion visualization, operated by TryVerse AI. Brands
-          connect their product catalogue and embed our widget, call our API, or use our dashboard tools to generate
-          virtual try-ons, complete-outfit visualizations, AI fashion models, product photoshoots, and short product
-          videos — rendered onto a photo of a shopper (or a preset/generated model) before they buy. Individuals can
-          also use TryVerse directly through our web app (Personal Studio) to try on outfits for themselves.
+          TryVerse is a B2B AI fashion infrastructure platform, operated by TryVerse AI
+          (<strong>[LEGAL ENTITY NAME &mdash; TO BE CONFIRMED BY COUNSEL]</strong>). Fashion brands,
+          retailers, and creative teams connect a product catalogue and use TryVerse through the dashboard,
+          the developer API and SDK, or an embeddable storefront widget to generate virtual try-ons,
+          complete-outfit visualizations, AI fashion models, product photoshoots, and short product videos —
+          rendered onto a model image or onto a photo of the brand&rsquo;s own shopper. TryVerse does not
+          offer a separate individual or consumer account type; every account is a business account.
         </p>
         <p>Our Services include:</p>
         <ul>
           <li>AI virtual try-on and complete-outfit generation</li>
           <li>AI Model Studio and AI Model Generation, AI Photoshoot, and Product Photography — generated or catalogue-based fashion models and imagery</li>
           <li>AI Video — short product/try-on video generation</li>
-          <li>An embeddable storefront widget and personalization script for e-commerce sites</li>
           <li>A developer API, SDK, and API keys for programmatic try-on and content-generation requests</li>
-          <li>A merchant dashboard with product management, analytics, and billing</li>
+          <li>An embeddable storefront widget and personalization script — a lower-friction integration path alongside the API and SDK</li>
+          <li>A dashboard with product-catalogue management, analytics, and billing</li>
           <li>Waitlist, early-access, and invite-based onboarding</li>
         </ul>
       </section>
@@ -87,11 +94,11 @@ export function TryVersePrivacyPolicy({
         <ul>
           <li>Name and email address</li>
           <li>Password (stored as a salted hash — we never store or can read your plaintext password)</li>
-          <li>Account type (individual or business), brand or company name, and role/job title</li>
+          <li>Brand or company name, and each Authorized User&rsquo;s name and role/job title</li>
         </ul>
         <h3>Photos and Product Images</h3>
         <ul>
-          <li>Shopper/user photos — the photo you (or a shopper interacting with a brand&rsquo;s widget) upload as the &quot;person&quot; image for a try-on</li>
+          <li>Subject photos — the photo uploaded as the &quot;person&quot; image for a try-on, whether uploaded by an Authorized User in the dashboard or by a Shopper interacting with a brand&rsquo;s embedded TryVerse experience</li>
           <li>Brand product images uploaded to a product catalogue to generate try-on results against</li>
           <li>The AI-generated try-on images produced from the above</li>
         </ul>
@@ -148,7 +155,7 @@ export function TryVersePrivacyPolicy({
         </p>
         <p>
           AI-generated results are produced automatically and are not reviewed by a human before being returned. We
-          aim to preserve the shopper&rsquo;s likeness and the product&rsquo;s appearance, but outputs are not
+          aim to preserve the subject&rsquo;s likeness and the product&rsquo;s appearance, but outputs are not
           guaranteed to be a perfectly accurate representation of how a product will look or fit in real life. See
           our{" "}
           <Link to="/ai-image-notice" className="text-primary underline underline-offset-2 font-medium">
@@ -187,9 +194,9 @@ export function TryVersePrivacyPolicy({
           window.
         </p>
         <p>
-          For dashboard-based try-ons (signed-in individual or business accounts), person and product images and the
-          resulting try-on outputs are retained as part of your try-on history until you delete them or close your
-          account, so you can revisit past results.
+          For dashboard-based try-ons run by an Authorized User in a signed-in business account, person and product
+          images and the resulting try-on outputs are retained as part of the account&rsquo;s try-on history until
+          they are deleted or the account is closed, so past results can be revisited.
         </p>
       </section>
 
@@ -253,7 +260,7 @@ export function TryVersePrivacyPolicy({
           We retain information only for as long as reasonably necessary to provide the Services, comply with legal
           obligations, resolve disputes, and enforce our agreements. In particular: widget/personalization reference
           photos are auto-deleted after 7 days (see &quot;Where We Store Your Data&quot;); dashboard try-on history
-          is retained until you delete individual try-ons or close your account; and account and billing records are
+          is retained until those try-ons are deleted or the account is closed; and account and billing records are
           retained while your account is active and for a limited period afterward as required for accounting, tax,
           and legal purposes. You may request deletion of your account and associated data at any time (see
           &quot;Your Rights&quot; below).
