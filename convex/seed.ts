@@ -30,7 +30,7 @@ export const seedPlansIfEmpty = mutation({
         price_usd: 0,
         tryons_per_month: 5,
         features: [
-          "Free try-on pool (individuals: 5 · brands: 10 on signup)",
+          "10 free AI generations on signup",
           "Watermark on free tier",
           "Basic quality",
           "Upgrade anytime",
@@ -126,6 +126,67 @@ export const seedPlansIfEmpty = mutation({
       await ctx.db.insert("plans", p);
     }
     return { seeded: true as const, count: rows.length };
+  },
+});
+
+/**
+ * One-off, idempotent correction of the obsolete free-plan feature copy that predates the
+ * B2B-only pivot ("Free try-on pool (individuals: 5 · brands: 10 on signup)" and near-variants).
+ * `seedPlansIfEmpty` / `ensurePlansSeeded` only ever INSERT into an empty table, so a live
+ * deployment seeded before this change still shows the old string. This patches just that one
+ * array entry.
+ *
+ * Safety:
+ *  - Touches ONLY the row whose `id === "free"` AND whose `price_ngn`/`price_usd` are both 0
+ *    (a sanity check that it really is the free plan before writing).
+ *  - Replaces ONLY known-obsolete strings inside `features`; never touches `id`, `name`,
+ *    `price_ngn`, `price_usd`, `tryons_per_month`, `max_products`, `is_active`, or any other row.
+ *  - Idempotent: a second run finds nothing to replace and reports `changed: false`.
+ *
+ * Run:      npx convex run seed:fixFreePlanFeatureCopy
+ * Rollback: npx convex run seed:fixFreePlanFeatureCopy '{ "revert": true }'
+ *           (restores the pre-pivot string on the free plan — same guard rails).
+ */
+export const fixFreePlanFeatureCopy = mutation({
+  args: { revert: v.optional(v.boolean()) },
+  handler: async (ctx, { revert }) => {
+    const CANONICAL = "10 free AI generations on signup";
+    const OBSOLETE = [
+      "Free try-on pool (individuals: 5 · brands: 10 on signup)",
+      "Free try-on pool (individuals: 5 - brands: 10 on signup)",
+    ];
+
+    const free = await ctx.db
+      .query("plans")
+      .withIndex("by_planId", (q) => q.eq("id", "free"))
+      .unique();
+
+    if (!free) return { changed: false as const, reason: "no free plan row" };
+    if (Number(free.price_ngn) !== 0 || Number(free.price_usd) !== 0) {
+      return { changed: false as const, reason: "free plan row failed price sanity check — not touched" };
+    }
+
+    const features: unknown = free.features;
+    if (!Array.isArray(features)) {
+      return { changed: false as const, reason: "features is not an array" };
+    }
+
+    const from = revert ? [CANONICAL] : OBSOLETE;
+    const to = revert ? OBSOLETE[0]! : CANONICAL;
+
+    let hits = 0;
+    const next = features.map((f) => {
+      if (typeof f === "string" && from.includes(f)) {
+        hits++;
+        return to;
+      }
+      return f;
+    });
+
+    if (hits === 0) return { changed: false as const, reason: "nothing to replace (already correct)" };
+
+    await ctx.db.patch(free._id, { features: next });
+    return { changed: true as const, replaced: hits, to };
   },
 });
 
