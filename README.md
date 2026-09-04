@@ -1,6 +1,11 @@
-# TryVerse — AI Virtual Try-On Platform
+# TryVerse — AI Fashion Infrastructure
 
-An AI-powered virtual try-on system for both consumers (B2C) and brands (B2B).
+A B2B AI fashion infrastructure platform. Fashion brands, retailers, and creative teams use
+TryVerse to generate and visualize fashion content — virtual try-on, AI photoshoots,
+AI-generated models, outfit visualization, and product video — via a dashboard, APIs, SDKs, and
+an embeddable storefront widget. TryVerse has no individual/consumer ("B2C") account type; every
+account is an organization/business account. (The "shoppers" referred to throughout the code are
+a **brand's own** end customers using that brand's embedded widget, not TryVerse users.)
 
 - **Frontend** — React + Vite + TypeScript + Tailwind CSS (`tryverse-ai-virtual-fashion/`)
 - **Backend** — Node.js + Express + TypeScript (`backend/`)
