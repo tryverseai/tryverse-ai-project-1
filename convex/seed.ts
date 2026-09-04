@@ -131,7 +131,8 @@ export const seedPlansIfEmpty = mutation({
 
 /**
  * One-off, idempotent correction of the obsolete free-plan feature copy that predates the
- * B2B-only pivot ("Free try-on pool (individuals: 5 · brands: 10 on signup)" and near-variants).
+ * B2B-only pivot — any "Free try-on pool (individuals: N · brands: M on signup)" phrasing
+ * (production currently shows "individuals: 5 · brands: 20"; the seed code has since said 10).
  * `seedPlansIfEmpty` / `ensurePlansSeeded` only ever INSERT into an empty table, so a live
  * deployment seeded before this change still shows the old string. This patches just that one
  * array entry.
@@ -139,23 +140,22 @@ export const seedPlansIfEmpty = mutation({
  * Safety:
  *  - Touches ONLY the row whose `id === "free"` AND whose `price_ngn`/`price_usd` are both 0
  *    (a sanity check that it really is the free plan before writing).
- *  - Replaces ONLY known-obsolete strings inside `features`; never touches `id`, `name`,
- *    `price_ngn`, `price_usd`, `tryons_per_month`, `max_products`, `is_active`, or any other row.
+ *  - Replaces ONLY a `features` entry matching /^Free try-on pool \(individuals:.*on signup\)$/ —
+ *    never touches `id`, `name`, `price_ngn`, `price_usd`, `tryons_per_month`, `max_products`,
+ *    `is_active`, any other `features` entry, or any other row.
  *  - Idempotent: a second run finds nothing to replace and reports `changed: false`.
  *
  * Run:      npx convex run seed:fixFreePlanFeatureCopy
  * Rollback: npx convex run seed:fixFreePlanFeatureCopy '{ "revert": true }'
- *           (restores the pre-pivot string on the free plan — same guard rails).
+ *           (restores a representative pre-pivot string on the free plan — same guard rails).
  */
+const OBSOLETE_FREE_POOL_RE = /^Free try-on pool \(individuals:.*on signup\)$/;
+const CANONICAL_FREE_FEATURE = "10 free AI generations on signup";
+const REPRESENTATIVE_OBSOLETE = "Free try-on pool (individuals: 5 · brands: 20 on signup)";
+
 export const fixFreePlanFeatureCopy = mutation({
   args: { revert: v.optional(v.boolean()) },
   handler: async (ctx, { revert }) => {
-    const CANONICAL = "10 free AI generations on signup";
-    const OBSOLETE = [
-      "Free try-on pool (individuals: 5 · brands: 10 on signup)",
-      "Free try-on pool (individuals: 5 - brands: 10 on signup)",
-    ];
-
     const free = await ctx.db
       .query("plans")
       .withIndex("by_planId", (q) => q.eq("id", "free"))
@@ -171,13 +171,17 @@ export const fixFreePlanFeatureCopy = mutation({
       return { changed: false as const, reason: "features is not an array" };
     }
 
-    const from = revert ? [CANONICAL] : OBSOLETE;
-    const to = revert ? OBSOLETE[0]! : CANONICAL;
+    const matches = (f: unknown): f is string =>
+      typeof f === "string" &&
+      (revert ? f === CANONICAL_FREE_FEATURE : OBSOLETE_FREE_POOL_RE.test(f));
+    const to = revert ? REPRESENTATIVE_OBSOLETE : CANONICAL_FREE_FEATURE;
 
     let hits = 0;
+    const seen: string[] = [];
     const next = features.map((f) => {
-      if (typeof f === "string" && from.includes(f)) {
+      if (matches(f)) {
         hits++;
+        seen.push(f);
         return to;
       }
       return f;
@@ -186,7 +190,7 @@ export const fixFreePlanFeatureCopy = mutation({
     if (hits === 0) return { changed: false as const, reason: "nothing to replace (already correct)" };
 
     await ctx.db.patch(free._id, { features: next });
-    return { changed: true as const, replaced: hits, to };
+    return { changed: true as const, replaced: hits, from: seen, to };
   },
 });
 
