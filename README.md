@@ -1,179 +1,114 @@
 # TryVerse — AI Fashion Infrastructure
 
-A B2B AI fashion infrastructure platform. Fashion brands, retailers, and creative teams use
-TryVerse to generate and visualize fashion content — virtual try-on, AI photoshoots,
-AI-generated models, outfit visualization, and product video — via a dashboard, APIs, SDKs, and
-an embeddable storefront widget. TryVerse has no individual/consumer ("B2C") account type; every
-account is an organization/business account. (The "shoppers" referred to throughout the code are
-a **brand's own** end customers using that brand's embedded widget, not TryVerse users.)
+A **B2B AI fashion infrastructure platform**. Fashion brands, retailers, designers, and creative
+teams use TryVerse to generate and visualize fashion content — virtual try-on, AI photoshoots,
+AI-generated models, outfit visualization, and product video.
 
-- **Frontend** — React + Vite + TypeScript + Tailwind CSS (`tryverse-ai-virtual-fashion/`)
-- **Backend** — Node.js + Express + TypeScript (`backend/`)
-- **Database / Auth** — Convex (`tryverse-ai-virtual-fashion/convex/`)
-- **AI** — Replicate (IDM-VTON, FASHN Try-On, Flux Kontext)
-- **Queue** — Bull / Redis
-- **Payments** — Paystack, Flutterwave
-- **Storage** — Convex file storage (signed URLs)
-- **Email** — Resend
-- **Monitoring** — Sentry (optional)
+- **TryVerse has no individual / consumer ("B2C") account type.** Every account is a business
+  account. A human authenticates as an **Authorized User** acting for that business; `user_id`
+  is the ownership, authorization, and audit boundary. There is no multi-seat organization model
+  today (deferred future work).
+- Two product surfaces: the **business dashboard** (`tryverseai.com` — creation tools, Products,
+  Analytics, Developers, API Keys, Billing) and the **integration surface** a business uses to
+  bring try-on to *its own* storefront. The integration surface has three paths, in order of
+  preference: the **SDK** (recommended), the **REST API**, and an **embeddable widget** /
+  personalization script (a lower-friction fallback for teams without engineering resource).
+- "Shoppers" throughout the code are a **brand's own** end customers using that brand's embedded
+  experience — never TryVerse account holders.
 
----
+## Stack
 
-## Prerequisites
+| Area | Tech |
+|------|------|
+| Frontend | React + Vite + TypeScript + Tailwind (`src/`, root package) |
+| Backend | Node.js + Express + TypeScript (`backend/`) |
+| Database / Auth / File storage | Convex (`convex/`) — Convex Auth (password + email OTP), signed-URL storage |
+| AI generation | FASHN direct API (try-on, outfit, model generation, photoshoot, video) |
+| Queue | Bull / Redis (optional — jobs run synchronously without it) |
+| Payments | Paystack, Flutterwave (NGN / USD) |
+| Email | Resend |
+| Analytics / monitoring | PostHog, Sentry (both optional, env-gated) |
+| SDK | `@tryverseai/sdk` (`sdk/`) |
 
-| Tool | Version |
-|------|---------|
-| Node.js | 18+ |
-| npm | 9+ |
-| Redis | 7+ (optional — try-ons run sync without it) |
-| Convex account | [convex.dev](https://convex.dev) |
+## Repository layout
 
----
+The repo is **flat** — the frontend and Convex functions live at the root, the API server is a
+nested package.
+
+```
+.
+├── src/               Frontend — pages, components, contexts, hooks, lib (backendApi.ts)
+├── convex/            Convex — schema.ts, queries/mutations/actions, auth, _generated/
+│   └── README.md      ⚠ dev-vs-production deployment rules — read before any convex command
+├── public/            Static assets + the embeddable widget scripts
+│                      (tryverse-widget.js, tryverse-personalize.js, widget.js)
+├── sdk/               @tryverseai/sdk source
+├── backend/           Express API server (own package.json / package-lock.json)
+│   └── src/
+│       ├── config/        env, logger, Sentry, Convex HTTP client
+│       ├── middleware/    auth, apiKey, rate limiting, requirePlan, validation
+│       ├── routes/        REST endpoints (tryon, widget, personalize, upload, payment, admin, …)
+│       └── services/      ai/ · analytics/ · cache/ · payments/ · queue/ · storage/ · email/
+├── docs/              Deployment, security, legal, testing, widget guides
+└── scripts/           One-off ops scripts
+```
 
 ## Quick start (development)
 
-### 1. Clone and install
+Requires **Node 18+** and a Convex project. The repo uses **Bun** at the root (`bun.lockb`) and
+**npm** in `backend/` (`package-lock.json`).
 
 ```sh
-git clone <YOUR_GIT_URL>
-cd TryVerse
+# root — frontend + Convex
+bun install
 
-# Frontend + Convex
-cd tryverse-ai-virtual-fashion
-npm install
-
-# Backend
-cd ../backend
-npm install
+# backend
+cd backend && npm install && cd ..
 ```
 
-### 2. Configure environment variables
+Environment:
 
 ```sh
-# Frontend / Convex
-cd tryverse-ai-virtual-fashion
-cp .env.example .env.local   # fill in VITE_CONVEX_URL at minimum
-
-# Backend
-cd ../backend
-cp .env.example .env         # fill in CONVEX_URL, BACKEND_SHARED_SECRET, REPLICATE_API_TOKEN at minimum
+cp .env.example .env.local          # set VITE_CONVEX_URL
+cp backend/.env.example backend/.env # set CONVEX_URL, BACKEND_SHARED_SECRET, plus AI/payment keys
 ```
 
-The minimum required keys to run locally:
+`BACKEND_SHARED_SECRET` must be identical in `backend/.env` and the Convex deployment's
+environment variables — it guards every trusted backend→Convex call.
 
-| Variable | Where to get it |
-|----------|----------------|
-| `VITE_CONVEX_URL` | `npx convex dev` prints it; also in Convex dashboard → Settings |
-| `CONVEX_URL` | Same URL as above |
-| `BACKEND_SHARED_SECRET` | Any strong random string: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
-| `REPLICATE_API_TOKEN` | [replicate.com/account/api-tokens](https://replicate.com/account/api-tokens) |
-| `ADMIN_SECRET_KEY` | Any strong random string (same command as above) |
-
-> Set `BACKEND_SHARED_SECRET` identically in both `.env` (backend) and
-> Convex dashboard → Settings → Environment Variables.
-
-### 3. Start Convex (dev deploy)
+Run (three terminals):
 
 ```sh
-cd tryverse-ai-virtual-fashion
-npx convex dev
+bun run convex:dev     # Convex watcher — see convex/README.md for the deployment caveat
+cd backend && npm run dev   # Express on :3001
+bun run dev            # Vite on :8080 (proxies /api → :3001)
 ```
 
-Leave this terminal running. Convex watches `convex/` and hot-reloads.
+Redis is optional; without it the try-on queue is disabled and jobs run synchronously.
 
-### 4. Start the backend
+## Tests
 
-```sh
-cd backend
-npm run dev
-```
+See **[`docs/TESTING.md`](docs/TESTING.md)** — three suites (frontend, convex+backend, backend),
+and the reliable per-platform commands.
 
-Starts Express on **port 3001**.
+## Deployment
 
-### 5. Start the frontend
-
-```sh
-cd tryverse-ai-virtual-fashion
-npm run dev
-```
-
-Starts Vite on **port 8080**. Vite proxies `/api` → `localhost:3001` automatically
-so you don't need to set `VITE_BACKEND_URL` in development.
-
-### 6. (Optional) Start Redis
-
-```sh
-redis-server
-```
-
-Without Redis the try-on queue is disabled and jobs run synchronously.
-The app still works — you'll just see slower response times.
-
----
-
-## Production deployment (Vercel + Railway)
-
-Step-by-step host wiring (API on Railway, UI on Vercel, Convex in the cloud) is in **[`docs/DEPLOY_VERCEL_RAILWAY.md`](docs/DEPLOY_VERCEL_RAILWAY.md)**.  
-Vercel project **root directory** should be `tryverse-ai-virtual-fashion` (uses [`vercel.json`](tryverse-ai-virtual-fashion/vercel.json) for SPA routing).  
-Railway service **root directory** should be `backend`.
-
----
-
-## Project structure
-
-```
-TryVerse/
-├── backend/                  Express API server
-│   ├── src/
-│   │   ├── config/           env, logger, Sentry, Convex HTTP client
-│   │   ├── lib/              shared constants, storage-path regex, plan tier
-│   │   ├── middleware/        auth, rate limiting, validation, error handling
-│   │   ├── routes/           REST endpoints (tryon, widget, upload, products, …)
-│   │   ├── services/
-│   │   │   ├── ai/           pipeline, Replicate wrappers, preprocessing
-│   │   │   ├── analytics/    brand analytics
-│   │   │   ├── cache/        Redis try-on result cache
-│   │   │   ├── payments/     Paystack + Flutterwave
-│   │   │   ├── queue/        Bull producer
-│   │   │   └── storage/      Convex-backed image upload / signed URLs
-│   │   └── types/            Shared TypeScript interfaces
-│   └── .env.example
-│
-└── tryverse-ai-virtual-fashion/   Frontend + Convex functions
-    ├── convex/               Database schema, queries, mutations, auth
-    ├── public/               Static assets
-    ├── src/
-    │   ├── components/       Reusable UI components
-    │   ├── contexts/         Auth context
-    │   ├── hooks/            Custom React hooks
-    │   ├── lib/              API client (backendApi.ts), utilities
-    │   └── pages/            Route-level page components
-    └── .env.example
-```
-
----
-
-## Running in production
-
-1. Deploy Convex: `npx convex deploy` (inside `tryverse-ai-virtual-fashion/`)
-2. Build the frontend: `npm run build` → serve `dist/` from any static host
-3. Build and run the backend: `npm run build && node dist/server.js`
-4. Set `FRONTEND_URL` and `WIDGET_ALLOWED_ORIGINS` to your production URLs
-5. Set `NODE_ENV=production` — this enforces stricter rate limits, disables dev
-   helpers (`TRYON_SKIP_CREDIT_CHECK`), and enables Redis-only queue mode
-
-See `backend/.env.example` for the full list of environment variables.
-
----
+- **Convex**: `convex/README.md` is authoritative. The deployment Convex labels `dev:`
+  (`patient-axolotl-17`) is the **real production database**; `prod:` (`pastel-setter-205`) is a
+  sandbox. Use `bun run convex:deploy:prod` — never a bare `convex deploy`.
+- **Frontend** (Vercel): root directory is the repo root, `vercel.json` handles SPA routing.
+- **Backend** (Railway): root directory is `backend/`. Set `FRONTEND_URL`,
+  `WIDGET_ALLOWED_ORIGINS`, and `NODE_ENV=production` (stricter rate limits, no dev helpers,
+  Redis-only queue). Full host wiring: [`docs/DEPLOY_VERCEL_RAILWAY.md`](docs/DEPLOY_VERCEL_RAILWAY.md);
+  go-live checklist: [`docs/GOING_TO_PRODUCTION.md`](docs/GOING_TO_PRODUCTION.md).
 
 ## Key scripts
 
-| Directory | Command | Description |
-|-----------|---------|-------------|
-| `backend/` | `npm run dev` | Start Express with ts-node-dev hot reload |
-| `backend/` | `npm run build` | Compile TypeScript to `dist/` |
-| `backend/` | `npm run lint` | ESLint |
-| `tryverse-ai-virtual-fashion/` | `npm run dev` | Vite dev server |
-| `tryverse-ai-virtual-fashion/` | `npm run build` | Production Vite build |
-| `tryverse-ai-virtual-fashion/` | `npx convex dev` | Convex dev watcher |
-| `tryverse-ai-virtual-fashion/` | `npx convex deploy` | Deploy Convex to production |
+| Where | Command | Description |
+|-------|---------|-------------|
+| root | `bun run dev` / `bun run build` | Vite dev server (:8080) / production build |
+| root | `bun run convex:dev` | Convex watcher against the sandbox |
+| root | `bun run convex:deploy:prod` | Deploy Convex functions to **real production** |
+| root | `bun run test` / `bun run test:convex` | Frontend / convex+backend suites (see `docs/TESTING.md`) |
+| `backend/` | `npm run dev` / `npm run build` | Express with `tsx watch` / compile to `dist/` |
+| `backend/` | `npm test` / `npm run lint` | Backend suite / ESLint |
