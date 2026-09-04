@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { welcomeEmail, accountVerifiedEmail } from './templates';
 
 // Regression coverage for the welcome-email credit bug: the template used to hardcode "20"
-// independently of the real per-account allocation (5 for individual, 10 for business —
-// see backend/src/services/credits.ts), so it could never reflect what a new account actually
-// got. These assert the template now renders whatever value it's told, with a safe default only
-// when the caller genuinely has no profile data.
+// independently of the real allocation (a flat 10 free AI generations per business account —
+// see DEFAULT_FREE_CREDITS_BUSINESS in backend/src/services/credits.ts), so it could never
+// reflect what a new account actually got. These assert the template now renders whatever value
+// it's told, with a safe default only when the caller genuinely has no profile data.
 
 describe('welcomeEmail credits line', () => {
   it('renders the real credits value passed in, not a hardcoded number', () => {

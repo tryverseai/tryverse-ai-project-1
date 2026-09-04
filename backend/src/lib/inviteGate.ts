@@ -5,8 +5,8 @@ export type InviteGateOk = {
   valid: true;
   email: string;
   name?: string;
-  /** personal | business; legacy ENV map treats as business-ish (full invite form) */
-  accountType?: 'personal' | 'business';
+  /** TryVerse is B2B-only — always "business". Retained so callers that spread it keep compiling. */
+  accountType?: 'business';
   companyName?: string;
 };
 
@@ -49,12 +49,11 @@ export async function resolveInviteGate(tokenRaw: string): Promise<InviteGateRes
       token,
     });
     if (row && row.status === 'sent') {
-      const at = row.accountType === 'personal' ? 'personal' : 'business';
       return {
         valid: true,
         email: String(row.email).toLowerCase(),
         name: row.name ?? undefined,
-        accountType: at,
+        accountType: 'business',
         companyName: row.companyName ?? undefined,
       };
     }

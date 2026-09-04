@@ -11,7 +11,7 @@ import {
   cxReplaceDeviceApprovalChallenge,
   cxVerifyDeviceApprovalChallenge,
 } from '../services/creditsConvexBridge';
-import { DEFAULT_FREE_CREDITS_BUSINESS, DEFAULT_FREE_CREDITS_INDIVIDUAL } from '../services/credits';
+import { DEFAULT_FREE_CREDITS_BUSINESS } from '../services/credits';
 import { logger } from '../config/logger';
 import { sendWelcomeEmail, sendDeviceApprovalEmail } from '../services/email';
 import { cxConsolidateTryonsToCanonicalUserId } from '../services/tryonConvexBridge';
@@ -156,9 +156,8 @@ router.post(
         return;
       }
 
-      const accountTypeRaw = body.accountType;
-      const at = accountTypeRaw === 'individual' ? 'individual' : 'business';
-      const cap = at === 'individual' ? DEFAULT_FREE_CREDITS_INDIVIDUAL : DEFAULT_FREE_CREDITS_BUSINESS;
+      // TryVerse is B2B-only — every account is a business account.
+      const cap = DEFAULT_FREE_CREDITS_BUSINESS;
       const brandName = typeof body.brandName === 'string' ? body.brandName : undefined;
       const fullName = typeof body.fullName === 'string' ? body.fullName : undefined;
       const role = typeof body.role === 'string' ? body.role : undefined;
@@ -171,7 +170,7 @@ router.post(
           ...(brandName !== undefined ? { brand_name: brandName } : {}),
           ...(fullName !== undefined ? { full_name: fullName } : {}),
           ...(role !== undefined ? { role } : {}),
-          account_type: at,
+          account_type: 'business',
         });
         // Fire-and-forget: this already no-ops for already-welcomed accounts (a redundant
         // Convex lookup on every single sign-in otherwise), and the caller shouldn't wait
@@ -185,7 +184,7 @@ router.post(
         }).catch((e) => logger.warn('welcome email send failed (non-fatal)', { error: String(e) }));
         createdFlag = false;
       } else {
-        await cxInsertProfile(profileKey, at, cap, cap, {
+        await cxInsertProfile(profileKey, cap, cap, {
           ...(email ? { contactEmail: email } : {}),
         });
         await cxPatchProfile(profileKey, {

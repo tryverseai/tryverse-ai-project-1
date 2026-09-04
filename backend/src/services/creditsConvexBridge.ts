@@ -53,15 +53,14 @@ export async function cxPatchProfile(userId: string, patch: Record<string, unkno
 
 export async function cxInsertProfile(
   userId: string,
-  accountType: 'individual' | 'business',
   freeCreditsRemaining: number,
   freeCreditsTotal: number,
   opts?: { contactEmail?: string }
 ): Promise<void> {
+  // TryVerse is B2B-only — `insertProfileRow` always stores account_type "business".
   await convexMutationTrusted(anyApi.backendTrusted.insertProfileRow, {
     ...trusted(),
     userId: userId.trim(),
-    accountType,
     freeCreditsRemaining,
     freeCreditsTotal,
     ...(opts?.contactEmail?.trim()

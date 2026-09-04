@@ -15,50 +15,6 @@ function sanitizeUrl(u: string): string {
   return u.replace(/\s/g, '').trim();
 }
 
-export function personalInviteBodies(params: {
-  name: string;
-  email: string;
-  inviteUrl: string;
-}): { subject: string; html: string; text: string } {
-  const name = params.name.trim() || 'there';
-  const em = sanitizeEmailRecipientCopy(params.email);
-  const safeUrl = sanitizeUrl(params.inviteUrl);
-  const href = escapeHtml(safeUrl);
-  const html = `
-<p>Hi ${escapeHtml(name)},</p>
-<p>Your application for early access to TryVerse has been approved.</p>
-<p>You've been selected as a founding member — get early access to AI-powered virtual try-on built for the future of personal style.</p>
-<p>Your personal access link is below. This link is unique to you and expires after use.</p>
-<p><a href="${href}">Accept Your Invitation →</a></p>
-<p>This invitation was created exclusively for ${escapeHtml(em)}.<br/>
-If you did not request access, you can safely ignore this email.</p>
-<p>— The TryVerse Team<br/>
-<a href="https://tryverseai.com">tryverseai.com</a> · info@tryverseai.com</p>
-`.trim();
-  const text = [
-    `Hi ${name},`,
-    '',
-    'Your application for early access to TryVerse has been approved.',
-    '',
-    "You've been selected as a founding member — get early access to AI-powered virtual try-on built for the future of personal style.",
-    '',
-    'Your personal access link is below. This link is unique to you and expires after use.',
-    '',
-    safeUrl,
-    '',
-    `This invitation was created exclusively for ${em}.`,
-    'If you did not request access, you can safely ignore this email.',
-    '',
-    '— The TryVerse Team',
-    'tryverseai.com · info@tryverseai.com',
-  ].join('\n');
-  return {
-    subject: "You're invited to TryVerse",
-    html,
-    text,
-  };
-}
-
 export function businessInviteBodies(params: {
   name: string;
   email: string;

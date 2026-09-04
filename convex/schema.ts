@@ -302,7 +302,7 @@ export default defineSchema({
     token: v.string(),
     email: v.string(),
     name: v.optional(v.string()),
-    /** \"personal\" | \"business\" (business maps to Convex profile account_type \"business\") */
+    /** Always \"business\" — TryVerse is B2B-only. Field kept (not dropped) for existing rows. */
     accountType: v.string(),
     companyName: v.optional(v.string()),
     /** pending | sent | accepted | expired */
