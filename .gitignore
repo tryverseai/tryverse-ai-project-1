@@ -38,6 +38,7 @@ Thumbs.db
 # Local agent / IDE artifacts
 **/.agents/
 **/.claude/
+.lovable/
 .vercel
 .env*.local
 .env*

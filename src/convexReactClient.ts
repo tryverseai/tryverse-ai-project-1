@@ -6,8 +6,7 @@ import { ConvexReactClient } from "convex/react";
  * Order:
  * 1. `VITE_CONVEX_URL` (build-time env — Vercel / local `.env`).
  * 2. `localStorage["tryverse.convexUrl"]` (runtime override used by the in-app setup screen,
- *    so environments that cannot inject build-time env vars — e.g. the Lovable preview —
- *    can still boot the app).
+ *    so a preview host that cannot inject build-time env vars can still boot the app).
  *
  * Never throws at import time: a hard throw here crashes the whole bundle before React mounts
  * and produces a blank preview instead of an actionable UI.
