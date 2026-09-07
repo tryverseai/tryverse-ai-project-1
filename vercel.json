@@ -4,9 +4,9 @@
   "framework": "vite",
   "redirects": [
     {
-      "source": "/:path*",
+      "source": "/(.*)",
       "has": [{ "type": "host", "value": "www.tryverseai.com" }],
-      "destination": "https://tryverseai.com/:path*",
+      "destination": "https://tryverseai.com/$1",
       "permanent": true
     }
   ],
