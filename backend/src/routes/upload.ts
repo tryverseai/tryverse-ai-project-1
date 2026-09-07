@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { uploadImageBuffer, getSignedUrl, INPUT_BUCKET } from '../services/storage/images';
 import type { StorageFolder } from '../types';
-import { optionalAuth, requireAuth } from '../middleware/auth';
+import { optionalAuth, requireAuth, requireAuthenticatedActor } from '../middleware/auth';
 import { optionalApiKey, requireScope } from '../middleware/apiKey';
 import { uploadRateLimit } from '../middleware/rateLimiter';
 import { logger } from '../config/logger';
@@ -40,6 +40,10 @@ router.post(
   optionalApiKey,
   requireScope('write'),
   optionalAuth,
+  // B2B-only product: every upload belongs to a signed-in dashboard user (JWT) or a widget
+  // request carrying a valid x-api-key. There is no anonymous upload use case, so reject one
+  // here rather than letting it write a 10 MB file + run Sharp under an `anonymous/` path.
+  requireAuthenticatedActor,
   // Must run after the auth middleware above — see tryon.ts for why (its keyGenerator reads
   // req.user/req.apiKey, which don't exist until optionalApiKey/optionalAuth have run).
   uploadRateLimit,
@@ -117,6 +121,9 @@ router.post(
   optionalApiKey,
   requireScope('write'),
   optionalAuth,
+  // Same as POST / above: no anonymous use case, and this route additionally makes an outbound
+  // fetch on a caller-supplied URL — keep it behind a real authenticated actor.
+  requireAuthenticatedActor,
   // Must run after the auth middleware above — see tryon.ts for why (its keyGenerator reads
   // req.user/req.apiKey, which don't exist until optionalApiKey/optionalAuth have run).
   uploadRateLimit,
