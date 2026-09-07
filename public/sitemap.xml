@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://tryverseai.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://tryverseai.com/pricing</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://tryverseai.com/technology</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tryverseai.com/about</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://tryverseai.com/partner</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://tryverseai.com/enterprise-contact</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://tryverseai.com/book-demo</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://tryverseai.com/early-access</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://tryverseai.com/support</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://tryverseai.com/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://tryverseai.com/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://tryverseai.com/data-processing</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://tryverseai.com/acceptable-use</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://tryverseai.com/cookie-policy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://tryverseai.com/ai-image-notice</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+</urlset>
