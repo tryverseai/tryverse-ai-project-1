@@ -56,7 +56,16 @@ export function MyCreationsTab() {
         setCursor(page.nextCursor);
         setHasMore(page.hasMore);
       })
-      .catch(() => { if (!cancelled) toast.error("Could not load your creations"); })
+      .catch((e) => {
+        if (cancelled) return;
+        // eslint-disable-next-line no-console -- deliberate diagnostic log; handleResponse also
+        // reports this to Sentry (feature: "my_creations"), but a console trace is what actually
+        // shows up when a user screen-shares a blank creations tab.
+        console.error("My Creations: failed to load", e);
+        toast.error("Could not load your creations", {
+          description: e instanceof Error ? e.message : undefined,
+        });
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
