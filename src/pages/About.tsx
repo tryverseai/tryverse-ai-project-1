@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { GLASS_EASE, glassOuter, glassInner, glassInnerCard } from "@/lib/glassFrame";
 import { Eye, Layers, Feather, Globe, ShieldCheck } from "lucide-react";
-import { Helmet } from "react-helmet-async";
+import { Seo } from "@/components/Seo";
 
 const values = [
   {
@@ -38,14 +38,7 @@ const values = [
 const About = () => {
   return (
     <div className="min-h-screen bg-background">
-      <Helmet>
-        <title>About — TryVerse AI Infrastructure for Fashion Visualization</title>
-        <meta
-          name="description"
-          content="TryVerse builds AI infrastructure for fashion visualization — virtual try-on, AI model photography, and outfit visualization for online fashion commerce."
-        />
-        <link rel="canonical" href="https://tryverseai.com/about" />
-      </Helmet>
+      <Seo path="/about" />
       <Navbar />
       <main className="pt-[var(--navbar-height)] pb-0">
         <div className="max-w-7xl mx-auto px-6">

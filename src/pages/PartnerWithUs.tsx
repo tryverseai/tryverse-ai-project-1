@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, TrendingDown, TrendingUp, ShieldCheck, Code2, Sparkles, Image as ImageIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
-import { Helmet } from "react-helmet-async";
+import { Seo } from "@/components/Seo";
 import { useSignupChooser } from "@/components/signup/SignupChooserContext";
 import { ParallaxImage } from "@/components/motion/ParallaxImage";
 import partnerMirror from "@/assets/partner-mirror.jpg";
@@ -30,11 +30,7 @@ const PartnerWithUs = () => {
   const { openSignupChooser } = useSignupChooser();
   return (
   <div className="min-h-screen bg-background">
-    <Helmet>
-      <title>Partner With Us — TryVerse AI Infrastructure for Fashion Visualization</title>
-      <meta name="description" content="Integrate TryVerse's fashion visualization platform into your commerce stack. Virtual try-on, AI model photography, and outfit visualization through APIs and SDKs." />
-      <link rel="canonical" href="https://tryverseai.com/partner" />
-    </Helmet>
+    <Seo path="/partner" />
     <Navbar />
     <main className="pt-[var(--navbar-height)] pb-24">
       {/* Bring Your Collection to Life — first */}

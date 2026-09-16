@@ -2,9 +2,11 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { motion } from "framer-motion";
 import { TryVersePrivacyPolicy } from "@/content/TryVersePrivacyPolicy";
+import { Seo } from "@/components/Seo";
 
 const PrivacyPolicy = () => (
   <div className="min-h-screen bg-background">
+    <Seo path="/privacy" />
     <Navbar />
     <main className="pt-[var(--navbar-height)] pb-20">
       <div className="max-w-4xl mx-auto px-6">

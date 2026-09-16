@@ -2,9 +2,11 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { motion } from "framer-motion";
 import { CookiePolicyContent } from "@/content/policyContent";
+import { Seo } from "@/components/Seo";
 
 const CookiePolicy = () => (
   <div className="min-h-screen bg-background">
+    <Seo path="/cookie-policy" />
     <Navbar />
     <main className="pt-[var(--navbar-height)] pb-20">
       <div className="max-w-3xl mx-auto px-6">

@@ -2,6 +2,14 @@
 User-agent: *
 Allow: /
 
+# Authenticated / private app surfaces — nothing behind these renders anything for a crawler
+# anyway (client-side auth redirect), but keep them out of the index and off crawl budget.
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /auth
+Disallow: /forgot-password
+Disallow: /reset-password
+
 # Favicon and brand assets are public and must stay crawlable.
 Allow: /favicon.ico
 Allow: /favicon.svg

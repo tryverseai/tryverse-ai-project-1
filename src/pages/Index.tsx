@@ -8,28 +8,14 @@ import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { PlatformSection } from "@/components/landing/PlatformSection";
 import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
-import { Helmet } from "react-helmet-async";
 import { MotionConfig } from "framer-motion";
+import { Seo } from "@/components/Seo";
 
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
-      <Helmet>
-        <title>TryVerse AI — AI Infrastructure for Fashion Commerce</title>
-        <meta
-          name="description"
-          content="AI infrastructure for fashion commerce. TryVerse powers virtual try-on, AI models, product photography, AI photoshoots, and fashion video from a single platform, embedded directly in your storefront."
-        />
-        <link rel="canonical" href="https://tryverseai.com/" />
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content="TryVerse AI — AI Infrastructure for Fashion Commerce" />
-        <meta
-          property="og:description"
-          content="Virtual try-on, AI models, product photography, and fashion video — from a single AI fashion infrastructure platform."
-        />
-        <meta name="twitter:card" content="summary_large_image" />
-      </Helmet>
+      <Seo path="/" />
 
       {/* Global reduced-motion guard for every framer-motion animation in this subtree. */}
       <MotionConfig reducedMotion="user">

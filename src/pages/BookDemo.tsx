@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { submitDemoBooking } from "@/lib/backendApi";
+import { Seo } from "@/components/Seo";
 
 const PLATFORMS = ["Shopify", "WooCommerce", "Wix", "Squarespace", "Other"] as const;
 const VISITOR_RANGES = ["Under 10k", "10k-50k", "50k-100k", "100k+"] as const;
@@ -60,6 +61,7 @@ const BookDemo = () => {
   if (submitted) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Seo path="/book-demo" />
         <div className="max-w-md text-center">
           <CheckCircle2 className="h-14 w-14 text-foreground mx-auto mb-4" aria-hidden />
           <h1 className="font-display text-2xl font-bold text-foreground mb-3">Request received</h1>
@@ -77,6 +79,7 @@ const BookDemo = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo path="/book-demo" />
       <div className="mx-auto max-w-xl px-6 py-12">
         <Link
           to="/"
