@@ -644,3 +644,41 @@ export const deleteUserAccountAdmin = mutation({
     return { ok: true as const };
   },
 });
+
+/**
+ * Read-only audit: does any EXISTING `ai_generated_models` row have a saved prompt that describes
+ * a minor? Keep this pattern list in sync with `backend/src/lib/contentPolicy.ts`
+ * (`MINOR_DESCRIPTOR_PATTERNS`) — that file is the enforced gate on new generations; this is only
+ * a report over rows saved before that gate existed. Does not delete or modify anything — run it,
+ * review the `prompt`/`userId`/`createdAt` of any hits, and decide per-row whether to archive via
+ * the existing `archiveGeneratedAiModel` mutation.
+ */
+const MINOR_DESCRIPTOR_PATTERNS_AUDIT: RegExp[] = [
+  /\b(toddlers?|infants?|newborns?|babies|baby)\b/i,
+  /\bpre[- ]?teens?\b/i,
+  /\btweens?\b/i,
+  /\bunderage\b/i,
+  /\bminors?\b/i,
+  /\bkindergart(en|ner)\b/i,
+  /\belementary[- ]school\b/i,
+  /\b(kid|kids|child|children)\b/i,
+  /\b(0?[0-9]|1[0-2])\s*[- ]?(years?|yrs?|y)\s*[- ]?olds?\b/i,
+  /\b(0?[0-9]|1[0-2])\s*[- ]?y\.?o\.?\b/i,
+  /\bage[d]?\s*[:\-]?\s*(0?[0-9]|1[0-2])\b(?!\d)/i,
+];
+
+export const auditAiModelPromptsForMinorContent = query({
+  args: { secret: v.string() },
+  handler: async (ctx, { secret }) => {
+    requireBackendSecret(secret);
+    const rows = await ctx.db.query("ai_generated_models").collect();
+    const hits: Array<{ id: string; userId: string; prompt: string; status: string; createdAt: string }> = [];
+    for (const r of rows) {
+      const prompt = String(r.params?.prompt ?? "");
+      if (MINOR_DESCRIPTOR_PATTERNS_AUDIT.some((re) => re.test(prompt))) {
+        hits.push({ id: String(r._id), userId: r.user_id, prompt, status: r.status, createdAt: r.created_at });
+      }
+    }
+    return { scanned: rows.length, flagged: hits.length, hits };
+  },
+});
