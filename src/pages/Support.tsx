@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { Mail, MessageSquare, Send, Building2, CheckCircle, ArrowLeft, Phone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import { Seo } from "@/components/Seo";
 import { submitSupportContact } from "@/lib/backendApi";
 import {
   Select,
@@ -76,10 +76,7 @@ const Support = () => {
   if (submitted) {
     return (
       <div className="min-h-screen bg-background">
-        <Helmet>
-          <title>Contact Us — TryVerse AI</title>
-          <meta name="description" content="Thank you for contacting TryVerse AI. We'll get back to you soon." />
-        </Helmet>
+        <Seo path="/support" />
         <Navbar />
         <main className="pt-[var(--navbar-height)] pb-24 min-h-[60vh] flex items-center justify-center">
           <motion.div
@@ -108,10 +105,7 @@ const Support = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Helmet>
-        <title>Contact Us — TryVerse AI</title>
-        <meta name="description" content="Contact TryVerse AI. Submit a request and our team will respond promptly." />
-      </Helmet>
+      <Seo path="/support" />
       <Navbar />
       <main className="pt-[var(--navbar-height)] pb-24">
         <div className="max-w-2xl mx-auto px-6">

@@ -27,10 +27,10 @@ e.g. `C:\Users\Prince Oruma\tvaudit`. The **backend** package pins `vitest@^4.1.
 unaffected. Run every suite through the backend's v4 binary against the config you want:
 
 ```bash
-# convex + backend  (verified: 14 files, 145 tests)
+# convex + backend  (verified: 19 files, 184 tests)
 "backend/node_modules/.bin/vitest.exe" run --config convex/vitest.config.ts
 
-# frontend  (verified: 3 files, 12 tests)
+# frontend  (verified: 5 files, 26 tests)
 "backend/node_modules/.bin/vitest.exe" run --config vitest.config.ts
 
 # backend only  (works with either runner)

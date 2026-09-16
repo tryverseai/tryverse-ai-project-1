@@ -3,19 +3,12 @@ import { Footer } from "@/components/Footer";
 import { CTASection } from "@/components/CTASection";
 import { TechnologySection } from "@/components/TechnologySection";
 import { motion } from "framer-motion";
-import { Helmet } from "react-helmet-async";
+import { Seo } from "@/components/Seo";
 
 const Technology = () => {
   return (
     <div className="min-h-screen bg-background">
-      <Helmet>
-        <title>Technology — TryVerse AI Infrastructure for Fashion Visualization</title>
-        <meta
-          name="description"
-          content="The infrastructure behind fashion visualization — how TryVerse powers virtual try-on, AI-generated content, and commerce integration across storefronts, marketplaces, and applications."
-        />
-        <link rel="canonical" href="https://tryverseai.com/technology" />
-      </Helmet>
+      <Seo path="/technology" />
       <Navbar />
       <main className="pt-[var(--navbar-height)] pb-0">
         <div className="max-w-7xl mx-auto px-6">

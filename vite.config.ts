@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { sitemapPlugin } from "./vite-sitemap-plugin";
 
 // https://vitejs.dev/config/
 export default defineConfig(() => ({
@@ -33,7 +34,7 @@ export default defineConfig(() => ({
       "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     },
   },
-  plugins: [react()],
+  plugins: [react(), sitemapPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

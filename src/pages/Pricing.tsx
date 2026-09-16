@@ -16,7 +16,7 @@ import {
 import { captureSentryException } from "@/lib/sentry";
 import { assignTrustedPaymentCheckoutUrl } from "@/lib/safeUrl";
 import { cn } from "@/lib/utils";
-import { Helmet } from "react-helmet-async";
+import { Seo } from "@/components/Seo";
 
 type PlanRow = {
   id: string;
@@ -456,14 +456,7 @@ const Pricing = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Helmet>
-        <title>Pricing — TryVerse AI Infrastructure for Fashion Visualization</title>
-        <meta
-          name="description"
-          content="Plans for fashion brands using TryVerse's fashion visualization platform — virtual try-on, AI model photography, and outfit visualization, from free to enterprise."
-        />
-        <link rel="canonical" href="https://tryverseai.com/pricing" />
-      </Helmet>
+      <Seo path="/pricing" />
       <Navbar />
       <main className="pt-[var(--navbar-height)] pb-20">
         <div className="max-w-7xl mx-auto px-6">
