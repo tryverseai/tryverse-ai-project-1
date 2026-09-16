@@ -6,6 +6,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { FashionGenerationProvider } from './fashionGenerationProvider';
 import { fetchRemoteMedia } from '../../lib/fetchRemoteMedia';
 import { TRUSTED_FASHN_OUTPUT_HOSTS } from '../../lib/fashnHosts';
+import { assertPromptDoesNotDescribeAMinor } from '../../lib/contentPolicy';
 
 const AI_MODEL_IMAGE_MAX_BYTES = 20 * 1024 * 1024; // 20 MB cap, matching other FASHN image results.
 
@@ -39,6 +40,10 @@ export async function generateAndSaveAiModel(
   userId: string,
   params: AiModelGenerationParams
 ): Promise<SavedAiModel> {
+  // Enforced here (the actual generation chokepoint), not just at the route, so no future caller
+  // of this function can bypass it. See lib/contentPolicy.ts for why this is a hard block.
+  assertPromptDoesNotDescribeAMinor(params.prompt);
+
   const prompt = buildPrompt(params);
 
   logger.info('Generating AI fashion model', { userId, provider: 'fashn', model: 'model-create' });

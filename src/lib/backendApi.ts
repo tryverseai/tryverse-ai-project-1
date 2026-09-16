@@ -1,4 +1,4 @@
-import { getBackendAuthBearerHeader } from '@/lib/backendAuthBearer';
+import { getBackendAuthBearerHeader, waitForBackendAuthBearerHeader } from '@/lib/backendAuthBearer';
 import type { AccountType } from '@/lib/accountType';
 
 /**
@@ -2008,22 +2008,37 @@ export interface CreationsPage {
   hasMore: boolean;
 }
 
+/**
+ * My Creations fires its first request on mount — which can be the very first authenticated fetch
+ * of the whole session, right after login or a hard reload. `isAuthenticated`/`user` can go true a
+ * render before the REST bearer token is cached (see backendAuthBearer.ts), so a plain
+ * `getAuthHeaders()` here can send the request with no Authorization header at all and get a
+ * spurious 401 that looks like a real failure. Wait briefly for the real token (bounded, same
+ * helper AuthContext uses right after sign-in) instead of racing it.
+ */
+async function getCreationsAuthHeaders(): Promise<HeadersInit> {
+  const auth = await waitForBackendAuthBearerHeader();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (auth) headers["Authorization"] = auth;
+  return headers;
+}
+
 /** Pass the previous page's `nextCursor` to fetch the next 20 (or `limit`) — omit for the first page. */
 export async function getMyCreations(cursor?: string | null, limit = 20): Promise<CreationsPage> {
-  const headers = await getAuthHeaders();
+  const headers = await getCreationsAuthHeaders();
   const params = new URLSearchParams({ limit: String(limit) });
   if (cursor) params.set("cursor", cursor);
   const res = await fetch(`${BACKEND_URL}/api/creations?${params}`, { headers });
-  return handleResponse<CreationsPage>(res);
+  return handleResponse<CreationsPage>(res, { feature: "my_creations" });
 }
 
 export async function deleteCreation(type: CreationType, id: string): Promise<void> {
-  const headers = await getAuthHeaders();
+  const headers = await getCreationsAuthHeaders();
   const res = await fetch(`${BACKEND_URL}/api/creations/${type}/${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers,
   });
-  await handleResponse<{ ok: boolean }>(res);
+  await handleResponse<{ ok: boolean }>(res, { feature: "my_creations" });
 }
 
 /** Types that produce an image usable as a model — `video` isn't an image, `ai_model` is already one. */
@@ -2031,12 +2046,12 @@ export type PromotableCreationType = Exclude<CreationType, "video" | "ai_model">
 
 /** "Save as model" — Brand Library write path. The result becomes a saved model in ModelPickerGrid everywhere. */
 export async function promoteCreationToModel(type: PromotableCreationType, id: string): Promise<{ modelId: string }> {
-  const headers = await getAuthHeaders();
+  const headers = await getCreationsAuthHeaders();
   const res = await fetch(`${BACKEND_URL}/api/creations/${type}/${encodeURIComponent(id)}/promote-to-model`, {
     method: "POST",
     headers,
   });
-  return handleResponse<{ ok: boolean; modelId: string }>(res);
+  return handleResponse<{ ok: boolean; modelId: string }>(res, { feature: "my_creations" });
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────
