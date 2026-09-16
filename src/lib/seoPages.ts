@@ -131,3 +131,39 @@ export const PUBLIC_PAGES: PublicPage[] = [
 export function getPublicPage(path: string): PublicPage | undefined {
   return PUBLIC_PAGES.find((p) => p.path === path);
 }
+
+/**
+ * index.html ships static `<link rel="canonical">`, `<meta name="description">`, and
+ * `og:*`/`twitter:*` tags as a plain-HTML fallback for the instant before JS runs. Once React
+ * mounts, every route's <Seo> component (src/components/Seo.tsx) renders its own page-scoped
+ * versions via react-helmet-async — but Helmet only manages tags it renders itself; it does not
+ * remove pre-existing ones. Left alone, every non-homepage route ends up with TWO of each tag
+ * (the static homepage-only one, plus Helmet's correct one appended after it) — confirmed live:
+ * `document.title` updated correctly (a true singleton Helmet replaces in place) while
+ * `document.querySelector('link[rel="canonical"]')` kept returning the static homepage URL on
+ * every other page, because querySelector returns the first match and the static tag is first in
+ * DOM order. A duplicated/conflicting canonical is a known Google Search Console footgun (Google
+ * documents that it may ignore canonical hints entirely when a page has more than one).
+ *
+ * Call this once at boot, before Helmet ever mounts, so the static fallbacks are gone before
+ * Helmet inserts its own — exactly one of each survives, always the page-correct one.
+ * `og:image` / `og:site_name` are page-invariant (Seo.tsx deliberately never re-declares them) and
+ * are left alone, as is the JSON-LD.
+ */
+export function stripStaticPerPageHeadFallbacks(): void {
+  if (typeof document === "undefined") return;
+  const selectors = [
+    'link[rel="canonical"]',
+    'meta[name="description"]',
+    'meta[property="og:type"]',
+    'meta[property="og:url"]',
+    'meta[property="og:title"]',
+    'meta[property="og:description"]',
+    'meta[name="twitter:card"]',
+    'meta[name="twitter:title"]',
+    'meta[name="twitter:description"]',
+  ];
+  for (const selector of selectors) {
+    document.head.querySelectorAll(selector).forEach((el) => el.remove());
+  }
+}

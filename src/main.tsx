@@ -2,6 +2,11 @@ import * as Sentry from "@sentry/react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import { initSentry } from "./lib/sentry";
+import { stripStaticPerPageHeadFallbacks } from "./lib/seoPages";
+
+// Must run before <Seo>/react-helmet-async ever mounts — see seoPages.ts for why (otherwise every
+// non-homepage route ends up with two canonical/description/og:*/twitter:* tags in <head>).
+stripStaticPerPageHeadFallbacks();
 
 try {
   initSentry();

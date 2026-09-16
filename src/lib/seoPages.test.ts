@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { PUBLIC_PAGES, getPublicPage, SITE_ORIGIN } from "./seoPages";
+import { describe, it, expect, afterEach } from "vitest";
+import { PUBLIC_PAGES, getPublicPage, SITE_ORIGIN, stripStaticPerPageHeadFallbacks } from "./seoPages";
 
 // This list is the single source both <Seo> and the sitemap build plugin read from — a typo'd
 // path here silently produces a page with no metadata (falls through <Seo>'s null branch) or a
@@ -81,5 +81,60 @@ describe("getPublicPage", () => {
 describe("SITE_ORIGIN", () => {
   it("is the canonical apex host with no trailing slash", () => {
     expect(SITE_ORIGIN).toBe("https://tryverseai.com");
+  });
+});
+
+describe("stripStaticPerPageHeadFallbacks", () => {
+  afterEach(() => {
+    document.head.innerHTML = "";
+  });
+
+  // Reproduces the real production bug: index.html ships static per-page-overridable tags for
+  // the homepage as a pre-JS fallback; react-helmet-async never removes them, so every other
+  // route ended up with two of each and document.querySelector (and Google) picked the wrong,
+  // homepage-only one because it comes first in DOM order.
+  function seedStaticIndexHtmlTags() {
+    document.head.innerHTML = `
+      <link rel="canonical" href="https://tryverseai.com/" />
+      <meta name="description" content="homepage description" />
+      <meta property="og:type" content="website" />
+      <meta property="og:url" content="https://tryverseai.com/" />
+      <meta property="og:title" content="homepage og title" />
+      <meta property="og:description" content="homepage og description" />
+      <meta property="og:image" content="https://tryverseai.com/og-image.jpg" />
+      <meta property="og:site_name" content="TryVerse AI" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content="homepage twitter title" />
+      <meta name="twitter:description" content="homepage twitter description" />
+    `;
+  }
+
+  it("removes every per-page-overridable static tag", () => {
+    seedStaticIndexHtmlTags();
+    stripStaticPerPageHeadFallbacks();
+
+    expect(document.querySelector('link[rel="canonical"]')).toBeNull();
+    expect(document.querySelector('meta[name="description"]')).toBeNull();
+    expect(document.querySelector('meta[property="og:type"]')).toBeNull();
+    expect(document.querySelector('meta[property="og:url"]')).toBeNull();
+    expect(document.querySelector('meta[property="og:title"]')).toBeNull();
+    expect(document.querySelector('meta[property="og:description"]')).toBeNull();
+    expect(document.querySelector('meta[name="twitter:card"]')).toBeNull();
+    expect(document.querySelector('meta[name="twitter:title"]')).toBeNull();
+    expect(document.querySelector('meta[name="twitter:description"]')).toBeNull();
+  });
+
+  it("leaves the page-invariant tags (og:image, og:site_name) alone", () => {
+    seedStaticIndexHtmlTags();
+    stripStaticPerPageHeadFallbacks();
+
+    expect(document.querySelector('meta[property="og:image"]')?.getAttribute("content")).toBe(
+      "https://tryverseai.com/og-image.jpg"
+    );
+    expect(document.querySelector('meta[property="og:site_name"]')?.getAttribute("content")).toBe("TryVerse AI");
+  });
+
+  it("is safe to call when there is nothing to strip", () => {
+    expect(() => stripStaticPerPageHeadFallbacks()).not.toThrow();
   });
 });
